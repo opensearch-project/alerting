@@ -24,15 +24,16 @@ import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.search.sort.SortOrder
 
 class AggregationQueryRewriter {
-
     companion object {
         /**
          * Add the bucket selector conditions for each trigger in input query. It also adds afterKeys from previous result
          * for each trigger.
          */
-        fun rewriteQuery(query: SearchSourceBuilder, prevResult: InputRunResults?, triggers: List<Trigger>): SearchSourceBuilder {
-            return rewriteQuery(query, prevResult, triggers, false)
-        }
+        fun rewriteQuery(
+            query: SearchSourceBuilder,
+            prevResult: InputRunResults?,
+            triggers: List<Trigger>,
+        ): SearchSourceBuilder = rewriteQuery(query, prevResult, triggers, false)
 
         /**
          * Optionally adds support for returning sample documents for each bucket of data returned for a bucket level monitor.
@@ -41,7 +42,7 @@ class AggregationQueryRewriter {
             query: SearchSourceBuilder,
             prevResult: InputRunResults?,
             triggers: List<Trigger>,
-            returnSampleDocs: Boolean = false
+            returnSampleDocs: Boolean = false,
         ): SearchSourceBuilder {
             triggers.forEach { trigger ->
                 if (trigger is BucketLevelTrigger) {
@@ -74,13 +75,15 @@ class AggregationQueryRewriter {
                                 val docFieldTags = parseSampleDocTags(listOf(trigger))
                                 val sampleDocsAgg = getSampleDocAggs(factory)
                                 sampleDocsAgg.forEach { agg ->
-                                    if (docFieldTags.isNotEmpty()) agg.fetchSource(
-                                        FetchSourceContext(
-                                            true,
-                                            docFieldTags.toTypedArray(),
-                                            emptyArray()
+                                    if (docFieldTags.isNotEmpty()) {
+                                        agg.fetchSource(
+                                            FetchSourceContext(
+                                                true,
+                                                docFieldTags.toTypedArray(),
+                                                emptyArray(),
+                                            ),
                                         )
-                                    )
+                                    }
                                     if (!factory.subAggregations.contains(agg)) factory.subAggregation(agg)
                                 }
                             } else {
@@ -105,7 +108,7 @@ class AggregationQueryRewriter {
         fun getAfterKeysFromSearchResponse(
             searchResponse: SearchResponse,
             triggers: List<Trigger>,
-            prevBucketLevelTriggerAfterKeys: Map<String, TriggerAfterKey>?
+            prevBucketLevelTriggerAfterKeys: Map<String, TriggerAfterKey>?,
         ): Map<String, TriggerAfterKey> {
             val bucketLevelTriggerAfterKeys = mutableMapOf<String, TriggerAfterKey>()
             triggers.forEach { trigger ->
@@ -130,17 +133,21 @@ class AggregationQueryRewriter {
                          */
                         val afterKey = lastAgg.afterKey()
                         val prevTriggerAfterKey = prevBucketLevelTriggerAfterKeys?.get(trigger.id)
-                        bucketLevelTriggerAfterKeys[trigger.id] = when {
-                            // If the previous TriggerAfterKey was null, this should be the first page
-                            prevTriggerAfterKey == null -> TriggerAfterKey(afterKey, afterKey == null)
-                            // If the previous TriggerAfterKey already hit the last page, pass along the after key it used to get there
-                            prevTriggerAfterKey.lastPage -> prevTriggerAfterKey
-                            // If the previous TriggerAfterKey had not reached the last page and the after key for the current result
-                            // is null, then the last page has been reached so the after key that was used to get there is stored
-                            afterKey == null -> TriggerAfterKey(prevTriggerAfterKey.afterKey, true)
-                            // Otherwise, update the after key to the current one
-                            else -> TriggerAfterKey(afterKey, false)
-                        }
+                        bucketLevelTriggerAfterKeys[trigger.id] =
+                            when {
+                                // If the previous TriggerAfterKey was null, this should be the first page
+                                prevTriggerAfterKey == null -> TriggerAfterKey(afterKey, afterKey == null)
+
+                                // If the previous TriggerAfterKey already hit the last page, pass along the after key it used to get there
+                                prevTriggerAfterKey.lastPage -> prevTriggerAfterKey
+
+                                // If the previous TriggerAfterKey had not reached the last page and the after key for the current result
+                                // is null, then the last page has been reached so the after key that was used to get there is stored
+                                afterKey == null -> TriggerAfterKey(prevTriggerAfterKey.afterKey, true)
+
+                                // Otherwise, update the after key to the current one
+                                else -> TriggerAfterKey(afterKey, false)
+                            }
                     }
                 }
             }
@@ -150,12 +157,13 @@ class AggregationQueryRewriter {
         @Suppress("UNCHECKED_CAST")
         private fun getSampleDocAggs(factory: CompositeAggregationBuilder): List<TopHitsAggregationBuilder> {
             var defaultSortFields = listOf("_score")
-            val aggregations = factory.subAggregations.flatMap {
-                (it.convertToMap()[it.name] as Map<String, Any>).values.flatMap { field ->
-                    field as Map<String, String>
-                    field.values
+            val aggregations =
+                factory.subAggregations.flatMap {
+                    (it.convertToMap()[it.name] as Map<String, Any>).values.flatMap { field ->
+                        field as Map<String, String>
+                        field.values
+                    }
                 }
-            }
             if (aggregations.isNotEmpty()) defaultSortFields = aggregations
 
             val lowHitsAgg = AggregationBuilders.topHits("low_hits").size(5)

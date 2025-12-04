@@ -14,9 +14,8 @@ import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest
 import org.opensearch.transport.TransportService
 
 object PPLUtils {
-
     // TODO: these are in-house PPL query parsers, find a PPL plugin dependency that does this for us
-    /* Regular Expressions */
+    // Regular Expressions
     // captures the name of the result variable in a PPL monitor's custom condition
     // e.g. custom condition: `eval apple = avg_latency > 100`
     // captures: "apple"
@@ -51,9 +50,10 @@ object PPLUtils {
      *       It is assumed that upstream workflows have already validated the base query,
      *       and that downstream workflows will validate the constructed query
      */
-    fun appendCustomCondition(query: String, customCondition: String): String {
-        return "$query | $customCondition"
-    }
+    fun appendCustomCondition(
+        query: String,
+        customCondition: String,
+    ): String = "$query | $customCondition"
 
     /**
      * Appends a limit on the number of documents/data rows to retrieve from a PPL query.
@@ -73,9 +73,10 @@ object PPLUtils {
      * // Returns: "source=logs | where status=error | head 100"
      * ```
      */
-    fun appendDataRowsLimit(query: String, maxDataRows: Long): String {
-        return "$query | head $maxDataRows"
-    }
+    fun appendDataRowsLimit(
+        query: String,
+        maxDataRows: Long,
+    ): String = "$query | head $maxDataRows"
 
     /**
      * Executes a PPL query and returns the response as a parsable JSONObject.
@@ -95,23 +96,25 @@ object PPLUtils {
     suspend fun executePplQuery(
         query: String,
         localNode: DiscoveryNode,
-        transportService: TransportService
+        transportService: TransportService,
     ): JSONObject {
         // call PPL plugin to execute query
-        val transportPplQueryRequest = TransportPPLQueryRequest(
-            query,
-            JSONObject(mapOf("query" to query)),
-            null // null path falls back to a default path internal to SQL/PPL Plugin
-        )
-
-        val transportPplQueryResponse = PPLPluginInterface.suspendUntil {
-            this.executeQuery(
-                transportService,
-                localNode,
-                transportPplQueryRequest,
-                it
+        val transportPplQueryRequest =
+            TransportPPLQueryRequest(
+                query,
+                JSONObject(mapOf("query" to query)),
+                null, // null path falls back to a default path internal to SQL/PPL Plugin
             )
-        }
+
+        val transportPplQueryResponse =
+            PPLPluginInterface.suspendUntil {
+                this.executeQuery(
+                    transportService,
+                    localNode,
+                    transportPplQueryRequest,
+                    it,
+                )
+            }
 
         val queryResponseJson = JSONObject(transportPplQueryResponse.result)
 
@@ -148,8 +151,9 @@ object PPLUtils {
      */
     fun findEvalResultVar(customCondition: String): String {
         // TODO: these are in-house PPL query parsers, find a PPL plugin dependency that does this for us
-        val evalResultVar = evalResultVarRegex.find(customCondition)?.groupValues?.get(1)
-            ?: throw IllegalArgumentException("Given custom condition is invalid, could not find eval result variable")
+        val evalResultVar =
+            evalResultVarRegex.find(customCondition)?.groupValues?.get(1)
+                ?: throw IllegalArgumentException("Given custom condition is invalid, could not find eval result variable")
         return evalResultVar
     }
 
@@ -170,7 +174,10 @@ object PPLUtils {
      *       executed successfully. If not found, this indicates an unexpected state.
      * @note The query response schema is assumed to follow PPL plugin Execute API response schema
      */
-    fun findEvalResultVarIdxInSchema(customConditionQueryResponse: JSONObject, evalResultVarName: String): Int {
+    fun findEvalResultVarIdxInSchema(
+        customConditionQueryResponse: JSONObject,
+        evalResultVarName: String,
+    ): Int {
         // find the index eval statement result variable in the PPL query response schema
         val schemaList = customConditionQueryResponse.getJSONArray("schema")
         var evalResultVarIdx = -1
@@ -188,7 +195,7 @@ object PPLUtils {
         if (evalResultVarIdx == -1) {
             throw IllegalStateException(
                 "Expected to find eval statement results variable \"$evalResultVarName\" in results " +
-                    "of PPL query with custom condition, but did not."
+                    "of PPL query with custom condition, but did not.",
             )
         }
 
@@ -227,11 +234,17 @@ object PPLUtils {
     fun getIndicesFromPplQuery(pplQuery: String): List<String> {
         // use find() instead of findAll() because a PPL query only ever has one source statement
         // the only capture group specified in the regex captures the comma separated string of indices/index patterns
-        val indices = indicesListRegex.find(pplQuery)?.groupValues?.get(1)?.split(",")?.map { it.trim() }
-            ?: throw IllegalStateException(
-                "Could not find indices that PPL Monitor query searches even " +
-                    "after validating the query through SQL/PPL plugin."
-            )
+        val indices =
+            indicesListRegex
+                .find(pplQuery)
+                ?.groupValues
+                ?.get(1)
+                ?.split(",")
+                ?.map { it.trim() }
+                ?: throw IllegalStateException(
+                    "Could not find indices that PPL Monitor query searches even " +
+                        "after validating the query through SQL/PPL plugin.",
+                )
 
         // remove any backticks that might have been read in
         val unBackTickedIndices = mutableListOf<String>()
@@ -276,7 +289,10 @@ object PPLUtils {
      *       - `total`: Total number of result rows
      *       - `size`: Same as `total` (redundant field in PPL response)
      */
-    fun capPPLQueryResultsSize(pplQueryResults: JSONObject, maxSize: Long): JSONObject {
+    fun capPPLQueryResultsSize(
+        pplQueryResults: JSONObject,
+        maxSize: Long,
+    ): JSONObject {
         // estimate byte size with serialized string length
         // if query results size are already under the limit, do nothing
         // and return the query results as is

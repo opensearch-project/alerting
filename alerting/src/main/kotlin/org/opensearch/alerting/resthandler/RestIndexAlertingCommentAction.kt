@@ -34,32 +34,32 @@ private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)
  * Rest handlers to create and update alerting comments.
  */
 class RestIndexAlertingCommentAction : BaseRestHandler() {
+    override fun getName(): String = "index_alerting_comment_action"
 
-    override fun getName(): String {
-        return "index_alerting_comment_action"
-    }
-
-    override fun routes(): List<Route> {
-        return listOf(
+    override fun routes(): List<Route> =
+        listOf(
             Route(
                 RestRequest.Method.POST,
-                "${AlertingPlugin.COMMENTS_BASE_URI}/{id}"
+                "${AlertingPlugin.COMMENTS_BASE_URI}/{id}",
             ),
             Route(
                 RestRequest.Method.PUT,
-                "${AlertingPlugin.COMMENTS_BASE_URI}/{id}"
-            )
+                "${AlertingPlugin.COMMENTS_BASE_URI}/{id}",
+            ),
         )
-    }
 
     @Throws(IOException::class)
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.info("${request.method()} ${AlertingPlugin.COMMENTS_BASE_URI}")
 
-        val id = request.param(
-            "id",
-            if (request.method() == RestRequest.Method.POST) Alert.NO_ID else Comment.NO_ID
-        )
+        val id =
+            request.param(
+                "id",
+                if (request.method() == RestRequest.Method.POST) Alert.NO_ID else Comment.NO_ID,
+            )
         if (request.method() == RestRequest.Method.POST && Alert.NO_ID == id) {
             throw AlertingException.wrap(IllegalArgumentException("Missing alert ID"))
         } else if (request.method() == RestRequest.Method.PUT && Comment.NO_ID == id) {
@@ -76,29 +76,33 @@ class RestIndexAlertingCommentAction : BaseRestHandler() {
         val seqNo = request.paramAsLong(IF_SEQ_NO, SequenceNumbers.UNASSIGNED_SEQ_NO)
         val primaryTerm = request.paramAsLong(IF_PRIMARY_TERM, SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
 
-        val indexCommentRequest = IndexCommentRequest(
-            alertId,
-            "alert",
-            commentId,
-            seqNo,
-            primaryTerm,
-            request.method(),
-            content
-        )
+        val indexCommentRequest =
+            IndexCommentRequest(
+                alertId,
+                "alert",
+                commentId,
+                seqNo,
+                primaryTerm,
+                request.method(),
+                content,
+            )
 
         return RestChannelConsumer { channel ->
             client.execute(AlertingActions.INDEX_COMMENT_ACTION_TYPE, indexCommentRequest, indexCommentResponse(channel, request.method()))
         }
     }
 
-    private fun indexCommentResponse(channel: RestChannel, restMethod: RestRequest.Method):
-        RestResponseListener<IndexCommentResponse> {
+    private fun indexCommentResponse(
+        channel: RestChannel,
+        restMethod: RestRequest.Method,
+    ): RestResponseListener<IndexCommentResponse> {
         return object : RestResponseListener<IndexCommentResponse>(channel) {
             @Throws(Exception::class)
             override fun buildResponse(response: IndexCommentResponse): RestResponse {
                 var returnStatus = RestStatus.CREATED
-                if (restMethod == RestRequest.Method.PUT)
+                if (restMethod == RestRequest.Method.PUT) {
                     returnStatus = RestStatus.OK
+                }
 
                 val restResponse = BytesRestResponse(returnStatus, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))
                 if (returnStatus == RestStatus.CREATED) {

@@ -14,17 +14,19 @@ import org.opensearch.core.xcontent.ToXContentObject
 import org.opensearch.core.xcontent.XContentBuilder
 import java.io.IOException
 
-class ExecuteWorkflowResponse : ActionResponse, ToXContentObject {
+class ExecuteWorkflowResponse :
+    ActionResponse,
+    ToXContentObject {
     val workflowRunResult: WorkflowRunResult
     constructor(
-        workflowRunResult: WorkflowRunResult
+        workflowRunResult: WorkflowRunResult,
     ) : super() {
         this.workflowRunResult = workflowRunResult
     }
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
-        WorkflowRunResult(sin)
+        WorkflowRunResult(sin),
     )
 
     @Throws(IOException::class)
@@ -33,7 +35,8 @@ class ExecuteWorkflowResponse : ActionResponse, ToXContentObject {
     }
 
     @Throws(IOException::class)
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        return workflowRunResult.toXContent(builder, params)
-    }
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder = workflowRunResult.toXContent(builder, params)
 }

@@ -35,81 +35,92 @@ import org.opensearch.transport.client.Client
 
 private val log = LogManager.getLogger(TransportGetEmailAccountAction::class.java)
 
-class TransportGetEmailAccountAction @Inject constructor(
-    transportService: TransportService,
-    val client: Client,
-    actionFilters: ActionFilters,
-    val clusterService: ClusterService,
-    settings: Settings,
-    val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<GetEmailAccountRequest, GetEmailAccountResponse>(
-    GetEmailAccountAction.NAME, transportService, actionFilters, ::GetEmailAccountRequest
-) {
+class TransportGetEmailAccountAction
+    @Inject
+    constructor(
+        transportService: TransportService,
+        val client: Client,
+        actionFilters: ActionFilters,
+        val clusterService: ClusterService,
+        settings: Settings,
+        val xContentRegistry: NamedXContentRegistry,
+    ) : HandledTransportAction<GetEmailAccountRequest, GetEmailAccountResponse>(
+            GetEmailAccountAction.NAME,
+            transportService,
+            actionFilters,
+            ::GetEmailAccountRequest,
+        ) {
+        @Volatile private var allowList = ALLOW_LIST.get(settings)
 
-    @Volatile private var allowList = ALLOW_LIST.get(settings)
+        init {
+            clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
+        }
 
-    init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
-    }
-
-    override fun doExecute(
-        task: Task,
-        getEmailAccountRequest: GetEmailAccountRequest,
-        actionListener: ActionListener<GetEmailAccountResponse>
-    ) {
-
-        if (!allowList.contains(DestinationType.EMAIL.value)) {
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    OpenSearchStatusException(
-                        "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
-                        RestStatus.FORBIDDEN
-                    )
+        override fun doExecute(
+            task: Task,
+            getEmailAccountRequest: GetEmailAccountRequest,
+            actionListener: ActionListener<GetEmailAccountResponse>,
+        ) {
+            if (!allowList.contains(DestinationType.EMAIL.value)) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
+                            RestStatus.FORBIDDEN,
+                        ),
+                    ),
                 )
-            )
-            return
-        }
+                return
+            }
 
-        val getRequest = GetRequest(SCHEDULED_JOBS_INDEX, getEmailAccountRequest.emailAccountID)
-            .version(getEmailAccountRequest.version)
-            .fetchSourceContext(getEmailAccountRequest.srcContext)
-        client.threadPool().threadContext.stashContext().use {
-            client.get(
-                getRequest,
-                object : ActionListener<GetResponse> {
-                    override fun onResponse(response: GetResponse) {
-                        if (!response.isExists) {
-                            actionListener.onFailure(
-                                AlertingException.wrap(
-                                    OpenSearchStatusException("Email Account not found.", RestStatus.NOT_FOUND)
+            val getRequest =
+                GetRequest(SCHEDULED_JOBS_INDEX, getEmailAccountRequest.emailAccountID)
+                    .version(getEmailAccountRequest.version)
+                    .fetchSourceContext(getEmailAccountRequest.srcContext)
+            client.threadPool().threadContext.stashContext().use {
+                client.get(
+                    getRequest,
+                    object : ActionListener<GetResponse> {
+                        override fun onResponse(response: GetResponse) {
+                            if (!response.isExists) {
+                                actionListener.onFailure(
+                                    AlertingException.wrap(
+                                        OpenSearchStatusException("Email Account not found.", RestStatus.NOT_FOUND),
+                                    ),
                                 )
-                            )
-                            return
-                        }
-
-                        var emailAccount: EmailAccount? = null
-                        if (!response.isSourceEmpty) {
-                            XContentHelper.createParser(
-                                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                                response.sourceAsBytesRef, XContentType.JSON
-                            ).use { xcp ->
-                                emailAccount = EmailAccount.parseWithType(xcp, response.id, response.version)
+                                return
                             }
+
+                            var emailAccount: EmailAccount? = null
+                            if (!response.isSourceEmpty) {
+                                XContentHelper
+                                    .createParser(
+                                        xContentRegistry,
+                                        LoggingDeprecationHandler.INSTANCE,
+                                        response.sourceAsBytesRef,
+                                        XContentType.JSON,
+                                    ).use { xcp ->
+                                        emailAccount = EmailAccount.parseWithType(xcp, response.id, response.version)
+                                    }
+                            }
+
+                            actionListener.onResponse(
+                                GetEmailAccountResponse(
+                                    response.id,
+                                    response.version,
+                                    response.seqNo,
+                                    response.primaryTerm,
+                                    RestStatus.OK,
+                                    emailAccount,
+                                ),
+                            )
                         }
 
-                        actionListener.onResponse(
-                            GetEmailAccountResponse(
-                                response.id, response.version, response.seqNo, response.primaryTerm,
-                                RestStatus.OK, emailAccount
-                            )
-                        )
-                    }
-
-                    override fun onFailure(e: Exception) {
-                        actionListener.onFailure(e)
-                    }
-                }
-            )
+                        override fun onFailure(e: Exception) {
+                            actionListener.onFailure(e)
+                        }
+                    },
+                )
+            }
         }
     }
-}

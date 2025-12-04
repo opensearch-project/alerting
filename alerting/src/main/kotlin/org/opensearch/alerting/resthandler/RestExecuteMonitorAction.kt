@@ -27,31 +27,30 @@ import java.time.Instant
 private val log = LogManager.getLogger(RestExecuteMonitorAction::class.java)
 
 class RestExecuteMonitorAction : BaseRestHandler() {
-
     override fun getName(): String = "execute_monitor_action"
 
-    override fun routes(): List<Route> {
-        return listOf()
-    }
+    override fun routes(): List<Route> = listOf()
 
-    override fun replacedRoutes(): MutableList<ReplacedRoute> {
-        return mutableListOf(
+    override fun replacedRoutes(): MutableList<ReplacedRoute> =
+        mutableListOf(
             ReplacedRoute(
                 POST,
                 "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_execute",
                 POST,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}/_execute"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}/_execute",
             ),
             ReplacedRoute(
                 POST,
                 "${AlertingPlugin.MONITOR_BASE_URI}/_execute",
                 POST,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/_execute"
-            )
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/_execute",
+            ),
         )
-    }
 
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/_execute")
 
         return RestChannelConsumer { channel ->
@@ -79,7 +78,5 @@ class RestExecuteMonitorAction : BaseRestHandler() {
         }
     }
 
-    override fun responseParams(): Set<String> {
-        return setOf("dryrun", "period_end", "monitorID")
-    }
+    override fun responseParams(): Set<String> = setOf("dryrun", "period_end", "monitorID")
 }

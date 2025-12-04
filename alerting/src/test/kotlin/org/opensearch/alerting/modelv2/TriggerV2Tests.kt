@@ -29,26 +29,32 @@ import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
 import java.lang.IllegalArgumentException
+import kotlin.test.Test
 
 class TriggerV2Tests : OpenSearchTestCase() {
+    @Test
     fun `test min throttle duration`() {
         try {
             randomPPLTrigger(
-                throttleDuration = MONITOR_V2_MIN_THROTTLE_DURATION_MINUTES - 1
+                throttleDuration = MONITOR_V2_MIN_THROTTLE_DURATION_MINUTES - 1,
             )
             fail("Trigger with throttle duration less than 1 should be rejected")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test min expire duration`() {
         try {
             randomPPLTrigger(
-                expireDuration = MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES - 1
+                expireDuration = MONITOR_V2_MIN_EXPIRE_DURATION_MINUTES - 1,
             )
             fail("Trigger with expire duration less than 1 should be rejected")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test trigger name too long`() {
         var triggerName = ""
         for (i in 0 until ALERTING_V2_MAX_NAME_LENGTH + 1) {
@@ -58,20 +64,24 @@ class TriggerV2Tests : OpenSearchTestCase() {
         try {
             randomPPLTrigger(name = triggerName)
             fail("Trigger with too long a name should be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test number of results trigger with negative number of results value`() {
         try {
             randomPPLTrigger(
                 conditionType = ConditionType.NUMBER_OF_RESULTS,
                 numResultsValue = -1L,
-                numResultsCondition = NumResultsCondition.GREATER_THAN
+                numResultsCondition = NumResultsCondition.GREATER_THAN,
             )
             fail("Number of results trigger with negative number of results value should be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test trigger action name too long`() {
         var actionName = ""
         for (i in 0 until ALERTING_V2_MAX_NAME_LENGTH + 1) {
@@ -80,16 +90,19 @@ class TriggerV2Tests : OpenSearchTestCase() {
 
         try {
             randomPPLTrigger(
-                actions = listOf(
-                    randomAction(
-                        name = actionName
-                    )
-                )
+                actions =
+                    listOf(
+                        randomAction(
+                            name = actionName,
+                        ),
+                    ),
             )
             fail("Trigger action with too long a name should be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test trigger action channel ID too long`() {
         var channelId = ""
         for (i in 0 until NOTIFICATIONS_ID_MAX_LENGTH + 1) {
@@ -98,88 +111,103 @@ class TriggerV2Tests : OpenSearchTestCase() {
 
         try {
             randomPPLTrigger(
-                actions = listOf(
-                    randomAction(
-                        destinationId = channelId
-                    )
-                )
+                actions =
+                    listOf(
+                        randomAction(
+                            destinationId = channelId,
+                        ),
+                    ),
             )
             fail("Trigger action with too long a channel ID should be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test number_of_results trigger has no number_of_results value field`() {
         try {
             randomPPLTrigger(
                 conditionType = ConditionType.NUMBER_OF_RESULTS,
                 numResultsCondition = NumResultsCondition.entries.random(),
                 numResultsValue = null,
-                customCondition = null
+                customCondition = null,
             )
             fail("Number of results trigger that has no number of results value should be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test number_of_results trigger has no number_of_results condition field`() {
         try {
             randomPPLTrigger(
                 conditionType = ConditionType.NUMBER_OF_RESULTS,
                 numResultsCondition = null,
                 numResultsValue = randomLongBetween(1, 10),
-                customCondition = null
+                customCondition = null,
             )
             fail("Number of results trigger that has no number of results condition should be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test number_of_results trigger has custom_condition value field`() {
         try {
             randomPPLTrigger(
                 conditionType = ConditionType.NUMBER_OF_RESULTS,
                 numResultsCondition = null,
                 numResultsValue = null,
-                customCondition = "eval result = something > 5"
+                customCondition = "eval result = something > 5",
             )
             fail("Number of results trigger that has custom condition should be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test custom trigger has number_of_results value field`() {
         try {
             randomPPLTrigger(
                 conditionType = ConditionType.CUSTOM,
                 numResultsCondition = NumResultsCondition.entries.random(),
                 numResultsValue = null,
-                customCondition = null
+                customCondition = null,
             )
             fail("Number of results trigger that has no number of results value should be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test custom trigger has number_of_results condition field`() {
         try {
             randomPPLTrigger(
                 conditionType = ConditionType.CUSTOM,
                 numResultsCondition = null,
                 numResultsValue = randomLongBetween(1, 10),
-                customCondition = null
+                customCondition = null,
             )
             fail("Number of results trigger that has no number of results condition should be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test custom trigger has no custom_condition value field`() {
         try {
             randomPPLTrigger(
                 conditionType = ConditionType.CUSTOM,
                 numResultsCondition = null,
                 numResultsValue = null,
-                customCondition = null
+                customCondition = null,
             )
             fail("Number of results trigger that has custom condition should be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test ppl trigger as stream`() {
         val pplTrigger = randomPPLTrigger()
         val out = BytesStreamOutput()
@@ -189,6 +217,7 @@ class TriggerV2Tests : OpenSearchTestCase() {
         assertPplTriggersEqual(pplTrigger, newPplTrigger)
     }
 
+    @Test
     fun `test ppl trigger asTemplateArgs`() {
         val pplTrigger = randomPPLTrigger()
         val templateArgs = pplTrigger.asTemplateArg()
@@ -196,59 +225,59 @@ class TriggerV2Tests : OpenSearchTestCase() {
         assertEquals(
             "Template args field $ID_FIELD doesn't match",
             pplTrigger.id,
-            templateArgs[ID_FIELD]
+            templateArgs[ID_FIELD],
         )
         assertEquals(
             "Template args field $NAME_FIELD doesn't match",
             pplTrigger.name,
-            templateArgs[NAME_FIELD]
+            templateArgs[NAME_FIELD],
         )
         assertEquals(
             "Template args field $SEVERITY_FIELD doesn't match",
             pplTrigger.severity.value,
-            templateArgs[SEVERITY_FIELD]
+            templateArgs[SEVERITY_FIELD],
         )
         assertEquals(
             "Template args field $THROTTLE_FIELD doesn't match",
             pplTrigger.throttleDuration,
-            templateArgs[THROTTLE_FIELD]
+            templateArgs[THROTTLE_FIELD],
         )
         assertEquals(
             "Template args field $EXPIRE_FIELD doesn't match",
             pplTrigger.expireDuration,
-            templateArgs[EXPIRE_FIELD]
+            templateArgs[EXPIRE_FIELD],
         )
         assertEquals(
             "Template args field $EXPIRE_FIELD doesn't match",
             pplTrigger.expireDuration,
-            templateArgs[EXPIRE_FIELD]
+            templateArgs[EXPIRE_FIELD],
         )
         val actions = templateArgs[ACTIONS_FIELD] as List<*>
         assertEquals("number of trigger actions doesn't match", pplTrigger.actions.size, actions.size)
         assertEquals(
             "Template args field $MODE_FIELD doesn't match",
             pplTrigger.mode.value,
-            templateArgs[MODE_FIELD]
+            templateArgs[MODE_FIELD],
         )
         assertEquals(
             "Template args field $CONDITION_TYPE_FIELD doesn't match",
             pplTrigger.conditionType.value,
-            templateArgs[CONDITION_TYPE_FIELD]
+            templateArgs[CONDITION_TYPE_FIELD],
         )
         assertEquals(
             "Template args field $NUM_RESULTS_CONDITION_FIELD doesn't match",
             pplTrigger.numResultsCondition?.value,
-            templateArgs[NUM_RESULTS_CONDITION_FIELD]
+            templateArgs[NUM_RESULTS_CONDITION_FIELD],
         )
         assertEquals(
             "Template args field $NUM_RESULTS_VALUE_FIELD doesn't match",
             pplTrigger.numResultsValue,
-            templateArgs[NUM_RESULTS_VALUE_FIELD]
+            templateArgs[NUM_RESULTS_VALUE_FIELD],
         )
         assertEquals(
             "Template args field $CUSTOM_CONDITION_FIELD doesn't match",
             pplTrigger.customCondition,
-            templateArgs[CUSTOM_CONDITION_FIELD]
+            templateArgs[CUSTOM_CONDITION_FIELD],
         )
     }
 }

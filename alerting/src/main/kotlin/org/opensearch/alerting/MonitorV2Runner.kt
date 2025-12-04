@@ -24,6 +24,6 @@ interface MonitorV2Runner {
         dryRun: Boolean,
         manual: Boolean,
         executionId: String,
-        transportService: TransportService
+        transportService: TransportService,
     ): MonitorV2RunResult<*>
 }

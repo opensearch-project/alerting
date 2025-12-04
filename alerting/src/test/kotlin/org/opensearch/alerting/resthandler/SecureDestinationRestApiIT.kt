@@ -27,13 +27,12 @@ import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.test.junit.annotations.TestLogging
 import java.time.Instant
+import kotlin.test.Test
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class SecureDestinationRestApiIT : AlertingRestTestCase() {
-
     companion object {
-
         @BeforeClass
         @JvmStatic fun setup() {
             // things to execute once and keep around for the class
@@ -46,55 +45,58 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
 
     @Before
     fun create() {
-
         if (userClient == null) {
             createUser(user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
-                .setSocketTimeout(60000)
-                .setConnectionRequestTimeout(180000)
-                .build()
+            userClient =
+                SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
+                    .setSocketTimeout(60000)
+                    .setConnectionRequestTimeout(180000)
+                    .build()
         }
     }
 
     @After
     fun cleanup() {
-
         userClient?.close()
         deleteUser(user)
     }
 
+    @Test
     fun `test create destination with disable filter by`() {
         disableFilterBy()
 
         val chime = Chime("http://abc.com")
-        val destination = Destination(
-            type = DestinationType.CHIME,
-            name = "test",
-            user = randomUser(),
-            lastUpdateTime = Instant.now(),
-            chime = chime,
-            slack = null,
-            customWebhook = null,
-            email = null
-        )
+        val destination =
+            Destination(
+                type = DestinationType.CHIME,
+                name = "test",
+                user = randomUser(),
+                lastUpdateTime = Instant.now(),
+                chime = chime,
+                slack = null,
+                customWebhook = null,
+                email = null,
+            )
         val createdDestination = createDestination(destination = destination)
         assertEquals("Incorrect destination name", createdDestination.name, "test")
         assertEquals("Incorrect destination type", createdDestination.type, DestinationType.CHIME)
     }
 
+    @Test
     fun `test get destinations with a destination type and disable filter by`() {
         disableFilterBy()
         val slack = Slack("url")
-        val destination = Destination(
-            type = DestinationType.SLACK,
-            name = "testSlack",
-            user = randomUser(),
-            lastUpdateTime = Instant.now(),
-            chime = null,
-            slack = slack,
-            customWebhook = null,
-            email = null
-        )
+        val destination =
+            Destination(
+                type = DestinationType.SLACK,
+                name = "testSlack",
+                user = randomUser(),
+                lastUpdateTime = Instant.now(),
+                chime = null,
+                slack = slack,
+                customWebhook = null,
+                email = null,
+            )
 
         // 1. create a destination as admin user
         createDestination(destination, true)
@@ -108,20 +110,22 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
         assertEquals(1, adminResponse.size)
     }
 
+    @Test
     fun `test get destinations with a destination type and filter by`() {
         enableFilterBy()
 
         val slack = Slack("url")
-        val destination = Destination(
-            type = DestinationType.SLACK,
-            name = "testSlack",
-            user = randomUser(),
-            lastUpdateTime = Instant.now(),
-            chime = null,
-            slack = slack,
-            customWebhook = null,
-            email = null
-        )
+        val destination =
+            Destination(
+                type = DestinationType.SLACK,
+                name = "testSlack",
+                user = randomUser(),
+                lastUpdateTime = Instant.now(),
+                chime = null,
+                slack = slack,
+                customWebhook = null,
+                email = null,
+            )
 
         // 1. create a destination as admin user
         createDestination(destination, true)
@@ -136,25 +140,26 @@ class SecureDestinationRestApiIT : AlertingRestTestCase() {
     }
 
     // Destination related tests
-
+    @Test
     fun `test get destination with an user with get destination role`() {
         createUserWithTestDataAndCustomRole(
             user,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
             listOf(TEST_HR_BACKEND_ROLE),
-            getClusterPermissionsFromCustomRole(ALERTING_GET_DESTINATION_ACCESS)
+            getClusterPermissionsFromCustomRole(ALERTING_GET_DESTINATION_ACCESS),
         )
 
         createDestination(getTestDestination())
 
         try {
-            val getDestinationResponse = userClient?.makeRequest(
-                "GET",
-                AlertingPlugin.DESTINATION_BASE_URI,
-                null,
-                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-            )
+            val getDestinationResponse =
+                userClient?.makeRequest(
+                    "GET",
+                    AlertingPlugin.DESTINATION_BASE_URI,
+                    null,
+                    BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+                )
             assertEquals("Index Email Group failed", RestStatus.OK, getDestinationResponse?.restStatus())
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)

@@ -29,7 +29,7 @@ class IndexMonitorV2Response : BaseResponse {
         version: Long,
         seqNo: Long,
         primaryTerm: Long,
-        monitorV2: MonitorV2
+        monitorV2: MonitorV2,
     ) : super() {
         this.id = id
         this.version = version
@@ -44,7 +44,7 @@ class IndexMonitorV2Response : BaseResponse {
         sin.readLong(), // version
         sin.readLong(), // seqNo
         sin.readLong(), // primaryTerm
-        MonitorV2.readFrom(sin) // monitorV2
+        MonitorV2.readFrom(sin), // monitorV2
     )
 
     @Throws(IOException::class)
@@ -57,15 +57,18 @@ class IndexMonitorV2Response : BaseResponse {
     }
 
     @Throws(IOException::class)
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        return builder.startObject()
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder =
+        builder
+            .startObject()
             .field(_ID, id)
             .field(_VERSION, version)
             .field(_SEQ_NO, seqNo)
             .field(_PRIMARY_TERM, primaryTerm)
             .field(MONITOR_V2_FIELD, monitorV2)
             .endObject()
-    }
 
     companion object {
         const val MONITOR_V2_FIELD = "monitor_v2"

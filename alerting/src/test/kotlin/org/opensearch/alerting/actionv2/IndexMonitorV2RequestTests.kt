@@ -12,18 +12,21 @@ import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.rest.RestRequest
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class IndexMonitorV2RequestTests : OpenSearchTestCase() {
+    @Test
     fun `test index monitor v2 request as stream`() {
-        val req = IndexMonitorV2Request(
-            monitorId = "abc",
-            seqNo = 1L,
-            primaryTerm = 1L,
-            refreshPolicy = WriteRequest.RefreshPolicy.IMMEDIATE,
-            method = RestRequest.Method.POST,
-            monitorV2 = randomPPLMonitor() as MonitorV2,
-            rbacRoles = listOf("role-a", "role-b")
-        )
+        val req =
+            IndexMonitorV2Request(
+                monitorId = "abc",
+                seqNo = 1L,
+                primaryTerm = 1L,
+                refreshPolicy = WriteRequest.RefreshPolicy.IMMEDIATE,
+                method = RestRequest.Method.POST,
+                monitorV2 = randomPPLMonitor() as MonitorV2,
+                rbacRoles = listOf("role-a", "role-b"),
+            )
         assertNotNull(req)
 
         val out = BytesStreamOutput()

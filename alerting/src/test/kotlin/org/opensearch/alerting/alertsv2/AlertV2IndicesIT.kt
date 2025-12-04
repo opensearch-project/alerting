@@ -27,6 +27,7 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.test.OpenSearchTestCase
 import java.time.temporal.ChronoUnit.MINUTES
 import java.util.concurrent.TimeUnit
+import kotlin.test.Test
 
 /**
  * Tests AlertV2 history migration, AlertV2 deletion, and AlertV2 expiration functionality
@@ -41,6 +42,7 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         client().updateSettings(AlertingV2Settings.ALERTING_V2_ENABLED.key, "true")
     }
 
+    @Test
     fun `test create alert v2 index`() {
         generateAlertV2s()
 
@@ -48,14 +50,18 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         assertIndexExists(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX)
     }
 
+    @Test
     fun `test update alert v2 index mapping with new schema version`() {
         wipeAllODFEIndices()
         assertIndexDoesNotExist(AlertV2Indices.ALERT_V2_INDEX)
         assertIndexDoesNotExist(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX)
 
         putAlertV2Mappings(
-            AlertV2Indices.alertV2Mapping().trimStart('{').trimEnd('}')
-                .replace("\"schema_version\": 1", "\"schema_version\": 0")
+            AlertV2Indices
+                .alertV2Mapping()
+                .trimStart('{')
+                .trimEnd('}')
+                .replace("\"schema_version\": 1", "\"schema_version\": 0"),
         )
         assertIndexExists(AlertV2Indices.ALERT_V2_INDEX)
         assertIndexExists(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX)
@@ -72,6 +78,7 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         verifyIndexSchemaVersion(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX, 1)
     }
 
+    @Test
     fun `test alert v2 index gets recreated automatically if deleted`() {
         wipeAllODFEIndices()
         assertIndexDoesNotExist(AlertV2Indices.ALERT_V2_INDEX)
@@ -88,6 +95,7 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         generateAlertV2s()
     }
 
+    @Test
     fun `test rollover alert v2 history index`() {
         // Update the rollover check to be every 1 second and the index max age to be 1 second
         client().updateSettings(AlertingSettings.ALERT_V2_HISTORY_ROLLOVER_PERIOD.key, "1s")
@@ -103,27 +111,30 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         assertTrue("Did not find 3 alert v2 indices", getAlertV2Indices().size >= 3)
     }
 
+    @Test
     fun `test alert v2 history disabled`() {
         resetHistorySettings()
 
         // Disable alert history
         client().updateSettings(AlertingSettings.ALERT_V2_HISTORY_ENABLED.key, "false")
 
-        val pplMonitorId = generateAlertV2s(
-            randomPPLMonitor(
-                schedule = IntervalSchedule(interval = 30, unit = MINUTES),
-                query = "source = $TEST_INDEX_NAME | head 3",
-                triggers = listOf(
-                    randomPPLTrigger(
-                        mode = PPLSQLTrigger.TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        expireDuration = 1L
-                    )
-                )
+        val pplMonitorId =
+            generateAlertV2s(
+                randomPPLMonitor(
+                    schedule = IntervalSchedule(interval = 30, unit = MINUTES),
+                    query = "source = $TEST_INDEX_NAME | head 3",
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                mode = PPLSQLTrigger.TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                expireDuration = 1L,
+                            ),
+                        ),
+                ),
             )
-        )
 
         val alerts1 = searchAlertV2s(pplMonitorId)
         assertEquals("1 alert should be present", 1, alerts1.size)
@@ -140,24 +151,27 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         assertTrue("There should be no alerts, but alerts were found", alerts2.isEmpty())
     }
 
+    @Test
     fun `test short retention period`() {
         resetHistorySettings()
 
-        val pplMonitorId = generateAlertV2s(
-            randomPPLMonitor(
-                schedule = IntervalSchedule(interval = 30, unit = MINUTES),
-                query = "source = $TEST_INDEX_NAME | head 3",
-                triggers = listOf(
-                    randomPPLTrigger(
-                        mode = PPLSQLTrigger.TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        expireDuration = 1L
-                    )
-                )
+        val pplMonitorId =
+            generateAlertV2s(
+                randomPPLMonitor(
+                    schedule = IntervalSchedule(interval = 30, unit = MINUTES),
+                    query = "source = $TEST_INDEX_NAME | head 3",
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                mode = PPLSQLTrigger.TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                expireDuration = 1L,
+                            ),
+                        ),
+                ),
             )
-        )
 
         val alerts1 = searchAlertV2s(pplMonitorId)
         assertEquals("1 alert should be present", 1, alerts1.size)
@@ -191,29 +205,32 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         assertEquals(0, getAlertV2HistoryDocCount())
     }
 
+    @Test
     fun `test generated alert gets expired because monitor was deleted with alert history enabled`() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
 
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 20, unit = MINUTES),
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        // for this test, configured expire can't be the reason for alert expiration
-                        expireDuration = 1000L,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
+        val pplMonitor =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 20, unit = MINUTES),
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = null,
+                                // for this test, configured expire can't be the reason for alert expiration
+                                expireDuration = 1000L,
+                                mode = TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                customCondition = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | head 10",
                 ),
-                query = "source = $TEST_INDEX_NAME | head 10"
             )
-        )
 
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
@@ -239,29 +256,32 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         assertEquals(1, getAlertV2HistoryDocCount())
     }
 
+    @Test
     fun `test generated alert gets expired because monitor was edited with alert history enabled`() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
 
         // first create a ppl monitor that's guaranteed to generate an alert
-        val initialPplTrigger = randomPPLTrigger(
-            id = "initialID",
-            throttleDuration = null,
-            // for this test, configured expire can't be the reason for alert expiration
-            expireDuration = 1000L,
-            mode = TriggerMode.RESULT_SET,
-            conditionType = ConditionType.NUMBER_OF_RESULTS,
-            numResultsCondition = NumResultsCondition.GREATER_THAN,
-            numResultsValue = 0L,
-            customCondition = null
-        )
+        val initialPplTrigger =
+            randomPPLTrigger(
+                id = "initialID",
+                throttleDuration = null,
+                // for this test, configured expire can't be the reason for alert expiration
+                expireDuration = 1000L,
+                mode = TriggerMode.RESULT_SET,
+                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                numResultsValue = 0L,
+                customCondition = null,
+            )
 
-        val initialPplMonitorConfig = randomPPLMonitor(
-            enabled = true,
-            schedule = IntervalSchedule(interval = 20, unit = MINUTES),
-            triggers = listOf(initialPplTrigger),
-            query = "source = $TEST_INDEX_NAME | head 10"
-        )
+        val initialPplMonitorConfig =
+            randomPPLMonitor(
+                enabled = true,
+                schedule = IntervalSchedule(interval = 20, unit = MINUTES),
+                triggers = listOf(initialPplTrigger),
+                query = "source = $TEST_INDEX_NAME | head 10",
+            )
 
         val pplMonitor = createRandomPPLMonitor(initialPplMonitorConfig)
 
@@ -290,31 +310,34 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         assertEquals(1, getAlertV2HistoryDocCount())
     }
 
+    @Test
     fun `test generated alert gets expired because monitor was deleted with alert history disabled`() {
         client().updateSettings(AlertingSettings.ALERT_V2_HISTORY_ENABLED.key, "false")
 
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
 
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 20, unit = MINUTES),
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        // for this test, configured expire can't be the reason for alert expiration
-                        expireDuration = 1000L,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
+        val pplMonitor =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 20, unit = MINUTES),
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = null,
+                                // for this test, configured expire can't be the reason for alert expiration
+                                expireDuration = 1000L,
+                                mode = TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                customCondition = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | head 10",
                 ),
-                query = "source = $TEST_INDEX_NAME | head 10"
             )
-        )
 
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
@@ -340,6 +363,7 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         assertEquals(0, getAlertV2HistoryDocCount())
     }
 
+    @Test
     fun `test generated alert gets expired because monitor was edited with alert history disabled`() {
         client().updateSettings(AlertingSettings.ALERT_V2_HISTORY_ENABLED.key, "false")
 
@@ -347,24 +371,26 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
 
         // first create a ppl monitor that's guaranteed to generate an alert
-        val initialPplTrigger = randomPPLTrigger(
-            id = "initialID",
-            throttleDuration = null,
-            // for this test, configured expire can't be the reason for alert expiration
-            expireDuration = 1000L,
-            mode = TriggerMode.RESULT_SET,
-            conditionType = ConditionType.NUMBER_OF_RESULTS,
-            numResultsCondition = NumResultsCondition.GREATER_THAN,
-            numResultsValue = 0L,
-            customCondition = null
-        )
+        val initialPplTrigger =
+            randomPPLTrigger(
+                id = "initialID",
+                throttleDuration = null,
+                // for this test, configured expire can't be the reason for alert expiration
+                expireDuration = 1000L,
+                mode = TriggerMode.RESULT_SET,
+                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                numResultsValue = 0L,
+                customCondition = null,
+            )
 
-        val initialPplMonitorConfig = randomPPLMonitor(
-            enabled = true,
-            schedule = IntervalSchedule(interval = 20, unit = MINUTES),
-            triggers = listOf(initialPplTrigger),
-            query = "source = $TEST_INDEX_NAME | head 10"
-        )
+        val initialPplMonitorConfig =
+            randomPPLMonitor(
+                enabled = true,
+                schedule = IntervalSchedule(interval = 20, unit = MINUTES),
+                triggers = listOf(initialPplTrigger),
+                query = "source = $TEST_INDEX_NAME | head 10",
+            )
 
         val pplMonitor = createRandomPPLMonitor(initialPplMonitorConfig)
 
@@ -420,16 +446,18 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
 
     // generates alerts by creating then executing a monitor
     private fun generateAlertV2s(
-        pplMonitorConfig: PPLSQLMonitor = randomPPLMonitor(
-            query = "source = $TEST_INDEX_NAME | head 3",
-            triggers = listOf(
-                randomPPLTrigger(
-                    conditionType = ConditionType.NUMBER_OF_RESULTS,
-                    numResultsCondition = NumResultsCondition.GREATER_THAN,
-                    numResultsValue = 0L
-                )
-            )
-        )
+        pplMonitorConfig: PPLSQLMonitor =
+            randomPPLMonitor(
+                query = "source = $TEST_INDEX_NAME | head 3",
+                triggers =
+                    listOf(
+                        randomPPLTrigger(
+                            conditionType = ConditionType.NUMBER_OF_RESULTS,
+                            numResultsCondition = NumResultsCondition.GREATER_THAN,
+                            numResultsValue = 0L,
+                        ),
+                    ),
+            ),
     ): String {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)

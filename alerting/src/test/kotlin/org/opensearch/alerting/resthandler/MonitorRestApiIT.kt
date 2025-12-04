@@ -67,16 +67,17 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
+import kotlin.test.Test
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class MonitorRestApiIT : AlertingRestTestCase() {
-
     companion object {
         val USE_TYPED_KEYS = ToXContent.MapParams(mapOf("with_type" to "true"))
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test plugin is loaded`() {
         val response = entityAsMap(OpenSearchRestTestCase.client().makeRequest("GET", "_nodes/plugins"))
         val nodesInfo = response["nodes"] as Map<String, Map<String, Any>>
@@ -91,6 +92,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         fail("Plugin not installed")
     }
 
+    @Test
     fun `test parsing monitor as a scheduled job`() {
         val monitor = createRandomMonitor()
 
@@ -102,6 +104,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test creating a monitor`() {
         val monitor = randomQueryLevelMonitor()
 
@@ -117,6 +120,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test creating a bucket monitor`() {
         val monitor = randomBucketLevelMonitor()
 
@@ -131,6 +135,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Incorrect Location header", "$ALERTING_BASE_URI/$createdId", createResponse.getHeader("Location"))
     }
 
+    @Test
     fun `test creating a monitor with legacy ODFE`() {
         val monitor = randomQueryLevelMonitor()
         val createResponse = client().makeRequest("POST", LEGACY_OPENDISTRO_ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
@@ -142,6 +147,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertTrue("incorrect version", createdVersion > 0)
     }
 
+    @Test
     fun `test creating a monitor with action threshold greater than max threshold`() {
         val monitor = randomMonitorWithThrottle(100000, ChronoUnit.MINUTES)
 
@@ -152,6 +158,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test creating a monitor with action threshold less than min threshold`() {
         val monitor = randomMonitorWithThrottle(-1)
 
@@ -162,6 +169,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test creating a monitor with updating action threshold`() {
         adminClient().updateSettings("plugins.alerting.action_throttle_max_value", TimeValue.timeValueHours(1))
 
@@ -175,6 +183,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         adminClient().updateSettings("plugins.alerting.action_throttle_max_value", TimeValue.timeValueHours(24))
     }
 
+    @Test
     fun `test creating a monitor with PUT fails`() {
         try {
             val monitor = randomQueryLevelMonitor()
@@ -185,6 +194,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test creating a monitor with illegal index name`() {
         try {
             val si = SearchInput(listOf("_#*IllegalIndexCharacters"), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
@@ -196,11 +206,12 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             // Without security plugin we get BAD_REQUEST correctly. With security_plugin we get INTERNAL_SERVER_ERROR, till above issue is fixed.
             assertTrue(
                 "Unexpected status",
-                listOf<RestStatus>(RestStatus.BAD_REQUEST, RestStatus.FORBIDDEN).contains(e.response.restStatus())
+                listOf<RestStatus>(RestStatus.BAD_REQUEST, RestStatus.FORBIDDEN).contains(e.response.restStatus()),
             )
         }
     }
 
+    @Test
     fun `test creating an AD monitor without detector index`() {
         try {
             val monitor = randomADMonitor()
@@ -211,11 +222,12 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             assertTrue("Unexpected error", e.message!!.contains("Configured indices are not found"))
             assertTrue(
                 "Unexpected status",
-                listOf<RestStatus>(RestStatus.NOT_FOUND).contains(e.response.restStatus())
+                listOf<RestStatus>(RestStatus.NOT_FOUND).contains(e.response.restStatus()),
             )
         }
     }
 
+    @Test
     fun `test creating an AD monitor with detector index created but no detectors`() {
         createAnomalyDetectorIndex()
         try {
@@ -226,11 +238,12 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             assertTrue("Unexpected error", e.message!!.contains("User has no available detectors"))
             assertTrue(
                 "Unexpected status",
-                listOf<RestStatus>(RestStatus.NOT_FOUND).contains(e.response.restStatus())
+                listOf<RestStatus>(RestStatus.NOT_FOUND).contains(e.response.restStatus()),
             )
         }
     }
 
+    @Test
     fun `test creating an AD monitor with no detector has monitor backend role`() {
         if (!securityEnabled()) {
             createAnomalyDetectorIndex()
@@ -245,7 +258,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
                 assertTrue("Unexpected error", e.message!!.contains("User has no available detectors"))
                 assertTrue(
                     "Unexpected status",
-                    listOf<RestStatus>(RestStatus.NOT_FOUND).contains(e.response.restStatus())
+                    listOf<RestStatus>(RestStatus.NOT_FOUND).contains(e.response.restStatus()),
                 )
             }
         }
@@ -312,17 +325,22 @@ class MonitorRestApiIT : AlertingRestTestCase() {
      */
 
     @Throws(Exception::class)
+    @Test
     fun `test updating search for a monitor`() {
         val monitor = createRandomMonitor()
 
-        val updatedSearch = SearchInput(
-            emptyList(),
-            SearchSourceBuilder().query(QueryBuilders.termQuery("foo", "bar"))
-        )
-        val updateResponse = client().makeRequest(
-            "PUT", monitor.relativeUrl(),
-            emptyMap(), monitor.copy(inputs = listOf(updatedSearch)).toHttpEntity()
-        )
+        val updatedSearch =
+            SearchInput(
+                emptyList(),
+                SearchSourceBuilder().query(QueryBuilders.termQuery("foo", "bar")),
+            )
+        val updateResponse =
+            client().makeRequest(
+                "PUT",
+                monitor.relativeUrl(),
+                emptyMap(),
+                monitor.copy(inputs = listOf(updatedSearch)).toHttpEntity(),
+            )
 
         assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())
         val responseBody = updateResponse.asMap()
@@ -334,21 +352,26 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test updating conditions for a monitor`() {
         val monitor = createRandomMonitor()
 
-        val updatedTriggers = listOf(
-            QueryLevelTrigger(
-                name = "foo",
-                severity = "1",
-                condition = Script("return true"),
-                actions = emptyList()
+        val updatedTriggers =
+            listOf(
+                QueryLevelTrigger(
+                    name = "foo",
+                    severity = "1",
+                    condition = Script("return true"),
+                    actions = emptyList(),
+                ),
             )
-        )
-        val updateResponse = client().makeRequest(
-            "PUT", monitor.relativeUrl(),
-            emptyMap(), monitor.copy(triggers = updatedTriggers).toHttpEntity()
-        )
+        val updateResponse =
+            client().makeRequest(
+                "PUT",
+                monitor.relativeUrl(),
+                emptyMap(),
+                monitor.copy(triggers = updatedTriggers).toHttpEntity(),
+            )
 
         assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())
         val responseBody = updateResponse.asMap()
@@ -360,14 +383,18 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test updating schedule for a monitor`() {
         val monitor = createRandomMonitor()
 
         val updatedSchedule = CronSchedule(expression = "0 9 * * *", timezone = ZoneId.of("UTC"))
-        val updateResponse = client().makeRequest(
-            "PUT", monitor.relativeUrl(),
-            emptyMap(), monitor.copy(schedule = updatedSchedule).toHttpEntity()
-        )
+        val updateResponse =
+            client().makeRequest(
+                "PUT",
+                monitor.relativeUrl(),
+                emptyMap(),
+                monitor.copy(schedule = updatedSchedule).toHttpEntity(),
+            )
 
         assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())
         val responseBody = updateResponse.asMap()
@@ -379,6 +406,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test getting a monitor`() {
         val monitor = createRandomMonitor()
 
@@ -388,6 +416,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test getting a monitor that doesn't exist`() {
         try {
             getMonitor(randomAlphaOfLength(20))
@@ -398,6 +427,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test get monitor returns 404 when alerting config index is missing`() {
         try {
             deleteIndex(".opendistro-alerting-config")
@@ -417,12 +447,13 @@ class MonitorRestApiIT : AlertingRestTestCase() {
                 errorMessage.contains("Monitor not found") ||
                     errorMessage.contains("index not found") ||
                     errorMessage.contains("no such index") ||
-                    errorMessage.contains("Configured indices are not found")
+                    errorMessage.contains("Configured indices are not found"),
             )
         }
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test checking if a monitor exists`() {
         val monitor = createRandomMonitor()
 
@@ -431,12 +462,14 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertNull("Response contains unexpected body", headResponse.entity)
     }
 
+    @Test
     fun `test checking if a non-existent monitor exists`() {
         val headResponse = client().makeRequest("HEAD", "$ALERTING_BASE_URI/foobarbaz")
         assertEquals("Unexpected status", RestStatus.NOT_FOUND, headResponse.restStatus())
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test deleting a monitor`() {
         val monitor = createRandomMonitor()
 
@@ -448,6 +481,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test deleting a monitor that doesn't exist`() {
         try {
             client().makeRequest("DELETE", "$ALERTING_BASE_URI/foobarbaz")
@@ -457,15 +491,18 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test getting UI metadata monitor not from OpenSearch Dashboards`() {
         val monitor = createRandomMonitor(withMetadata = true)
         val getMonitor = getMonitor(monitorId = monitor.id)
         assertEquals(
             "UI Metadata returned but request did not come from OpenSearch Dashboards.",
-            getMonitor.uiMetadata, mapOf<String, Any>()
+            getMonitor.uiMetadata,
+            mapOf<String, Any>(),
         )
     }
 
+    @Test
     fun `test getting UI metadata monitor from OpenSearch Dashboards`() {
         val monitor = createRandomMonitor(refresh = true, withMetadata = true)
         val header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards")
@@ -473,15 +510,18 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("", monitor.uiMetadata, getMonitor.uiMetadata)
     }
 
+    @Test
     fun `test query a monitor that exists`() {
         val monitor = createRandomMonitor(true)
 
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitor.id)).toString()
-        val searchResponse = client().makeRequest(
-            "GET", "$ALERTING_BASE_URI/_search",
-            emptyMap(),
-            StringEntity(search, ContentType.APPLICATION_JSON)
-        )
+        val searchResponse =
+            client().makeRequest(
+                "GET",
+                "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(search, ContentType.APPLICATION_JSON),
+            )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -489,15 +529,18 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Monitor not found during search", 1, numberDocsFound)
     }
 
+    @Test
     fun `test query a monitor that exists POST`() {
         val monitor = createRandomMonitor(true)
 
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitor.id)).toString()
-        val searchResponse = client().makeRequest(
-            "POST", "$ALERTING_BASE_URI/_search",
-            emptyMap(),
-            StringEntity(search, ContentType.APPLICATION_JSON)
-        )
+        val searchResponse =
+            client().makeRequest(
+                "POST",
+                "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(search, ContentType.APPLICATION_JSON),
+            )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -505,22 +548,26 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Monitor not found during search", 1, numberDocsFound)
     }
 
+    @Test
     fun `test query a monitor that doesn't exist`() {
         // Create a random monitor to create the ScheduledJob index. Otherwise we test will fail with 404 index not found.
         createRandomMonitor(refresh = true)
-        val search = SearchSourceBuilder().query(
-            QueryBuilders.termQuery(
-                OpenSearchTestCase.randomAlphaOfLength(5),
-                OpenSearchTestCase.randomAlphaOfLength(5)
-            )
-        ).toString()
+        val search =
+            SearchSourceBuilder()
+                .query(
+                    QueryBuilders.termQuery(
+                        OpenSearchTestCase.randomAlphaOfLength(5),
+                        OpenSearchTestCase.randomAlphaOfLength(5),
+                    ),
+                ).toString()
 
-        val searchResponse = client().makeRequest(
-            "GET",
-            "$ALERTING_BASE_URI/_search",
-            emptyMap(),
-            StringEntity(search, ContentType.APPLICATION_JSON)
-        )
+        val searchResponse =
+            client().makeRequest(
+                "GET",
+                "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(search, ContentType.APPLICATION_JSON),
+            )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -529,6 +576,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test search monitor returns empty response when index is missing`() {
         try {
             deleteIndex(".opendistro-alerting-config")
@@ -537,67 +585,76 @@ class MonitorRestApiIT : AlertingRestTestCase() {
                 throw e
             }
         }
-        val searchBody = """
+        val searchBody =
+            """
             {
                 "query": {
                     "match_all": {}
                 }
             }
-        """.trimIndent()
-        val response = client().makeRequest(
-            "POST",
-            "$ALERTING_BASE_URI/_search",
-            emptyMap(),
-            StringEntity(searchBody, ContentType.APPLICATION_JSON)
-        )
+            """.trimIndent()
+        val response =
+            client().makeRequest(
+                "POST",
+                "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(searchBody, ContentType.APPLICATION_JSON),
+            )
         val responseBody = response.asMap()
         val total = ((responseBody["hits"] as? Map<*, *>)?.get("total") as? Map<*, *>)?.get("value") as? Int ?: 0
         assertEquals("Expected no search results when config index is missing", 0, total)
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test search monitor fails with unexpected error`() {
-        val invalidSearchBody = """
+        val invalidSearchBody =
+            """
             {
                 "query": {
                     "bad_query_type": {}
                 }
             }
-        """.trimIndent()
+            """.trimIndent()
         try {
             client().makeRequest(
                 "POST",
                 "$ALERTING_BASE_URI/_search",
                 emptyMap(),
-                StringEntity(invalidSearchBody, ContentType.APPLICATION_JSON)
+                StringEntity(invalidSearchBody, ContentType.APPLICATION_JSON),
             )
             fail("Expected failure due to bad query")
         } catch (e: ResponseException) {
-            val responseBody = e.response.entity.content.bufferedReader().use { it.readText() }
+            val responseBody =
+                e.response.entity.content
+                    .bufferedReader()
+                    .use { it.readText() }
             assertTrue(
                 "Should receive an error from unexpected query type",
                 e.response.restStatus() === RestStatus.BAD_REQUEST ||
-                    e.response.restStatus() === RestStatus.INTERNAL_SERVER_ERROR
+                    e.response.restStatus() === RestStatus.INTERNAL_SERVER_ERROR,
             )
             assertTrue(
                 "Response body should indicate query parsing error",
                 responseBody.contains("parsing_exception") ||
-                    responseBody.contains("failed to parse")
+                    responseBody.contains("failed to parse"),
             )
         }
     }
 
+    @Test
     fun `test query a monitor with UI metadata from OpenSearch Dashboards`() {
         val monitor = createRandomMonitor(refresh = true, withMetadata = true)
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitor.id)).toString()
         val header = BasicHeader(HttpHeaders.USER_AGENT, "OpenSearch-Dashboards")
-        val searchResponse = client().makeRequest(
-            "GET",
-            "$ALERTING_BASE_URI/_search",
-            emptyMap(),
-            StringEntity(search, ContentType.APPLICATION_JSON),
-            header
-        )
+        val searchResponse =
+            client().makeRequest(
+                "GET",
+                "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(search, ContentType.APPLICATION_JSON),
+                header,
+            )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
 
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
@@ -610,19 +667,21 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val monitorHit = hit["_source"] as Map<String, Any>
         assertNotNull(
             "UI Metadata returned from search but request did not come from OpenSearchDashboards",
-            monitorHit[Monitor.UI_METADATA_FIELD]
+            monitorHit[Monitor.UI_METADATA_FIELD],
         )
     }
 
+    @Test
     fun `test query a monitor with UI metadata as user`() {
         val monitor = createRandomMonitor(refresh = true, withMetadata = true)
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitor.id)).toString()
-        val searchResponse = client().makeRequest(
-            "GET",
-            "$ALERTING_BASE_URI/_search",
-            emptyMap(),
-            StringEntity(search, ContentType.APPLICATION_JSON)
-        )
+        val searchResponse =
+            client().makeRequest(
+                "GET",
+                "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(search, ContentType.APPLICATION_JSON),
+            )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
 
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
@@ -635,10 +694,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val monitorHit = hit["_source"] as Map<String, Any>
         assertNull(
             "UI Metadata returned from search but request did not come from OpenSearchDashboards",
-            monitorHit[Monitor.UI_METADATA_FIELD]
+            monitorHit[Monitor.UI_METADATA_FIELD],
         )
     }
 
+    @Test
     fun `test acknowledge all alert states`() {
         putAlertMappings() // Required as we do not have a create alert API.
         val monitor = createRandomMonitor(refresh = true)
@@ -665,6 +725,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertFalse("Alert in state ${activeAlert.state} found in failed list", failedResponseList.contains(activeAlert.id))
     }
 
+    @Test
     fun `test acknowledging more than 10 alerts at once`() {
         // GIVEN
         putAlertMappings() // Required as we do not have a create alert API.
@@ -681,7 +742,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val acknowledgedAlerts = responseMap["success"] as List<String>
         assertTrue(
             "Expected $expectedAcknowledgedCount alerts to be acknowledged successfully.",
-            acknowledgedAlerts.size == expectedAcknowledgedCount
+            acknowledgedAlerts.size == expectedAcknowledgedCount,
         )
 
         val acknowledgedAlertsList = acknowledgedAlerts.toString()
@@ -693,6 +754,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertTrue("Expected 0 alerts to fail acknowledgment.", failedResponse.isEmpty())
     }
 
+    @Test
     fun `test acknowledging more than 10 alerts at once, including acknowledged alerts`() {
         // GIVEN
         putAlertMappings() // Required as we do not have a create alert API.
@@ -715,7 +777,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val acknowledgedAlerts = responseMap["success"] as List<String>
         assertTrue(
             "Expected $expectedAcknowledgedCount alerts to be acknowledged successfully.",
-            acknowledgedAlerts.size == expectedAcknowledgedCount
+            acknowledgedAlerts.size == expectedAcknowledgedCount,
         )
 
         val acknowledgedAlertsList = acknowledgedAlerts.toString()
@@ -739,6 +801,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test acknowledging 0 alerts`() {
         // GIVEN
         putAlertMappings() // Required as we do not have a create alert API.
@@ -754,6 +817,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test get all alerts in all states`() {
         putAlertMappings() // Required as we do not have a create alert API.
         val monitor = createRandomMonitor(refresh = true)
@@ -777,6 +841,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertFalse("Invalid alert with id, ${invalidAlert.id}, found in alert list", alerts.contains(invalidAlert.id))
     }
 
+    @Test
     fun `test get all alerts with active states`() {
         putAlertMappings() // Required as we do not have a create alert API.
         val monitor = createRandomMonitor(refresh = true)
@@ -800,6 +865,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertFalse("Invalid alert with id, ${invalidAlert.id}, found in alert list", alerts.contains(invalidAlert.id))
     }
 
+    @Test
     fun `test get all alerts with severity 1`() {
         putAlertMappings() // Required as we do not have a create alert API.
         val monitor = createRandomMonitor(refresh = true)
@@ -817,13 +883,14 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals(2, responseMap["totalAlerts"])
         assertTrue(
             "Acknowledged sev 1 alert with id, ${acknowledgedAlert.id}, not found in alert list",
-            alerts.contains(acknowledgedAlert.id)
+            alerts.contains(acknowledgedAlert.id),
         )
         assertFalse("Completed sev 3 alert with id, ${completedAlert.id}, found in alert list", alerts.contains(completedAlert.id))
         assertTrue("Error sev 1 alert with id, ${errorAlert.id}, not found in alert list", alerts.contains(errorAlert.id))
         assertFalse("Active sev 2 alert with id, ${activeAlert.id}, found in alert list", alerts.contains(activeAlert.id))
     }
 
+    @Test
     fun `test get all alerts for a specific monitor by id`() {
         putAlertMappings() // Required as we do not have a create alert API.
         val monitor = createRandomMonitor(refresh = true)
@@ -842,13 +909,14 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals(2, responseMap["totalAlerts"])
         assertTrue(
             "Acknowledged alert for chosen monitor with id, ${acknowledgedAlert.id}, not found in alert list",
-            alerts.contains(acknowledgedAlert.id)
+            alerts.contains(acknowledgedAlert.id),
         )
         assertFalse("Completed sev 3 alert with id, ${completedAlert.id}, found in alert list", alerts.contains(completedAlert.id))
         assertTrue("Error alert for chosen monitor with id, ${errorAlert.id}, not found in alert list", alerts.contains(errorAlert.id))
         assertFalse("Active alert sev 2 with id, ${activeAlert.id}, found in alert list", alerts.contains(activeAlert.id))
     }
 
+    @Test
     fun `test get alerts by searching monitor name`() {
         putAlertMappings() // Required as we do not have a create alert API.
 
@@ -868,28 +936,31 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals(2, responseMap["totalAlerts"])
         assertTrue(
             "Acknowledged alert for matching monitor with id, ${acknowledgedAlert.id}, not found in alert list",
-            alerts.contains(acknowledgedAlert.id)
+            alerts.contains(acknowledgedAlert.id),
         )
         assertFalse("Completed sev 3 alert with id, ${completedAlert.id}, found in alert list", alerts.contains(completedAlert.id))
         assertTrue("Error alert for matching monitor with id, ${errorAlert.id}, not found in alert list", alerts.contains(errorAlert.id))
         assertFalse("Active alert sev 2 with id, ${activeAlert.id}, found in alert list", alerts.contains(activeAlert.id))
     }
 
+    @Test
     fun `test mappings after monitor creation`() {
         createRandomMonitor(refresh = true)
 
         val response = client().makeRequest("GET", "/${ScheduledJob.SCHEDULED_JOBS_INDEX}/_mapping")
         val parserMap = createParser(XContentType.JSON.xContent(), response.entity.content).map() as Map<String, Map<String, Any>>
         val mappingsMap = parserMap[ScheduledJob.SCHEDULED_JOBS_INDEX]!!["mappings"] as Map<String, Any>
-        val expected = createParser(
-            XContentType.JSON.xContent(),
-            javaClass.classLoader.getResource("mappings/scheduled-jobs.json").readText()
-        )
+        val expected =
+            createParser(
+                XContentType.JSON.xContent(),
+                javaClass.classLoader.getResource("mappings/scheduled-jobs.json").readText(),
+            )
         val expectedMap = expected.map()
 
         assertEquals("Mappings are different", expectedMap, mappingsMap)
     }
 
+    @Test
     fun `test delete monitor moves alerts`() {
         client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
         putAlertMappings()
@@ -914,10 +985,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals(
             "Alert data incorrect",
             alert.copy(state = Alert.State.DELETED).toJsonString(),
-            historyAlerts.single().toJsonString()
+            historyAlerts.single().toJsonString(),
         )
     }
 
+    @Test
     fun `test delete trigger moves alerts then try to search alert by monitorId to find alert in history index`() {
         client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
         putAlertMappings()
@@ -926,12 +998,13 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val alert = createAlert(randomAlert(monitor).copy(triggerId = trigger.id, state = Alert.State.ACTIVE))
         refreshIndex("*")
         val updatedMonitor = monitor.copy(triggers = emptyList())
-        val updateResponse = client().makeRequest(
-            "PUT",
-            "$ALERTING_BASE_URI/${monitor.id}",
-            emptyMap(),
-            updatedMonitor.toHttpEntity()
-        )
+        val updateResponse =
+            client().makeRequest(
+                "PUT",
+                "$ALERTING_BASE_URI/${monitor.id}",
+                emptyMap(),
+                updatedMonitor.toHttpEntity(),
+            )
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
 
         // Wait 5 seconds for event to be processed and alerts moved
@@ -950,6 +1023,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals(1, responseMap["totalAlerts"])
     }
 
+    @Test
     fun `test delete trigger moves alerts`() {
         client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
         putAlertMappings()
@@ -958,10 +1032,13 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val alert = createAlert(randomAlert(monitor).copy(triggerId = trigger.id, state = Alert.State.ACTIVE))
         refreshIndex("*")
         val updatedMonitor = monitor.copy(triggers = emptyList())
-        val updateResponse = client().makeRequest(
-            "PUT", "$ALERTING_BASE_URI/${monitor.id}", emptyMap(),
-            updatedMonitor.toHttpEntity()
-        )
+        val updateResponse =
+            client().makeRequest(
+                "PUT",
+                "$ALERTING_BASE_URI/${monitor.id}",
+                emptyMap(),
+                updatedMonitor.toHttpEntity(),
+            )
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
 
         // Wait 5 seconds for event to be processed and alerts moved
@@ -979,10 +1056,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals(
             "Alert data incorrect",
             alert.copy(state = Alert.State.DELETED).toJsonString(),
-            historyAlerts.single().toJsonString()
+            historyAlerts.single().toJsonString(),
         )
     }
 
+    @Test
     fun `test delete trigger moves alerts only for deleted trigger`() {
         client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
         putAlertMappings()
@@ -993,10 +1071,13 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val alertDelete = createAlert(randomAlert(monitor).copy(triggerId = triggerToDelete.id, state = Alert.State.ACTIVE))
         refreshIndex("*")
         val updatedMonitor = monitor.copy(triggers = listOf(triggerToKeep))
-        val updateResponse = client().makeRequest(
-            "PUT", "$ALERTING_BASE_URI/${monitor.id}", emptyMap(),
-            updatedMonitor.toHttpEntity()
-        )
+        val updateResponse =
+            client().makeRequest(
+                "PUT",
+                "$ALERTING_BASE_URI/${monitor.id}",
+                emptyMap(),
+                updatedMonitor.toHttpEntity(),
+            )
         assertEquals("Update request not successful", RestStatus.OK, updateResponse.restStatus())
         // Wait until postIndex hook is executed due to monitor update
         waitUntil({
@@ -1025,16 +1106,19 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals(
             "Alert data incorrect",
             alertDelete.copy(state = Alert.State.DELETED).toJsonString(),
-            historyAlerts.single().toJsonString()
+            historyAlerts.single().toJsonString(),
         )
     }
 
+    @Test
     fun `test update monitor with wrong version`() {
         val monitor = createRandomMonitor(refresh = true)
         try {
             client().makeRequest(
-                "PUT", "${monitor.relativeUrl()}?refresh=true&if_seq_no=1234&if_primary_term=1234",
-                emptyMap(), monitor.toHttpEntity()
+                "PUT",
+                "${monitor.relativeUrl()}?refresh=true&if_seq_no=1234&if_primary_term=1234",
+                emptyMap(),
+                monitor.toHttpEntity(),
             )
             fail("expected 409 ResponseException")
         } catch (e: ResponseException) {
@@ -1042,6 +1126,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test monitor stats disable plugin`() {
         // Disable the Monitor plugin.
         disableScheduledJob()
@@ -1049,19 +1134,22 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val responseMap = getAlertingStats()
         assertAlertingStatsSweeperEnabled(responseMap, false)
         assertEquals("Scheduled job index exists but there are no scheduled jobs.", false, responseMap["scheduled_job_index_exists"])
-        val _nodes = responseMap["_nodes"] as Map<String, Int>
-        validateAlertingStatsNodeResponse(_nodes)
+        val nodes = responseMap["_nodes"] as Map<String, Int>
+        validateAlertingStatsNodeResponse(nodes)
     }
 
+    @Test
     fun `test monitor stats when disabling and re-enabling scheduled jobs with existing monitor`() {
         // Enable Monitor jobs
 
         enableScheduledJob()
         val monitorId = createMonitor(randomQueryLevelMonitor(enabled = true), refresh = true).id
 
-        if (isMultiNode) OpenSearchTestCase.waitUntil({
-            return@waitUntil false
-        }, 2, TimeUnit.SECONDS)
+        if (isMultiNode) {
+            OpenSearchTestCase.waitUntil({
+                return@waitUntil false
+            }, 2, TimeUnit.SECONDS)
+        }
         var alertingStats = getAlertingStats()
         assertAlertingStatsSweeperEnabled(alertingStats, true)
         assertEquals("Scheduled job index does not exist", true, alertingStats["scheduled_job_index_exists"])
@@ -1072,12 +1160,12 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
         assertEquals("Nodes are not on schedule", numberOfNodes, alertingStats["nodes_on_schedule"])
 
-        val _nodes = alertingStats["_nodes"] as Map<String, Int>
-        validateAlertingStatsNodeResponse(_nodes)
+        val nodes = alertingStats["_nodes"] as Map<String, Int>
+        validateAlertingStatsNodeResponse(nodes)
 
         assertTrue(
             "Monitor [$monitorId] was not found scheduled based on the alerting stats response: $alertingStats",
-            isMonitorScheduled(monitorId, alertingStats)
+            isMonitorScheduled(monitorId, alertingStats),
         )
 
         // Disable Monitor jobs
@@ -1087,7 +1175,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertAlertingStatsSweeperEnabled(alertingStats, false)
         assertFalse(
             "Monitor [$monitorId] was still scheduled based on the alerting stats response: $alertingStats",
-            isMonitorScheduled(monitorId, alertingStats)
+            isMonitorScheduled(monitorId, alertingStats),
         )
 
         // Re-enable Monitor jobs
@@ -1102,10 +1190,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertAlertingStatsSweeperEnabled(alertingStats, true)
         assertTrue(
             "Monitor [$monitorId] was not re-scheduled based on the alerting stats response: $alertingStats",
-            isMonitorScheduled(monitorId, alertingStats)
+            isMonitorScheduled(monitorId, alertingStats),
         )
     }
 
+    @Test
     fun `test monitor stats no jobs`() {
         // Enable the Monitor plugin.
         enableScheduledJob()
@@ -1113,19 +1202,22 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val responseMap = getAlertingStats()
         assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index exists but there are no scheduled jobs.", false, responseMap["scheduled_job_index_exists"])
-        val _nodes = responseMap["_nodes"] as Map<String, Int>
-        validateAlertingStatsNodeResponse(_nodes)
+        val nodes = responseMap["_nodes"] as Map<String, Int>
+        validateAlertingStatsNodeResponse(nodes)
     }
 
+    @Test
     fun `test monitor stats jobs`() {
         // Enable the Monitor plugin.
 
         enableScheduledJob()
         createRandomMonitor(refresh = true)
 
-        if (isMultiNode) OpenSearchTestCase.waitUntil({
-            return@waitUntil false
-        }, 2, TimeUnit.SECONDS)
+        if (isMultiNode) {
+            OpenSearchTestCase.waitUntil({
+                return@waitUntil false
+            }, 2, TimeUnit.SECONDS)
+        }
         val responseMap = getAlertingStats()
         assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index does not exist", true, responseMap["scheduled_job_index_exists"])
@@ -1136,11 +1228,12 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
         assertEquals("Nodes are not on schedule", numberOfNodes, responseMap["nodes_on_schedule"])
 
-        val _nodes = responseMap["_nodes"] as Map<String, Int>
-        validateAlertingStatsNodeResponse(_nodes)
+        val nodes = responseMap["_nodes"] as Map<String, Int>
+        validateAlertingStatsNodeResponse(nodes)
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test max number of monitors`() {
         client().updateSettings(AlertingSettings.ALERTING_MAX_MONITORS.key, "1")
 
@@ -1153,14 +1246,17 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test monitor specific metric`() {
         // Enable the Monitor plugin.
         enableScheduledJob()
         createRandomMonitor(refresh = true)
 
-        if (isMultiNode) OpenSearchTestCase.waitUntil({
-            return@waitUntil false
-        }, 2, TimeUnit.SECONDS)
+        if (isMultiNode) {
+            OpenSearchTestCase.waitUntil({
+                return@waitUntil false
+            }, 2, TimeUnit.SECONDS)
+        }
         val responseMap = getAlertingStats("/jobs_info")
         assertAlertingStatsSweeperEnabled(responseMap, true)
         assertEquals("Scheduled job index does not exist", true, responseMap["scheduled_job_index_exists"])
@@ -1171,10 +1267,11 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
         assertEquals("Nodes not on schedule", numberOfNodes, responseMap["nodes_on_schedule"])
 
-        val _nodes = responseMap["_nodes"] as Map<String, Int>
-        validateAlertingStatsNodeResponse(_nodes)
+        val nodes = responseMap["_nodes"] as Map<String, Int>
+        validateAlertingStatsNodeResponse(nodes)
     }
 
+    @Test
     fun `test monitor stats incorrect metric`() {
         try {
             getAlertingStats("/foobarzzz")
@@ -1184,6 +1281,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test monitor stats _all and other metric`() {
         try {
             getAlertingStats("/_all,jobs_info")
@@ -1193,7 +1291,10 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    private fun randomMonitorWithThrottle(value: Int, unit: ChronoUnit = ChronoUnit.MINUTES): Monitor {
+    private fun randomMonitorWithThrottle(
+        value: Int,
+        unit: ChronoUnit = ChronoUnit.MINUTES,
+    ): Monitor {
         val throttle = randomThrottle(value, unit)
         val action = randomAction().copy(throttle = throttle)
         val trigger = randomQueryLevelTrigger(actions = listOf(action))
@@ -1201,8 +1302,8 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test search monitors only`() {
-
         // 1. create monitor
         val monitor = randomQueryLevelMonitor()
         val createResponse = client().makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
@@ -1210,26 +1311,28 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         // 2. create destination
         val chime = Chime("http://abc.com")
-        val destination = Destination(
-            type = DestinationType.CHIME,
-            name = "test",
-            user = randomUser(),
-            lastUpdateTime = Instant.now(),
-            chime = chime,
-            slack = null,
-            customWebhook = null,
-            email = null
-        )
+        val destination =
+            Destination(
+                type = DestinationType.CHIME,
+                name = "test",
+                user = randomUser(),
+                lastUpdateTime = Instant.now(),
+                chime = chime,
+                slack = null,
+                customWebhook = null,
+                email = null,
+            )
         createDestination(destination)
 
         // 3. search - must return only monitors.
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
-        val searchResponse = client().makeRequest(
-            "GET",
-            "$ALERTING_BASE_URI/_search",
-            emptyMap(),
-            StringEntity(search, ContentType.APPLICATION_JSON)
-        )
+        val searchResponse =
+            client().makeRequest(
+                "GET",
+                "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(search, ContentType.APPLICATION_JSON),
+            )
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -1243,6 +1346,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test search monitor with alerting indices only`() {
         // 1. search - must return error as invalid index is passed
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
@@ -1253,7 +1357,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
                 "GET",
                 "$ALERTING_BASE_URI/_search",
                 params,
-                StringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON),
             )
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
@@ -1261,6 +1365,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test creating a document monitor`() {
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
@@ -1282,15 +1387,17 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test getting a document level monitor`() {
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val monitor = createMonitor(
-            randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger), user = null)
-        )
+        val monitor =
+            createMonitor(
+                randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger), user = null),
+            )
 
         val storedMonitor = getMonitor(monitor.id)
 
@@ -1298,6 +1405,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test updating conditions for a doc-level monitor`() {
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
@@ -1306,18 +1414,22 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
 
-        val updatedTriggers = listOf(
-            DocumentLevelTrigger(
-                name = "foo",
-                severity = "1",
-                condition = Script("return true"),
-                actions = emptyList()
+        val updatedTriggers =
+            listOf(
+                DocumentLevelTrigger(
+                    name = "foo",
+                    severity = "1",
+                    condition = Script("return true"),
+                    actions = emptyList(),
+                ),
             )
-        )
-        val updateResponse = client().makeRequest(
-            "PUT", monitor.relativeUrl(),
-            emptyMap(), monitor.copy(triggers = updatedTriggers).toHttpEntity()
-        )
+        val updateResponse =
+            client().makeRequest(
+                "PUT",
+                monitor.relativeUrl(),
+                emptyMap(),
+                monitor.copy(triggers = updatedTriggers).toHttpEntity(),
+            )
 
         assertEquals("Update monitor failed", RestStatus.OK, updateResponse.restStatus())
         val responseBody = updateResponse.asMap()
@@ -1329,6 +1441,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    @Test
     fun `test deleting a document level monitor`() {
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
@@ -1344,6 +1457,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Deleted monitor still exists", RestStatus.NOT_FOUND, getResponse.restStatus())
     }
 
+    @Test
     fun `test creating a document monitor with error trigger`() {
         val trigger = randomQueryLevelTrigger()
         try {
@@ -1354,11 +1468,12 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             assertEquals(
                 "a document monitor with error trigger",
                 "Incompatible trigger [${trigger.id}] for monitor type [${Monitor.MonitorType.DOC_LEVEL_MONITOR}]",
-                e.message
+                e.message,
             )
         }
     }
 
+    @Test
     fun `test creating a query monitor with error trigger`() {
         val trigger = randomBucketLevelTrigger()
         try {
@@ -1369,11 +1484,12 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             assertEquals(
                 "a query monitor with error trigger",
                 "Incompatible trigger [${trigger.id}] for monitor type [${Monitor.MonitorType.QUERY_LEVEL_MONITOR}]",
-                e.message
+                e.message,
             )
         }
     }
 
+    @Test
     fun `test creating and updating a document monitor with invalid query name`() {
         // creating a monitor with an invalid query name
         val invalidQueryName = "_Invalid .. query ! n>ame"
@@ -1388,8 +1504,9 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             fail("Doc level monitor with invalid query name should be rejected")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
-            val expectedMessage = "Doc level query name may not start with [_, +, -], contain '..', or contain: " +
-                getInvalidNameChars().replace("\\", "")
+            val expectedMessage =
+                "Doc level query name may not start with [_, +, -], contain '..', or contain: " +
+                    getInvalidNameChars().replace("\\", "")
             e.message?.let { assertTrue(it.contains(expectedMessage)) }
         }
 
@@ -1406,14 +1523,17 @@ class MonitorRestApiIT : AlertingRestTestCase() {
 
         try {
             client().makeRequest(
-                "PUT", monitor.relativeUrl(),
-                emptyMap(), monitor.copy(inputs = listOf(updatedDocLevelInput)).toHttpEntity()
+                "PUT",
+                monitor.relativeUrl(),
+                emptyMap(),
+                monitor.copy(inputs = listOf(updatedDocLevelInput)).toHttpEntity(),
             )
             fail("Doc level monitor with invalid query name should be rejected")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
-            val expectedMessage = "Doc level query name may not start with [_, +, -], contain '..', or contain: " +
-                getInvalidNameChars().replace("\\", "")
+            val expectedMessage =
+                "Doc level query name may not start with [_, +, -], contain '..', or contain: " +
+                    getInvalidNameChars().replace("\\", "")
             e.message?.let { assertTrue(it.contains(expectedMessage)) }
         }
     }
@@ -1422,6 +1542,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
      * This use case is needed by the frontend plugin for displaying alert counts on the Monitors list page.
      * https://github.com/opensearch-project/alerting-dashboards-plugin/blob/main/server/services/MonitorService.js#L235
      */
+    @Test
     fun `test get acknowledged, active, error, and ignored alerts counts`() {
         putAlertMappings()
         val monitorAlertCounts = hashMapOf<String, HashMap<String, Int>>()
@@ -1436,13 +1557,14 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             val numIgnoredAlerts = randomIntBetween(1, numCompletedAlerts)
             numCompletedAlerts -= numIgnoredAlerts
 
-            val alertCounts = hashMapOf(
-                Alert.State.ACKNOWLEDGED.name to numAcknowledgedAlerts,
-                Alert.State.ACTIVE.name to numActiveAlerts,
-                Alert.State.COMPLETED.name to numCompletedAlerts,
-                Alert.State.ERROR.name to numErrorAlerts,
-                "IGNORED" to numIgnoredAlerts
-            )
+            val alertCounts =
+                hashMapOf(
+                    Alert.State.ACKNOWLEDGED.name to numAcknowledgedAlerts,
+                    Alert.State.ACTIVE.name to numActiveAlerts,
+                    Alert.State.COMPLETED.name to numCompletedAlerts,
+                    Alert.State.ERROR.name to numErrorAlerts,
+                    "IGNORED" to numIgnoredAlerts,
+                )
             monitorAlertCounts[monitor.id] = alertCounts
 
             repeat(numAcknowledgedAlerts) {
@@ -1462,38 +1584,42 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             }
         }
 
-        val sourceBuilder = SearchSourceBuilder()
-            .size(0)
-            .query(QueryBuilders.termsQuery("monitor_id", monitorAlertCounts.keys))
-            .aggregation(
-                AggregationBuilders
-                    .terms("uniq_monitor_ids").field("monitor_id")
-                    .subAggregation(AggregationBuilders.filter("active", QueryBuilders.termQuery("state", "ACTIVE")))
-                    .subAggregation(AggregationBuilders.filter("acknowledged", QueryBuilders.termQuery("state", "ACKNOWLEDGED")))
-                    .subAggregation(AggregationBuilders.filter("errors", QueryBuilders.termQuery("state", "ERROR")))
-                    .subAggregation(
-                        AggregationBuilders.filter(
-                            "ignored",
-                            QueryBuilders.boolQuery()
-                                .filter(QueryBuilders.termQuery("state", "COMPLETED"))
-                                .mustNot(QueryBuilders.existsQuery("acknowledged_time"))
-                        )
-                    )
-                    .subAggregation(AggregationBuilders.max("last_notification_time").field("last_notification_time"))
-                    .subAggregation(
-                        AggregationBuilders.topHits("latest_alert")
-                            .size(1)
-                            .sort("start_time", SortOrder.DESC)
-                            .fetchSource(arrayOf("last_notification_time", "trigger_name"), null)
-                    )
-            )
+        val sourceBuilder =
+            SearchSourceBuilder()
+                .size(0)
+                .query(QueryBuilders.termsQuery("monitor_id", monitorAlertCounts.keys))
+                .aggregation(
+                    AggregationBuilders
+                        .terms("uniq_monitor_ids")
+                        .field("monitor_id")
+                        .subAggregation(AggregationBuilders.filter("active", QueryBuilders.termQuery("state", "ACTIVE")))
+                        .subAggregation(AggregationBuilders.filter("acknowledged", QueryBuilders.termQuery("state", "ACKNOWLEDGED")))
+                        .subAggregation(AggregationBuilders.filter("errors", QueryBuilders.termQuery("state", "ERROR")))
+                        .subAggregation(
+                            AggregationBuilders.filter(
+                                "ignored",
+                                QueryBuilders
+                                    .boolQuery()
+                                    .filter(QueryBuilders.termQuery("state", "COMPLETED"))
+                                    .mustNot(QueryBuilders.existsQuery("acknowledged_time")),
+                            ),
+                        ).subAggregation(AggregationBuilders.max("last_notification_time").field("last_notification_time"))
+                        .subAggregation(
+                            AggregationBuilders
+                                .topHits("latest_alert")
+                                .size(1)
+                                .sort("start_time", SortOrder.DESC)
+                                .fetchSource(arrayOf("last_notification_time", "trigger_name"), null),
+                        ),
+                )
 
-        val searchResponse = client().makeRequest(
-            "GET",
-            "$ALERTING_BASE_URI/_search",
-            hashMapOf("index" to AlertIndices.ALL_ALERT_INDEX_PATTERN),
-            StringEntity(sourceBuilder.toString(), ContentType.APPLICATION_JSON)
-        )
+        val searchResponse =
+            client().makeRequest(
+                "GET",
+                "$ALERTING_BASE_URI/_search",
+                hashMapOf("index" to AlertIndices.ALL_ALERT_INDEX_PATTERN),
+                StringEntity(sourceBuilder.toString(), ContentType.APPLICATION_JSON),
+            )
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content).map()
         val aggregations = (xcp["aggregations"]!! as Map<String, Map<String, Any>>)
         val uniqMonitorIds = aggregations["uniq_monitor_ids"]!!
@@ -1507,25 +1633,29 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             val acknowledged = (bucket["acknowledged"]!! as Map<String, Int>)["doc_count"]!!
             assertEquals(
                 "Incorrect ${Alert.State.ACKNOWLEDGED} count returned for monitor $id",
-                monitorCounts[Alert.State.ACKNOWLEDGED.name], acknowledged
+                monitorCounts[Alert.State.ACKNOWLEDGED.name],
+                acknowledged,
             )
 
             val active = (bucket["active"]!! as Map<String, Int>)["doc_count"]!!
             assertEquals(
                 "Incorrect ${Alert.State.ACTIVE} count returned for monitor $id",
-                monitorCounts[Alert.State.ACTIVE.name], active
+                monitorCounts[Alert.State.ACTIVE.name],
+                active,
             )
 
             val errors = (bucket["errors"]!! as Map<String, Int>)["doc_count"]!!
             assertEquals(
                 "Incorrect ${Alert.State.ERROR} count returned for monitor $id",
-                monitorCounts[Alert.State.ERROR.name], errors
+                monitorCounts[Alert.State.ERROR.name],
+                errors,
             )
 
             val ignored = (bucket["ignored"]!! as Map<String, Int>)["doc_count"]!!
             assertEquals(
                 "Incorrect IGNORED count returned for monitor $id",
-                monitorCounts["IGNORED"], ignored
+                monitorCounts["IGNORED"],
+                ignored,
             )
         }
     }
@@ -1536,16 +1666,19 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("More than $numberOfNodes successful node", numberOfNodes, nodesResponse["successful"])
     }
 
-    private fun assertAlertingStatsSweeperEnabled(alertingStatsResponse: Map<String, Any>, expected: Boolean) {
+    private fun assertAlertingStatsSweeperEnabled(
+        alertingStatsResponse: Map<String, Any>,
+        expected: Boolean,
+    ) {
         assertEquals(
             "Legacy scheduled job enabled field is not set to $expected",
             expected,
-            alertingStatsResponse[statsResponseOpendistroSweeperEnabledField]
+            alertingStatsResponse[statsResponseOpendistroSweeperEnabledField],
         )
         assertEquals(
             "Scheduled job is not ${if (expected) "enabled" else "disabled"}",
             expected,
-            alertingStatsResponse[statsResponseOpenSearchSweeperEnabledField]
+            alertingStatsResponse[statsResponseOpenSearchSweeperEnabledField],
         )
     }
 }

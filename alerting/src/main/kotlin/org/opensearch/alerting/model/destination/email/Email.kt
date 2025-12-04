@@ -24,19 +24,22 @@ import java.util.Locale
  */
 data class Email(
     val emailAccountID: String,
-    val recipients: List<Recipient>
-) : Writeable, ToXContent {
-
+    val recipients: List<Recipient>,
+) : Writeable,
+    ToXContent {
     init {
         require(recipients.isNotEmpty()) { "At least one recipient must be provided" }
     }
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        return builder.startObject(TYPE)
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder =
+        builder
+            .startObject(TYPE)
             .field(EMAIL_ACCOUNT_ID_FIELD, emailAccountID)
             .field(RECIPIENTS_FIELD, recipients.toTypedArray())
             .endObject()
-    }
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
@@ -61,13 +64,17 @@ data class Email(
                 xcp.nextToken()
 
                 when (fieldName) {
-                    EMAIL_ACCOUNT_ID_FIELD -> emailAccountID = xcp.text()
+                    EMAIL_ACCOUNT_ID_FIELD -> {
+                        emailAccountID = xcp.text()
+                    }
+
                     RECIPIENTS_FIELD -> {
                         ensureExpectedToken(Token.START_ARRAY, xcp.currentToken(), xcp)
                         while (xcp.nextToken() != Token.END_ARRAY) {
                             recipients.add(Recipient.parse(xcp))
                         }
                     }
+
                     else -> {
                         throw IllegalStateException("Unexpected field: $fieldName, while parsing email destination")
                     }
@@ -76,20 +83,21 @@ data class Email(
 
             return Email(
                 requireNotNull(emailAccountID) { "Email account ID is null" },
-                recipients
+                recipients,
             )
         }
 
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): Email? {
-            return if (sin.readBoolean()) {
+        fun readFrom(sin: StreamInput): Email? =
+            if (sin.readBoolean()) {
                 Email(
                     sin.readString(), // emailAccountID
-                    sin.readList(::Recipient) // recipients
+                    sin.readList(::Recipient), // recipients
                 )
-            } else null
-        }
+            } else {
+                null
+            }
     }
 }
 
@@ -99,12 +107,15 @@ data class Email(
 data class Recipient(
     val type: RecipientType,
     val emailGroupID: String?,
-    val email: String?
-) : Writeable, ToXContent {
-
+    val email: String?,
+) : Writeable,
+    ToXContent {
     init {
         when (type) {
-            RecipientType.EMAIL_GROUP -> requireNotNull(emailGroupID) { "Email group ID is null" }
+            RecipientType.EMAIL_GROUP -> {
+                requireNotNull(emailGroupID) { "Email group ID is null" }
+            }
+
             RecipientType.EMAIL -> {
                 requireNotNull(email) { "Email is null" }
                 require(isValidEmail(email)) { "Invalid email" }
@@ -116,10 +127,13 @@ data class Recipient(
     constructor(sin: StreamInput) : this(
         sin.readEnum(Recipient.RecipientType::class.java), // type
         sin.readOptionalString(), // emailGroupId
-        sin.readOptionalString() // email
+        sin.readOptionalString(), // email
     )
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
         builder.startObject().field(TYPE_FIELD, type.value)
 
         when (type) {
@@ -137,9 +151,11 @@ data class Recipient(
         out.writeOptionalString(email)
     }
 
-    enum class RecipientType(val value: String) {
+    enum class RecipientType(
+        val value: String,
+    ) {
         EMAIL("email"),
-        EMAIL_GROUP("email_group")
+        EMAIL_GROUP("email_group"),
     }
 
     companion object {
@@ -167,22 +183,26 @@ data class Recipient(
                             throw IllegalStateException("Type should be one of $allowedTypes")
                         }
                     }
-                    EMAIL_GROUP_ID_FIELD -> emailGroupID = xcp.text()
-                    EMAIL_FIELD -> email = xcp.text()
+
+                    EMAIL_GROUP_ID_FIELD -> {
+                        emailGroupID = xcp.text()
+                    }
+
+                    EMAIL_FIELD -> {
+                        email = xcp.text()
+                    }
                 }
             }
 
             return Recipient(
                 RecipientType.valueOf(type.uppercase(Locale.ROOT)),
                 emailGroupID,
-                email
+                email,
             )
         }
 
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): Recipient {
-            return Recipient(sin)
-        }
+        fun readFrom(sin: StreamInput): Recipient = Recipient(sin)
     }
 }

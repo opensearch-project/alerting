@@ -34,9 +34,7 @@ class GetAlertsV2Request : ActionRequest {
         monitorV2Ids = sin.readOptionalStringList(),
     )
 
-    override fun validate(): ActionRequestValidationException? {
-        return null
-    }
+    override fun validate(): ActionRequestValidationException? = null
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {

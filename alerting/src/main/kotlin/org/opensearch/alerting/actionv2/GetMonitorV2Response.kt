@@ -29,7 +29,7 @@ class GetMonitorV2Response : BaseResponse {
         version: Long,
         seqNo: Long,
         primaryTerm: Long,
-        monitorV2: MonitorV2?
+        monitorV2: MonitorV2?,
     ) : super() {
         this.id = id
         this.version = version
@@ -44,11 +44,12 @@ class GetMonitorV2Response : BaseResponse {
         version = sin.readLong(), // version
         seqNo = sin.readLong(), // seqNo
         primaryTerm = sin.readLong(), // primaryTerm
-        monitorV2 = if (sin.readBoolean()) {
-            MonitorV2.readFrom(sin) // monitorV2
-        } else {
-            null
-        }
+        monitorV2 =
+            if (sin.readBoolean()) {
+                MonitorV2.readFrom(sin) // monitorV2
+            } else {
+                null
+            },
     )
 
     @Throws(IOException::class)
@@ -66,8 +67,12 @@ class GetMonitorV2Response : BaseResponse {
     }
 
     @Throws(IOException::class)
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        builder.startObject()
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
+        builder
+            .startObject()
             .field(_ID, id)
             .field(_VERSION, version)
             .field(_SEQ_NO, seqNo)

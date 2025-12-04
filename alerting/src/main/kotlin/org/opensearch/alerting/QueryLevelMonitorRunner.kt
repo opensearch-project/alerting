@@ -34,7 +34,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         dryrun: Boolean,
         workflowRunContext: WorkflowRunContext?,
         executionId: String,
-        transportService: TransportService
+        transportService: TransportService,
     ): MonitorRunResult<QueryLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
@@ -44,16 +44,17 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         }
 
         var monitorResult = MonitorRunResult<QueryLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
-        val currentAlerts = try {
-            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
-            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
-            monitorCtx.alertService!!.loadCurrentAlertsForQueryLevelMonitor(monitor, workflowRunContext)
-        } catch (e: Exception) {
-            // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
-            val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
-            logger.error("Error loading alerts for monitor: $id", e)
-            return monitorResult.copy(error = e)
-        }
+        val currentAlerts =
+            try {
+                monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
+                monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
+                monitorCtx.alertService!!.loadCurrentAlertsForQueryLevelMonitor(monitor, workflowRunContext)
+            } catch (e: Exception) {
+                // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
+                val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
+                logger.error("Error loading alerts for monitor: $id", e)
+                return monitorResult.copy(error = e)
+            }
         if (!isADMonitor(monitor)) {
             withClosableContext(
                 InjectorContextElement(
@@ -61,17 +62,26 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                     monitorCtx.settings!!,
                     monitorCtx.threadPool!!.threadContext,
                     roles,
-                    monitor.user
-                )
+                    monitor.user,
+                ),
             ) {
-                monitorResult = monitorResult.copy(
-                    inputResults = monitorCtx.inputService!!.collectInputResults(monitor, periodStart, periodEnd, null, workflowRunContext)
-                )
+                monitorResult =
+                    monitorResult.copy(
+                        inputResults =
+                            monitorCtx.inputService!!.collectInputResults(
+                                monitor,
+                                periodStart,
+                                periodEnd,
+                                null,
+                                workflowRunContext,
+                            ),
+                    )
             }
         } else {
-            monitorResult = monitorResult.copy(
-                inputResults = monitorCtx.inputService!!.collectInputResultsForADMonitor(monitor, periodStart, periodEnd)
-            )
+            monitorResult =
+                monitorResult.copy(
+                    inputResults = monitorCtx.inputService!!.collectInputResultsForADMonitor(monitor, periodStart, periodEnd),
+                )
         }
 
         val updatedAlerts = mutableListOf<Alert>()
@@ -79,31 +89,40 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
         val maxComments = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION)
         val alertsToExecuteActionsForIds = currentAlerts.mapNotNull { it.value }.map { it.id }
-        val allAlertsComments = CommentsUtils.getCommentsForAlertNotification(
-            monitorCtx.client!!,
-            alertsToExecuteActionsForIds,
-            maxComments
-        )
+        val allAlertsComments =
+            CommentsUtils.getCommentsForAlertNotification(
+                monitorCtx.client!!,
+                alertsToExecuteActionsForIds,
+                maxComments,
+            )
         for (trigger in monitor.triggers) {
             val currentAlert = currentAlerts[trigger]
-            val currentAlertContext = currentAlert?.let {
-                AlertContext(alert = currentAlert, comments = allAlertsComments[currentAlert.id])
-            }
-            val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlertContext)
-            val triggerResult = when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
-                Monitor.MonitorType.QUERY_LEVEL_MONITOR ->
-                    monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
-                Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> {
-                    val remoteMonitoringEnabled =
-                        monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
-                    logger.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
-                    if (remoteMonitoringEnabled)
-                        monitorCtx.triggerService!!.runClusterMetricsTrigger(monitor, trigger, triggerCtx, monitorCtx.clusterService!!)
-                    else monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
+            val currentAlertContext =
+                currentAlert?.let {
+                    AlertContext(alert = currentAlert, comments = allAlertsComments[currentAlert.id])
                 }
-                else ->
-                    throw IllegalArgumentException("Unsupported monitor type: ${monitor.monitorType}.")
-            }
+            val triggerCtx = QueryLevelTriggerExecutionContext(monitor, trigger as QueryLevelTrigger, monitorResult, currentAlertContext)
+            val triggerResult =
+                when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
+                    Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {
+                        monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
+                    }
+
+                    Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> {
+                        val remoteMonitoringEnabled =
+                            monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
+                        logger.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
+                        if (remoteMonitoringEnabled) {
+                            monitorCtx.triggerService!!.runClusterMetricsTrigger(monitor, trigger, triggerCtx, monitorCtx.clusterService!!)
+                        } else {
+                            monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
+                        }
+                    }
+
+                    else -> {
+                        throw IllegalArgumentException("Unsupported monitor type: ${monitor.monitorType}.")
+                    }
+                }
 
             triggerResults[trigger.id] = triggerResult
 
@@ -114,13 +133,14 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                 }
             }
 
-            val updatedAlert = monitorCtx.alertService!!.composeQueryLevelAlert(
-                triggerCtx,
-                triggerResult,
-                monitorResult.alertError() ?: triggerResult.alertError(),
-                executionId,
-                workflowRunContext
-            )
+            val updatedAlert =
+                monitorCtx.alertService!!.composeQueryLevelAlert(
+                    triggerCtx,
+                    triggerResult,
+                    monitorResult.alertError() ?: triggerResult.alertError(),
+                    executionId,
+                    workflowRunContext,
+                )
             if (updatedAlert != null) updatedAlerts += updatedAlert
         }
 
@@ -131,7 +151,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                     monitor.dataSources,
                     updatedAlerts,
                     it,
-                    routingId = monitor.id
+                    routingId = monitor.id,
                 )
             }
         }

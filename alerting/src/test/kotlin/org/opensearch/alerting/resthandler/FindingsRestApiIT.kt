@@ -12,11 +12,12 @@ import org.opensearch.alerting.randomDocumentLevelTrigger
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.test.junit.annotations.TestLogging
+import kotlin.test.Test
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class FindingsRestApiIT : AlertingRestTestCase() {
-
+    @Test
     fun `test find Finding where doc is not retrieved`() {
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
@@ -31,6 +32,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         assertFalse(response.findings[0].documents[0].found)
     }
 
+    @Test
     fun `test find Finding where source docData is null`() {
         val testIndex = createTestIndex()
         val testDoc = """{
@@ -58,6 +60,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         assertFalse(responseAfterDelete.findings[0].documents[0].found)
     }
 
+    @Test
     fun `test find Finding where doc is retrieved`() {
         val testIndex = createTestIndex()
         val testDoc = """{
@@ -98,6 +101,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test find Finding for specific finding by id`() {
         val testIndex = createTestIndex()
         val testDoc = """{
@@ -129,6 +133,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         assertEquals(testDoc2, response.findings[0].documents[1].document)
     }
 
+    @Test
     fun `test find Finding by tag`() {
         val testIndex = createTestIndex()
         val testDoc = """{
@@ -149,11 +154,12 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         executeMonitor(trueMonitor.id, mapOf(Pair("dryrun", "true")))
 
         createFinding(matchingDocIds = listOf("someId"), index = testIndex)
-        val findingId = createFinding(
-            matchingDocIds = listOf("someId", "someId2"),
-            index = testIndex,
-            docLevelQueries = listOf(docLevelQuery)
-        )
+        val findingId =
+            createFinding(
+                matchingDocIds = listOf("someId", "someId2"),
+                index = testIndex,
+                docLevelQueries = listOf(docLevelQuery),
+            )
         val response = searchFindings(mapOf(Pair("searchString", "sigma")))
         assertEquals(1, response.totalFindings)
         assertEquals(findingId, response.findings[0].finding.id)
@@ -164,6 +170,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         assertEquals(testDoc2, response.findings[0].documents[1].document)
     }
 
+    @Test
     fun `test find Finding by name`() {
         val testIndex = createTestIndex()
         val testDoc = """{
@@ -184,11 +191,12 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         executeMonitor(trueMonitor.id, mapOf(Pair("dryrun", "true")))
 
         createFinding(matchingDocIds = listOf("someId"), index = testIndex)
-        val findingId = createFinding(
-            matchingDocIds = listOf("someId", "someId2"),
-            index = testIndex,
-            docLevelQueries = listOf(docLevelQuery)
-        )
+        val findingId =
+            createFinding(
+                matchingDocIds = listOf("someId", "someId2"),
+                index = testIndex,
+                docLevelQueries = listOf(docLevelQuery),
+            )
         val response = searchFindings(mapOf(Pair("searchString", "realQuery")))
         assertEquals(1, response.totalFindings)
         assertEquals(findingId, response.findings[0].finding.id)
@@ -199,6 +207,7 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         assertEquals(testDoc2, response.findings[0].documents[1].document)
     }
 
+    @Test
     fun `test find Finding by monitor id`() {
         val testIndex = createTestIndex()
         val testDoc = """{
@@ -219,12 +228,13 @@ class FindingsRestApiIT : AlertingRestTestCase() {
         executeMonitor(trueMonitor.id, mapOf(Pair("dryrun", "true")))
 
         createFinding(matchingDocIds = listOf("someId"), index = testIndex)
-        val findingId = createFinding(
-            monitorId = "monitorToFind",
-            matchingDocIds = listOf("someId", "someId2"),
-            index = testIndex,
-            docLevelQueries = listOf(docLevelQuery)
-        )
+        val findingId =
+            createFinding(
+                monitorId = "monitorToFind",
+                matchingDocIds = listOf("someId", "someId2"),
+                index = testIndex,
+                docLevelQueries = listOf(docLevelQuery),
+            )
         val response = searchFindings(mapOf(Pair("searchString", "monitorToFind")))
         assertEquals(1, response.totalFindings)
         assertEquals(findingId, response.findings[0].finding.id)

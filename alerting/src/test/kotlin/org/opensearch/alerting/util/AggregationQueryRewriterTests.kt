@@ -28,9 +28,10 @@ import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
 import java.io.IOException
+import kotlin.test.Test
 
 class AggregationQueryRewriterTests : OpenSearchTestCase() {
-
+    @Test
     fun `test RewriteQuery empty previous result`() {
         val triggers: MutableList<Trigger> = mutableListOf()
         for (i in 0 until 10) {
@@ -44,16 +45,18 @@ class AggregationQueryRewriterTests : OpenSearchTestCase() {
         Assert.assertEquals(queryBuilder.aggregations().pipelineAggregatorFactories.size, 10)
     }
 
+    @Test
     fun `skip test RewriteQuery with non-empty previous result`() {
         val triggers: MutableList<Trigger> = mutableListOf()
         for (i in 0 until 10) {
             triggers.add(randomBucketLevelTrigger())
         }
         val queryBuilder = SearchSourceBuilder()
-        val termAgg: AggregationBuilder = CompositeAggregationBuilder(
-            "testPath",
-            listOf(TermsValuesSourceBuilder("k1"), TermsValuesSourceBuilder("k2"))
-        )
+        val termAgg: AggregationBuilder =
+            CompositeAggregationBuilder(
+                "testPath",
+                listOf(TermsValuesSourceBuilder("k1"), TermsValuesSourceBuilder("k2")),
+            )
         queryBuilder.aggregation(termAgg)
         val aggTriggersAfterKey = mutableMapOf<String, TriggerAfterKey>()
         for (trigger in triggers) {
@@ -74,6 +77,7 @@ class AggregationQueryRewriterTests : OpenSearchTestCase() {
         }
     }
 
+    @Test
     fun `test RewriteQuery with non aggregation trigger`() {
         val triggers: MutableList<Trigger> = mutableListOf()
         for (i in 0 until 10) {
@@ -87,42 +91,44 @@ class AggregationQueryRewriterTests : OpenSearchTestCase() {
         Assert.assertEquals(queryBuilder.aggregations().pipelineAggregatorFactories.size, 0)
     }
 
+    @Test
     fun `test after keys from search response`() {
-        val responseContent = """
-        {
-          "took" : 97,
-          "timed_out" : false,
-          "_shards" : {
-            "total" : 3,
-            "successful" : 3,
-            "skipped" : 0,
-            "failed" : 0
-          },
-          "hits" : {
-            "total" : {
-              "value" : 20,
-              "relation" : "eq"
-            },
-            "max_score" : null,
-            "hits" : [ ]
-          },
-          "aggregations" : {
-            "composite#testPath" : {
-              "after_key" : {
-                "sport" : "Basketball"
+        val responseContent =
+            """
+            {
+              "took" : 97,
+              "timed_out" : false,
+              "_shards" : {
+                "total" : 3,
+                "successful" : 3,
+                "skipped" : 0,
+                "failed" : 0
               },
-              "buckets" : [
-                {
-                  "key" : {
+              "hits" : {
+                "total" : {
+                  "value" : 20,
+                  "relation" : "eq"
+                },
+                "max_score" : null,
+                "hits" : [ ]
+              },
+              "aggregations" : {
+                "composite#testPath" : {
+                  "after_key" : {
                     "sport" : "Basketball"
                   },
-                  "doc_count" : 5
+                  "buckets" : [
+                    {
+                      "key" : {
+                        "sport" : "Basketball"
+                      },
+                      "doc_count" : 5
+                    }
+                  ]
                 }
-              ]
+              }
             }
-          }
-        }
-        """.trimIndent()
+            """.trimIndent()
 
         val aggTriggers: MutableList<Trigger> = mutableListOf(randomBucketLevelTrigger())
         val tradTriggers: MutableList<Trigger> = mutableListOf(randomQueryLevelTrigger())
@@ -135,140 +141,145 @@ class AggregationQueryRewriterTests : OpenSearchTestCase() {
         Assert.assertEquals(afterKeys2.size, 0)
     }
 
+    @Test
     fun `test after keys from search responses for multiple bucket paths and different page counts`() {
-        val firstResponseContent = """
-        {
-          "took" : 0,
-          "timed_out" : false,
-          "_shards" : {
-            "total" : 1,
-            "successful" : 1,
-            "skipped" : 0,
-            "failed" : 0
-          },
-          "hits" : {
-            "total" : {
-              "value" : 4675,
-              "relation" : "eq"
-            },
-            "max_score" : null,
-            "hits" : [ ]
-          },
-          "aggregations" : {
-            "composite2#smallerResults" : {
-              "after_key" : {
-                "category" : "Women's Shoes"
+        val firstResponseContent =
+            """
+            {
+              "took" : 0,
+              "timed_out" : false,
+              "_shards" : {
+                "total" : 1,
+                "successful" : 1,
+                "skipped" : 0,
+                "failed" : 0
               },
-              "buckets" : [
-                {
-                  "key" : {
+              "hits" : {
+                "total" : {
+                  "value" : 4675,
+                  "relation" : "eq"
+                },
+                "max_score" : null,
+                "hits" : [ ]
+              },
+              "aggregations" : {
+                "composite2#smallerResults" : {
+                  "after_key" : {
                     "category" : "Women's Shoes"
                   },
-                  "doc_count" : 1136
-                }
-              ]
-            },
-            "composite3#largerResults" : {
-              "after_key" : {
-                "user" : "abigail"
-              },
-              "buckets" : [
-                {
-                  "key" : {
-                    "user" : "abd"
-                  },
-                  "doc_count" : 188
+                  "buckets" : [
+                    {
+                      "key" : {
+                        "category" : "Women's Shoes"
+                      },
+                      "doc_count" : 1136
+                    }
+                  ]
                 },
-                {
-                  "key" : {
+                "composite3#largerResults" : {
+                  "after_key" : {
                     "user" : "abigail"
                   },
-                  "doc_count" : 128
+                  "buckets" : [
+                    {
+                      "key" : {
+                        "user" : "abd"
+                      },
+                      "doc_count" : 188
+                    },
+                    {
+                      "key" : {
+                        "user" : "abigail"
+                      },
+                      "doc_count" : 128
+                    }
+                  ]
                 }
-              ]
+              }
             }
-          }
-        }
-        """.trimIndent()
+            """.trimIndent()
 
-        val secondResponseContent = """
-        {
-          "took" : 0,
-          "timed_out" : false,
-          "_shards" : {
-            "total" : 1,
-            "successful" : 1,
-            "skipped" : 0,
-            "failed" : 0
-          },
-          "hits" : {
-            "total" : {
-              "value" : 4675,
-              "relation" : "eq"
-            },
-            "max_score" : null,
-            "hits" : [ ]
-          },
-          "aggregations" : {
-            "composite2#smallerResults" : {
-              "buckets" : [ ]
-            },
-            "composite3#largerResults" : {
-              "after_key" : {
-                "user" : "boris"
+        val secondResponseContent =
+            """
+            {
+              "took" : 0,
+              "timed_out" : false,
+              "_shards" : {
+                "total" : 1,
+                "successful" : 1,
+                "skipped" : 0,
+                "failed" : 0
               },
-              "buckets" : [
-                {
-                  "key" : {
-                    "user" : "betty"
-                  },
-                  "doc_count" : 148
+              "hits" : {
+                "total" : {
+                  "value" : 4675,
+                  "relation" : "eq"
                 },
-                {
-                  "key" : {
+                "max_score" : null,
+                "hits" : [ ]
+              },
+              "aggregations" : {
+                "composite2#smallerResults" : {
+                  "buckets" : [ ]
+                },
+                "composite3#largerResults" : {
+                  "after_key" : {
                     "user" : "boris"
                   },
-                  "doc_count" : 74
+                  "buckets" : [
+                    {
+                      "key" : {
+                        "user" : "betty"
+                      },
+                      "doc_count" : 148
+                    },
+                    {
+                      "key" : {
+                        "user" : "boris"
+                      },
+                      "doc_count" : 74
+                    }
+                  ]
                 }
-              ]
+              }
             }
-          }
-        }
-        """.trimIndent()
+            """.trimIndent()
 
-        val thirdResponseContent = """
-        {
-          "took" : 0,
-          "timed_out" : false,
-          "_shards" : {
-            "total" : 1,
-            "successful" : 1,
-            "skipped" : 0,
-            "failed" : 0
-          },
-          "hits" : {
-            "total" : {
-              "value" : 4675,
-              "relation" : "eq"
-            },
-            "max_score" : null,
-            "hits" : [ ]
-          },
-          "aggregations" : {
-            "composite2#smallerResults" : {
-              "buckets" : [ ]
-            },
-            "composite3#largerResults" : {
-              "buckets" : [ ]
+        val thirdResponseContent =
+            """
+            {
+              "took" : 0,
+              "timed_out" : false,
+              "_shards" : {
+                "total" : 1,
+                "successful" : 1,
+                "skipped" : 0,
+                "failed" : 0
+              },
+              "hits" : {
+                "total" : {
+                  "value" : 4675,
+                  "relation" : "eq"
+                },
+                "max_score" : null,
+                "hits" : [ ]
+              },
+              "aggregations" : {
+                "composite2#smallerResults" : {
+                  "buckets" : [ ]
+                },
+                "composite3#largerResults" : {
+                  "buckets" : [ ]
+                }
+              }
             }
-          }
-        }
-        """.trimIndent()
+            """.trimIndent()
 
-        val bucketLevelTriggers: MutableList<Trigger> = mutableListOf(
-            randomBucketLevelTrigger(bucketSelector = randomBucketSelectorExtAggregationBuilder(parentBucketPath = "smallerResults")),
-            randomBucketLevelTrigger(bucketSelector = randomBucketSelectorExtAggregationBuilder(parentBucketPath = "largerResults"))
-        )
+        val bucketLevelTriggers: MutableList<Trigger> =
+            mutableListOf(
+                randomBucketLevelTrigger(bucketSelector = randomBucketSelectorExtAggregationBuilder(parentBucketPath = "smallerResults")),
+                randomBucketLevelTrigger(bucketSelector = randomBucketSelectorExtAggregationBuilder(parentBucketPath = "largerResults")),
+            )
 
         var searchResponse = SearchResponse.fromXContent(createParser(JsonXContent.jsonXContent, firstResponseContent))
         val afterKeys = AggregationQueryRewriter.getAfterKeysFromSearchResponse(searchResponse, bucketLevelTriggers, null)
@@ -296,33 +307,39 @@ class AggregationQueryRewriterTests : OpenSearchTestCase() {
         val entries = ClusterModule.getNamedXWriteables()
         entries.add(
             NamedXContentRegistry.Entry(
-                Aggregation::class.java, ParseField(CompositeAggregationBuilder.NAME),
+                Aggregation::class.java,
+                ParseField(CompositeAggregationBuilder.NAME),
                 CheckedFunction<XContentParser, ParsedComposite, IOException> { parser: XContentParser? ->
                     ParsedComposite.fromXContent(
-                        parser, "testPath"
+                        parser,
+                        "testPath",
                     )
-                }
-            )
+                },
+            ),
         )
         entries.add(
             NamedXContentRegistry.Entry(
-                Aggregation::class.java, ParseField(CompositeAggregationBuilder.NAME + "2"),
+                Aggregation::class.java,
+                ParseField(CompositeAggregationBuilder.NAME + "2"),
                 CheckedFunction<XContentParser, ParsedComposite, IOException> { parser: XContentParser? ->
                     ParsedComposite.fromXContent(
-                        parser, "smallerResults"
+                        parser,
+                        "smallerResults",
                     )
-                }
-            )
+                },
+            ),
         )
         entries.add(
             NamedXContentRegistry.Entry(
-                Aggregation::class.java, ParseField(CompositeAggregationBuilder.NAME + "3"),
+                Aggregation::class.java,
+                ParseField(CompositeAggregationBuilder.NAME + "3"),
                 CheckedFunction<XContentParser, ParsedComposite, IOException> { parser: XContentParser? ->
                     ParsedComposite.fromXContent(
-                        parser, "largerResults"
+                        parser,
+                        "largerResults",
                     )
-                }
-            )
+                },
+            ),
         )
         return NamedXContentRegistry(entries)
     }

@@ -44,103 +44,116 @@ import org.opensearch.transport.client.Client
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 private val log = LogManager.getLogger(TransportDeleteMonitorAction::class.java)
 
-class TransportDeleteMonitorAction @Inject constructor(
-    transportService: TransportService,
-    val client: Client,
-    actionFilters: ActionFilters,
-    val clusterService: ClusterService,
-    settings: Settings,
-    val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<ActionRequest, DeleteMonitorResponse>(
-    AlertingActions.DELETE_MONITOR_ACTION_NAME, transportService, actionFilters, ::DeleteMonitorRequest
-),
-    SecureTransportAction {
+class TransportDeleteMonitorAction
+    @Inject
+    constructor(
+        transportService: TransportService,
+        val client: Client,
+        actionFilters: ActionFilters,
+        val clusterService: ClusterService,
+        settings: Settings,
+        val xContentRegistry: NamedXContentRegistry,
+    ) : HandledTransportAction<ActionRequest, DeleteMonitorResponse>(
+            AlertingActions.DELETE_MONITOR_ACTION_NAME,
+            transportService,
+            actionFilters,
+            ::DeleteMonitorRequest,
+        ),
+        SecureTransportAction {
+        @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
-    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
-
-    init {
-        listenFilterBySettingChange(clusterService)
-    }
-
-    override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<DeleteMonitorResponse>) {
-        val transformedRequest = request as? DeleteMonitorRequest
-            ?: recreateObject(request) { DeleteMonitorRequest(it) }
-        val user = readUserFromThreadContext(client)
-
-        if (!validateUserBackendRoles(user, actionListener)) {
-            return
+        init {
+            listenFilterBySettingChange(clusterService)
         }
-        scope.launch {
-            DeleteMonitorHandler(
-                client,
-                actionListener,
-                user,
-                transformedRequest.monitorId
-            ).resolveUserAndStart(transformedRequest.refreshPolicy)
+
+        override fun doExecute(
+            task: Task,
+            request: ActionRequest,
+            actionListener: ActionListener<DeleteMonitorResponse>,
+        ) {
+            val transformedRequest =
+                request as? DeleteMonitorRequest
+                    ?: recreateObject(request) { DeleteMonitorRequest(it) }
+            val user = readUserFromThreadContext(client)
+
+            if (!validateUserBackendRoles(user, actionListener)) {
+                return
+            }
+            scope.launch {
+                DeleteMonitorHandler(
+                    client,
+                    actionListener,
+                    user,
+                    transformedRequest.monitorId,
+                ).resolveUserAndStart(transformedRequest.refreshPolicy)
+            }
         }
-    }
 
-    inner class DeleteMonitorHandler(
-        private val client: Client,
-        private val actionListener: ActionListener<DeleteMonitorResponse>,
-        private val user: User?,
-        private val monitorId: String
-    ) {
-        suspend fun resolveUserAndStart(refreshPolicy: RefreshPolicy) {
-            try {
-                val monitor = getMonitor() ?: return // null means there was an issue retrieving the Monitor
+        inner class DeleteMonitorHandler(
+            private val client: Client,
+            private val actionListener: ActionListener<DeleteMonitorResponse>,
+            private val user: User?,
+            private val monitorId: String,
+        ) {
+            suspend fun resolveUserAndStart(refreshPolicy: RefreshPolicy) {
+                try {
+                    val monitor = getMonitor() ?: return // null means there was an issue retrieving the Monitor
 
-                val canDelete = user == null || !doFilterForUser(user) ||
-                    checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)
+                    val canDelete =
+                        user == null || !doFilterForUser(user) ||
+                            checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)
 
-                if (DeleteMonitorService.monitorIsWorkflowDelegate(monitor.id)) {
-                    actionListener.onFailure(
-                        AlertingException(
-                            "Monitor can't be deleted because it is a part of workflow(s)",
-                            RestStatus.FORBIDDEN,
-                            IllegalStateException()
+                    if (DeleteMonitorService.monitorIsWorkflowDelegate(monitor.id)) {
+                        actionListener.onFailure(
+                            AlertingException(
+                                "Monitor can't be deleted because it is a part of workflow(s)",
+                                RestStatus.FORBIDDEN,
+                                IllegalStateException(),
+                            ),
                         )
-                    )
-                } else if (canDelete) {
-                    actionListener.onResponse(
-                        DeleteMonitorService.deleteMonitor(monitor, refreshPolicy)
-                    )
-                } else {
+                    } else if (canDelete) {
+                        actionListener.onResponse(
+                            DeleteMonitorService.deleteMonitor(monitor, refreshPolicy),
+                        )
+                    } else {
+                        actionListener.onFailure(
+                            AlertingException("Not allowed to delete this monitor!", RestStatus.FORBIDDEN, IllegalStateException()),
+                        )
+                    }
+                } catch (t: Exception) {
+                    log.error("Failed to delete monitor $monitorId", t)
+                    actionListener.onFailure(AlertingException.wrap(t))
+                }
+            }
+
+            private suspend fun getMonitor(): Monitor? {
+                val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
+
+                val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
+                if (!getResponse.isExists) {
                     actionListener.onFailure(
-                        AlertingException("Not allowed to delete this monitor!", RestStatus.FORBIDDEN, IllegalStateException())
+                        AlertingException.wrap(
+                            OpenSearchStatusException("Monitor with $monitorId is not found", RestStatus.NOT_FOUND),
+                        ),
                     )
                 }
-            } catch (t: Exception) {
-                log.error("Failed to delete monitor $monitorId", t)
-                actionListener.onFailure(AlertingException.wrap(t))
-            }
-        }
-
-        private suspend fun getMonitor(): Monitor? {
-            val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
-
-            val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
-            if (!getResponse.isExists) {
-                actionListener.onFailure(
-                    AlertingException.wrap(
-                        OpenSearchStatusException("Monitor with $monitorId is not found", RestStatus.NOT_FOUND)
+                val xcp =
+                    XContentHelper.createParser(
+                        xContentRegistry,
+                        LoggingDeprecationHandler.INSTANCE,
+                        getResponse.sourceAsBytesRef,
+                        XContentType.JSON,
                     )
-                )
+                val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
+
+                validateMonitorV1(scheduledJob)?.let {
+                    actionListener.onFailure(AlertingException.wrap(it))
+                    return null
+                }
+
+                val monitor = scheduledJob as Monitor
+
+                return monitor
             }
-            val xcp = XContentHelper.createParser(
-                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                getResponse.sourceAsBytesRef, XContentType.JSON
-            )
-            val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
-
-            validateMonitorV1(scheduledJob)?.let {
-                actionListener.onFailure(AlertingException.wrap(it))
-                return null
-            }
-
-            val monitor = scheduledJob as Monitor
-
-            return monitor
         }
     }
-}

@@ -23,29 +23,28 @@ class RestGetRemoteIndexesAction : BaseRestHandler() {
         val ROUTE = "${AlertingPlugin.REMOTE_BASE_URI}/indexes"
     }
 
-    override fun getName(): String {
-        return "get_remote_indexes_action"
-    }
+    override fun getName(): String = "get_remote_indexes_action"
 
-    override fun routes(): List<RestHandler.Route> {
-        return mutableListOf(
-            RestHandler.Route(RestRequest.Method.GET, ROUTE)
+    override fun routes(): List<RestHandler.Route> =
+        mutableListOf(
+            RestHandler.Route(RestRequest.Method.GET, ROUTE),
         )
-    }
 
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.info("${request.method()} $ROUTE")
         val indexes = Strings.splitStringByCommaToArray(request.param(GetRemoteIndexesRequest.INDEXES_FIELD, ""))
         val includeMappings = request.paramAsBoolean(GetRemoteIndexesRequest.INCLUDE_MAPPINGS_FIELD, false)
-        return RestChannelConsumer {
-                channel ->
+        return RestChannelConsumer { channel ->
             client.execute(
                 GetRemoteIndexesAction.INSTANCE,
                 GetRemoteIndexesRequest(
                     indexes = indexes.toList(),
-                    includeMappings = includeMappings
+                    includeMappings = includeMappings,
                 ),
-                RestToXContentListener(channel)
+                RestToXContentListener(channel),
             )
         }
     }

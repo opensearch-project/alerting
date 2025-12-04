@@ -18,17 +18,21 @@ import java.io.IOException
  * A value object that represents a Chime message. Chime message will be
  * submitted to the Chime destination
  */
-data class Chime(val url: String) : ToXContent {
-
+data class Chime(
+    val url: String,
+) : ToXContent {
     init {
         require(!Strings.isNullOrEmpty(url)) { "URL is null or empty" }
     }
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        return builder.startObject(TYPE)
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder =
+        builder
+            .startObject(TYPE)
             .field(URL, url)
             .endObject()
-    }
 
     @Throws(IOException::class)
     fun writeTo(out: StreamOutput) {
@@ -49,7 +53,10 @@ data class Chime(val url: String) : ToXContent {
                 val fieldName = xcp.currentName()
                 xcp.nextToken()
                 when (fieldName) {
-                    URL -> url = xcp.text()
+                    URL -> {
+                        url = xcp.text()
+                    }
+
                     else -> {
                         throw IllegalStateException("Unexpected field: $fieldName, while parsing Chime destination")
                     }
@@ -60,15 +67,17 @@ data class Chime(val url: String) : ToXContent {
 
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): Chime? {
-            return if (sin.readBoolean()) {
+        fun readFrom(sin: StreamInput): Chime? =
+            if (sin.readBoolean()) {
                 Chime(sin.readString())
-            } else null
-        }
+            } else {
+                null
+            }
     }
 
     // Complete JSON structure is now constructed in the notification plugin
-    fun constructMessageContent(subject: String?, message: String): String {
-        return if (Strings.isNullOrEmpty(subject)) message else "$subject \n\n $message"
-    }
+    fun constructMessageContent(
+        subject: String?,
+        message: String,
+    ): String = if (Strings.isNullOrEmpty(subject)) message else "$subject \n\n $message"
 }

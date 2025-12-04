@@ -24,21 +24,22 @@ object PPLPluginInterface {
         request: TransportPPLQueryRequest,
         listener: ActionListener<TransportPPLQueryResponse>,
     ) {
-
-        val responseReader = Writeable.Reader<ActionResponse> {
-            TransportPPLQueryResponse(it)
-        }
-
-        val wrappedListener = object : ActionListener<ActionResponse> {
-            override fun onResponse(response: ActionResponse) {
-                val recreated = recreateObject(response) { TransportPPLQueryResponse(it) }
-                listener.onResponse(recreated)
+        val responseReader =
+            Writeable.Reader<ActionResponse> {
+                TransportPPLQueryResponse(it)
             }
 
-            override fun onFailure(exception: Exception) {
-                listener.onFailure(exception)
+        val wrappedListener =
+            object : ActionListener<ActionResponse> {
+                override fun onResponse(response: ActionResponse) {
+                    val recreated = recreateObject(response) { TransportPPLQueryResponse(it) }
+                    listener.onResponse(recreated)
+                }
+
+                override fun onFailure(exception: Exception) {
+                    listener.onFailure(exception)
+                }
             }
-        }
 
         transportService.sendRequest(
             localNode,
@@ -50,7 +51,7 @@ object PPLPluginInterface {
                 .build(),
             object : ActionListenerResponseHandler<ActionResponse>(
                 wrappedListener,
-                responseReader
+                responseReader,
             ) {
                 override fun handleResponse(response: ActionResponse) {
                     wrappedListener.onResponse(response)
@@ -59,7 +60,7 @@ object PPLPluginInterface {
                 override fun handleException(e: TransportException) {
                     wrappedListener.onFailure(e)
                 }
-            }
+            },
         )
     }
 }

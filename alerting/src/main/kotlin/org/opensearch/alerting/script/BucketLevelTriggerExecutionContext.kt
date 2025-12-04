@@ -24,19 +24,25 @@ data class BucketLevelTriggerExecutionContext(
     val dedupedAlerts: List<AlertContext> = listOf(),
     val newAlerts: List<AlertContext> = listOf(),
     val completedAlerts: List<AlertContext> = listOf(),
-    override val error: Exception? = null
+    override val error: Exception? = null,
 ) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error) {
-
     constructor(
         monitor: Monitor,
         trigger: BucketLevelTrigger,
         monitorRunResult: MonitorRunResult<BucketLevelTriggerRunResult>,
         dedupedAlerts: List<AlertContext> = listOf(),
         newAlerts: List<AlertContext> = listOf(),
-        completedAlerts: List<AlertContext> = listOf()
+        completedAlerts: List<AlertContext> = listOf(),
     ) : this(
-        monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart, monitorRunResult.periodEnd,
-        dedupedAlerts, newAlerts, completedAlerts, monitorRunResult.scriptContextError(trigger)
+        monitor,
+        trigger,
+        monitorRunResult.inputResults.results,
+        monitorRunResult.periodStart,
+        monitorRunResult.periodEnd,
+        dedupedAlerts,
+        newAlerts,
+        completedAlerts,
+        monitorRunResult.scriptContextError(trigger),
     )
 
     /**

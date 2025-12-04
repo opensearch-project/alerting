@@ -21,23 +21,22 @@ import org.opensearch.transport.client.node.NodeClient
  * This class consists of the REST handler to retrieve a workflow .
  */
 class RestGetWorkflowAction : BaseRestHandler() {
-
     private val log = LogManager.getLogger(javaClass)
 
-    override fun getName(): String {
-        return "get_workflow_action"
-    }
+    override fun getName(): String = "get_workflow_action"
 
-    override fun routes(): List<RestHandler.Route> {
-        return listOf(
+    override fun routes(): List<RestHandler.Route> =
+        listOf(
             RestHandler.Route(
                 RestRequest.Method.GET,
-                "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}"
-            )
+                "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}",
+            ),
         )
-    }
 
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}")
 
         val workflowId = request.param("workflowID")
@@ -51,8 +50,7 @@ class RestGetWorkflowAction : BaseRestHandler() {
         }
         val getWorkflowRequest =
             GetWorkflowRequest(workflowId, request.method())
-        return RestChannelConsumer {
-                channel ->
+        return RestChannelConsumer { channel ->
             client.execute(AlertingActions.GET_WORKFLOW_ACTION_TYPE, getWorkflowRequest, RestToXContentListener(channel))
         }
     }

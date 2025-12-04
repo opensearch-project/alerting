@@ -50,180 +50,190 @@ private val log = LogManager.getLogger(TransportExecuteMonitorV2Action::class.ja
  *
  * @opensearch.experimental
  */
-class TransportExecuteMonitorV2Action @Inject constructor(
-    private val transportService: TransportService,
-    private val client: Client,
-    private val clusterService: ClusterService,
-    private val runner: MonitorRunnerService,
-    actionFilters: ActionFilters,
-    val xContentRegistry: NamedXContentRegistry,
-    private val settings: Settings
-) : HandledTransportAction<ExecuteMonitorV2Request, ExecuteMonitorV2Response>(
-    ExecuteMonitorV2Action.NAME, transportService, actionFilters, ::ExecuteMonitorV2Request
-),
-    SecureTransportAction {
+class TransportExecuteMonitorV2Action
+    @Inject
+    constructor(
+        private val transportService: TransportService,
+        private val client: Client,
+        private val clusterService: ClusterService,
+        private val runner: MonitorRunnerService,
+        actionFilters: ActionFilters,
+        val xContentRegistry: NamedXContentRegistry,
+        private val settings: Settings,
+    ) : HandledTransportAction<ExecuteMonitorV2Request, ExecuteMonitorV2Response>(
+            ExecuteMonitorV2Action.NAME,
+            transportService,
+            actionFilters,
+            ::ExecuteMonitorV2Request,
+        ),
+        SecureTransportAction {
+        @Volatile private var alertingV2Enabled = ALERTING_V2_ENABLED.get(settings)
 
-    @Volatile private var alertingV2Enabled = ALERTING_V2_ENABLED.get(settings)
+        @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
-    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
-
-    init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_ENABLED) { alertingV2Enabled = it }
-        listenFilterBySettingChange(clusterService)
-    }
-
-    override fun doExecute(
-        task: Task,
-        execMonitorV2Request: ExecuteMonitorV2Request,
-        actionListener: ActionListener<ExecuteMonitorV2Response>
-    ) {
-        if (!alertingV2Enabled) {
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    OpenSearchStatusException(
-                        "Alerting V2 is currently disabled, please enable it with the " +
-                            "cluster setting: ${ALERTING_V2_ENABLED.key}",
-                        RestStatus.FORBIDDEN
-                    ),
-                )
-            )
-            return
+        init {
+            clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_ENABLED) { alertingV2Enabled = it }
+            listenFilterBySettingChange(clusterService)
         }
 
-        val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-        log.debug("User and roles string from thread context: $userStr")
-        val user: User? = User.parse(userStr)
+        override fun doExecute(
+            task: Task,
+            execMonitorV2Request: ExecuteMonitorV2Request,
+            actionListener: ActionListener<ExecuteMonitorV2Response>,
+        ) {
+            if (!alertingV2Enabled) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Alerting V2 is currently disabled, please enable it with the " +
+                                "cluster setting: ${ALERTING_V2_ENABLED.key}",
+                            RestStatus.FORBIDDEN,
+                        ),
+                    ),
+                )
+                return
+            }
 
-        client.threadPool().threadContext.stashContext().use {
-            /* first define a function that will be used later to run MonitorV2s */
-            val executeMonitorV2 = fun (monitorV2: MonitorV2) {
-                runner.launch {
-                    // get execution end, this will be used to compute the execution interval
-                    // via look back window (if one is supplied)
-                    val periodEnd = Instant.ofEpochMilli(execMonitorV2Request.requestEnd.millis)
+            val userStr =
+                client.threadPool().threadContext.getTransient<String>(
+                    ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT,
+                )
+            log.debug("User and roles string from thread context: $userStr")
+            val user: User? = User.parse(userStr)
 
-                    // call the MonitorRunnerService to execute the MonitorV2
-                    try {
-                        val monitorV2Type = when (monitorV2) {
-                            is PPLSQLMonitor -> PPL_SQL_MONITOR_TYPE
-                            else -> throw IllegalStateException("Unexpected MonitorV2 type: ${monitorV2.javaClass.name}")
-                        }
-                        log.info(
-                            "Executing MonitorV2 from API - id: ${monitorV2.id}, type: $monitorV2Type, " +
-                                "periodEnd: $periodEnd, manual: ${execMonitorV2Request.manual}"
-                        )
-                        val monitorV2RunResult = runner.runJobV2(
-                            monitorV2,
-                            periodEnd,
-                            execMonitorV2Request.dryrun,
-                            execMonitorV2Request.manual,
-                            transportService
-                        )
-                        withContext(Dispatchers.IO) {
-                            actionListener.onResponse(ExecuteMonitorV2Response(monitorV2RunResult))
-                        }
-                    } catch (e: Exception) {
-                        log.error("Unexpected error running monitor", e)
-                        withContext(Dispatchers.IO) {
-                            actionListener.onFailure(AlertingException.wrap(e))
+            client.threadPool().threadContext.stashContext().use {
+                // first define a function that will be used later to run MonitorV2s
+                val executeMonitorV2 = fun (monitorV2: MonitorV2) {
+                    runner.launch {
+                        // get execution end, this will be used to compute the execution interval
+                        // via look back window (if one is supplied)
+                        val periodEnd = Instant.ofEpochMilli(execMonitorV2Request.requestEnd.millis)
+
+                        // call the MonitorRunnerService to execute the MonitorV2
+                        try {
+                            val monitorV2Type =
+                                when (monitorV2) {
+                                    is PPLSQLMonitor -> PPL_SQL_MONITOR_TYPE
+                                    else -> throw IllegalStateException("Unexpected MonitorV2 type: ${monitorV2.javaClass.name}")
+                                }
+                            log.info(
+                                "Executing MonitorV2 from API - id: ${monitorV2.id}, type: $monitorV2Type, " +
+                                    "periodEnd: $periodEnd, manual: ${execMonitorV2Request.manual}",
+                            )
+                            val monitorV2RunResult =
+                                runner.runJobV2(
+                                    monitorV2,
+                                    periodEnd,
+                                    execMonitorV2Request.dryrun,
+                                    execMonitorV2Request.manual,
+                                    transportService,
+                                )
+                            withContext(Dispatchers.IO) {
+                                actionListener.onResponse(ExecuteMonitorV2Response(monitorV2RunResult))
+                            }
+                        } catch (e: Exception) {
+                            log.error("Unexpected error running monitor", e)
+                            withContext(Dispatchers.IO) {
+                                actionListener.onFailure(AlertingException.wrap(e))
+                            }
                         }
                     }
                 }
-            }
 
-            /* now execute the MonitorV2 */
+                // now execute the MonitorV2
 
-            // if both monitor_v2 id and object were passed in, ignore object and proceed with id
-            if (execMonitorV2Request.monitorV2Id != null && execMonitorV2Request.monitorV2 != null) {
-                log.info(
-                    "Both a monitor_v2 id and monitor_v2 object were passed in to ExecuteMonitorV2" +
-                        "request. Proceeding to execute by monitor_v2 ID and ignoring monitor_v2 object."
-                )
-            }
+                // if both monitor_v2 id and object were passed in, ignore object and proceed with id
+                if (execMonitorV2Request.monitorV2Id != null && execMonitorV2Request.monitorV2 != null) {
+                    log.info(
+                        "Both a monitor_v2 id and monitor_v2 object were passed in to ExecuteMonitorV2" +
+                            "request. Proceeding to execute by monitor_v2 ID and ignoring monitor_v2 object.",
+                    )
+                }
 
-            if (execMonitorV2Request.monitorV2Id != null) { // execute with monitor ID case
-                // search the alerting-config index for the MonitorV2 with this ID
-                val getMonitorV2Request = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).id(execMonitorV2Request.monitorV2Id)
-                client.get(
-                    getMonitorV2Request,
-                    object : ActionListener<GetResponse> {
-                        override fun onResponse(getMonitorV2Response: GetResponse) {
-                            if (!getMonitorV2Response.isExists) {
-                                actionListener.onFailure(
-                                    AlertingException.wrap(
-                                        OpenSearchStatusException(
-                                            "Can't find monitorV2 with id: ${getMonitorV2Response.id} to execute",
-                                            RestStatus.NOT_FOUND
-                                        )
+                if (execMonitorV2Request.monitorV2Id != null) { // execute with monitor ID case
+                    // search the alerting-config index for the MonitorV2 with this ID
+                    val getMonitorV2Request = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).id(execMonitorV2Request.monitorV2Id)
+                    client.get(
+                        getMonitorV2Request,
+                        object : ActionListener<GetResponse> {
+                            override fun onResponse(getMonitorV2Response: GetResponse) {
+                                if (!getMonitorV2Response.isExists) {
+                                    actionListener.onFailure(
+                                        AlertingException.wrap(
+                                            OpenSearchStatusException(
+                                                "Can't find monitorV2 with id: ${getMonitorV2Response.id} to execute",
+                                                RestStatus.NOT_FOUND,
+                                            ),
+                                        ),
                                     )
-                                )
-                                return
-                            }
+                                    return
+                                }
 
-                            if (getMonitorV2Response.isSourceEmpty) {
-                                actionListener.onFailure(
-                                    AlertingException.wrap(
-                                        OpenSearchStatusException(
-                                            "Found monitorV2 with id: ${getMonitorV2Response.id} but it was empty",
-                                            RestStatus.NO_CONTENT
-                                        )
+                                if (getMonitorV2Response.isSourceEmpty) {
+                                    actionListener.onFailure(
+                                        AlertingException.wrap(
+                                            OpenSearchStatusException(
+                                                "Found monitorV2 with id: ${getMonitorV2Response.id} but it was empty",
+                                                RestStatus.NO_CONTENT,
+                                            ),
+                                        ),
                                     )
-                                )
-                                return
-                            }
+                                    return
+                                }
 
-                            val xcp = XContentHelper.createParser(
-                                xContentRegistry,
-                                LoggingDeprecationHandler.INSTANCE,
-                                getMonitorV2Response.sourceAsBytesRef,
-                                XContentType.JSON
-                            )
+                                val xcp =
+                                    XContentHelper.createParser(
+                                        xContentRegistry,
+                                        LoggingDeprecationHandler.INSTANCE,
+                                        getMonitorV2Response.sourceAsBytesRef,
+                                        XContentType.JSON,
+                                    )
 
-                            val scheduledJob = ScheduledJob.parse(xcp, getMonitorV2Response.id, getMonitorV2Response.version)
+                                val scheduledJob = ScheduledJob.parse(xcp, getMonitorV2Response.id, getMonitorV2Response.version)
 
-                            validateMonitorV2(scheduledJob)?.let {
-                                actionListener.onFailure(AlertingException.wrap(it))
-                                return
-                            }
+                                validateMonitorV2(scheduledJob)?.let {
+                                    actionListener.onFailure(AlertingException.wrap(it))
+                                    return
+                                }
 
-                            val monitorV2 = scheduledJob as MonitorV2
+                                val monitorV2 = scheduledJob as MonitorV2
 
-                            // security is enabled and filterby is enabled
-                            // only run this check on manual executions,
-                            // automatic scheduled job executions should
-                            // bypass this check and proceed to execution
-                            if (execMonitorV2Request.manual &&
-                                !checkUserPermissionsWithResource(
+                                // security is enabled and filterby is enabled
+                                // only run this check on manual executions,
+                                // automatic scheduled job executions should
+                                // bypass this check and proceed to execution
+                                if (execMonitorV2Request.manual &&
+                                    !checkUserPermissionsWithResource(
                                         user,
                                         monitorV2.user,
                                         actionListener,
                                         "monitor",
-                                        execMonitorV2Request.monitorV2Id
+                                        execMonitorV2Request.monitorV2Id,
                                     )
-                            ) {
-                                return
+                                ) {
+                                    return
+                                }
+
+                                try {
+                                    executeMonitorV2(monitorV2)
+                                } catch (e: Exception) {
+                                    actionListener.onFailure(AlertingException.wrap(e))
+                                }
                             }
 
-                            try {
-                                executeMonitorV2(monitorV2)
-                            } catch (e: Exception) {
-                                actionListener.onFailure(AlertingException.wrap(e))
+                            override fun onFailure(t: Exception) {
+                                actionListener.onFailure(AlertingException.wrap(t))
                             }
-                        }
-
-                        override fun onFailure(t: Exception) {
-                            actionListener.onFailure(AlertingException.wrap(t))
-                        }
+                        },
+                    )
+                } else { // execute with monitor object case
+                    try {
+                        val monitorV2 = execMonitorV2Request.monitorV2!!.makeCopy(user = user)
+                        executeMonitorV2(monitorV2)
+                    } catch (e: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(e))
                     }
-                )
-            } else { // execute with monitor object case
-                try {
-                    val monitorV2 = execMonitorV2Request.monitorV2!!.makeCopy(user = user)
-                    executeMonitorV2(monitorV2)
-                } catch (e: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(e))
                 }
             }
         }
     }
-}

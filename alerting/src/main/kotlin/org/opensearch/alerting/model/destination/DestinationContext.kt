@@ -13,5 +13,5 @@ import org.opensearch.alerting.model.destination.email.EmailAccount
  */
 data class DestinationContext(
     val emailAccount: EmailAccount? = null,
-    val recipients: List<String> = emptyList()
+    val recipients: List<String> = emptyList(),
 )

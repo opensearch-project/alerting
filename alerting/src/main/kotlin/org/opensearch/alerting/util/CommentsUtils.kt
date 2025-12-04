@@ -34,7 +34,10 @@ class CommentsUtils {
     companion object {
         // Searches through all Comments history indices and returns a list of all Comments associated
         // with the Entities given by the list of Entity IDs
-        suspend fun getCommentsByAlertIDs(client: Client, alertIDs: List<String>): List<Comment> {
+        suspend fun getCommentsByAlertIDs(
+            client: Client,
+            alertIDs: List<String>,
+        ): List<Comment> {
             val queryBuilder = QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("entity_id", alertIDs))
             val searchSourceBuilder =
                 SearchSourceBuilder()
@@ -48,23 +51,28 @@ class CommentsUtils {
                     .source(searchSourceBuilder)
 
             val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
-            val comments = searchResponse.hits.map { hit ->
-                val xcp = XContentHelper.createParser(
-                    NamedXContentRegistry.EMPTY,
-                    LoggingDeprecationHandler.INSTANCE,
-                    hit.sourceRef,
-                    XContentType.JSON
-                )
-                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                val comment = Comment.parse(xcp, hit.id)
-                comment
-            }
+            val comments =
+                searchResponse.hits.map { hit ->
+                    val xcp =
+                        XContentHelper.createParser(
+                            NamedXContentRegistry.EMPTY,
+                            LoggingDeprecationHandler.INSTANCE,
+                            hit.sourceRef,
+                            XContentType.JSON,
+                        )
+                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                    val comment = Comment.parse(xcp, hit.id)
+                    comment
+                }
 
             return comments
         }
 
         // Identical to getCommentsByAlertIDs, just returns list of Comment IDs instead of list of Comment objects
-        suspend fun getCommentIDsByAlertIDs(client: Client, alertIDs: List<String>): List<String> {
+        suspend fun getCommentIDsByAlertIDs(
+            client: Client,
+            alertIDs: List<String>,
+        ): List<String> {
             val comments = getCommentsByAlertIDs(client, alertIDs)
             return comments.map { it.id }
         }
@@ -76,7 +84,7 @@ class CommentsUtils {
         suspend fun getCommentsForAlertNotification(
             client: Client,
             alertIds: List<String>,
-            maxComments: Int
+            maxComments: Int,
         ): Map<String, List<Comment>> {
             val allComments = getCommentsByAlertIDs(client, alertIds)
             val sortedComments = allComments.sortedByDescending { it.createdTime }
@@ -93,20 +101,25 @@ class CommentsUtils {
         }
 
         // Deletes all Comments given by the list of Comments IDs
-        suspend fun deleteComments(client: Client, commentIDs: List<String>) {
+        suspend fun deleteComments(
+            client: Client,
+            commentIDs: List<String>,
+        ) {
             if (commentIDs.isEmpty()) return
-            val deleteResponse: BulkByScrollResponse = suspendCoroutine { cont ->
-                DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                    .source(ALL_COMMENTS_INDEX_PATTERN)
-                    .filter(QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("_id", commentIDs)))
-                    .refresh(true)
-                    .execute(
-                        object : ActionListener<BulkByScrollResponse> {
-                            override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
-                            override fun onFailure(t: Exception) = cont.resumeWithException(t)
-                        }
-                    )
-            }
+            val deleteResponse: BulkByScrollResponse =
+                suspendCoroutine { cont ->
+                    DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                        .source(ALL_COMMENTS_INDEX_PATTERN)
+                        .filter(QueryBuilders.boolQuery().must(QueryBuilders.termsQuery("_id", commentIDs)))
+                        .refresh(true)
+                        .execute(
+                            object : ActionListener<BulkByScrollResponse> {
+                                override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
+
+                                override fun onFailure(t: Exception) = cont.resumeWithException(t)
+                            },
+                        )
+                }
             deleteResponse.bulkFailures.forEach {
                 log.error("Failed to delete Comment. Comment ID: [${it.id}] cause: [${it.cause}] ")
             }

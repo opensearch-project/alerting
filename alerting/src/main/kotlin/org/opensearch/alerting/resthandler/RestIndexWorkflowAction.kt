@@ -35,23 +35,22 @@ import java.time.Instant
  * Rest handlers to create and update workflows.
  */
 class RestIndexWorkflowAction : BaseRestHandler() {
+    override fun getName(): String = "index_workflow_action"
 
-    override fun getName(): String {
-        return "index_workflow_action"
-    }
-
-    override fun routes(): List<RestHandler.Route> {
-        return listOf(
+    override fun routes(): List<RestHandler.Route> =
+        listOf(
             RestHandler.Route(RestRequest.Method.POST, AlertingPlugin.WORKFLOW_BASE_URI),
             RestHandler.Route(
                 RestRequest.Method.PUT,
-                "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}"
-            )
+                "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}",
+            ),
         )
-    }
 
     @Throws(IOException::class)
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         val id = request.param("workflowID", Workflow.NO_ID)
         if (request.method() == RestRequest.Method.PUT && Workflow.NO_ID == id) {
             throw AlertingException.wrap(IllegalArgumentException("Missing workflow ID"))
@@ -65,11 +64,12 @@ class RestIndexWorkflowAction : BaseRestHandler() {
 
         val seqNo = request.paramAsLong(IF_SEQ_NO, SequenceNumbers.UNASSIGNED_SEQ_NO)
         val primaryTerm = request.paramAsLong(IF_PRIMARY_TERM, SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
-        val refreshPolicy = if (request.hasParam(REFRESH)) {
-            WriteRequest.RefreshPolicy.parse(request.param(REFRESH))
-        } else {
-            WriteRequest.RefreshPolicy.IMMEDIATE
-        }
+        val refreshPolicy =
+            if (request.hasParam(REFRESH)) {
+                WriteRequest.RefreshPolicy.parse(request.param(REFRESH))
+            } else {
+                WriteRequest.RefreshPolicy.IMMEDIATE
+            }
         val workflowRequest =
             IndexWorkflowRequest(id, seqNo, primaryTerm, refreshPolicy, request.method(), workflow, rbacRoles)
 
@@ -78,13 +78,17 @@ class RestIndexWorkflowAction : BaseRestHandler() {
         }
     }
 
-    private fun indexMonitorResponse(channel: RestChannel, restMethod: RestRequest.Method): RestResponseListener<IndexWorkflowResponse> {
+    private fun indexMonitorResponse(
+        channel: RestChannel,
+        restMethod: RestRequest.Method,
+    ): RestResponseListener<IndexWorkflowResponse> {
         return object : RestResponseListener<IndexWorkflowResponse>(channel) {
             @Throws(Exception::class)
             override fun buildResponse(response: IndexWorkflowResponse): RestResponse {
                 var returnStatus = RestStatus.CREATED
-                if (restMethod == RestRequest.Method.PUT)
+                if (restMethod == RestRequest.Method.PUT) {
                     returnStatus = RestStatus.OK
+                }
 
                 val restResponse =
                     BytesRestResponse(returnStatus, response.toXContent(channel.newBuilder(), ToXContent.EMPTY_PARAMS))

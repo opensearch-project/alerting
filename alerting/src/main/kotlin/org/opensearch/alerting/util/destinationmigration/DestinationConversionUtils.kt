@@ -27,9 +27,7 @@ import java.net.URISyntaxException
 import java.util.Locale
 
 class DestinationConversionUtils {
-
     companion object {
-
         fun convertDestinationToNotificationConfig(destination: Destination): NotificationConfig? {
             when (destination.type) {
                 DestinationType.CHIME -> {
@@ -40,9 +38,10 @@ class DestinationConversionUtils {
                         destination.name,
                         description,
                         ConfigType.CHIME,
-                        chime
+                        chime,
                     )
                 }
+
                 DestinationType.SLACK -> {
                     val alertSlack = destination.slack ?: return null
                     val slack = Slack(alertSlack.url)
@@ -51,9 +50,10 @@ class DestinationConversionUtils {
                         destination.name,
                         description,
                         ConfigType.SLACK,
-                        slack
+                        slack,
                     )
                 }
+
                 // TODO: Add this back after adding SNS to Destination data models
 //                DestinationType.SNS -> {
 //                    val alertSNS = destination.sns ?: return null
@@ -68,37 +68,42 @@ class DestinationConversionUtils {
 //                }
                 DestinationType.CUSTOM_WEBHOOK -> {
                     val alertWebhook = destination.customWebhook ?: return null
-                    val uri = buildUri(
-                        alertWebhook.url,
-                        alertWebhook.scheme,
-                        alertWebhook.host,
-                        alertWebhook.port,
-                        alertWebhook.path,
-                        alertWebhook.queryParams
-                    ).toString()
-                    val methodType = when (alertWebhook.method?.uppercase(Locale.ENGLISH)) {
-                        "POST" -> HttpMethodType.POST
-                        "PUT" -> HttpMethodType.PUT
-                        "PATCH" -> HttpMethodType.PATCH
-                        else -> HttpMethodType.POST
-                    }
+                    val uri =
+                        buildUri(
+                            alertWebhook.url,
+                            alertWebhook.scheme,
+                            alertWebhook.host,
+                            alertWebhook.port,
+                            alertWebhook.path,
+                            alertWebhook.queryParams,
+                        ).toString()
+                    val methodType =
+                        when (alertWebhook.method?.uppercase(Locale.ENGLISH)) {
+                            "POST" -> HttpMethodType.POST
+                            "PUT" -> HttpMethodType.PUT
+                            "PATCH" -> HttpMethodType.PATCH
+                            else -> HttpMethodType.POST
+                        }
                     val webhook = Webhook(uri, alertWebhook.headerParams, methodType)
                     val description = "Webhook destination created from the Alerting plugin"
                     return NotificationConfig(
                         destination.name,
                         description,
                         ConfigType.WEBHOOK,
-                        webhook
+                        webhook,
                     )
                 }
+
                 DestinationType.EMAIL -> {
                     val alertEmail = destination.email ?: return null
                     val recipients = mutableListOf<EmailRecipient>()
                     val emailGroupIds = mutableListOf<String>()
                     alertEmail.recipients.forEach {
-                        if (it.type == Recipient.RecipientType.EMAIL_GROUP)
+                        if (it.type == Recipient.RecipientType.EMAIL_GROUP) {
                             it.emailGroupID?.let { emailGroup -> emailGroupIds.add(emailGroup) }
-                        else it.email?.let { emailRecipient -> recipients.add(EmailRecipient(emailRecipient)) }
+                        } else {
+                            it.email?.let { emailRecipient -> recipients.add(EmailRecipient(emailRecipient)) }
+                        }
                     }
 
                     val email = Email(alertEmail.emailAccountID, recipients, emailGroupIds)
@@ -107,10 +112,13 @@ class DestinationConversionUtils {
                         destination.name,
                         description,
                         ConfigType.EMAIL,
-                        email
+                        email,
                     )
                 }
-                else -> return null
+
+                else -> {
+                    return null
+                }
             }
         }
 
@@ -122,12 +130,12 @@ class DestinationConversionUtils {
                 emailAccount.name,
                 description,
                 ConfigType.SMTP_ACCOUNT,
-                smtpAccount
+                smtpAccount,
             )
         }
 
         fun convertEmailGroupToNotificationConfig(
-            emailGroup: org.opensearch.alerting.model.destination.email.EmailGroup
+            emailGroup: org.opensearch.alerting.model.destination.email.EmailGroup,
         ): NotificationConfig {
             val recipients = mutableListOf<EmailRecipient>()
             emailGroup.emails.forEach {
@@ -140,7 +148,7 @@ class DestinationConversionUtils {
                 emailGroup.name,
                 description,
                 ConfigType.EMAIL_GROUP,
-                notificationEmailGroup
+                notificationEmailGroup,
             )
         }
 
@@ -150,7 +158,7 @@ class DestinationConversionUtils {
             host: String?,
             port: Int,
             path: String?,
-            queryParams: Map<String, String>
+            queryParams: Map<String, String>,
         ): URI? {
             return try {
                 if (Strings.isNullOrEmpty(endpoint)) {
@@ -165,7 +173,12 @@ class DestinationConversionUtils {
                     if (queryParams.isNotEmpty()) {
                         for ((key, value) in queryParams) uriBuilder.addParameter(key, value)
                     }
-                    return uriBuilder.setScheme(uriScheme).setHost(host).setPort(port).setPath(path).build()
+                    return uriBuilder
+                        .setScheme(uriScheme)
+                        .setHost(host)
+                        .setPort(port)
+                        .setPath(path)
+                        .build()
                 }
                 URIBuilder(endpoint).build()
             } catch (e: URISyntaxException) {
@@ -173,12 +186,11 @@ class DestinationConversionUtils {
             }
         }
 
-        fun convertAlertingToNotificationMethodType(alertMethodType: EmailAccount.MethodType): MethodType {
-            return when (alertMethodType) {
+        fun convertAlertingToNotificationMethodType(alertMethodType: EmailAccount.MethodType): MethodType =
+            when (alertMethodType) {
                 EmailAccount.MethodType.NONE -> MethodType.NONE
                 EmailAccount.MethodType.SSL -> MethodType.SSL
                 EmailAccount.MethodType.TLS -> MethodType.START_TLS
             }
-        }
     }
 }

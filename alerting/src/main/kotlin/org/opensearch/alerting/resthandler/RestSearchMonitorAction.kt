@@ -47,43 +47,40 @@ private val log = LogManager.getLogger(RestSearchMonitorAction::class.java)
  */
 class RestSearchMonitorAction(
     val settings: Settings,
-    clusterService: ClusterService
+    clusterService: ClusterService,
 ) : BaseRestHandler() {
-
     @Volatile private var filterBy = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FILTER_BY_BACKEND_ROLES) { filterBy = it }
     }
 
-    override fun getName(): String {
-        return "search_monitor_action"
-    }
+    override fun getName(): String = "search_monitor_action"
 
-    override fun routes(): List<Route> {
-        return listOf()
-    }
+    override fun routes(): List<Route> = listOf()
 
-    override fun replacedRoutes(): MutableList<ReplacedRoute> {
-        return mutableListOf(
+    override fun replacedRoutes(): MutableList<ReplacedRoute> =
+        mutableListOf(
             // Search for monitors
             ReplacedRoute(
                 POST,
                 "${AlertingPlugin.MONITOR_BASE_URI}/_search",
                 POST,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/_search"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/_search",
             ),
             ReplacedRoute(
                 GET,
                 "${AlertingPlugin.MONITOR_BASE_URI}/_search",
                 GET,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/_search"
-            )
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/_search",
+            ),
         )
-    }
 
     @Throws(IOException::class)
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/_search")
 
         val index = request.param("index", SCHEDULED_JOBS_INDEX)
@@ -95,9 +92,10 @@ class RestSearchMonitorAction(
         searchSourceBuilder.parseXContent(request.contentOrSourceParamParser())
         searchSourceBuilder.fetchSource(context(request))
 
-        val searchRequest = SearchRequest()
-            .source(searchSourceBuilder)
-            .indices(index)
+        val searchRequest =
+            SearchRequest()
+                .source(searchSourceBuilder)
+                .indices(index)
 
         val searchMonitorRequest = SearchMonitorRequest(searchRequest)
         return RestChannelConsumer { channel ->
@@ -116,14 +114,17 @@ class RestSearchMonitorAction(
                 // Swallow exception and return response as is
                 try {
                     for (hit in response.hits) {
-                        XContentType.JSON.xContent().createParser(
-                            channel.request().xContentRegistry,
-                            LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
-                        ).use { hitsParser ->
-                            val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version)
-                            val xcb = monitor.toXContent(jsonBuilder(), EMPTY_PARAMS)
-                            hit.sourceRef(BytesReference.bytes(xcb))
-                        }
+                        XContentType.JSON
+                            .xContent()
+                            .createParser(
+                                channel.request().xContentRegistry,
+                                LoggingDeprecationHandler.INSTANCE,
+                                hit.sourceAsString,
+                            ).use { hitsParser ->
+                                val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version)
+                                val xcb = monitor.toXContent(jsonBuilder(), EMPTY_PARAMS)
+                                hit.sourceRef(BytesReference.bytes(xcb))
+                            }
                     }
                 } catch (e: Exception) {
                     log.error("The monitor parsing failed. Will return response as is.")

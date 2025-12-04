@@ -23,33 +23,30 @@ import java.lang.IllegalArgumentException
  * Rest handler to retrieve an EmailAccount.
  */
 class RestGetEmailAccountAction : BaseRestHandler() {
+    override fun getName(): String = "get_email_account_action"
 
-    override fun getName(): String {
-        return "get_email_account_action"
-    }
+    override fun routes(): List<Route> = listOf()
 
-    override fun routes(): List<Route> {
-        return listOf()
-    }
-
-    override fun replacedRoutes(): MutableList<ReplacedRoute> {
-        return mutableListOf(
+    override fun replacedRoutes(): MutableList<ReplacedRoute> =
+        mutableListOf(
             ReplacedRoute(
                 RestRequest.Method.GET,
                 "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}",
                 RestRequest.Method.GET,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}",
             ),
             ReplacedRoute(
                 RestRequest.Method.HEAD,
                 "${AlertingPlugin.EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}",
                 RestRequest.Method.HEAD,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}"
-            )
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_ACCOUNT_BASE_URI}/{emailAccountID}",
+            ),
         )
-    }
 
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         val emailAccountID = request.param("emailAccountID")
         if (emailAccountID == null || emailAccountID.isEmpty()) {
             throw IllegalArgumentException("Missing email account ID")

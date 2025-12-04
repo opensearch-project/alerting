@@ -56,7 +56,7 @@ object DeleteMonitorService :
 
     fun initialize(
         client: Client,
-        lockService: LockService
+        lockService: LockService,
     ) {
         DeleteMonitorService.client = client
         DeleteMonitorService.lockService = lockService
@@ -67,7 +67,10 @@ object DeleteMonitorService :
      * @param monitor monitor to be deleted
      * @param refreshPolicy
      */
-    suspend fun deleteMonitor(monitor: Monitor, refreshPolicy: RefreshPolicy): DeleteMonitorResponse {
+    suspend fun deleteMonitor(
+        monitor: Monitor,
+        refreshPolicy: RefreshPolicy,
+    ): DeleteMonitorResponse {
         val deleteResponse = deleteMonitor(monitor.id, refreshPolicy)
         deleteDocLevelMonitorQueriesAndIndices(monitor)
         deleteMetadata(monitor)
@@ -81,22 +84,30 @@ object DeleteMonitorService :
      * @param monitorV2Id monitorV2 ID to be deleted
      * @param refreshPolicy
      */
-    suspend fun deleteMonitorV2(monitorV2Id: String, refreshPolicy: RefreshPolicy): DeleteMonitorV2Response {
+    suspend fun deleteMonitorV2(
+        monitorV2Id: String,
+        refreshPolicy: RefreshPolicy,
+    ): DeleteMonitorV2Response {
         val deleteResponse = deleteMonitor(monitorV2Id, refreshPolicy)
         deleteLock(monitorV2Id)
         return DeleteMonitorV2Response(deleteResponse.id, deleteResponse.version)
     }
 
     // both Alerting v1 and v2 workflows flow through this function
-    private suspend fun deleteMonitor(monitorId: String, refreshPolicy: RefreshPolicy): DeleteResponse {
-        val deleteMonitorRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
-            .setRefreshPolicy(refreshPolicy)
+    private suspend fun deleteMonitor(
+        monitorId: String,
+        refreshPolicy: RefreshPolicy,
+    ): DeleteResponse {
+        val deleteMonitorRequest =
+            DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
+                .setRefreshPolicy(refreshPolicy)
         return client.suspendUntil { delete(deleteMonitorRequest, it) }
     }
 
     private suspend fun deleteMetadata(monitor: Monitor) {
-        val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, "${monitor.id}-metadata")
-            .setRefreshPolicy(RefreshPolicy.IMMEDIATE)
+        val deleteRequest =
+            DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, "${monitor.id}-metadata")
+                .setRefreshPolicy(RefreshPolicy.IMMEDIATE)
         try {
             val deleteResponse: DeleteResponse = client.suspendUntil { delete(deleteRequest, it) }
             log.debug("Monitor metadata: ${deleteResponse.id} deletion result: ${deleteResponse.result}")
@@ -122,53 +133,59 @@ object DeleteMonitorService :
                     }
                     // Check if there's any queries from other monitors in this queryIndex,
                     // to avoid unnecessary doc deletion, if we could just delete index completely
-                    val searchResponse: SearchResponse = client.suspendUntil {
-                        search(
-                            SearchRequest(queryIndex).source(
-                                SearchSourceBuilder()
-                                    .size(0)
-                                    .query(
-                                        QueryBuilders.boolQuery().mustNot(
-                                            QueryBuilders.matchQuery("monitor_id", monitor.id)
-                                        )
-                                    )
-                            ).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
-                            it
-                        )
-                    }
-                    if (searchResponse.hits.totalHits.value == 0L) {
-                        val ack: AcknowledgedResponse = client.suspendUntil {
-                            client.admin().indices().delete(
-                                DeleteIndexRequest(queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
-                                it
+                    val searchResponse: SearchResponse =
+                        client.suspendUntil {
+                            search(
+                                SearchRequest(queryIndex)
+                                    .source(
+                                        SearchSourceBuilder()
+                                            .size(0)
+                                            .query(
+                                                QueryBuilders.boolQuery().mustNot(
+                                                    QueryBuilders.matchQuery("monitor_id", monitor.id),
+                                                ),
+                                            ),
+                                    ).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
+                                it,
                             )
                         }
+                    if (searchResponse.hits.totalHits.value == 0L) {
+                        val ack: AcknowledgedResponse =
+                            client.suspendUntil {
+                                client.admin().indices().delete(
+                                    DeleteIndexRequest(queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
+                                    it,
+                                )
+                            }
                         if (ack.isAcknowledged == false) {
                             log.error("Deletion of concrete queryIndex:$queryIndex is not ack'd!")
                         }
                     } else {
                         // Delete all queries added by this monitor
-                        val response: BulkByScrollResponse = suspendCoroutine { cont ->
-                            DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                                .source(queryIndex)
-                                .filter(QueryBuilders.matchQuery("monitor_id", monitor.id))
-                                .refresh(true)
-                                .execute(
-                                    object : ActionListener<BulkByScrollResponse> {
-                                        override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
-                                        override fun onFailure(t: Exception) = cont.resumeWithException(t)
-                                    }
-                                )
-                        }
+                        val response: BulkByScrollResponse =
+                            suspendCoroutine { cont ->
+                                DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                                    .source(queryIndex)
+                                    .filter(QueryBuilders.matchQuery("monitor_id", monitor.id))
+                                    .refresh(true)
+                                    .execute(
+                                        object : ActionListener<BulkByScrollResponse> {
+                                            override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
+
+                                            override fun onFailure(t: Exception) = cont.resumeWithException(t)
+                                        },
+                                    )
+                            }
                     }
                 }
             } else {
-                val ack: AcknowledgedResponse = client.suspendUntil {
-                    client.admin().indices().delete(
-                        DeleteIndexRequest(monitor.dataSources.queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
-                        it
-                    )
-                }
+                val ack: AcknowledgedResponse =
+                    client.suspendUntil {
+                        client.admin().indices().delete(
+                            DeleteIndexRequest(monitor.dataSources.queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
+                            it,
+                        )
+                    }
                 if (ack.isAcknowledged == false) {
                     log.error("Deletion of concrete queryIndex:${monitor.dataSources.queryIndex} is not ack'd!")
                 }
@@ -195,20 +212,22 @@ object DeleteMonitorService :
      * @param monitorId id of monitor that is checked if it is a workflow delegate
      */
     suspend fun monitorIsWorkflowDelegate(monitorId: String): Boolean {
-        val queryBuilder = QueryBuilders.nestedQuery(
-            WORKFLOW_DELEGATE_PATH,
-            QueryBuilders.boolQuery().must(
-                QueryBuilders.matchQuery(
-                    WORKFLOW_MONITOR_PATH,
-                    monitorId
-                )
-            ),
-            ScoreMode.None
-        )
+        val queryBuilder =
+            QueryBuilders.nestedQuery(
+                WORKFLOW_DELEGATE_PATH,
+                QueryBuilders.boolQuery().must(
+                    QueryBuilders.matchQuery(
+                        WORKFLOW_MONITOR_PATH,
+                        monitorId,
+                    ),
+                ),
+                ScoreMode.None,
+            )
         try {
-            val searchRequest = SearchRequest()
-                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                .source(SearchSourceBuilder().query(queryBuilder))
+            val searchRequest =
+                SearchRequest()
+                    .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                    .source(SearchSourceBuilder().query(queryBuilder))
 
             client.threadPool().threadContext.stashContext().use {
                 val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
@@ -216,7 +235,10 @@ object DeleteMonitorService :
                     return false
                 }
 
-                val workflowIds = searchResponse.hits.hits.map { it.id }.joinToString()
+                val workflowIds =
+                    searchResponse.hits.hits
+                        .map { it.id }
+                        .joinToString()
                 log.info("Monitor $monitorId can't be deleted since it belongs to $workflowIds")
                 return true
             }

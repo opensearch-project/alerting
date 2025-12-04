@@ -26,9 +26,9 @@ data class EmailGroup(
     val version: Long = NO_VERSION,
     val schemaVersion: Int = NO_SCHEMA_VERSION,
     val name: String,
-    val emails: List<EmailEntry>
-) : Writeable, ToXContent {
-
+    val emails: List<EmailEntry>,
+) : Writeable,
+    ToXContent {
     init {
         val validNamePattern = Regex("[A-Z0-9_-]+", RegexOption.IGNORE_CASE)
         require(validNamePattern.matches(name)) {
@@ -36,19 +36,21 @@ data class EmailGroup(
         }
     }
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
         builder.startObject()
         if (params.paramAsBoolean("with_type", false)) builder.startObject(EMAIL_GROUP_TYPE)
-        builder.field(SCHEMA_VERSION, schemaVersion)
+        builder
+            .field(SCHEMA_VERSION, schemaVersion)
             .field(NAME_FIELD, name)
             .field(EMAILS_FIELD, emails.toTypedArray())
         if (params.paramAsBoolean("with_type", false)) builder.endObject()
         return builder.endObject()
     }
 
-    fun toXContent(builder: XContentBuilder): XContentBuilder {
-        return toXContent(builder, ToXContent.EMPTY_PARAMS)
-    }
+    fun toXContent(builder: XContentBuilder): XContentBuilder = toXContent(builder, ToXContent.EMPTY_PARAMS)
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
@@ -75,7 +77,11 @@ data class EmailGroup(
 
         @JvmStatic
         @Throws(IOException::class)
-        fun parse(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): EmailGroup {
+        fun parse(
+            xcp: XContentParser,
+            id: String = NO_ID,
+            version: Long = NO_VERSION,
+        ): EmailGroup {
             var schemaVersion = NO_SCHEMA_VERSION
             lateinit var name: String
             val emails: MutableList<EmailEntry> = mutableListOf()
@@ -86,14 +92,21 @@ data class EmailGroup(
                 xcp.nextToken()
 
                 when (fieldName) {
-                    SCHEMA_VERSION -> schemaVersion = xcp.intValue()
-                    NAME_FIELD -> name = xcp.text()
+                    SCHEMA_VERSION -> {
+                        schemaVersion = xcp.intValue()
+                    }
+
+                    NAME_FIELD -> {
+                        name = xcp.text()
+                    }
+
                     EMAILS_FIELD -> {
                         ensureExpectedToken(Token.START_ARRAY, xcp.currentToken(), xcp)
                         while (xcp.nextToken() != Token.END_ARRAY) {
                             emails.add(EmailEntry.parse(xcp))
                         }
                     }
+
                     else -> {
                         throw IllegalStateException("Unexpected field: $fieldName, while parsing email group")
                     }
@@ -105,13 +118,17 @@ data class EmailGroup(
                 version,
                 schemaVersion,
                 requireNotNull(name) { "Email group name is null" },
-                emails
+                emails,
             )
         }
 
         @JvmStatic
         @Throws(IOException::class)
-        fun parseWithType(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): EmailGroup {
+        fun parseWithType(
+            xcp: XContentParser,
+            id: String = NO_ID,
+            version: Long = NO_VERSION,
+        ): EmailGroup {
             ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
             ensureExpectedToken(Token.FIELD_NAME, xcp.nextToken(), xcp)
             ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
@@ -122,20 +139,21 @@ data class EmailGroup(
 
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): EmailGroup {
-            return EmailGroup(
+        fun readFrom(sin: StreamInput): EmailGroup =
+            EmailGroup(
                 sin.readString(), // id
                 sin.readLong(), // version
                 sin.readInt(), // schemaVersion
                 sin.readString(), // name
-                sin.readList(::EmailEntry) // emails
+                sin.readList(::EmailEntry), // emails
             )
-        }
     }
 }
 
-data class EmailEntry(val email: String) : Writeable, ToXContent {
-
+data class EmailEntry(
+    val email: String,
+) : Writeable,
+    ToXContent {
     init {
         require(!Strings.isEmpty(email)) { "Email entry must have a non-empty email" }
         require(isValidEmail(email)) { "Invalid email" }
@@ -143,14 +161,17 @@ data class EmailEntry(val email: String) : Writeable, ToXContent {
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
-        sin.readString() // email
+        sin.readString(), // email
     )
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        return builder.startObject()
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder =
+        builder
+            .startObject()
             .field(EMAIL_FIELD, email)
             .endObject()
-    }
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
@@ -171,7 +192,10 @@ data class EmailEntry(val email: String) : Writeable, ToXContent {
                 xcp.nextToken()
 
                 when (fieldName) {
-                    EMAIL_FIELD -> email = xcp.text()
+                    EMAIL_FIELD -> {
+                        email = xcp.text()
+                    }
+
                     else -> {
                         throw IllegalStateException("Unexpected field: $fieldName, while parsing email entry")
                     }
@@ -183,8 +207,6 @@ data class EmailEntry(val email: String) : Writeable, ToXContent {
 
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): EmailEntry {
-            return EmailEntry(sin)
-        }
+        fun readFrom(sin: StreamInput): EmailEntry = EmailEntry(sin)
     }
 }

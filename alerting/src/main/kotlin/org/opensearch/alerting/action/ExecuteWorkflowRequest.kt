@@ -45,16 +45,20 @@ class ExecuteWorkflowRequest : ActionRequest {
         sin.readOptionalString(),
         if (sin.readBoolean()) {
             Workflow.readFrom(sin)
-        } else null,
-        sin.readOptionalTimeValue()
+        } else {
+            null
+        },
+        sin.readOptionalTimeValue(),
     )
 
     override fun validate(): ActionRequestValidationException? {
         var validationException: ActionRequestValidationException? = null
         if (workflowId == null && workflow == null) {
-            validationException = ValidateActions.addValidationError(
-                "Both workflow and workflow id are missing", validationException
-            )
+            validationException =
+                ValidateActions.addValidationError(
+                    "Both workflow and workflow id are missing",
+                    validationException,
+                )
         }
         return validationException
     }

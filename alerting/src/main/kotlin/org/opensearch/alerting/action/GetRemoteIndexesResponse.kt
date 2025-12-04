@@ -16,7 +16,9 @@ import org.opensearch.core.xcontent.ToXContentObject
 import org.opensearch.core.xcontent.XContentBuilder
 import java.io.IOException
 
-class GetRemoteIndexesResponse : ActionResponse, ToXContentObject {
+class GetRemoteIndexesResponse :
+    ActionResponse,
+    ToXContentObject {
     var clusterIndexes: List<ClusterIndexes> = emptyList()
 
     constructor(clusterIndexes: List<ClusterIndexes>) : super() {
@@ -25,10 +27,13 @@ class GetRemoteIndexesResponse : ActionResponse, ToXContentObject {
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
-        clusterIndexes = sin.readList((ClusterIndexes.Companion)::readFrom)
+        clusterIndexes = sin.readList((ClusterIndexes.Companion)::readFrom),
     )
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
         builder.startObject()
         clusterIndexes.forEach {
             it.toXContent(builder, params)
@@ -45,19 +50,22 @@ class GetRemoteIndexesResponse : ActionResponse, ToXContentObject {
         val clusterHealth: ClusterHealthStatus?,
         val hubCluster: Boolean,
         val indexes: List<ClusterIndex> = listOf(),
-        val latency: Long
-    ) : ToXContentObject, Writeable {
-
+        val latency: Long,
+    ) : ToXContentObject,
+        Writeable {
         @Throws(IOException::class)
         constructor(sin: StreamInput) : this(
             clusterName = sin.readString(),
             clusterHealth = sin.readOptionalWriteable(ClusterHealthStatus::readFrom),
             hubCluster = sin.readBoolean(),
             indexes = sin.readList((ClusterIndex.Companion)::readFrom),
-            latency = sin.readLong()
+            latency = sin.readLong(),
         )
 
-        override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+        override fun toXContent(
+            builder: XContentBuilder,
+            params: ToXContent.Params,
+        ): XContentBuilder {
             builder.startObject(clusterName)
             builder.field(CLUSTER_NAME_FIELD, clusterName)
             builder.field(CLUSTER_HEALTH_FIELD, clusterHealth)
@@ -86,30 +94,34 @@ class GetRemoteIndexesResponse : ActionResponse, ToXContentObject {
 
             @JvmStatic
             @Throws(IOException::class)
-            fun readFrom(sin: StreamInput): ClusterIndexes {
-                return ClusterIndexes(sin)
-            }
+            fun readFrom(sin: StreamInput): ClusterIndexes = ClusterIndexes(sin)
         }
 
         data class ClusterIndex(
             val indexName: String,
             val indexHealth: ClusterHealthStatus?,
-            val mappings: MappingMetadata?
-        ) : ToXContentObject, Writeable {
-
+            val mappings: MappingMetadata?,
+        ) : ToXContentObject,
+            Writeable {
             @Throws(IOException::class)
             constructor(sin: StreamInput) : this(
                 indexName = sin.readString(),
                 indexHealth = sin.readOptionalWriteable(ClusterHealthStatus::readFrom),
-                mappings = sin.readOptionalWriteable(::MappingMetadata)
+                mappings = sin.readOptionalWriteable(::MappingMetadata),
             )
 
-            override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+            override fun toXContent(
+                builder: XContentBuilder,
+                params: ToXContent.Params,
+            ): XContentBuilder {
                 builder.startObject(indexName)
                 builder.field(INDEX_NAME_FIELD, indexName)
                 builder.field(INDEX_HEALTH_FIELD, indexHealth)
-                if (mappings == null) builder.startObject(MAPPINGS_FIELD).endObject()
-                else builder.field(MAPPINGS_FIELD, mappings.sourceAsMap())
+                if (mappings == null) {
+                    builder.startObject(MAPPINGS_FIELD).endObject()
+                } else {
+                    builder.field(MAPPINGS_FIELD, mappings.sourceAsMap())
+                }
                 return builder.endObject()
             }
 
@@ -126,9 +138,7 @@ class GetRemoteIndexesResponse : ActionResponse, ToXContentObject {
 
                 @JvmStatic
                 @Throws(IOException::class)
-                fun readFrom(sin: StreamInput): ClusterIndex {
-                    return ClusterIndex(sin)
-                }
+                fun readFrom(sin: StreamInput): ClusterIndex = ClusterIndex(sin)
             }
         }
     }

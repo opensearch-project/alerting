@@ -10,11 +10,11 @@ import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class GetEmailAccountRequestTests : OpenSearchTestCase() {
-
+    @Test
     fun `test get email account request`() {
-
         val req = GetEmailAccountRequest("1234", 1L, RestRequest.Method.GET, FetchSourceContext.FETCH_SOURCE)
         assertNotNull(req)
 
@@ -28,8 +28,8 @@ class GetEmailAccountRequestTests : OpenSearchTestCase() {
         assertEquals(FetchSourceContext.FETCH_SOURCE, newReq.srcContext)
     }
 
+    @Test
     fun `test head email account request`() {
-
         val req = GetEmailAccountRequest("1234", 2L, RestRequest.Method.HEAD, FetchSourceContext.FETCH_SOURCE)
         assertNotNull(req)
 

@@ -29,25 +29,24 @@ private val log = LogManager.getLogger(RestGetMonitorV2Action::class.java)
  * @opensearch.experimental
  */
 class RestGetMonitorV2Action : BaseRestHandler() {
+    override fun getName(): String = "get_monitor_v2_action"
 
-    override fun getName(): String {
-        return "get_monitor_v2_action"
-    }
-
-    override fun routes(): List<Route> {
-        return listOf(
+    override fun routes(): List<Route> =
+        listOf(
             Route(
                 GET,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}"
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}",
             ),
             Route(
                 HEAD,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}"
-            )
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}",
+            ),
         )
-    }
 
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}")
 
         val monitorV2Id = request.param("monitor_id")
@@ -65,8 +64,7 @@ class RestGetMonitorV2Action : BaseRestHandler() {
         }
 
         val getMonitorV2Request = GetMonitorV2Request(monitorV2Id, RestActions.parseVersion(request), srcContext)
-        return RestChannelConsumer {
-                channel ->
+        return RestChannelConsumer { channel ->
             client.execute(GetMonitorV2Action.INSTANCE, getMonitorV2Request, RestToXContentListener(channel))
         }
     }

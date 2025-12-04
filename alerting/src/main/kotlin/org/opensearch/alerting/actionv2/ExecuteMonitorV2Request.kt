@@ -26,7 +26,7 @@ class ExecuteMonitorV2Request : ActionRequest {
         manual: Boolean, // if execute was called by user or by scheduled job
         monitorV2Id: String?,
         monitorV2: MonitorV2?,
-        requestEnd: TimeValue
+        requestEnd: TimeValue,
     ) : super() {
         this.dryrun = dryrun
         this.manual = manual
@@ -45,7 +45,7 @@ class ExecuteMonitorV2Request : ActionRequest {
         } else {
             null
         },
-        sin.readTimeValue() // requestEnd
+        sin.readTimeValue(), // requestEnd
     )
 
     override fun validate(): ActionRequestValidationException? =

@@ -66,8 +66,9 @@ data class AlertV2(
     val triggeredTime: Instant,
     val errorMessage: String? = null,
     val severity: Severity,
-    val executionId: String? = null
-) : Writeable, ToXContent {
+    val executionId: String? = null,
+) : Writeable,
+    ToXContent {
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         id = sin.readString(),
@@ -76,11 +77,12 @@ data class AlertV2(
         monitorId = sin.readString(),
         monitorName = sin.readString(),
         monitorVersion = sin.readLong(),
-        monitorUser = if (sin.readBoolean()) {
-            User(sin)
-        } else {
-            null
-        },
+        monitorUser =
+            if (sin.readBoolean()) {
+                User(sin)
+            } else {
+                null
+            },
         triggerId = sin.readString(),
         triggerName = sin.readString(),
         query = sin.readString(),
@@ -88,7 +90,7 @@ data class AlertV2(
         triggeredTime = sin.readInstant(),
         errorMessage = sin.readOptionalString(),
         severity = sin.readEnum(Severity::class.java),
-        executionId = sin.readOptionalString()
+        executionId = sin.readOptionalString(),
     )
 
     @Throws(IOException::class)
@@ -111,16 +113,19 @@ data class AlertV2(
         out.writeOptionalString(executionId)
     }
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        return createXContentBuilder(builder, false)
-    }
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder = createXContentBuilder(builder, false)
 
-    fun toXContentWithUser(builder: XContentBuilder): XContentBuilder {
-        return createXContentBuilder(builder, true)
-    }
+    fun toXContentWithUser(builder: XContentBuilder): XContentBuilder = createXContentBuilder(builder, true)
 
-    private fun createXContentBuilder(builder: XContentBuilder, withUser: Boolean): XContentBuilder {
-        builder.startObject()
+    private fun createXContentBuilder(
+        builder: XContentBuilder,
+        withUser: Boolean,
+    ): XContentBuilder {
+        builder
+            .startObject()
             .field(ALERT_V2_ID_FIELD, id)
             .field(ALERT_V2_VERSION_FIELD, version)
             .field(MONITOR_V2_ID_FIELD, monitorId)
@@ -145,15 +150,14 @@ data class AlertV2(
         return builder
     }
 
-    fun asTemplateArg(): Map<String, Any?> {
-        return mapOf(
+    fun asTemplateArg(): Map<String, Any?> =
+        mapOf(
             ALERT_V2_ID_FIELD to id,
             ALERT_V2_VERSION_FIELD to version,
             ERROR_MESSAGE_FIELD to errorMessage,
             EXECUTION_ID_FIELD to executionId,
-            SEVERITY_FIELD to severity.value
+            SEVERITY_FIELD to severity.value,
         )
-    }
 
     companion object {
         const val ALERT_V2_ID_FIELD = "id"
@@ -179,7 +183,11 @@ data class AlertV2(
         @JvmStatic
         @JvmOverloads
         @Throws(IOException::class)
-        fun parse(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): AlertV2 {
+        fun parse(
+            xcp: XContentParser,
+            id: String = NO_ID,
+            version: Long = NO_VERSION,
+        ): AlertV2 {
             var schemaVersion = NO_SCHEMA_VERSION
             lateinit var monitorId: String
             lateinit var monitorName: String
@@ -200,30 +208,67 @@ data class AlertV2(
                 xcp.nextToken()
 
                 when (fieldName) {
-                    MONITOR_V2_ID_FIELD -> monitorId = xcp.text()
-                    SCHEMA_VERSION_FIELD -> schemaVersion = xcp.intValue()
-                    MONITOR_V2_NAME_FIELD -> monitorName = xcp.text()
-                    MONITOR_V2_VERSION_FIELD -> monitorVersion = xcp.longValue()
-                    MONITOR_V2_USER_FIELD ->
-                        monitorUser = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) {
-                            null
-                        } else {
-                            User.parse(xcp)
-                        }
-                    TRIGGER_V2_ID_FIELD -> triggerId = xcp.text()
-                    TRIGGER_V2_NAME_FIELD -> triggerName = xcp.text()
-                    QUERY_FIELD -> query = xcp.text()
-                    QUERY_RESULTS_FIELD -> queryResults = xcp.map()
-                    TRIGGERED_TIME_FIELD -> triggeredTime = xcp.instant()
-                    ERROR_MESSAGE_FIELD -> errorMessage = xcp.textOrNull()
-                    EXECUTION_ID_FIELD -> executionId = xcp.textOrNull()
+                    MONITOR_V2_ID_FIELD -> {
+                        monitorId = xcp.text()
+                    }
+
+                    SCHEMA_VERSION_FIELD -> {
+                        schemaVersion = xcp.intValue()
+                    }
+
+                    MONITOR_V2_NAME_FIELD -> {
+                        monitorName = xcp.text()
+                    }
+
+                    MONITOR_V2_VERSION_FIELD -> {
+                        monitorVersion = xcp.longValue()
+                    }
+
+                    MONITOR_V2_USER_FIELD -> {
+                        monitorUser =
+                            if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) {
+                                null
+                            } else {
+                                User.parse(xcp)
+                            }
+                    }
+
+                    TRIGGER_V2_ID_FIELD -> {
+                        triggerId = xcp.text()
+                    }
+
+                    TRIGGER_V2_NAME_FIELD -> {
+                        triggerName = xcp.text()
+                    }
+
+                    QUERY_FIELD -> {
+                        query = xcp.text()
+                    }
+
+                    QUERY_RESULTS_FIELD -> {
+                        queryResults = xcp.map()
+                    }
+
+                    TRIGGERED_TIME_FIELD -> {
+                        triggeredTime = xcp.instant()
+                    }
+
+                    ERROR_MESSAGE_FIELD -> {
+                        errorMessage = xcp.textOrNull()
+                    }
+
+                    EXECUTION_ID_FIELD -> {
+                        executionId = xcp.textOrNull()
+                    }
+
                     TriggerV2.SEVERITY_FIELD -> {
                         val input = xcp.text()
-                        val enumMatchResult = Severity.enumFromString(input)
-                            ?: throw IllegalArgumentException(
-                                "Invalid value for ${TriggerV2.SEVERITY_FIELD}: $input. " +
-                                    "Supported values are ${Severity.entries.map { it.value }}"
-                            )
+                        val enumMatchResult =
+                            Severity.enumFromString(input)
+                                ?: throw IllegalArgumentException(
+                                    "Invalid value for ${TriggerV2.SEVERITY_FIELD}: $input. " +
+                                        "Supported values are ${Severity.entries.map { it.value }}",
+                                )
                         severity = enumMatchResult
                     }
                 }
@@ -244,14 +289,12 @@ data class AlertV2(
                 triggeredTime = requireNotNull(triggeredTime),
                 errorMessage = errorMessage,
                 severity = severity,
-                executionId = executionId
+                executionId = executionId,
             )
         }
 
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): AlertV2 {
-            return AlertV2(sin)
-        }
+        fun readFrom(sin: StreamInput): AlertV2 = AlertV2(sin)
     }
 }

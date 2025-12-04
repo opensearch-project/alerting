@@ -74,7 +74,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         dryrun: Boolean,
         workflowRunContext: WorkflowRunContext?,
         executionId: String,
-        transportService: TransportService
+        transportService: TransportService,
     ): MonitorRunResult<BucketLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")
@@ -84,19 +84,20 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         }
 
         var monitorResult = MonitorRunResult<BucketLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
-        val currentAlerts = try {
-            monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
-            monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
-            if (monitor.dataSources.findingsEnabled == true) {
-                monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex(monitor.dataSources)
+        val currentAlerts =
+            try {
+                monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
+                monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
+                if (monitor.dataSources.findingsEnabled == true) {
+                    monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex(monitor.dataSources)
+                }
+                monitorCtx.alertService!!.loadCurrentAlertsForBucketLevelMonitor(monitor, workflowRunContext)
+            } catch (e: Exception) {
+                // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
+                val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
+                logger.error("Error loading alerts for monitor: $id", e)
+                return monitorResult.copy(error = e)
             }
-            monitorCtx.alertService!!.loadCurrentAlertsForBucketLevelMonitor(monitor, workflowRunContext)
-        } catch (e: Exception) {
-            // We can't save ERROR alerts to the index here as we don't know if there are existing ACTIVE alerts
-            val id = if (monitor.id.trim().isEmpty()) "_na_" else monitor.id
-            logger.error("Error loading alerts for monitor: $id", e)
-            return monitorResult.copy(error = e)
-        }
 
         /*
          * Since the aggregation query can consist of multiple pages, each iteration of the do-while loop only has partial results
@@ -130,20 +131,21 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     monitorCtx.settings!!,
                     monitorCtx.threadPool!!.threadContext,
                     roles,
-                    monitor.user
-                )
+                    monitor.user,
+                ),
             ) {
                 // Storing the first page of results in the case of pagination input results to prevent empty results
                 // in the final output of monitorResult which occurs when all pages have been exhausted.
                 // If it's favorable to return the last page, will need to check how to accomplish that with multiple aggregation paths
                 // with different page counts.
-                val inputResults = monitorCtx.inputService!!.collectInputResults(
-                    monitor,
-                    periodStart,
-                    periodEnd,
-                    monitorResult.inputResults,
-                    workflowRunContext
-                )
+                val inputResults =
+                    monitorCtx.inputService!!.collectInputResults(
+                        monitor,
+                        periodStart,
+                        periodEnd,
+                        monitorResult.inputResults,
+                        workflowRunContext,
+                    )
                 if (firstIteration) {
                     firstPageOfInputResults = inputResults
                     firstIteration = false
@@ -179,22 +181,24 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             periodStart,
                             periodEnd,
                             !dryrun && monitor.id != Monitor.NO_ID,
-                            executionId
+                            executionId,
                         )
                     } else {
                         emptyList()
                     }
                 // TODO: Should triggerResult's aggregationResultBucket be a list? If not, getCategorizedAlertsForBucketLevelMonitor can
                 //  be refactored to use a map instead
-                val categorizedAlerts = monitorCtx.alertService!!.getCategorizedAlertsForBucketLevelMonitor(
-                    monitor,
-                    trigger,
-                    currentAlertsForTrigger,
-                    triggerResult.aggregationResultBuckets.values.toList(),
-                    findings,
-                    executionId,
-                    workflowRunContext
-                ).toMutableMap()
+                val categorizedAlerts =
+                    monitorCtx.alertService!!
+                        .getCategorizedAlertsForBucketLevelMonitor(
+                            monitor,
+                            trigger,
+                            currentAlertsForTrigger,
+                            triggerResult.aggregationResultBuckets.values.toList(),
+                            findings,
+                            executionId,
+                            workflowRunContext,
+                        ).toMutableMap()
                 val dedupedAlerts = categorizedAlerts.getOrDefault(AlertCategory.DEDUPED, emptyList())
                 var newAlerts = categorizedAlerts.getOrDefault(AlertCategory.NEW, emptyList())
 
@@ -213,18 +217,19 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         dedupedAlerts,
                         monitorCtx.retryPolicy!!,
                         allowUpdatingAcknowledgedAlert = true,
-                        monitor.id
+                        monitor.id,
                     )
                     newAlerts = monitorCtx.alertService!!.saveNewAlerts(monitor.dataSources, newAlerts, monitorCtx.retryPolicy!!)
                 }
 
                 // Store deduped and new Alerts to accumulate across pages
                 if (!nextAlerts.containsKey(trigger.id)) {
-                    nextAlerts[trigger.id] = mutableMapOf(
-                        AlertCategory.DEDUPED to mutableListOf(),
-                        AlertCategory.NEW to mutableListOf(),
-                        AlertCategory.COMPLETED to mutableListOf()
-                    )
+                    nextAlerts[trigger.id] =
+                        mutableMapOf(
+                            AlertCategory.DEDUPED to mutableListOf(),
+                            AlertCategory.NEW to mutableListOf(),
+                            AlertCategory.COMPLETED to mutableListOf(),
+                        )
                 }
                 nextAlerts[trigger.id]?.get(AlertCategory.DEDUPED)?.addAll(dedupedAlerts)
                 nextAlerts[trigger.id]?.get(AlertCategory.NEW)?.addAll(newAlerts)
@@ -235,9 +240,11 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         // However, this operation will only be done if there was no trigger error, since otherwise the nextAlerts were not collected
         // in favor of just using the currentAlerts as-is.
         currentAlerts.forEach { (trigger, keysToAlertsMap) ->
-            if (triggerResults[trigger.id]?.error == null)
-                nextAlerts[trigger.id]?.get(AlertCategory.COMPLETED)
+            if (triggerResults[trigger.id]?.error == null) {
+                nextAlerts[trigger.id]
+                    ?.get(AlertCategory.COMPLETED)
                     ?.addAll(monitorCtx.alertService!!.convertToCompletedAlerts(keysToAlertsMap))
+            }
         }
 
         // The alertSampleDocs map structure is Map<TriggerId, Map<BucketKeysHash, List<Alert>>>
@@ -247,9 +254,12 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             val completedAlertsToUpdate = mutableSetOf<Alert>()
             // Filter ACKNOWLEDGED Alerts from the deduped list so they do not have Actions executed for them.
             // New Alerts are ignored since they cannot be acknowledged yet.
-            val dedupedAlerts = nextAlerts[trigger.id]?.get(AlertCategory.DEDUPED)
-                ?.filterNot { it.state == Alert.State.ACKNOWLEDGED }?.toMutableList()
-                ?: mutableListOf()
+            val dedupedAlerts =
+                nextAlerts[trigger.id]
+                    ?.get(AlertCategory.DEDUPED)
+                    ?.filterNot { it.state == Alert.State.ACKNOWLEDGED }
+                    ?.toMutableList()
+                    ?: mutableListOf()
             // Update nextAlerts so the filtered DEDUPED Alerts are reflected for PER_ALERT Action execution
             nextAlerts[trigger.id]?.set(AlertCategory.DEDUPED, dedupedAlerts)
 
@@ -257,21 +267,23 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             val isTriggered = !nextAlerts[trigger.id]?.get(AlertCategory.NEW).isNullOrEmpty()
             if (isTriggered && printsSampleDocData(trigger)) {
                 try {
-                    val searchRequest = monitorCtx.inputService!!.getSearchRequest(
-                        monitor = monitor.copy(triggers = listOf(trigger)),
-                        searchInput = monitor.inputs[0] as SearchInput,
-                        periodStart = periodStart,
-                        periodEnd = periodEnd,
-                        prevResult = monitorResult.inputResults,
-                        matchingDocIdsPerIndex = null,
-                        returnSampleDocs = true
-                    )
-                    val sampleDocumentsByBucket = getSampleDocs(
-                        client = monitorCtx.client!!,
-                        monitorId = monitor.id,
-                        triggerId = trigger.id,
-                        searchRequest = searchRequest
-                    )
+                    val searchRequest =
+                        monitorCtx.inputService!!.getSearchRequest(
+                            monitor = monitor.copy(triggers = listOf(trigger)),
+                            searchInput = monitor.inputs[0] as SearchInput,
+                            periodStart = periodStart,
+                            periodEnd = periodEnd,
+                            prevResult = monitorResult.inputResults,
+                            matchingDocIdsPerIndex = null,
+                            returnSampleDocs = true,
+                        )
+                    val sampleDocumentsByBucket =
+                        getSampleDocs(
+                            client = monitorCtx.client!!,
+                            monitorId = monitor.id,
+                            triggerId = trigger.id,
+                            searchRequest = searchRequest,
+                        )
                     alertSampleDocs[trigger.id] = sampleDocumentsByBucket
                 } catch (e: Exception) {
                     logger.error("Error retrieving sample documents for trigger {} of monitor {}.", trigger.id, monitor.id, e)
@@ -292,13 +304,14 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             val triggerCtx = triggerContexts[trigger.id]!!
             val triggerResult = triggerResults[trigger.id]!!
             val monitorOrTriggerError = monitorResult.error ?: triggerResult.error
-            val shouldDefaultToPerExecution = defaultToPerExecutionAction(
-                monitorCtx.maxActionableAlertCount,
-                monitorId = monitor.id,
-                triggerId = trigger.id,
-                totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
-                monitorOrTriggerError = monitorOrTriggerError
-            )
+            val shouldDefaultToPerExecution =
+                defaultToPerExecutionAction(
+                    monitorCtx.maxActionableAlertCount,
+                    monitorId = monitor.id,
+                    triggerId = trigger.id,
+                    totalActionableAlertCount = dedupedAlerts.size + newAlerts.size + completedAlerts.size,
+                    monitorOrTriggerError = monitorOrTriggerError,
+                )
             for (action in trigger.actions) {
                 // ActionExecutionPolicy should not be null for Bucket-Level Monitors since it has a default config when not set explicitly
                 val actionExecutionScope = action.getActionExecutionPolicy(monitor)!!.actionExecutionScope
@@ -306,21 +319,27 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     for (alertCategory in actionExecutionScope.actionableAlerts) {
                         val alertsToExecuteActionsFor = nextAlerts[trigger.id]?.get(alertCategory) ?: mutableListOf()
                         val alertsToExecuteActionsForIds = alertsToExecuteActionsFor.map { it.id }
-                        val allAlertsComments = CommentsUtils.getCommentsForAlertNotification(
-                            monitorCtx.client!!,
-                            alertsToExecuteActionsForIds,
-                            maxComments
-                        )
-                        for (alert in alertsToExecuteActionsFor) {
-                            val alertContext = if (alertCategory != AlertCategory.NEW) {
-                                AlertContext(alert = alert, comments = allAlertsComments[alert.id])
-                            } else {
-                                getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs, allAlertsComments[alert.id])
-                            }
-
-                            val actionCtx = getActionContextForAlertCategory(
-                                alertCategory, alertContext, triggerCtx, monitorOrTriggerError
+                        val allAlertsComments =
+                            CommentsUtils.getCommentsForAlertNotification(
+                                monitorCtx.client!!,
+                                alertsToExecuteActionsForIds,
+                                maxComments,
                             )
+                        for (alert in alertsToExecuteActionsFor) {
+                            val alertContext =
+                                if (alertCategory != AlertCategory.NEW) {
+                                    AlertContext(alert = alert, comments = allAlertsComments[alert.id])
+                                } else {
+                                    getAlertContext(alert = alert, alertSampleDocs = alertSampleDocs, allAlertsComments[alert.id])
+                                }
+
+                            val actionCtx =
+                                getActionContextForAlertCategory(
+                                    alertCategory,
+                                    alertContext,
+                                    triggerCtx,
+                                    monitorOrTriggerError,
+                                )
                             // AggregationResultBucket should not be null here
                             val alertBucketKeysHash = alert.aggregationResultBucket!!.getBucketKeysHash()
                             if (!triggerResult.actionResultsMap.containsKey(alertBucketKeysHash)) {
@@ -329,11 +348,12 @@ object BucketLevelMonitorRunner : MonitorRunner() {
 
                             // Keeping the throttled response separate from runAction for now since
                             // throttling is not supported for PER_EXECUTION
-                            val actionResult = if (MonitorRunnerService.isActionActionable(action, alert)) {
-                                this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
-                            } else {
-                                ActionRunResult(action.id, action.name, mapOf(), true, null, null)
-                            }
+                            val actionResult =
+                                if (MonitorRunnerService.isActionActionable(action, alert)) {
+                                    this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
+                                } else {
+                                    ActionRunResult(action.id, action.name, mapOf(), true, null, null)
+                                }
 
                             triggerResult.actionResultsMap[alertBucketKeysHash]?.set(action.id, actionResult)
                             alertsToUpdate.add(alert)
@@ -345,39 +365,50 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 } else if (actionExecutionScope is PerExecutionActionScope || shouldDefaultToPerExecution) {
                     // If all categories of Alerts are empty, there is nothing to message on and we can skip the Action.
                     // If the error is not null, this is disregarded and the Action is executed anyway so the user can be notified.
-                    if (monitorOrTriggerError == null && dedupedAlerts.isEmpty() && newAlerts.isEmpty() && completedAlerts.isEmpty())
+                    if (monitorOrTriggerError == null && dedupedAlerts.isEmpty() && newAlerts.isEmpty() && completedAlerts.isEmpty()) {
                         continue
+                    }
 
-                    val alertsToExecuteActionsForIds = dedupedAlerts.map { it.id }
-                        .plus(newAlerts.map { it.id })
-                        .plus(completedAlerts.map { it.id })
-                    val allAlertsComments = CommentsUtils.getCommentsForAlertNotification(
-                        monitorCtx.client!!,
-                        alertsToExecuteActionsForIds,
-                        maxComments
-                    )
-                    val actionCtx = triggerCtx.copy(
-                        dedupedAlerts = dedupedAlerts.map {
-                            AlertContext(alert = it, comments = allAlertsComments[it.id])
-                        },
-                        newAlerts = newAlerts.map {
-                            getAlertContext(
-                                alert = it,
-                                alertSampleDocs = alertSampleDocs,
-                                alertComments = allAlertsComments[it.id]
-                            )
-                        },
-                        completedAlerts = completedAlerts.map {
-                            AlertContext(alert = it, comments = allAlertsComments[it.id])
-                        },
-                        error = monitorResult.error ?: triggerResult.error
-                    )
+                    val alertsToExecuteActionsForIds =
+                        dedupedAlerts
+                            .map { it.id }
+                            .plus(newAlerts.map { it.id })
+                            .plus(completedAlerts.map { it.id })
+                    val allAlertsComments =
+                        CommentsUtils.getCommentsForAlertNotification(
+                            monitorCtx.client!!,
+                            alertsToExecuteActionsForIds,
+                            maxComments,
+                        )
+                    val actionCtx =
+                        triggerCtx.copy(
+                            dedupedAlerts =
+                                dedupedAlerts.map {
+                                    AlertContext(alert = it, comments = allAlertsComments[it.id])
+                                },
+                            newAlerts =
+                                newAlerts.map {
+                                    getAlertContext(
+                                        alert = it,
+                                        alertSampleDocs = alertSampleDocs,
+                                        alertComments = allAlertsComments[it.id],
+                                    )
+                                },
+                            completedAlerts =
+                                completedAlerts.map {
+                                    AlertContext(alert = it, comments = allAlertsComments[it.id])
+                                },
+                            error = monitorResult.error ?: triggerResult.error,
+                        )
                     val actionResult = this.runAction(action, actionCtx, monitorCtx, monitor, dryrun)
                     // If there was an error during trigger execution then the Alerts to be updated are the current Alerts since the state
                     // was not changed. Otherwise, the Alerts to be updated are the sum of the deduped, new and completed Alerts.
-                    val alertsToIterate = if (monitorOrTriggerError == null) {
-                        (dedupedAlerts + newAlerts + completedAlerts)
-                    } else currentAlerts[trigger]?.map { it.value } ?: listOf()
+                    val alertsToIterate =
+                        if (monitorOrTriggerError == null) {
+                            (dedupedAlerts + newAlerts + completedAlerts)
+                        } else {
+                            currentAlerts[trigger]?.map { it.value } ?: listOf()
+                        }
                     // Save the Action run result for every Alert
                     for (alert in alertsToIterate) {
                         val alertBucketKeysHash = alert.aggregationResultBucket!!.getBucketKeysHash()
@@ -395,23 +426,27 @@ object BucketLevelMonitorRunner : MonitorRunner() {
 
             // Alerts are only added to alertsToUpdate after Action execution meaning the action results for it should be present
             // in the actionResultsMap but returning a default value when accessing the map to be safe.
-            val updatedAlerts = alertsToUpdate.map { alert ->
-                val bucketKeysHash = alert.aggregationResultBucket!!.getBucketKeysHash()
-                val actionResults = triggerResult.actionResultsMap.getOrDefault(bucketKeysHash, emptyMap<String, ActionRunResult>())
-                monitorCtx.alertService!!.updateActionResultsForBucketLevelAlert(
-                    alert.copy(lastNotificationTime = MonitorRunnerService.currentTime()),
-                    actionResults,
-                    // TODO: Update BucketLevelTriggerRunResult.alertError() to retrieve error based on the first failed Action
-                    monitorResult.alertError() ?: triggerResult.alertError()
-                )
-            }
+            val updatedAlerts =
+                alertsToUpdate.map { alert ->
+                    val bucketKeysHash = alert.aggregationResultBucket!!.getBucketKeysHash()
+                    val actionResults = triggerResult.actionResultsMap.getOrDefault(bucketKeysHash, emptyMap<String, ActionRunResult>())
+                    monitorCtx.alertService!!.updateActionResultsForBucketLevelAlert(
+                        alert.copy(lastNotificationTime = MonitorRunnerService.currentTime()),
+                        actionResults,
+                        // TODO: Update BucketLevelTriggerRunResult.alertError() to retrieve error based on the first failed Action
+                        monitorResult.alertError() ?: triggerResult.alertError(),
+                    )
+                }
 
             // Update Alerts with action execution results (if it's not a test Monitor).
             // ACKNOWLEDGED Alerts should not be saved here since actions are not executed for them.
             if (!dryrun && monitor.id != Monitor.NO_ID) {
                 monitorCtx.alertService!!.saveAlerts(
-                    monitor.dataSources, updatedAlerts, monitorCtx.retryPolicy!!, allowUpdatingAcknowledgedAlert = false,
-                    routingId = monitor.id
+                    monitor.dataSources,
+                    updatedAlerts,
+                    monitorCtx.retryPolicy!!,
+                    allowUpdatingAcknowledgedAlert = false,
+                    routingId = monitor.id,
                 )
                 // Save any COMPLETED Alerts that were not covered in updatedAlerts
                 monitorCtx.alertService!!.saveAlerts(
@@ -419,7 +454,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     completedAlertsToUpdate.toList(),
                     monitorCtx.retryPolicy!!,
                     allowUpdatingAcknowledgedAlert = false,
-                    monitor.id
+                    monitor.id,
                 )
             }
         }
@@ -456,43 +491,56 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                                 fieldName = source.field()
                             }
                         }
+
                         is TermsAggregationBuilder -> {
                             fieldName = aggFactory.field()
                         }
+
                         else -> {
                             logger.error(
-                                "Bucket level monitor findings supported only for composite and term aggs. Found [{${aggFactory.type}}]"
+                                "Bucket level monitor findings supported only for composite and term aggs. Found [{${aggFactory.type}}]",
                             )
                             return listOf()
                         }
                     }
                 }
                 if (fieldName != "") {
-                    val searchParams = mapOf(
-                        "period_start" to periodStart.toEpochMilli(),
-                        "period_end" to periodEnd.toEpochMilli()
-                    )
-                    val searchSource = monitorCtx.scriptService!!.compile(
-                        Script(
-                            ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                            query.toString(), searchParams
-                        ),
-                        TemplateScript.CONTEXT
-                    )
-                        .newInstance(searchParams)
-                        .execute()
+                    val searchParams =
+                        mapOf(
+                            "period_start" to periodStart.toEpochMilli(),
+                            "period_end" to periodEnd.toEpochMilli(),
+                        )
+                    val searchSource =
+                        monitorCtx.scriptService!!
+                            .compile(
+                                Script(
+                                    ScriptType.INLINE,
+                                    Script.DEFAULT_TEMPLATE_LANG,
+                                    query.toString(),
+                                    searchParams,
+                                ),
+                                TemplateScript.CONTEXT,
+                            ).newInstance(searchParams)
+                            .execute()
                     val sr = SearchRequest(*input.indices.toTypedArray())
-                    XContentType.JSON.xContent().createParser(monitorCtx.xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource)
+                    XContentType.JSON
+                        .xContent()
+                        .createParser(monitorCtx.xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource)
                         .use {
                             val source = SearchSourceBuilder.fromXContent(it)
-                            val queryBuilder = if (input.query.query() == null) BoolQueryBuilder()
-                            else QueryBuilders.boolQuery().must(source.query())
+                            val queryBuilder =
+                                if (input.query.query() == null) {
+                                    BoolQueryBuilder()
+                                } else {
+                                    QueryBuilders.boolQuery().must(source.query())
+                                }
                             queryBuilder.filter(QueryBuilders.termsQuery(fieldName, bucketValues))
                             sr.source().query(queryBuilder).sort("_seq_no", SortOrder.DESC)
                         }
-                    sr.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
-                        getCancelAfterTimeInterval()
-                    )
+                    sr.cancelAfterTimeInterval =
+                        TimeValue.timeValueMinutes(
+                            getCancelAfterTimeInterval(),
+                        )
                     val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
                     return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, executionId)
                 } else {
@@ -508,7 +556,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
         shouldCreateFinding: Boolean,
-        workflowExecutionId: String? = null
+        workflowExecutionId: String? = null,
     ): List<String> {
         val docIdsByIndexName: MutableMap<String, MutableList<String>> = mutableMapOf()
         for (hit in searchResponse.hits.hits) {
@@ -520,25 +568,27 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         var requestsToRetry: MutableList<IndexRequest> = mutableListOf()
         docIdsByIndexName.entries.forEach { it ->
             run {
-                val finding = Finding(
-                    id = UUID.randomUUID().toString(),
-                    relatedDocIds = it.value,
-                    monitorId = monitor.id,
-                    monitorName = monitor.name,
-                    index = it.key,
-                    timestamp = Instant.now(),
-                    docLevelQueries = listOf(),
-                    executionId = workflowExecutionId
-                )
+                val finding =
+                    Finding(
+                        id = UUID.randomUUID().toString(),
+                        relatedDocIds = it.value,
+                        monitorId = monitor.id,
+                        monitorName = monitor.name,
+                        index = it.key,
+                        timestamp = Instant.now(),
+                        docLevelQueries = listOf(),
+                        executionId = workflowExecutionId,
+                    )
 
                 val findingStr = finding.toXContent(XContentBuilder.builder(XContentType.JSON.xContent()), ToXContent.EMPTY_PARAMS).string()
                 logger.debug("Bucket level monitor ${monitor.id} Findings: $findingStr")
                 if (shouldCreateFinding) {
                     logger.debug("Saving bucket level monitor findings for monitor ${monitor.id}")
-                    val indexRequest = IndexRequest(monitor.dataSources.findingsIndex)
-                        .source(findingStr, XContentType.JSON)
-                        .id(finding.id)
-                        .routing(finding.id)
+                    val indexRequest =
+                        IndexRequest(monitor.dataSources.findingsIndex)
+                            .source(findingStr, XContentType.JSON)
+                            .id(finding.id)
+                            .routing(finding.id)
                     requestsToRetry.add(indexRequest)
                 }
                 findings.add(finding.id)
@@ -566,22 +616,26 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         alertCategory: AlertCategory,
         alertContext: AlertContext,
         ctx: BucketLevelTriggerExecutionContext,
-        error: Exception?
-    ): BucketLevelTriggerExecutionContext {
-        return when (alertCategory) {
-            AlertCategory.DEDUPED ->
+        error: Exception?,
+    ): BucketLevelTriggerExecutionContext =
+        when (alertCategory) {
+            AlertCategory.DEDUPED -> {
                 ctx.copy(dedupedAlerts = listOf(alertContext), newAlerts = emptyList(), completedAlerts = emptyList(), error = error)
-            AlertCategory.NEW ->
+            }
+
+            AlertCategory.NEW -> {
                 ctx.copy(dedupedAlerts = emptyList(), newAlerts = listOf(alertContext), completedAlerts = emptyList(), error = error)
-            AlertCategory.COMPLETED ->
+            }
+
+            AlertCategory.COMPLETED -> {
                 ctx.copy(dedupedAlerts = emptyList(), newAlerts = emptyList(), completedAlerts = listOf(alertContext), error = error)
+            }
         }
-    }
 
     private fun getAlertContext(
         alert: Alert,
         alertSampleDocs: Map<String, Map<String, List<Map<String, Any>>>>,
-        alertComments: List<Comment>?
+        alertComments: List<Comment>?,
     ): AlertContext {
         val bucketKey = alert.aggregationResultBucket?.getBucketKeysHash()
         val sampleDocs = alertSampleDocs[alert.triggerId]?.get(bucketKey)
@@ -593,7 +647,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 alert.id,
                 alert.triggerId,
                 alert.monitorId,
-                alert.executionId
+                alert.executionId,
             )
             AlertContext(alert = alert, sampleDocs = listOf(), comments = alertComments)
         }
@@ -610,7 +664,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         client: Client,
         monitorId: String,
         triggerId: String,
-        searchRequest: SearchRequest
+        searchRequest: SearchRequest,
     ): Map<String, List<Map<String, Any>>> {
         val sampleDocumentsByBucket = mutableMapOf<String, List<Map<String, Any>>>()
         val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
@@ -622,12 +676,14 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             val bucketKey = getBucketKeysHash((bucket.getOrDefault("key", mapOf<String, String>()) as Map<String, String>).values.toList())
             if (bucketKey.isEmpty()) throw IllegalStateException("Cannot format bucket keys.")
 
-            val unwrappedTopHits = (bucket.getOrDefault("top_hits", mapOf<String, Any>()) as Map<String, Any>)
-                .getOrDefault("hits", mapOf<String, Any>()) as Map<String, Any>
+            val unwrappedTopHits =
+                (bucket.getOrDefault("top_hits", mapOf<String, Any>()) as Map<String, Any>)
+                    .getOrDefault("hits", mapOf<String, Any>()) as Map<String, Any>
             val topHits = unwrappedTopHits.getOrDefault("hits", listOf<Map<String, Any>>()) as List<Map<String, Any>>
 
-            val unwrappedLowHits = (bucket.getOrDefault("low_hits", mapOf<String, Any>()) as Map<String, Any>)
-                .getOrDefault("hits", mapOf<String, Any>()) as Map<String, Any>
+            val unwrappedLowHits =
+                (bucket.getOrDefault("low_hits", mapOf<String, Any>()) as Map<String, Any>)
+                    .getOrDefault("hits", mapOf<String, Any>()) as Map<String, Any>
             val lowHits = unwrappedLowHits.getOrDefault("hits", listOf<Map<String, Any>>()) as List<Map<String, Any>>
 
             // Reversing the order of lowHits so allHits will be in descending order.

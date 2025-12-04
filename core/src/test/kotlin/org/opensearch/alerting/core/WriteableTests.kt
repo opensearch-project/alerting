@@ -13,7 +13,6 @@ import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase.assertEquals
 
 class WriteableTests {
-
     @Test
     fun `test jobschedule metrics as stream`() {
         val metrics = JobSchedulerMetrics("test", DateTime.now().millis, false)

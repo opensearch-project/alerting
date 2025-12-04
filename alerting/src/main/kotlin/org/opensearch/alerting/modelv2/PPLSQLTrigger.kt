@@ -80,9 +80,8 @@ data class PPLSQLTrigger(
     val conditionType: ConditionType, // NUMBER_OF_RESULTS or CUSTOM
     val numResultsCondition: NumResultsCondition?,
     val numResultsValue: Long?,
-    val customCondition: String?
+    val customCondition: String?,
 ) : TriggerV2 {
-
     init {
         requireNotNull(this.name) { "Trigger name must be included." }
         requireNotNull(this.severity) { "Trigger severity must be included." }
@@ -137,6 +136,7 @@ data class PPLSQLTrigger(
                         "$CUSTOM_CONDITION_FIELD must not be included."
                 }
             }
+
             ConditionType.CUSTOM -> {
                 requireNotNull(this.customCondition) {
                     "if trigger condition is of type ${ConditionType.CUSTOM.value}, " +
@@ -171,7 +171,7 @@ data class PPLSQLTrigger(
         sin.readEnum(ConditionType::class.java), // condition type
         if (sin.readBoolean()) sin.readEnum(NumResultsCondition::class.java) else null, // num results condition
         sin.readOptionalLong(), // num results value
-        sin.readOptionalString() // custom condition
+        sin.readOptionalString(), // custom condition
     )
 
     @Throws(IOException::class)
@@ -193,7 +193,10 @@ data class PPLSQLTrigger(
         out.writeOptionalString(customCondition)
     }
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params?): XContentBuilder {
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params?,
+    ): XContentBuilder {
         builder.startObject()
         builder.field(ID_FIELD, id)
         builder.field(NAME_FIELD, name)
@@ -211,8 +214,8 @@ data class PPLSQLTrigger(
         return builder
     }
 
-    fun asTemplateArg(): Map<String, Any?> {
-        return mapOf(
+    fun asTemplateArg(): Map<String, Any?> =
+        mapOf(
             ID_FIELD to id,
             NAME_FIELD to name,
             SEVERITY_FIELD to severity.value,
@@ -223,35 +226,43 @@ data class PPLSQLTrigger(
             CONDITION_TYPE_FIELD to conditionType.value,
             NUM_RESULTS_CONDITION_FIELD to numResultsCondition?.value,
             NUM_RESULTS_VALUE_FIELD to numResultsValue,
-            CUSTOM_CONDITION_FIELD to customCondition
+            CUSTOM_CONDITION_FIELD to customCondition,
         )
-    }
 
-    enum class TriggerMode(val value: String) {
+    enum class TriggerMode(
+        val value: String,
+    ) {
         RESULT_SET("result_set"),
-        PER_RESULT("per_result");
+        PER_RESULT("per_result"),
+        ;
 
         companion object {
             fun enumFromString(value: String): TriggerMode? = entries.firstOrNull { it.value == value }
         }
     }
 
-    enum class ConditionType(val value: String) {
+    enum class ConditionType(
+        val value: String,
+    ) {
         NUMBER_OF_RESULTS("number_of_results"),
-        CUSTOM("custom");
+        CUSTOM("custom"),
+        ;
 
         companion object {
             fun enumFromString(value: String): ConditionType? = entries.firstOrNull { it.value == value }
         }
     }
 
-    enum class NumResultsCondition(val value: String) {
+    enum class NumResultsCondition(
+        val value: String,
+    ) {
         GREATER_THAN(">"),
         GREATER_THAN_EQUAL(">="),
         LESS_THAN("<"),
         LESS_THAN_EQUAL("<="),
         EQUAL("=="),
-        NOT_EQUAL("!=");
+        NOT_EQUAL("!="),
+        ;
 
         companion object {
             fun enumFromString(value: String): NumResultsCondition? = entries.firstOrNull { it.value == value }
@@ -273,11 +284,12 @@ data class PPLSQLTrigger(
         // only valid chars (letters, numbers, -, _)
         private val validCharsRegex = """^[a-zA-Z0-9_-]+$""".toRegex()
 
-        val XCONTENT_REGISTRY = NamedXContentRegistry.Entry(
-            TriggerV2::class.java,
-            ParseField(PPL_SQL_TRIGGER_FIELD),
-            CheckedFunction { parseInner(it) }
-        )
+        val XCONTENT_REGISTRY =
+            NamedXContentRegistry.Entry(
+                TriggerV2::class.java,
+                ParseField(PPL_SQL_TRIGGER_FIELD),
+                CheckedFunction { parseInner(it) },
+            )
 
         @JvmStatic
         @Throws(IOException::class)
@@ -295,10 +307,11 @@ data class PPLSQLTrigger(
             var numResultsValue: Long? = null
             var customCondition: String? = null
 
-            /* parse */
+            // parse
             XContentParserUtils.ensureExpectedToken( // outer trigger object start
                 XContentParser.Token.START_OBJECT,
-                xcp.currentToken(), xcp
+                xcp.currentToken(),
+                xcp,
             )
 
             while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
@@ -306,82 +319,106 @@ data class PPLSQLTrigger(
                 xcp.nextToken()
 
                 when (fieldName) {
-                    ID_FIELD -> id = xcp.text()
-                    NAME_FIELD -> name = xcp.text()
+                    ID_FIELD -> {
+                        id = xcp.text()
+                    }
+
+                    NAME_FIELD -> {
+                        name = xcp.text()
+                    }
+
                     SEVERITY_FIELD -> {
                         val input = xcp.text()
-                        val enumMatchResult = Severity.enumFromString(input)
-                            ?: throw IllegalArgumentException(
-                                "Invalid value for $SEVERITY_FIELD: $input. " +
-                                    "Supported values are ${Severity.entries.map { it.value }}"
-                            )
+                        val enumMatchResult =
+                            Severity.enumFromString(input)
+                                ?: throw IllegalArgumentException(
+                                    "Invalid value for $SEVERITY_FIELD: $input. " +
+                                        "Supported values are ${Severity.entries.map { it.value }}",
+                                )
                         severity = enumMatchResult
                     }
+
                     MODE_FIELD -> {
                         val input = xcp.text()
-                        val enumMatchResult = TriggerMode.enumFromString(input)
-                            ?: throw IllegalArgumentException(
-                                "Invalid value for $MODE_FIELD: $input. " +
-                                    "Supported values are ${TriggerMode.entries.map { it.value }}"
-                            )
+                        val enumMatchResult =
+                            TriggerMode.enumFromString(input)
+                                ?: throw IllegalArgumentException(
+                                    "Invalid value for $MODE_FIELD: $input. " +
+                                        "Supported values are ${TriggerMode.entries.map { it.value }}",
+                                )
                         mode = enumMatchResult
                     }
+
                     CONDITION_TYPE_FIELD -> {
                         val input = xcp.text()
-                        val enumMatchResult = ConditionType.enumFromString(input)
-                            ?: throw IllegalArgumentException(
-                                "Invalid value for $CONDITION_TYPE_FIELD: $input. " +
-                                    "Supported values are ${ConditionType.entries.map { it.value }}"
-                            )
+                        val enumMatchResult =
+                            ConditionType.enumFromString(input)
+                                ?: throw IllegalArgumentException(
+                                    "Invalid value for $CONDITION_TYPE_FIELD: $input. " +
+                                        "Supported values are ${ConditionType.entries.map { it.value }}",
+                                )
                         conditionType = enumMatchResult
                     }
+
                     NUM_RESULTS_CONDITION_FIELD -> {
                         if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
                             val input = xcp.text()
-                            val enumMatchResult = NumResultsCondition.enumFromString(input)
-                                ?: throw IllegalArgumentException(
-                                    "Invalid value for $NUM_RESULTS_CONDITION_FIELD: $input. " +
-                                        "Supported values are ${NumResultsCondition.entries.map { it.value }}"
-                                )
+                            val enumMatchResult =
+                                NumResultsCondition.enumFromString(input)
+                                    ?: throw IllegalArgumentException(
+                                        "Invalid value for $NUM_RESULTS_CONDITION_FIELD: $input. " +
+                                            "Supported values are ${NumResultsCondition.entries.map { it.value }}",
+                                    )
                             numResultsCondition = enumMatchResult
                         }
                     }
+
                     NUM_RESULTS_VALUE_FIELD -> {
                         if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
                             numResultsValue = xcp.longValue()
                         }
                     }
+
                     CUSTOM_CONDITION_FIELD -> {
                         if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
                             customCondition = xcp.text()
                         }
                     }
+
                     THROTTLE_FIELD -> {
                         if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
                             throttleDuration = xcp.longValue()
                         }
                     }
+
                     EXPIRE_FIELD -> {
                         if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
                             expireDuration = xcp.longValue()
                         }
                     }
-                    LAST_TRIGGERED_FIELD -> lastTriggeredTime = xcp.instant()
+
+                    LAST_TRIGGERED_FIELD -> {
+                        lastTriggeredTime = xcp.instant()
+                    }
+
                     ACTIONS_FIELD -> {
                         XContentParserUtils.ensureExpectedToken(
                             XContentParser.Token.START_ARRAY,
                             xcp.currentToken(),
-                            xcp
+                            xcp,
                         )
                         while (xcp.nextToken() != XContentParser.Token.END_ARRAY) {
                             actions.add(Action.parse(xcp))
                         }
                     }
-                    else -> throw IllegalArgumentException("Unexpected field when parsing PPL Trigger: $fieldName")
+
+                    else -> {
+                        throw IllegalArgumentException("Unexpected field when parsing PPL Trigger: $fieldName")
+                    }
                 }
             }
 
-            /* validations */
+            // validations
             requireNotNull(name) { "Trigger name must be included" }
             requireNotNull(severity) { "Trigger severity must be included" }
             requireNotNull(mode) { "Trigger mode must be included" }
@@ -400,14 +437,12 @@ data class PPLSQLTrigger(
                 conditionType,
                 numResultsCondition,
                 numResultsValue,
-                customCondition
+                customCondition,
             )
         }
 
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): PPLSQLTrigger {
-            return PPLSQLTrigger(sin)
-        }
+        fun readFrom(sin: StreamInput): PPLSQLTrigger = PPLSQLTrigger(sin)
     }
 }

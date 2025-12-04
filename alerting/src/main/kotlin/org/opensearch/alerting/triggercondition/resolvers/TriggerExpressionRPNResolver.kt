@@ -18,9 +18,8 @@ import java.util.Stack
  * @param polishNotation an array of expression tokens organized in the RPN order
  */
 class TriggerExpressionRPNResolver(
-    private val polishNotation: ArrayList<ExpressionToken>
+    private val polishNotation: ArrayList<ExpressionToken>,
 ) : TriggerExpressionResolver {
-
     private val eqString by lazy {
         val stringBuilder = StringBuilder()
         for (expToken in polishNotation) {
@@ -52,15 +51,19 @@ class TriggerExpressionRPNResolver(
 
         for (expToken in polishNotation) {
             when (expToken) {
-                is TriggerExpressionToken -> tokenStack.push(resolveQueryExpression(expToken.value, queryToDocIds))
+                is TriggerExpressionToken -> {
+                    tokenStack.push(resolveQueryExpression(expToken.value, queryToDocIds))
+                }
+
                 is TriggerExpressionOperator -> {
                     val right = tokenStack.pop()
-                    val expr = when (expToken) {
-                        TriggerExpressionOperator.AND -> TriggerExpression.And(tokenStack.pop(), right)
-                        TriggerExpressionOperator.OR -> TriggerExpression.Or(tokenStack.pop(), right)
-                        TriggerExpressionOperator.NOT -> TriggerExpression.Not(allDocIds, right)
-                        else -> throw IllegalArgumentException("No matching operator.")
-                    }
+                    val expr =
+                        when (expToken) {
+                            TriggerExpressionOperator.AND -> TriggerExpression.And(tokenStack.pop(), right)
+                            TriggerExpressionOperator.OR -> TriggerExpression.Or(tokenStack.pop(), right)
+                            TriggerExpressionOperator.NOT -> TriggerExpression.Not(allDocIds, right)
+                            else -> throw IllegalArgumentException("No matching operator.")
+                        }
                     tokenStack.push(expr.resolve())
                 }
             }
@@ -68,10 +71,15 @@ class TriggerExpressionRPNResolver(
         return tokenStack.pop()
     }
 
-    private fun resolveQueryExpression(queryExpString: String, queryToDocIds: Map<DocLevelQuery, Set<String>>): Set<String> {
+    private fun resolveQueryExpression(
+        queryExpString: String,
+        queryToDocIds: Map<DocLevelQuery, Set<String>>,
+    ): Set<String> {
         if (!queryExpString.startsWith(TriggerExpressionConstant.ConstantType.QUERY.ident)) return emptySet()
-        val token = queryExpString.substringAfter(TriggerExpressionConstant.ConstantType.BRACKET_LEFT.ident)
-            .substringBefore(TriggerExpressionConstant.ConstantType.BRACKET_RIGHT.ident)
+        val token =
+            queryExpString
+                .substringAfter(TriggerExpressionConstant.ConstantType.BRACKET_LEFT.ident)
+                .substringBefore(TriggerExpressionConstant.ConstantType.BRACKET_RIGHT.ident)
         if (token.isEmpty()) return emptySet()
 
         val tokens = token.split(TriggerExpressionConstant.ConstantType.EQUALS.ident)
@@ -82,12 +90,20 @@ class TriggerExpressionRPNResolver(
         val documents = mutableSetOf<String>()
         when (identifier) {
             TriggerExpressionConstant.ConstantType.NAME.ident -> {
-                val key: Optional<DocLevelQuery> = queryToDocIds.keys.stream().filter { it.name == value }.findFirst()
+                val key: Optional<DocLevelQuery> =
+                    queryToDocIds.keys
+                        .stream()
+                        .filter { it.name == value }
+                        .findFirst()
                 if (key.isPresent) queryToDocIds[key.get()]?.let { doc -> documents.addAll(doc) }
             }
 
             TriggerExpressionConstant.ConstantType.ID.ident -> {
-                val key: Optional<DocLevelQuery> = queryToDocIds.keys.stream().filter { it.id == value }.findFirst()
+                val key: Optional<DocLevelQuery> =
+                    queryToDocIds.keys
+                        .stream()
+                        .filter { it.id == value }
+                        .findFirst()
                 if (key.isPresent) queryToDocIds[key.get()]?.let { doc -> documents.addAll(doc) }
             }
 

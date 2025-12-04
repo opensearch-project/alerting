@@ -13,13 +13,12 @@ class ScheduledJobsStatsAction : ActionType<ScheduledJobsStatsResponse>(NAME, re
         val INSTANCE = ScheduledJobsStatsAction()
         const val NAME = "cluster:admin/opendistro/_scheduled_jobs/stats"
 
-        val reader = Writeable.Reader {
-            val response = ScheduledJobsStatsResponse(it)
-            response
-        }
+        val reader =
+            Writeable.Reader {
+                val response = ScheduledJobsStatsResponse(it)
+                response
+            }
     }
 
-    override fun getResponseReader(): Writeable.Reader<ScheduledJobsStatsResponse> {
-        return reader
-    }
+    override fun getResponseReader(): Writeable.Reader<ScheduledJobsStatsResponse> = reader
 }

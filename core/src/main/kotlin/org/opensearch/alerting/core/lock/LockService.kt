@@ -34,7 +34,10 @@ import java.util.concurrent.TimeUnit
 
 private val log = LogManager.getLogger(LockService::class.java)
 
-class LockService(private val client: Client, private val clusterService: ClusterService) {
+class LockService(
+    private val client: Client,
+    private val clusterService: ClusterService,
+) {
     private var testInstant: Instant? = null
 
     companion object {
@@ -42,19 +45,17 @@ class LockService(private val client: Client, private val clusterService: Cluste
         val LOCK_EXPIRED_MINUTES = TimeValue(5, TimeUnit.MINUTES)
 
         @JvmStatic
-        fun lockMapping(): String? {
-            return LockService::class.java.classLoader.getResource("mappings/opensearch-alerting-config-lock.json")
+        fun lockMapping(): String? =
+            LockService::class.java.classLoader
+                .getResource("mappings/opensearch-alerting-config-lock.json")
                 ?.readText()
-        }
     }
 
-    fun lockIndexExist(): Boolean {
-        return clusterService.state().routingTable().hasIndex(LOCK_INDEX_NAME)
-    }
+    fun lockIndexExist(): Boolean = clusterService.state().routingTable().hasIndex(LOCK_INDEX_NAME)
 
     fun acquireLock(
         scheduledJob: ScheduledJob,
-        listener: ActionListener<LockModel?>
+        listener: ActionListener<LockModel?>,
     ) {
         val scheduledJobId = scheduledJob.id
         acquireLockWithId(scheduledJobId, listener)
@@ -62,7 +63,7 @@ class LockService(private val client: Client, private val clusterService: Cluste
 
     fun acquireLockWithId(
         scheduledJobId: String,
-        listener: ActionListener<LockModel?>
+        listener: ActionListener<LockModel?>,
     ) {
         val lockId = LockModel.generateLockId(scheduledJobId)
         createLockIndex(
@@ -103,7 +104,7 @@ class LockService(private val client: Client, private val clusterService: Cluste
                                     override fun onFailure(e: Exception) {
                                         listener.onFailure(e)
                                     }
-                                }
+                                },
                             )
                         } catch (e: VersionConflictEngineException) {
                             log.debug("could not acquire lock {}", e.message)
@@ -117,20 +118,22 @@ class LockService(private val client: Client, private val clusterService: Cluste
                 override fun onFailure(e: Exception) {
                     listener.onFailure(e)
                 }
-            }
+            },
         )
     }
 
     private fun createLock(
         tempLock: LockModel,
-        listener: ActionListener<LockModel?>
+        listener: ActionListener<LockModel?>,
     ) {
         try {
-            val request = IndexRequest(LOCK_INDEX_NAME).id(tempLock.lockId)
-                .source(tempLock.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
-                .setIfSeqNo(SequenceNumbers.UNASSIGNED_SEQ_NO)
-                .setIfPrimaryTerm(SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
-                .create(true)
+            val request =
+                IndexRequest(LOCK_INDEX_NAME)
+                    .id(tempLock.lockId)
+                    .source(tempLock.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
+                    .setIfSeqNo(SequenceNumbers.UNASSIGNED_SEQ_NO)
+                    .setIfPrimaryTerm(SequenceNumbers.UNASSIGNED_PRIMARY_TERM)
+                    .create(true)
             client.index(
                 request,
                 object : ActionListener<IndexResponse> {
@@ -146,7 +149,7 @@ class LockService(private val client: Client, private val clusterService: Cluste
                         }
                         listener.onFailure(e)
                     }
-                }
+                },
             )
         } catch (ex: IOException) {
             log.error("IOException occurred creating lock", ex)
@@ -156,15 +159,17 @@ class LockService(private val client: Client, private val clusterService: Cluste
 
     private fun updateLock(
         updateLock: LockModel,
-        listener: ActionListener<LockModel?>
+        listener: ActionListener<LockModel?>,
     ) {
         try {
-            val updateRequest = UpdateRequest().index(LOCK_INDEX_NAME)
-                .id(updateLock.lockId)
-                .setIfSeqNo(updateLock.seqNo)
-                .setIfPrimaryTerm(updateLock.primaryTerm)
-                .doc(updateLock.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
-                .fetchSource(true)
+            val updateRequest =
+                UpdateRequest()
+                    .index(LOCK_INDEX_NAME)
+                    .id(updateLock.lockId)
+                    .setIfSeqNo(updateLock.seqNo)
+                    .setIfPrimaryTerm(updateLock.primaryTerm)
+                    .doc(updateLock.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
+                    .fetchSource(true)
 
             client.update(
                 updateRequest,
@@ -180,7 +185,7 @@ class LockService(private val client: Client, private val clusterService: Cluste
                         if (e is DocumentMissingException) {
                             log.debug(
                                 "Document is deleted. This happens if the job is already removed and" + " this is the last run." + "{}",
-                                e.message
+                                e.message,
                             )
                         }
                         if (e is IOException) {
@@ -188,7 +193,7 @@ class LockService(private val client: Client, private val clusterService: Cluste
                         }
                         listener.onResponse(null)
                     }
-                }
+                },
             )
         } catch (ex: IOException) {
             log.error("IOException occurred updating lock.", ex)
@@ -198,7 +203,7 @@ class LockService(private val client: Client, private val clusterService: Cluste
 
     fun findLock(
         lockId: String,
-        listener: ActionListener<LockModel>
+        listener: ActionListener<LockModel>,
     ) {
         val getRequest = GetRequest(LOCK_INDEX_NAME).id(lockId)
         client.get(
@@ -209,8 +214,10 @@ class LockService(private val client: Client, private val clusterService: Cluste
                         listener.onResponse(null)
                     } else {
                         try {
-                            val parser = XContentType.JSON.xContent()
-                                .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, response.sourceAsString)
+                            val parser =
+                                XContentType.JSON
+                                    .xContent()
+                                    .createParser(NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE, response.sourceAsString)
                             parser.nextToken()
                             listener.onResponse(LockModel.parse(parser, response.seqNo, response.primaryTerm))
                         } catch (e: IOException) {
@@ -224,13 +231,13 @@ class LockService(private val client: Client, private val clusterService: Cluste
                     log.error("Exception occurred finding lock", e)
                     listener.onFailure(e)
                 }
-            }
+            },
         )
     }
 
     fun release(
         lock: LockModel?,
-        listener: ActionListener<Boolean>
+        listener: ActionListener<Boolean>,
     ) {
         if (lock == null) {
             log.error("Lock is null. Nothing to release.")
@@ -248,14 +255,14 @@ class LockService(private val client: Client, private val clusterService: Cluste
                     override fun onFailure(e: Exception) {
                         listener.onFailure(e)
                     }
-                }
+                },
             )
         }
     }
 
     fun deleteLock(
         lockId: String,
-        listener: ActionListener<Boolean>
+        listener: ActionListener<Boolean>,
     ) {
         val deleteRequest = DeleteRequest(LOCK_INDEX_NAME).id(lockId)
         client.delete(
@@ -263,7 +270,7 @@ class LockService(private val client: Client, private val clusterService: Cluste
             object : ActionListener<DeleteResponse> {
                 override fun onResponse(response: DeleteResponse) {
                     listener.onResponse(
-                        response.result == DocWriteResponse.Result.DELETED || response.result == DocWriteResponse.Result.NOT_FOUND
+                        response.result == DocWriteResponse.Result.DELETED || response.result == DocWriteResponse.Result.NOT_FOUND,
                     )
                 }
 
@@ -275,7 +282,7 @@ class LockService(private val client: Client, private val clusterService: Cluste
                         listener.onFailure(e)
                     }
                 }
-            }
+            },
         )
     }
 
@@ -283,8 +290,10 @@ class LockService(private val client: Client, private val clusterService: Cluste
         if (lockIndexExist()) {
             listener.onResponse(true)
         } else {
-            val indexRequest = CreateIndexRequest(LOCK_INDEX_NAME).mapping(lockMapping())
-                .settings(Settings.builder().put("index.hidden", true).build())
+            val indexRequest =
+                CreateIndexRequest(LOCK_INDEX_NAME)
+                    .mapping(lockMapping())
+                    .settings(Settings.builder().put("index.hidden", true).build())
             client.admin().indices().create(
                 indexRequest,
                 object : ActionListener<CreateIndexResponse> {
@@ -294,29 +303,25 @@ class LockService(private val client: Client, private val clusterService: Cluste
 
                     override fun onFailure(ex: Exception) {
                         log.error("Failed to update config index schema", ex)
-                        if (ex is ResourceAlreadyExistsException || ex.cause is ResourceAlreadyExistsException
-                        ) {
+                        if (ex is ResourceAlreadyExistsException || ex.cause is ResourceAlreadyExistsException) {
                             listener.onResponse(true)
                         } else {
                             listener.onFailure(ex)
                         }
                     }
-                }
+                },
             )
         }
     }
 
-    private fun isLockReleased(lock: LockModel): Boolean {
-        return lock.released
-    }
+    private fun isLockReleased(lock: LockModel): Boolean = lock.released
 
-    private fun getNow(): Instant {
-        return if (testInstant != null) {
+    private fun getNow(): Instant =
+        if (testInstant != null) {
             testInstant!!
         } else {
             Instant.now()
         }
-    }
 
     fun setTime(testInstant: Instant) {
         this.testInstant = testInstant

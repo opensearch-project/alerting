@@ -23,27 +23,24 @@ import org.opensearch.transport.client.node.NodeClient
  * This class consists of the REST handler to retrieve chained alerts by workflow id.
  */
 class RestGetWorkflowAlertsAction : BaseRestHandler() {
-
     private val log = LogManager.getLogger(RestGetWorkflowAlertsAction::class.java)
 
-    override fun getName(): String {
-        return "get_workflow_alerts_action"
-    }
+    override fun getName(): String = "get_workflow_alerts_action"
 
-    override fun routes(): List<Route> {
-        return mutableListOf(
+    override fun routes(): List<Route> =
+        mutableListOf(
             Route(
                 GET,
-                "${AlertingPlugin.WORKFLOW_BASE_URI}/alerts"
-            )
+                "${AlertingPlugin.WORKFLOW_BASE_URI}/alerts",
+            ),
         )
-    }
 
-    override fun replacedRoutes(): MutableList<ReplacedRoute> {
-        return mutableListOf()
-    }
+    override fun replacedRoutes(): MutableList<ReplacedRoute> = mutableListOf()
 
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.WORKFLOW_BASE_URI}/alerts")
 
         val sortString = request.param("sortString", "monitor_name.keyword")
@@ -65,26 +62,28 @@ class RestGetWorkflowAlertsAction : BaseRestHandler() {
         if (alertId.isNullOrEmpty() == false) {
             alertIds.add(alertId)
         }
-        val table = Table(
-            sortOrder,
-            sortString,
-            missing,
-            size,
-            startIndex,
-            searchString
-        )
+        val table =
+            Table(
+                sortOrder,
+                sortString,
+                missing,
+                size,
+                startIndex,
+                searchString,
+            )
 
-        val getWorkflowAlertsRequest = GetWorkflowAlertsRequest(
-            table,
-            severityLevel,
-            alertState,
-            alertIndex = null,
-            associatedAlertsIndex = null,
-            workflowIds = workflowIds,
-            monitorIds = emptyList(),
-            getAssociatedAlerts = getAssociatedAlerts,
-            alertIds = alertIds
-        )
+        val getWorkflowAlertsRequest =
+            GetWorkflowAlertsRequest(
+                table,
+                severityLevel,
+                alertState,
+                alertIndex = null,
+                associatedAlertsIndex = null,
+                workflowIds = workflowIds,
+                monitorIds = emptyList(),
+                getAssociatedAlerts = getAssociatedAlerts,
+                alertIds = alertIds,
+            )
         return RestChannelConsumer { channel ->
             client.execute(AlertingActions.GET_WORKFLOW_ALERTS_ACTION_TYPE, getWorkflowAlertsRequest, RestToXContentListener(channel))
         }

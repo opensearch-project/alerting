@@ -23,22 +23,21 @@ private val log: Logger = LogManager.getLogger(RestDeleteMonitorAction::class.ja
  * Rest handlers to create and update comments.
  */
 class RestDeleteAlertingCommentAction : BaseRestHandler() {
+    override fun getName(): String = "delete_alerting_comment_action"
 
-    override fun getName(): String {
-        return "delete_alerting_comment_action"
-    }
-
-    override fun routes(): List<Route> {
-        return listOf(
+    override fun routes(): List<Route> =
+        listOf(
             Route(
                 RestRequest.Method.DELETE,
-                "${AlertingPlugin.COMMENTS_BASE_URI}/{id}"
-            )
+                "${AlertingPlugin.COMMENTS_BASE_URI}/{id}",
+            ),
         )
-    }
 
     @Throws(IOException::class)
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.info("${request.method()} ${AlertingPlugin.COMMENTS_BASE_URI}/{id}")
         val commentId = request.param("id")
         val deleteMonitorRequest = DeleteCommentRequest(commentId)

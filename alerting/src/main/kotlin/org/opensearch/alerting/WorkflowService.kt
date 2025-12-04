@@ -42,40 +42,47 @@ class WorkflowService(
      * @param chainedMonitors Monitors that have previously executed
      * @param workflowExecutionId Execution id of the current workflow
      */
-    suspend fun getFindingDocIdsByExecutionId(chainedMonitors: List<Monitor>, workflowExecutionId: String):
-        Pair<Map<String, List<String>>, List<String>> {
-        if (chainedMonitors.isEmpty())
+    suspend fun getFindingDocIdsByExecutionId(
+        chainedMonitors: List<Monitor>,
+        workflowExecutionId: String,
+    ): Pair<Map<String, List<String>>, List<String>> {
+        if (chainedMonitors.isEmpty()) {
             return Pair(emptyMap(), listOf())
+        }
         val dataSources = chainedMonitors[0].dataSources
         try {
-            val existsResponse: IndicesExistsResponse = client.admin().indices().suspendUntil {
-                exists(IndicesExistsRequest(dataSources.findingsIndex).local(true), it)
-            }
+            val existsResponse: IndicesExistsResponse =
+                client.admin().indices().suspendUntil {
+                    exists(IndicesExistsRequest(dataSources.findingsIndex).local(true), it)
+                }
             if (existsResponse.isExists == false) return Pair(emptyMap(), listOf())
             // Search findings index to match id of monitors and workflow execution id
-            val bqb = QueryBuilders.boolQuery()
-                .filter(
-                    QueryBuilders.termsQuery(
-                        Finding.MONITOR_ID_FIELD,
-                        chainedMonitors.map { it.id }
-                    )
-                )
-                .filter(QueryBuilders.termQuery(Finding.EXECUTION_ID_FIELD, workflowExecutionId))
-            val searchRequest = SearchRequest()
-                .source(
-                    SearchSourceBuilder()
-                        .query(bqb)
-                        .version(true)
-                        .seqNoAndPrimaryTerm(true)
-                )
-                .indices(dataSources.findingsIndex)
+            val bqb =
+                QueryBuilders
+                    .boolQuery()
+                    .filter(
+                        QueryBuilders.termsQuery(
+                            Finding.MONITOR_ID_FIELD,
+                            chainedMonitors.map { it.id },
+                        ),
+                    ).filter(QueryBuilders.termQuery(Finding.EXECUTION_ID_FIELD, workflowExecutionId))
+            val searchRequest =
+                SearchRequest()
+                    .source(
+                        SearchSourceBuilder()
+                            .query(bqb)
+                            .version(true)
+                            .seqNoAndPrimaryTerm(true),
+                    ).indices(dataSources.findingsIndex)
             val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
 
             // Get the findings docs
             val findings = mutableListOf<Finding>()
             for (hit in searchResponse.hits) {
-                val xcp = XContentType.JSON.xContent()
-                    .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+                val xcp =
+                    XContentType.JSON
+                        .xContent()
+                        .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                 val finding = Finding.parse(xcp)
                 findings.add(finding)
@@ -99,19 +106,22 @@ class WorkflowService(
      * @param monitors List of monitor ids
      * @param size Expected number of monitors
      */
-    suspend fun getMonitorsById(monitors: List<String>, size: Int): List<Monitor> {
+    suspend fun getMonitorsById(
+        monitors: List<String>,
+        size: Int,
+    ): List<Monitor> {
         try {
             val bqb = QueryBuilders.boolQuery().filter(QueryBuilders.termsQuery("_id", monitors))
 
-            val searchRequest = SearchRequest()
-                .source(
-                    SearchSourceBuilder()
-                        .query(bqb)
-                        .version(true)
-                        .seqNoAndPrimaryTerm(true)
-                        .size(size)
-                )
-                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+            val searchRequest =
+                SearchRequest()
+                    .source(
+                        SearchSourceBuilder()
+                            .query(bqb)
+                            .version(true)
+                            .seqNoAndPrimaryTerm(true)
+                            .size(size),
+                    ).indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
 
             val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
             return parseMonitors(searchResponse)
@@ -129,18 +139,21 @@ class WorkflowService(
         val monitors = mutableListOf<Monitor>()
         try {
             for (hit in response.hits) {
-                XContentType.JSON.xContent().createParser(
-                    xContentRegistry,
-                    LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
-                ).use { hitsParser ->
-                    val scheduledJob = ScheduledJob.parse(hitsParser, hit.id, hit.version)
-                    validateMonitorV1(scheduledJob)?.let {
-                        throw OpenSearchException(it)
-                    }
+                XContentType.JSON
+                    .xContent()
+                    .createParser(
+                        xContentRegistry,
+                        LoggingDeprecationHandler.INSTANCE,
+                        hit.sourceAsString,
+                    ).use { hitsParser ->
+                        val scheduledJob = ScheduledJob.parse(hitsParser, hit.id, hit.version)
+                        validateMonitorV1(scheduledJob)?.let {
+                            throw OpenSearchException(it)
+                        }
 
-                    val monitor = scheduledJob as Monitor
-                    monitors.add(monitor)
-                }
+                        val monitor = scheduledJob as Monitor
+                        monitors.add(monitor)
+                    }
             }
         } catch (e: Exception) {
             log.error("Error parsing monitors: ${e.message}", e)

@@ -54,174 +54,190 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 
-private val log = LogManager.getLogger(TransportGetFindingsSearchAction::class.java)
+private val log = LogManager.getLogger(TransportGetFindingsAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
-class TransportGetFindingsSearchAction @Inject constructor(
-    transportService: TransportService,
-    val client: Client,
-    clusterService: ClusterService,
-    actionFilters: ActionFilters,
-    val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry,
-    val namedWriteableRegistry: NamedWriteableRegistry
-) : HandledTransportAction<ActionRequest, GetFindingsResponse> (
-    AlertingActions.GET_FINDINGS_ACTION_NAME, transportService, actionFilters, ::GetFindingsRequest
-),
-    SecureTransportAction {
+class TransportGetFindingsAction
+    @Inject
+    constructor(
+        transportService: TransportService,
+        val client: Client,
+        clusterService: ClusterService,
+        actionFilters: ActionFilters,
+        val settings: Settings,
+        val xContentRegistry: NamedXContentRegistry,
+        val namedWriteableRegistry: NamedWriteableRegistry,
+    ) : HandledTransportAction<ActionRequest, GetFindingsResponse>(
+            AlertingActions.GET_FINDINGS_ACTION_NAME,
+            transportService,
+            actionFilters,
+            ::GetFindingsRequest,
+        ),
+        SecureTransportAction {
+        @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
-    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
-
-    init {
-        listenFilterBySettingChange(clusterService)
-    }
-
-    override fun doExecute(
-        task: Task,
-        request: ActionRequest,
-        actionListener: ActionListener<GetFindingsResponse>
-    ) {
-        val getFindingsRequest = request as? GetFindingsRequest
-            ?: recreateObject(request, namedWriteableRegistry) { GetFindingsRequest(it) }
-        val tableProp = getFindingsRequest.table
-
-        val sortBuilder = SortBuilders
-            .fieldSort(tableProp.sortString)
-            .order(SortOrder.fromString(tableProp.sortOrder))
-        if (!tableProp.missing.isNullOrBlank()) {
-            sortBuilder.missing(tableProp.missing)
+        init {
+            listenFilterBySettingChange(clusterService)
         }
 
-        val searchSourceBuilder = SearchSourceBuilder()
-            .sort(sortBuilder)
-            .size(tableProp.size)
-            .from(tableProp.startIndex)
-            .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
-            .seqNoAndPrimaryTerm(true)
-            .version(true)
+        override fun doExecute(
+            task: Task,
+            request: ActionRequest,
+            actionListener: ActionListener<GetFindingsResponse>,
+        ) {
+            val getFindingsRequest =
+                request as? GetFindingsRequest
+                    ?: recreateObject(request, namedWriteableRegistry) { GetFindingsRequest(it) }
+            val tableProp = getFindingsRequest.table
 
-        val queryBuilder = getFindingsRequest.boolQueryBuilder ?: QueryBuilders.boolQuery()
+            val sortBuilder =
+                SortBuilders
+                    .fieldSort(tableProp.sortString)
+                    .order(SortOrder.fromString(tableProp.sortOrder))
+            if (!tableProp.missing.isNullOrBlank()) {
+                sortBuilder.missing(tableProp.missing)
+            }
 
-        if (!getFindingsRequest.findingId.isNullOrBlank())
-            queryBuilder.filter(QueryBuilders.termQuery("_id", getFindingsRequest.findingId))
-        if (getFindingsRequest.monitorId != null) {
-            queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getFindingsRequest.monitorId))
-        } else if (getFindingsRequest.monitorIds.isNullOrEmpty() == false) {
-            queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getFindingsRequest.monitorIds))
-        }
+            val searchSourceBuilder =
+                SearchSourceBuilder()
+                    .sort(sortBuilder)
+                    .size(tableProp.size)
+                    .from(tableProp.startIndex)
+                    .fetchSource(FetchSourceContext(true, Strings.EMPTY_ARRAY, Strings.EMPTY_ARRAY))
+                    .seqNoAndPrimaryTerm(true)
+                    .version(true)
 
-        if (!tableProp.searchString.isNullOrBlank()) {
-            queryBuilder
-                .should(
-                    QueryBuilders
-                        .queryStringQuery(tableProp.searchString)
-                )
-                .should(
-                    QueryBuilders.nestedQuery(
-                        "queries",
-                        QueryBuilders.boolQuery()
-                            .must(
-                                QueryBuilders
-                                    .queryStringQuery(tableProp.searchString)
-                                    .defaultOperator(Operator.AND)
-                                    .field("queries.tags")
-                                    .field("queries.name")
-                            ),
-                        ScoreMode.Avg
+            val queryBuilder = getFindingsRequest.boolQueryBuilder ?: QueryBuilders.boolQuery()
+
+            if (!getFindingsRequest.findingId.isNullOrBlank()) {
+                queryBuilder.filter(QueryBuilders.termQuery("_id", getFindingsRequest.findingId))
+            }
+            if (getFindingsRequest.monitorId != null) {
+                queryBuilder.filter(QueryBuilders.termQuery("monitor_id", getFindingsRequest.monitorId))
+            } else if (getFindingsRequest.monitorIds.isNullOrEmpty() == false) {
+                queryBuilder.filter(QueryBuilders.termsQuery("monitor_id", getFindingsRequest.monitorIds))
+            }
+
+            if (!tableProp.searchString.isNullOrBlank()) {
+                queryBuilder
+                    .should(
+                        QueryBuilders
+                            .queryStringQuery(tableProp.searchString),
+                    ).should(
+                        QueryBuilders.nestedQuery(
+                            "queries",
+                            QueryBuilders
+                                .boolQuery()
+                                .must(
+                                    QueryBuilders
+                                        .queryStringQuery(tableProp.searchString)
+                                        .defaultOperator(Operator.AND)
+                                        .field("queries.tags")
+                                        .field("queries.name"),
+                                ),
+                            ScoreMode.Avg,
+                        ),
                     )
-                )
-        }
-        searchSourceBuilder.query(queryBuilder).trackTotalHits(true)
-        client.threadPool().threadContext.stashContext().use {
-            scope.launch {
-                try {
-                    val indexName = resolveFindingsIndexName(getFindingsRequest)
-                    val getFindingsResponse = search(searchSourceBuilder, indexName)
-                    actionListener.onResponse(getFindingsResponse)
-                } catch (t: AlertingException) {
-                    actionListener.onFailure(t)
-                } catch (t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
+            }
+            searchSourceBuilder.query(queryBuilder).trackTotalHits(true)
+            client.threadPool().threadContext.stashContext().use {
+                scope.launch {
+                    try {
+                        val indexName = resolveFindingsIndexName(getFindingsRequest)
+                        val getFindingsResponse = search(searchSourceBuilder, indexName)
+                        actionListener.onResponse(getFindingsResponse)
+                    } catch (t: AlertingException) {
+                        actionListener.onFailure(t)
+                    } catch (t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                    }
                 }
             }
         }
-    }
 
-    suspend fun resolveFindingsIndexName(findingsRequest: GetFindingsRequest): String {
-        var indexName = ALL_FINDING_INDEX_PATTERN
+        suspend fun resolveFindingsIndexName(findingsRequest: GetFindingsRequest): String {
+            var indexName = ALL_FINDING_INDEX_PATTERN
 
-        if (findingsRequest.findingIndex.isNullOrEmpty() == false) {
-            // findingIndex has highest priority, so use that if available
-            indexName = findingsRequest.findingIndex!!
-        } else if (findingsRequest.monitorId.isNullOrEmpty() == false) {
-            // second best is monitorId.
-            // We will use it to fetch monitor and then read indexName from dataSources field of monitor
-            withContext(Dispatchers.IO) {
-                val getMonitorRequest = GetMonitorRequest(
-                    findingsRequest.monitorId!!,
-                    -3L,
-                    RestRequest.Method.GET,
-                    FetchSourceContext.FETCH_SOURCE
-                )
-                val getMonitorResponse: GetMonitorResponse =
-                    this@TransportGetFindingsSearchAction.client.suspendUntil {
-                        execute(AlertingActions.GET_MONITOR_ACTION_TYPE, getMonitorRequest, it)
-                    }
-                indexName = getMonitorResponse.monitor?.dataSources?.findingsIndex ?: ALL_FINDING_INDEX_PATTERN
+            if (findingsRequest.findingIndex.isNullOrEmpty() == false) {
+                // findingIndex has highest priority, so use that if available
+                indexName = findingsRequest.findingIndex!!
+            } else if (findingsRequest.monitorId.isNullOrEmpty() == false) {
+                // second best is monitorId.
+                // We will use it to fetch monitor and then read indexName from dataSources field of monitor
+                withContext(Dispatchers.IO) {
+                    val getMonitorRequest =
+                        GetMonitorRequest(
+                            findingsRequest.monitorId!!,
+                            -3L,
+                            RestRequest.Method.GET,
+                            FetchSourceContext.FETCH_SOURCE,
+                        )
+                    val getMonitorResponse: GetMonitorResponse =
+                        this@TransportGetFindingsAction.client.suspendUntil {
+                            execute(AlertingActions.GET_MONITOR_ACTION_TYPE, getMonitorRequest, it)
+                        }
+                    indexName = getMonitorResponse.monitor?.dataSources?.findingsIndex ?: ALL_FINDING_INDEX_PATTERN
+                }
             }
+            return indexName
         }
-        return indexName
-    }
 
-    suspend fun search(searchSourceBuilder: SearchSourceBuilder, indexName: String): GetFindingsResponse {
-        val searchRequest = SearchRequest()
-            .source(searchSourceBuilder)
-            .indices(indexName)
-        val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-        val totalFindingCount = searchResponse.hits.totalHits?.value?.toInt()
-        val mgetRequest = MultiGetRequest()
-        val findingsWithDocs = mutableListOf<FindingWithDocs>()
-        val findings = mutableListOf<Finding>()
-        for (hit in searchResponse.hits) {
-            val xcp = XContentType.JSON.xContent()
-                .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
-            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-            val finding = Finding.parse(xcp)
-            findings.add(finding)
-            val documentIds = finding.relatedDocIds
-            // Add getRequests to mget request
-            documentIds.forEach { docId ->
-                mgetRequest.add(MultiGetRequest.Item(finding.index, docId))
+        suspend fun search(
+            searchSourceBuilder: SearchSourceBuilder,
+            indexName: String,
+        ): GetFindingsResponse {
+            val searchRequest =
+                SearchRequest()
+                    .source(searchSourceBuilder)
+                    .indices(indexName)
+            val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
+            val totalFindingCount =
+                searchResponse.hits.totalHits
+                    ?.value
+                    ?.toInt()
+            val mgetRequest = MultiGetRequest()
+            val findingsWithDocs = mutableListOf<FindingWithDocs>()
+            val findings = mutableListOf<Finding>()
+            for (hit in searchResponse.hits) {
+                val xcp =
+                    XContentType.JSON
+                        .xContent()
+                        .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                val finding = Finding.parse(xcp)
+                findings.add(finding)
+                val documentIds = finding.relatedDocIds
+                // Add getRequests to mget request
+                documentIds.forEach { docId ->
+                    mgetRequest.add(MultiGetRequest.Item(finding.index, docId))
+                }
             }
-        }
-        val documents = if (mgetRequest.items.isEmpty()) mutableMapOf() else searchDocument(mgetRequest)
-        findings.forEach {
-            val documentIds = it.relatedDocIds
-            val relatedDocs = mutableListOf<FindingDocument>()
-            for (docId in documentIds) {
-                val key = "${it.index}|$docId"
-                documents[key]?.let { document -> relatedDocs.add(document) }
+            val documents = if (mgetRequest.items.isEmpty()) mutableMapOf() else searchDocument(mgetRequest)
+            findings.forEach {
+                val documentIds = it.relatedDocIds
+                val relatedDocs = mutableListOf<FindingDocument>()
+                for (docId in documentIds) {
+                    val key = "${it.index}|$docId"
+                    documents[key]?.let { document -> relatedDocs.add(document) }
+                }
+                findingsWithDocs.add(FindingWithDocs(it, relatedDocs))
             }
-            findingsWithDocs.add(FindingWithDocs(it, relatedDocs))
+
+            return GetFindingsResponse(searchResponse.status(), totalFindingCount, findingsWithDocs)
         }
 
-        return GetFindingsResponse(searchResponse.status(), totalFindingCount, findingsWithDocs)
-    }
+        // TODO: Verify what happens if indices are closed/deleted
+        suspend fun searchDocument(mgetRequest: MultiGetRequest): Map<String, FindingDocument> {
+            val response: MultiGetResponse = client.suspendUntil { client.multiGet(mgetRequest, it) }
+            val documents: MutableMap<String, FindingDocument> = mutableMapOf()
+            response.responses.forEach {
+                val key = "${it.index}|${it.id}"
+                val isDocFound = !(it.isFailed || it.response.sourceAsString == null)
+                val docData = if (isDocFound) it.response.sourceAsString else ""
+                val findingDocument = FindingDocument(it.index, it.id, isDocFound, docData)
+                documents[key] = findingDocument
+            }
 
-    // TODO: Verify what happens if indices are closed/deleted
-    suspend fun searchDocument(
-        mgetRequest: MultiGetRequest
-    ): Map<String, FindingDocument> {
-        val response: MultiGetResponse = client.suspendUntil { client.multiGet(mgetRequest, it) }
-        val documents: MutableMap<String, FindingDocument> = mutableMapOf()
-        response.responses.forEach {
-            val key = "${it.index}|${it.id}"
-            val isDocFound = !(it.isFailed || it.response.sourceAsString == null)
-            val docData = if (isDocFound) it.response.sourceAsString else ""
-            val findingDocument = FindingDocument(it.index, it.id, isDocFound, docData)
-            documents[key] = findingDocument
+            return documents
         }
-
-        return documents
     }
-}

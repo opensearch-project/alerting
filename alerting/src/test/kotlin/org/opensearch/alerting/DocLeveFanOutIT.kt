@@ -15,10 +15,11 @@ import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
+import kotlin.test.Test
 
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 class DocLeveFanOutIT : AlertingRestTestCase() {
-
+    @Test
     fun `test execution reaches endtime before completing execution`() {
         val updateSettings1 = adminClient().updateSettings(AlertingSettings.FINDING_HISTORY_ENABLED.key, false)
         logger.info(updateSettings1)
@@ -35,22 +36,24 @@ class DocLeveFanOutIT : AlertingRestTestCase() {
 
         val actionExecutionScope = PerExecutionActionScope()
         val actionExecutionPolicy = ActionExecutionPolicy(actionExecutionScope)
-        val actions = (0..randomInt(10)).map {
-            randomActionWithPolicy(
-                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
-                destinationId = createDestination().id,
-                actionExecutionPolicy = actionExecutionPolicy
-            )
-        }
+        val actions =
+            (0..randomInt(10)).map {
+                randomActionWithPolicy(
+                    template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+                    destinationId = createDestination().id,
+                    actionExecutionPolicy = actionExecutionPolicy,
+                )
+            }
 
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = actions)
 
-        val monitor = createMonitor(
-            randomDocumentLevelMonitor(
-                inputs = listOf(docLevelInput),
-                triggers = listOf(trigger)
+        val monitor =
+            createMonitor(
+                randomDocumentLevelMonitor(
+                    inputs = listOf(docLevelInput),
+                    triggers = listOf(trigger),
+                ),
             )
-        )
         assertNotNull(monitor.id)
         executeMonitor(monitor.id)
         indexDoc(testIndex, "1", testDoc)

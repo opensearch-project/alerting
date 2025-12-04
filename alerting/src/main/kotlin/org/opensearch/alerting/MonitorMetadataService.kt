@@ -54,7 +54,6 @@ private val log = LogManager.getLogger(MonitorMetadataService::class.java)
 
 object MonitorMetadataService :
     CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("MonitorMetadataService")) {
-
     private lateinit var client: Client
     private lateinit var xContentRegistry: NamedXContentRegistry
     private lateinit var clusterService: ClusterService
@@ -78,22 +77,25 @@ object MonitorMetadataService :
     }
 
     @Suppress("ComplexMethod", "ReturnCount")
-    suspend fun upsertMetadata(metadata: MonitorMetadata, updating: Boolean): MonitorMetadata {
+    suspend fun upsertMetadata(
+        metadata: MonitorMetadata,
+        updating: Boolean,
+    ): MonitorMetadata {
         try {
             if (clusterService.state().routingTable.hasIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)) {
-                val indexRequest = IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-                    .source(
-                        metadata.toXContent(
-                            XContentFactory.jsonBuilder(),
-                            ToXContent.MapParams(mapOf("with_type" to "true"))
-                        )
-                    )
-                    .id(metadata.id)
-                    .routing(metadata.monitorId)
-                    .setIfSeqNo(metadata.seqNo)
-                    .setIfPrimaryTerm(metadata.primaryTerm)
-                    .timeout(indexTimeout)
+                val indexRequest =
+                    IndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                        .source(
+                            metadata.toXContent(
+                                XContentFactory.jsonBuilder(),
+                                ToXContent.MapParams(mapOf("with_type" to "true")),
+                            ),
+                        ).id(metadata.id)
+                        .routing(metadata.monitorId)
+                        .setIfSeqNo(metadata.seqNo)
+                        .setIfPrimaryTerm(metadata.primaryTerm)
+                        .timeout(indexTimeout)
 
                 if (updating) {
                     indexRequest.id(metadata.id).setIfSeqNo(metadata.seqNo).setIfPrimaryTerm(metadata.primaryTerm)
@@ -109,7 +111,7 @@ object MonitorMetadataService :
                         throw AlertingException(
                             failureReason,
                             RestStatus.INTERNAL_SERVER_ERROR,
-                            IllegalStateException(failureReason)
+                            IllegalStateException(failureReason),
                         )
                     }
 
@@ -119,7 +121,7 @@ object MonitorMetadataService :
                 }
                 return metadata.copy(
                     seqNo = response.seqNo,
-                    primaryTerm = response.primaryTerm
+                    primaryTerm = response.primaryTerm,
                 )
             } else {
                 val failureReason = "Job index ${ScheduledJob.SCHEDULED_JOBS_INDEX} does not exist to update monitor metadata"
@@ -140,7 +142,7 @@ object MonitorMetadataService :
         createWithRunContext: Boolean = true,
         skipIndex: Boolean = false,
         workflowMetadataId: String? = null,
-        forceCreateLastRunContext: Boolean = false
+        forceCreateLastRunContext: Boolean = false,
     ): Pair<MonitorMetadata, Boolean> {
         try {
             val created = true
@@ -163,31 +165,41 @@ object MonitorMetadataService :
         }
     }
 
-    private suspend fun createUpdatedRunContext(
-        monitor: Monitor
-    ): Map<String, MutableMap<String, Any>> {
-        val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value)
-            (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
-        else if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
-            (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
-        else null
-        val runContext = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
-            createFullRunContext(monitorIndex)
-        else emptyMap()
+    private suspend fun createUpdatedRunContext(monitor: Monitor): Map<String, MutableMap<String, Any>> {
+        val monitorIndex =
+            if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value) {
+                (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
+            } else if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)) {
+                (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
+            } else {
+                null
+            }
+        val runContext =
+            if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)) {
+                createFullRunContext(monitorIndex)
+            } else {
+                emptyMap()
+            }
         return runContext
     }
 
-    suspend fun getMetadata(monitor: Monitor, workflowMetadataId: String? = null): MonitorMetadata? {
+    suspend fun getMetadata(
+        monitor: Monitor,
+        workflowMetadataId: String? = null,
+    ): MonitorMetadata? {
         try {
             val metadataId = MonitorMetadata.getId(monitor, workflowMetadataId)
             val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, metadataId).routing(monitor.id)
 
             val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
             return if (getResponse.isExists) {
-                val xcp = XContentHelper.createParser(
-                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                    getResponse.sourceAsBytesRef, XContentType.JSON
-                )
+                val xcp =
+                    XContentHelper.createParser(
+                        xContentRegistry,
+                        LoggingDeprecationHandler.INSTANCE,
+                        getResponse.sourceAsBytesRef,
+                        XContentType.JSON,
+                    )
                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                 MonitorMetadata.parse(xcp, getResponse.id, getResponse.seqNo, getResponse.primaryTerm)
             } else {
@@ -202,19 +214,28 @@ object MonitorMetadataService :
         }
     }
 
-    suspend fun recreateRunContext(metadata: MonitorMetadata, monitor: Monitor): MonitorMetadata {
+    suspend fun recreateRunContext(
+        metadata: MonitorMetadata,
+        monitor: Monitor,
+    ): MonitorMetadata {
         try {
-            val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value)
-                (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
-            else if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
-                (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
-            else null
-            val runContext = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
-                createFullRunContext(monitorIndex, metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
-            else null
+            val monitorIndex =
+                if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value) {
+                    (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
+                } else if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)) {
+                    (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
+                } else {
+                    null
+                }
+            val runContext =
+                if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)) {
+                    createFullRunContext(monitorIndex, metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
+                } else {
+                    null
+                }
             return if (runContext != null) {
                 metadata.copy(
-                    lastRunContext = runContext
+                    lastRunContext = runContext,
                 )
             } else {
                 metadata
@@ -229,14 +250,20 @@ object MonitorMetadataService :
         createWithRunContext: Boolean,
         workflowMetadataId: String? = null,
     ): MonitorMetadata {
-        val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value)
-            (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
-        else if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
-            (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
-        else null
-        val runContext = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
-            createFullRunContext(monitorIndex)
-        else emptyMap()
+        val monitorIndex =
+            if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value) {
+                (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
+            } else if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)) {
+                (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
+            } else {
+                null
+            }
+        val runContext =
+            if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)) {
+                createFullRunContext(monitorIndex)
+            } else {
+                emptyMap()
+            }
         return MonitorMetadata(
             id = MonitorMetadata.getId(monitor, workflowMetadataId),
             seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
@@ -244,7 +271,7 @@ object MonitorMetadataService :
             monitorId = monitor.id,
             lastActionExecutionTimes = emptyList(),
             lastRunContext = runContext,
-            sourceToQueryIndexMapping = mutableMapOf()
+            sourceToQueryIndexMapping = mutableMapOf(),
         )
     }
 
@@ -263,9 +290,10 @@ object MonitorMetadataService :
                 IndexUtils.getWriteIndex(index, clusterService.state())?.let { indices.add(it) }
             } else {
                 val getIndexRequest = GetIndexRequest().indices(index)
-                val getIndexResponse: GetIndexResponse = client.suspendUntil {
-                    client.admin().indices().getIndex(getIndexRequest, it)
-                }
+                val getIndexResponse: GetIndexResponse =
+                    client.suspendUntil {
+                        client.admin().indices().getIndex(getIndexRequest, it)
+                    }
                 indices.addAll(getIndexResponse.indices())
             }
 
@@ -281,7 +309,7 @@ object MonitorMetadataService :
             throw AlertingException(
                 "Failed fetching index stats - missing required index permissions: ${e.localizedMessage}",
                 RestStatus.INTERNAL_SERVER_ERROR,
-                e
+                e,
             )
         } catch (e: Exception) {
             throw AlertingException("Failed fetching index stats", RestStatus.INTERNAL_SERVER_ERROR, e)
@@ -289,7 +317,10 @@ object MonitorMetadataService :
         return lastRunContext
     }
 
-    suspend fun createRunContextForIndex(index: String, createdRecently: Boolean = false): MutableMap<String, Any> {
+    suspend fun createRunContextForIndex(
+        index: String,
+        createdRecently: Boolean = false,
+    ): MutableMap<String, Any> {
         val request = IndicesStatsRequest().indices(index).clear()
         val response: IndicesStatsResponse = client.suspendUntil { execute(IndicesStatsAction.INSTANCE, request, it) }
         if (response.status != RestStatus.OK) {
@@ -304,8 +335,11 @@ object MonitorMetadataService :
 
         for (shard in shards) {
             lastRunContext[shard.shardRouting.id.toString()] =
-                if (createdRecently) -1L
-                else shard.seqNoStats?.globalCheckpoint ?: SequenceNumbers.UNASSIGNED_SEQ_NO
+                if (createdRecently) {
+                    -1L
+                } else {
+                    shard.seqNoStats?.globalCheckpoint ?: SequenceNumbers.UNASSIGNED_SEQ_NO
+                }
         }
         return lastRunContext
     }

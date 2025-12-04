@@ -25,36 +25,33 @@ import org.opensearch.transport.client.node.NodeClient
  * This class consists of the REST handler to retrieve destinations .
  */
 class RestGetDestinationsAction : BaseRestHandler() {
-
     private val log = LogManager.getLogger(RestGetDestinationsAction::class.java)
 
-    override fun getName(): String {
-        return "get_destinations_action"
-    }
+    override fun getName(): String = "get_destinations_action"
 
-    override fun routes(): List<Route> {
-        return listOf()
-    }
+    override fun routes(): List<Route> = listOf()
 
-    override fun replacedRoutes(): MutableList<ReplacedRoute> {
-        return mutableListOf(
+    override fun replacedRoutes(): MutableList<ReplacedRoute> =
+        mutableListOf(
             // Get a specific destination
             ReplacedRoute(
                 RestRequest.Method.GET,
                 "${AlertingPlugin.DESTINATION_BASE_URI}/{destinationID}",
                 RestRequest.Method.GET,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_DESTINATION_BASE_URI}/{destinationID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_DESTINATION_BASE_URI}/{destinationID}",
             ),
             ReplacedRoute(
                 RestRequest.Method.GET,
                 AlertingPlugin.DESTINATION_BASE_URI,
                 RestRequest.Method.GET,
-                AlertingPlugin.LEGACY_OPENDISTRO_DESTINATION_BASE_URI
-            )
+                AlertingPlugin.LEGACY_OPENDISTRO_DESTINATION_BASE_URI,
+            ),
         )
-    }
 
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${request.path()}")
 
         val destinationId: String? = request.param("destinationID")
@@ -72,24 +69,25 @@ class RestGetDestinationsAction : BaseRestHandler() {
         val searchString = request.param("searchString", "")
         val destinationType = request.param("destinationType", "ALL")
 
-        val table = Table(
-            sortOrder,
-            sortString,
-            missing,
-            size,
-            startIndex,
-            searchString
-        )
+        val table =
+            Table(
+                sortOrder,
+                sortString,
+                missing,
+                size,
+                startIndex,
+                searchString,
+            )
 
-        val getDestinationsRequest = GetDestinationsRequest(
-            destinationId,
-            RestActions.parseVersion(request),
-            srcContext,
-            table,
-            destinationType
-        )
-        return RestChannelConsumer {
-                channel ->
+        val getDestinationsRequest =
+            GetDestinationsRequest(
+                destinationId,
+                RestActions.parseVersion(request),
+                srcContext,
+                table,
+                destinationType,
+            )
+        return RestChannelConsumer { channel ->
             client.execute(GetDestinationsAction.INSTANCE, getDestinationsRequest, RestToXContentListener(channel))
         }
     }

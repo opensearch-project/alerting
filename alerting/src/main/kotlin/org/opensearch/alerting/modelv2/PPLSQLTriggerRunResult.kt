@@ -25,16 +25,18 @@ data class PPLSQLTriggerRunResult(
     override var triggered: Boolean,
     override var error: Exception?,
 ) : TriggerV2RunResult {
-
     @Throws(IOException::class)
     @Suppress("UNCHECKED_CAST")
     constructor(sin: StreamInput) : this(
         triggerName = sin.readString(),
         triggered = sin.readBoolean(),
-        error = sin.readException()
+        error = sin.readException(),
     )
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
         builder.startObject()
         builder.field(NAME_FIELD, triggerName)
         builder.field(TRIGGERED_FIELD, triggered)
@@ -53,8 +55,6 @@ data class PPLSQLTriggerRunResult(
     companion object {
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): PPLSQLTriggerRunResult {
-            return PPLSQLTriggerRunResult(sin)
-        }
+        fun readFrom(sin: StreamInput): PPLSQLTriggerRunResult = PPLSQLTriggerRunResult(sin)
     }
 }

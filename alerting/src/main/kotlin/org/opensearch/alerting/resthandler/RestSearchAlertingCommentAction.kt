@@ -36,36 +36,36 @@ private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)
 /**
  * Rest handler to search alerting comments.
  */
-class RestSearchAlertingCommentAction() : BaseRestHandler() {
+class RestSearchAlertingCommentAction : BaseRestHandler() {
+    override fun getName(): String = "search_alerting_comments_action"
 
-    override fun getName(): String {
-        return "search_alerting_comments_action"
-    }
-
-    override fun routes(): List<Route> {
-        return listOf(
+    override fun routes(): List<Route> =
+        listOf(
             Route(
                 RestRequest.Method.GET,
-                "${AlertingPlugin.COMMENTS_BASE_URI}/_search"
+                "${AlertingPlugin.COMMENTS_BASE_URI}/_search",
             ),
             Route(
                 RestRequest.Method.POST,
-                "${AlertingPlugin.COMMENTS_BASE_URI}/_search"
-            )
+                "${AlertingPlugin.COMMENTS_BASE_URI}/_search",
+            ),
         )
-    }
 
     @Throws(IOException::class)
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.info("${request.method()} ${AlertingPlugin.COMMENTS_BASE_URI}/_search")
 
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.parseXContent(request.contentOrSourceParamParser())
         searchSourceBuilder.fetchSource(context(request))
 
-        val searchRequest = SearchRequest()
-            .source(searchSourceBuilder)
-            .indices(ALL_COMMENTS_INDEX_PATTERN)
+        val searchRequest =
+            SearchRequest()
+                .source(searchSourceBuilder)
+                .indices(ALL_COMMENTS_INDEX_PATTERN)
 
         val searchCommentRequest = SearchCommentRequest(searchRequest)
         return RestChannelConsumer { channel ->
@@ -84,16 +84,18 @@ class RestSearchAlertingCommentAction() : BaseRestHandler() {
                 // Swallow exception and return response as is
                 try {
                     for (hit in response.hits) {
-                        XContentType.JSON.xContent().createParser(
-                            channel.request().xContentRegistry,
-                            LoggingDeprecationHandler.INSTANCE,
-                            hit.sourceAsString
-                        ).use { hitsParser ->
-                            hitsParser.nextToken()
-                            val comment = Comment.parse(hitsParser, hit.id)
-                            val xcb = comment.toXContent(jsonBuilder(), EMPTY_PARAMS)
-                            hit.sourceRef(BytesReference.bytes(xcb))
-                        }
+                        XContentType.JSON
+                            .xContent()
+                            .createParser(
+                                channel.request().xContentRegistry,
+                                LoggingDeprecationHandler.INSTANCE,
+                                hit.sourceAsString,
+                            ).use { hitsParser ->
+                                hitsParser.nextToken()
+                                val comment = Comment.parse(hitsParser, hit.id)
+                                val xcb = comment.toXContent(jsonBuilder(), EMPTY_PARAMS)
+                                hit.sourceRef(BytesReference.bytes(xcb))
+                            }
                     }
                 } catch (e: Exception) {
                     log.error("The comment parsing failed. Will return response as is.")

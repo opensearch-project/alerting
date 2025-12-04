@@ -32,14 +32,9 @@ private val log: Logger = LogManager.getLogger(RestAcknowledgeAlertAction::class
  * the ids to the alerts he would like to acknowledge.
  */
 class RestAcknowledgeAlertAction : BaseRestHandler() {
+    override fun getName(): String = "acknowledge_alert_action"
 
-    override fun getName(): String {
-        return "acknowledge_alert_action"
-    }
-
-    override fun routes(): List<Route> {
-        return listOf()
-    }
+    override fun routes(): List<Route> = listOf()
 
     override fun replacedRoutes(): MutableList<ReplacedRoute> {
         // Acknowledge alerts
@@ -48,13 +43,16 @@ class RestAcknowledgeAlertAction : BaseRestHandler() {
                 POST,
                 "${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts",
                 POST,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts"
-            )
+                "${AlertingPlugin.LEGACY_OPENDISTRO_MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts",
+            ),
         )
     }
 
     @Throws(IOException::class)
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.MONITOR_BASE_URI}/{monitorID}/_acknowledge/alerts")
 
         val monitorId = request.param("monitorID")

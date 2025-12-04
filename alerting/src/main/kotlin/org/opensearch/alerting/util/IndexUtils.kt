@@ -27,8 +27,8 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.transport.client.IndicesAdminClient
 
 class IndexUtils {
-
     companion object {
+        @Suppress("ktlint:standard:property-naming", "ktlint:standard:backing-property-naming")
         const val _META = "_meta"
         const val SCHEMA_VERSION = "schema_version"
 
@@ -94,10 +94,12 @@ class IndexUtils {
 
         @JvmStatic
         fun getSchemaVersion(mapping: String): Int {
-            val xcp = XContentType.JSON.xContent().createParser(
-                NamedXContentRegistry.EMPTY,
-                LoggingDeprecationHandler.INSTANCE, mapping
-            )
+            val xcp =
+                XContentType.JSON.xContent().createParser(
+                    NamedXContentRegistry.EMPTY,
+                    LoggingDeprecationHandler.INSTANCE,
+                    mapping,
+                )
 
             while (!xcp.isClosed) {
                 val token = xcp.currentToken()
@@ -113,7 +115,10 @@ class IndexUtils {
                                     require(version > -1)
                                     return version
                                 }
-                                else -> xcp.nextToken()
+
+                                else -> {
+                                    xcp.nextToken()
+                                }
                             }
                         }
                     }
@@ -124,12 +129,19 @@ class IndexUtils {
         }
 
         @JvmStatic
-        fun getIndexNameWithAlias(clusterState: ClusterState, alias: String): String {
-            return clusterState.metadata.indices.entries.first { it.value.aliases.containsKey(alias) }.key
-        }
+        fun getIndexNameWithAlias(
+            clusterState: ClusterState,
+            alias: String,
+        ): String =
+            clusterState.metadata.indices.entries
+                .first { it.value.aliases.containsKey(alias) }
+                .key
 
         @JvmStatic
-        fun shouldUpdateIndex(index: IndexMetadata, mapping: String): Boolean {
+        fun shouldUpdateIndex(
+            index: IndexMetadata,
+            mapping: String,
+        ): Boolean {
             var oldVersion = IndexUtils.NO_SCHEMA_VERSION
             val newVersion = getSchemaVersion(mapping)
 
@@ -149,7 +161,7 @@ class IndexUtils {
             mapping: String,
             clusterState: ClusterState,
             client: IndicesAdminClient,
-            actionListener: ActionListener<AcknowledgedResponse>
+            actionListener: ActionListener<AcknowledgedResponse>,
         ) {
             if (clusterState.metadata.indices.containsKey(index)) {
                 if (shouldUpdateIndex(clusterState.metadata.indices[index]!!, mapping)) {
@@ -162,16 +174,21 @@ class IndexUtils {
         }
 
         @JvmStatic
-        fun resolveAllIndices(indices: List<String>, clusterService: ClusterService, resolver: IndexNameExpressionResolver): List<String> {
+        fun resolveAllIndices(
+            indices: List<String>,
+            clusterService: ClusterService,
+            resolver: IndexNameExpressionResolver,
+        ): List<String> {
             val result = mutableListOf<String>()
 
             indices.forEach { index ->
-                val concreteIndices = resolver.concreteIndexNames(
-                    clusterService.state(),
-                    IndicesOptions.lenientExpand(),
-                    true,
-                    index
-                )
+                val concreteIndices =
+                    resolver.concreteIndexNames(
+                        clusterService.state(),
+                        IndicesOptions.lenientExpand(),
+                        true,
+                        index,
+                    )
                 result.addAll(concreteIndices)
             }
 
@@ -179,17 +196,22 @@ class IndexUtils {
         }
 
         @JvmStatic
-        fun isDataStream(name: String, clusterState: ClusterState): Boolean {
-            return clusterState.metadata().dataStreams().containsKey(name)
-        }
+        fun isDataStream(
+            name: String,
+            clusterState: ClusterState,
+        ): Boolean = clusterState.metadata().dataStreams().containsKey(name)
 
         @JvmStatic
-        fun isAlias(name: String, clusterState: ClusterState): Boolean {
-            return clusterState.metadata().hasAlias(name)
-        }
+        fun isAlias(
+            name: String,
+            clusterState: ClusterState,
+        ): Boolean = clusterState.metadata().hasAlias(name)
 
         @JvmStatic
-        fun getWriteIndex(index: String, clusterState: ClusterState): String? {
+        fun getWriteIndex(
+            index: String,
+            clusterState: ClusterState,
+        ): String? {
             if (isAlias(index, clusterState) || isDataStream(index, clusterState)) {
                 val metadata = clusterState.metadata.indicesLookup[index]?.writeIndex
                 if (metadata != null) {
@@ -200,7 +222,11 @@ class IndexUtils {
         }
 
         @JvmStatic
-        fun getNewestIndicesByCreationDate(concreteIndices: List<String>, clusterState: ClusterState, thresholdDate: Long): List<String> {
+        fun getNewestIndicesByCreationDate(
+            concreteIndices: List<String>,
+            clusterState: ClusterState,
+            thresholdDate: Long,
+        ): List<String> {
             val filteredIndices = mutableListOf<String>()
             val lookup = clusterState.metadata().indicesLookup
             concreteIndices.forEach { indexName ->
@@ -216,16 +242,16 @@ class IndexUtils {
         }
 
         @JvmStatic
-        fun getCreationDateForIndex(index: String, clusterState: ClusterState): Long {
-            return clusterState.metadata.index(index).creationDate
-        }
+        fun getCreationDateForIndex(
+            index: String,
+            clusterState: ClusterState,
+        ): Long = clusterState.metadata.index(index).creationDate
 
         @JvmStatic
         fun checkShardsFailure(response: IndexResponse): String? {
             val failureReasons = StringBuilder()
             if (response.shardInfo.failed > 0) {
-                response.shardInfo.failures.forEach {
-                        entry ->
+                response.shardInfo.failures.forEach { entry ->
                     failureReasons.append(entry.reason())
                 }
                 return failureReasons.toString()

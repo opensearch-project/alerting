@@ -9,14 +9,17 @@ import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class GetMonitorV2RequestTests : OpenSearchTestCase() {
+    @Test
     fun `test get monitor v2 request as stream`() {
-        val req = GetMonitorV2Request(
-            monitorV2Id = "abc",
-            version = 2L,
-            srcContext = FetchSourceContext.FETCH_SOURCE
-        )
+        val req =
+            GetMonitorV2Request(
+                monitorV2Id = "abc",
+                version = 2L,
+                srcContext = FetchSourceContext.FETCH_SOURCE,
+            )
         assertNotNull(req)
 
         val out = BytesStreamOutput()

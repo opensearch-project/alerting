@@ -74,13 +74,15 @@ data class PPLSQLMonitor(
     override val triggers: List<PPLSQLTrigger>,
     override val schemaVersion: Int = IndexUtils.NO_SCHEMA_VERSION,
     val queryLanguage: QueryLanguage = QueryLanguage.PPL, // default to PPL, SQL not currently supported
-    val query: String
+    val query: String,
 ) : MonitorV2 {
-
     // specify scheduled job type
     override val type = MonitorV2.MONITOR_V2_TYPE
 
-    override fun fromDocument(id: String, version: Long): PPLSQLMonitor = copy(id = id, version = version)
+    override fun fromDocument(
+        id: String,
+        version: Long,
+    ): PPLSQLMonitor = copy(id = id, version = version)
 
     init {
         // SQL monitors are not yet supported
@@ -136,26 +138,33 @@ data class PPLSQLMonitor(
         lastUpdateTime = sin.readInstant(),
         enabledTime = sin.readOptionalInstant(),
         description = sin.readOptionalString(),
-        user = if (sin.readBoolean()) {
-            User(sin)
-        } else {
-            null
-        },
+        user =
+            if (sin.readBoolean()) {
+                User(sin)
+            } else {
+                null
+            },
         triggers = sin.readList(PPLSQLTrigger.Companion::readFrom),
         schemaVersion = sin.readInt(),
         queryLanguage = sin.readEnum(QueryLanguage::class.java),
-        query = sin.readString()
+        query = sin.readString(),
     )
 
-    override fun toXContentWithUser(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        return createXContentBuilder(builder, params, true)
-    }
+    override fun toXContentWithUser(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder = createXContentBuilder(builder, params, true)
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        return createXContentBuilder(builder, params, false)
-    }
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder = createXContentBuilder(builder, params, false)
 
-    private fun createXContentBuilder(builder: XContentBuilder, params: ToXContent.Params, withUser: Boolean): XContentBuilder {
+    private fun createXContentBuilder(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+        withUser: Boolean,
+    ): XContentBuilder {
         builder.startObject() // overall start object
 
         // if this is being written as ScheduledJob, add extra object layer and add ScheduledJob
@@ -228,8 +237,8 @@ data class PPLSQLMonitor(
         out.writeString(query)
     }
 
-    override fun asTemplateArg(): Map<String, Any?> {
-        return mapOf(
+    override fun asTemplateArg(): Map<String, Any?> =
+        mapOf(
             IndexUtils._ID to id,
             IndexUtils._VERSION to version,
             NAME_FIELD to name,
@@ -238,9 +247,8 @@ data class PPLSQLMonitor(
             LOOK_BACK_WINDOW_FIELD to lookBackWindow,
             LAST_UPDATE_TIME_FIELD to lastUpdateTime.toEpochMilli(),
             ENABLED_TIME_FIELD to enabledTime?.toEpochMilli(),
-            QUERY_FIELD to query
+            QUERY_FIELD to query,
         )
-    }
 
     override fun makeCopy(
         id: String,
@@ -254,9 +262,9 @@ data class PPLSQLMonitor(
         user: User?,
         schemaVersion: Int,
         lookBackWindow: Long?,
-        timestampField: String?
-    ): PPLSQLMonitor {
-        return copy(
+        timestampField: String?,
+    ): PPLSQLMonitor =
+        copy(
             id = id,
             version = version,
             name = name,
@@ -268,13 +276,15 @@ data class PPLSQLMonitor(
             user = user,
             schemaVersion = schemaVersion,
             lookBackWindow = lookBackWindow,
-            timestampField = timestampField
+            timestampField = timestampField,
         )
-    }
 
-    enum class QueryLanguage(val value: String) {
+    enum class QueryLanguage(
+        val value: String,
+    ) {
         PPL(PPL_QUERY_LANGUAGE),
-        SQL(SQL_QUERY_LANGUAGE);
+        SQL(SQL_QUERY_LANGUAGE),
+        ;
 
         companion object {
             fun enumFromString(value: String): QueryLanguage? = QueryLanguage.entries.firstOrNull { it.value == value }
@@ -296,7 +306,11 @@ data class PPLSQLMonitor(
         @JvmStatic
         @JvmOverloads
         @Throws(IOException::class)
-        fun parse(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): PPLSQLMonitor {
+        fun parse(
+            xcp: XContentParser,
+            id: String = NO_ID,
+            version: Long = NO_VERSION,
+        ): PPLSQLMonitor {
             var name: String? = null
             var enabled = true
             var schedule: Schedule? = null
@@ -311,66 +325,96 @@ data class PPLSQLMonitor(
             var queryLanguage: QueryLanguage = QueryLanguage.PPL // default to PPL
             var query: String? = null
 
-            /* parse */
+            // parse
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.currentToken(), xcp)
             while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
                 val fieldName = xcp.currentName()
                 xcp.nextToken()
 
                 when (fieldName) {
-                    NAME_FIELD -> name = xcp.text()
-                    ENABLED_FIELD -> enabled = xcp.booleanValue()
-                    SCHEDULE_FIELD -> schedule = Schedule.parse(xcp)
+                    NAME_FIELD -> {
+                        name = xcp.text()
+                    }
+
+                    ENABLED_FIELD -> {
+                        enabled = xcp.booleanValue()
+                    }
+
+                    SCHEDULE_FIELD -> {
+                        schedule = Schedule.parse(xcp)
+                    }
+
                     LOOK_BACK_WINDOW_FIELD -> {
                         if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
                             lookBackWindow = xcp.longValue()
                         }
                     }
+
                     TIMESTAMP_FIELD -> {
                         if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
                             timestampField = xcp.text()
                         }
                     }
-                    LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
-                    ENABLED_TIME_FIELD -> enabledTime = xcp.instant()
+
+                    LAST_UPDATE_TIME_FIELD -> {
+                        lastUpdateTime = xcp.instant()
+                    }
+
+                    ENABLED_TIME_FIELD -> {
+                        enabledTime = xcp.instant()
+                    }
+
                     DESCRIPTION_FIELD -> {
                         if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
                             description = xcp.text()
                         }
                     }
+
                     USER_FIELD -> {
                         if (xcp.currentToken() != XContentParser.Token.VALUE_NULL) {
                             user = User.parse(xcp)
                         }
                     }
+
                     TRIGGERS_FIELD -> {
                         XContentParserUtils.ensureExpectedToken(
                             XContentParser.Token.START_ARRAY,
                             xcp.currentToken(),
-                            xcp
+                            xcp,
                         )
                         while (xcp.nextToken() != XContentParser.Token.END_ARRAY) {
                             triggers.add(PPLSQLTrigger.parseInner(xcp))
                         }
                     }
-                    SCHEMA_VERSION_FIELD -> schemaVersion = xcp.intValue()
+
+                    SCHEMA_VERSION_FIELD -> {
+                        schemaVersion = xcp.intValue()
+                    }
+
                     QUERY_LANGUAGE_FIELD -> {
                         val input = xcp.text()
-                        val enumMatchResult = QueryLanguage.enumFromString(input)
-                            ?: throw AlertingException.wrap(
-                                IllegalArgumentException(
-                                    "Invalid value for $QUERY_LANGUAGE_FIELD: $input. " +
-                                        "Supported values are ${QueryLanguage.entries.map { it.value }}"
+                        val enumMatchResult =
+                            QueryLanguage.enumFromString(input)
+                                ?: throw AlertingException.wrap(
+                                    IllegalArgumentException(
+                                        "Invalid value for $QUERY_LANGUAGE_FIELD: $input. " +
+                                            "Supported values are ${QueryLanguage.entries.map { it.value }}",
+                                    ),
                                 )
-                            )
                         queryLanguage = enumMatchResult
                     }
-                    QUERY_FIELD -> query = xcp.text()
-                    else -> throw IllegalArgumentException("Unexpected field when parsing PPL/SQL Monitor: $fieldName")
+
+                    QUERY_FIELD -> {
+                        query = xcp.text()
+                    }
+
+                    else -> {
+                        throw IllegalArgumentException("Unexpected field when parsing PPL/SQL Monitor: $fieldName")
+                    }
                 }
             }
 
-            /* validations */
+            // validations
 
             // if enabled, set time of MonitorV2 creation/update is set as enable time
             if (enabled && enabledTime == null) {
@@ -387,7 +431,7 @@ data class PPLSQLMonitor(
             requireNotNull(query) { "Query is null" }
             requireNotNull(lastUpdateTime) { "Last update time is null" }
 
-            /* return PPLSQLMonitor */
+            // return PPLSQLMonitor
             return PPLSQLMonitor(
                 id,
                 version,
@@ -403,7 +447,7 @@ data class PPLSQLMonitor(
                 triggers,
                 schemaVersion,
                 queryLanguage,
-                query
+                query,
             )
         }
     }
