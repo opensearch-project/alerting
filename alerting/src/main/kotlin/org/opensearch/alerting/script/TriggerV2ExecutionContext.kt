@@ -9,13 +9,11 @@ import org.opensearch.alerting.modelv2.MonitorV2
 
 abstract class TriggerV2ExecutionContext(
     open val monitorV2: MonitorV2,
-    open val error: Exception? = null
+    open val error: Exception? = null,
 ) {
-
-    open fun asTemplateArg(): Map<String, Any?> {
-        return mapOf(
+    open fun asTemplateArg(): Map<String, Any?> =
+        mapOf(
             "monitorV2" to monitorV2.asTemplateArg(),
-            "error" to error
+            "error" to error,
         )
-    }
 }

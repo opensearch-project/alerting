@@ -36,14 +36,9 @@ import java.io.IOException
  */
 
 abstract class ODFERestTestCase : OpenSearchRestTestCase() {
+    fun isHttps(): Boolean = System.getProperty("https", "false")!!.toBoolean()
 
-    fun isHttps(): Boolean {
-        return System.getProperty("https", "false")!!.toBoolean()
-    }
-
-    fun securityEnabled(): Boolean {
-        return System.getProperty("security", "false")!!.toBoolean()
-    }
+    fun securityEnabled(): Boolean = System.getProperty("security", "false")!!.toBoolean()
 
     @Suppress("UNCHECKED_CAST")
     fun isNotificationPluginInstalled(): Boolean {
@@ -60,17 +55,14 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
         return false
     }
 
-    override fun getProtocol(): String {
-        return if (isHttps()) {
+    override fun getProtocol(): String =
+        if (isHttps()) {
             "https"
         } else {
             "http"
         }
-    }
 
-    override fun preserveIndicesUponCompletion(): Boolean {
-        return true
-    }
+    override fun preserveIndicesUponCompletion(): Boolean = true
 
     open fun preserveODFEIndicesAfterTest(): Boolean = false
 
@@ -82,31 +74,34 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
         val response = client().performRequest(Request("GET", "/_cat/indices?format=json&expand_wildcards=all"))
 
         val xContentType = MediaType.fromMediaType(response.entity.contentType)
-        xContentType.xContent().createParser(
-            NamedXContentRegistry.EMPTY, DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
-            response.entity.content
-        ).use { parser ->
-            for (index in parser.list()) {
-                val jsonObject: Map<*, *> = index as java.util.HashMap<*, *>
-                val indexName: String = jsonObject["index"] as String
-                // .opendistro_security isn't allowed to delete from cluster
-                if (".opendistro_security" != indexName) {
-                    var request = Request("DELETE", "/$indexName")
-                    // TODO: remove PERMISSIVE option after moving system index access to REST API call
-                    val options = RequestOptions.DEFAULT.toBuilder()
-                    options.setWarningsHandler(WarningsHandler.PERMISSIVE)
-                    request.options = options.build()
-                    adminClient().performRequest(request)
+        xContentType
+            .xContent()
+            .createParser(
+                NamedXContentRegistry.EMPTY,
+                DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
+                response.entity.content,
+            ).use { parser ->
+                for (index in parser.list()) {
+                    val jsonObject: Map<*, *> = index as java.util.HashMap<*, *>
+                    val indexName: String = jsonObject["index"] as String
+                    // .opendistro_security isn't allowed to delete from cluster
+                    if (".opendistro_security" != indexName) {
+                        var request = Request("DELETE", "/$indexName")
+                        // TODO: remove PERMISSIVE option after moving system index access to REST API call
+                        val options = RequestOptions.DEFAULT.toBuilder()
+                        options.setWarningsHandler(WarningsHandler.PERMISSIVE)
+                        request.options = options.build()
+                        adminClient().performRequest(request)
+                    }
                 }
             }
-        }
     }
 
     /**
      * Returns the REST client settings used for super-admin actions like cleaning up after the test has completed.
      */
-    override fun restAdminSettings(): Settings {
-        return Settings
+    override fun restAdminSettings(): Settings =
+        Settings
             .builder()
             .put("http.port", 9200)
             .put(OPENSEARCH_SECURITY_SSL_HTTP_ENABLED, isHttps())
@@ -115,10 +110,12 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
             .put(OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_PASSWORD, "changeit")
             .put(OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_KEYPASSWORD, "changeit")
             .build()
-    }
 
     @Throws(IOException::class)
-    override fun buildClient(settings: Settings, hosts: Array<HttpHost>): RestClient {
+    override fun buildClient(
+        settings: Settings,
+        hosts: Array<HttpHost>,
+    ): RestClient {
         if (securityEnabled()) {
             val keystore = settings.get(OPENSEARCH_SECURITY_SSL_HTTP_KEYSTORE_FILEPATH)
             return when (keystore != null) {
@@ -131,6 +128,7 @@ abstract class ODFERestTestCase : OpenSearchRestTestCase() {
                         .setConnectionRequestTimeout(180000)
                         .build()
                 }
+
                 false -> {
                     // create client with passed user
                     val userName = System.getProperty("user")

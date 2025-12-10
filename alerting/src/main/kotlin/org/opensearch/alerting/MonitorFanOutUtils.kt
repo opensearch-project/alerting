@@ -22,9 +22,10 @@ fun distributeShards(
     val numFanOutNodes = allNodes.size.coerceAtMost(totalShards)
     val totalNodes = maxFanoutNodes.coerceAtMost(numFanOutNodes)
 
-    val shardIdList = shards.map {
-        ShardId(index, it.toInt())
-    }
+    val shardIdList =
+        shards.map {
+            ShardId(index, it.toInt())
+        }
     val shuffledNodes = allNodes.shuffled()
     val nodes = shuffledNodes.subList(0, totalNodes)
 

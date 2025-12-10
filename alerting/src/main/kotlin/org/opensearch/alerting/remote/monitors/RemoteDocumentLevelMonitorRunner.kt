@@ -43,7 +43,7 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         dryRun: Boolean,
         workflowRunContext: WorkflowRunContext?,
         executionId: String,
-        transportService: TransportService
+        transportService: TransportService,
     ): MonitorRunResult<*> {
         logger.debug("Remote Document-level-monitor is running ...")
         val isTempMonitor = dryRun || monitor.id == Monitor.NO_ID
@@ -56,15 +56,20 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
             monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
 
-        var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(
-            monitor = monitor,
-            createWithRunContext = false,
-            skipIndex = isTempMonitor,
-            workflowRunContext?.workflowMetadataId
-        )
+        var (monitorMetadata, _) =
+            MonitorMetadataService.getOrCreateMetadata(
+                monitor = monitor,
+                createWithRunContext = false,
+                skipIndex = isTempMonitor,
+                workflowRunContext?.workflowMetadataId,
+            )
         logger.info(monitorMetadata.lastRunContext.toMutableMap().toString())
-        val lastRunContext = if (monitorMetadata.lastRunContext.isNullOrEmpty()) mutableMapOf()
-        else monitorMetadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
+        val lastRunContext =
+            if (monitorMetadata.lastRunContext.isNullOrEmpty()) {
+                mutableMapOf()
+            } else {
+                monitorMetadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
+            }
         val updatedLastRunContext = lastRunContext.toMutableMap()
 
         val remoteDocLevelMonitorInput = monitor.inputs[0] as RemoteDocLevelMonitorInput
@@ -73,11 +78,12 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         var concreteIndices = listOf<String>()
 
         // Resolve all passed indices to concrete indices
-        val allConcreteIndices = IndexUtils.resolveAllIndices(
-            docLevelMonitorInput.indices,
-            monitorCtx.clusterService!!,
-            monitorCtx.indexNameExpressionResolver!!
-        )
+        val allConcreteIndices =
+            IndexUtils.resolveAllIndices(
+                docLevelMonitorInput.indices,
+                monitorCtx.clusterService!!,
+                monitorCtx.indexNameExpressionResolver!!,
+            )
         // cleanup old indices that are not monitored anymore from the same monitor
         val runContextKeys = updatedLastRunContext.keys.toMutableSet()
         for (ind in runContextKeys) {
@@ -89,11 +95,12 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
 
         try {
             docLevelMonitorInput.indices.forEach { indexName ->
-                concreteIndices = IndexUtils.resolveAllIndices(
-                    listOf(indexName),
-                    monitorCtx.clusterService!!,
-                    monitorCtx.indexNameExpressionResolver!!
-                )
+                concreteIndices =
+                    IndexUtils.resolveAllIndices(
+                        listOf(indexName),
+                        monitorCtx.clusterService!!,
+                        monitorCtx.indexNameExpressionResolver!!,
+                    )
                 var lastWriteIndex: String? = null
                 if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                     IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
@@ -102,37 +109,45 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
                     if (lastWriteIndex != null) {
                         val lastWriteIndexCreationDate =
                             IndexUtils.getCreationDateForIndex(lastWriteIndex, monitorCtx.clusterService!!.state())
-                        concreteIndices = IndexUtils.getNewestIndicesByCreationDate(
-                            concreteIndices,
-                            monitorCtx.clusterService!!.state(),
-                            lastWriteIndexCreationDate
-                        )
+                        concreteIndices =
+                            IndexUtils.getNewestIndicesByCreationDate(
+                                concreteIndices,
+                                monitorCtx.clusterService!!.state(),
+                                lastWriteIndexCreationDate,
+                            )
                     }
                 }
 
                 concreteIndices.forEach { concreteIndexName ->
                     // Prepare lastRunContext for each index
-                    val indexLastRunContext = lastRunContext.getOrPut(concreteIndexName) {
-                        val isIndexCreatedRecently = createdRecently(
-                            monitor,
-                            periodStart,
-                            periodEnd,
-                            monitorCtx.clusterService!!.state().metadata.index(concreteIndexName)
-                        )
-                        MonitorMetadataService.createRunContextForIndex(concreteIndexName, isIndexCreatedRecently)
-                    }
+                    val indexLastRunContext =
+                        lastRunContext.getOrPut(concreteIndexName) {
+                            val isIndexCreatedRecently =
+                                createdRecently(
+                                    monitor,
+                                    periodStart,
+                                    periodEnd,
+                                    monitorCtx.clusterService!!
+                                        .state()
+                                        .metadata
+                                        .index(concreteIndexName),
+                                )
+                            MonitorMetadataService.createRunContextForIndex(concreteIndexName, isIndexCreatedRecently)
+                        }
                     val shardCount: Int = getShardsCount(monitorCtx.clusterService!!, concreteIndexName)
-                    val indexUpdatedRunContext = initializeNewLastRunContext(
-                        indexLastRunContext.toMutableMap(),
-                        concreteIndexName,
-                        shardCount
-                    ) as MutableMap<String, Any>
+                    val indexUpdatedRunContext =
+                        initializeNewLastRunContext(
+                            indexLastRunContext.toMutableMap(),
+                            concreteIndexName,
+                            shardCount,
+                        ) as MutableMap<String, Any>
                     if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                         IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
                     ) {
-                        if (concreteIndexName == IndexUtils.getWriteIndex(
+                        if (concreteIndexName ==
+                            IndexUtils.getWriteIndex(
                                 indexName,
-                                monitorCtx.clusterService!!.state()
+                                monitorCtx.clusterService!!.state(),
                             )
                         ) {
                             updatedLastRunContext.remove(lastWriteIndex)
@@ -152,31 +167,33 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
             }
 
             val nodeMap = getNodes(monitorCtx)
-            val nodeShardAssignments = distributeShards(
-                monitorCtx,
-                nodeMap.keys.toList(),
-                shards.toList()
-            )
+            val nodeShardAssignments =
+                distributeShards(
+                    monitorCtx,
+                    nodeMap.keys.toList(),
+                    shards.toList(),
+                )
 
-            val docLevelMonitorFanOutResponses = monitorCtx.remoteMonitors[monitor.monitorType]!!.monitorRunner.doFanOut(
-                monitorCtx.clusterService!!,
-                monitor,
-                monitorMetadata.copy(lastRunContext = lastRunContext),
-                executionId,
-                concreteIndices,
-                workflowRunContext,
-                dryRun,
-                transportService,
-                nodeMap,
-                nodeShardAssignments
-            )
+            val docLevelMonitorFanOutResponses =
+                monitorCtx.remoteMonitors[monitor.monitorType]!!.monitorRunner.doFanOut(
+                    monitorCtx.clusterService!!,
+                    monitor,
+                    monitorMetadata.copy(lastRunContext = lastRunContext),
+                    executionId,
+                    concreteIndices,
+                    workflowRunContext,
+                    dryRun,
+                    transportService,
+                    nodeMap,
+                    nodeShardAssignments,
+                )
             updateLastRunContextFromFanOutResponses(docLevelMonitorFanOutResponses, updatedLastRunContext)
             val triggerResults = buildTriggerResults(docLevelMonitorFanOutResponses)
             val inputRunResults = buildInputRunResults(docLevelMonitorFanOutResponses)
             if (!isTempMonitor) {
                 MonitorMetadataService.upsertMetadata(
                     monitorMetadata.copy(lastRunContext = updatedLastRunContext),
-                    true
+                    true,
                 )
             }
             return monitorResult.copy(triggerResults = triggerResults, inputResults = inputRunResults)
@@ -184,11 +201,12 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
             logger.error("Failed running Document-level-monitor ${monitor.name}", e)
             val errorMessage = ExceptionsHelper.detailedMessage(e)
             monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage, executionId, workflowRunContext)
-            val alertingException = AlertingException(
-                errorMessage,
-                RestStatus.INTERNAL_SERVER_ERROR,
-                e
-            )
+            val alertingException =
+                AlertingException(
+                    errorMessage,
+                    RestStatus.INTERNAL_SERVER_ERROR,
+                    e,
+                )
             return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
         }
     }
@@ -207,9 +225,10 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         }
     }
 
-    private fun getNodes(monitorCtx: MonitorRunnerExecutionContext): Map<String, DiscoveryNode> {
-        return monitorCtx.clusterService!!.state().nodes.dataNodes.filter { it.value.version >= Version.CURRENT }
-    }
+    private fun getNodes(monitorCtx: MonitorRunnerExecutionContext): Map<String, DiscoveryNode> =
+        monitorCtx.clusterService!!.state().nodes.dataNodes.filter {
+            it.value.version >= Version.CURRENT
+        }
 
     private fun distributeShards(
         monitorCtx: MonitorRunnerExecutionContext,
@@ -222,11 +241,19 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         val shardsPerNode = totalShards / totalNodes
         var shardsRemaining = totalShards % totalNodes
 
-        val shardIdList = shards.map {
-            val index = it.split(":")[0]
-            val shardId = it.split(":")[1]
-            ShardId(monitorCtx.clusterService!!.state().metadata.index(index).index, shardId.toInt())
-        }
+        val shardIdList =
+            shards.map {
+                val index = it.split(":")[0]
+                val shardId = it.split(":")[1]
+                ShardId(
+                    monitorCtx.clusterService!!
+                        .state()
+                        .metadata
+                        .index(index)
+                        .index,
+                    shardId.toInt(),
+                )
+            }
         val nodes = allNodes.subList(0, totalNodes)
 
         val nodeShardAssignments = mutableMapOf<String, MutableSet<ShardId>>()
@@ -249,7 +276,10 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         return nodeShardAssignments
     }
 
-    private fun getShardsCount(clusterService: ClusterService, index: String): Int {
+    private fun getShardsCount(
+        clusterService: ClusterService,
+        index: String,
+    ): Int {
         val allShards: List<ShardRouting> = clusterService!!.state().routingTable().allShards(index)
         return allShards.filter { it.primary() }.size
     }
@@ -258,7 +288,6 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         docLevelMonitorFanOutResponses: MutableList<DocLevelMonitorFanOutResponse>,
         updatedLastRunContext: MutableMap<String, MutableMap<String, Any>>,
     ) {
-
         // Prepare updatedLastRunContext for each index
         for (indexName in updatedLastRunContext.keys) {
             for (fanOutResponse in docLevelMonitorFanOutResponses) {
@@ -268,15 +297,14 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
 
                     if (fanOutResponse.lastRunContexts.contains(indexName)) {
                         (fanOutResponse.lastRunContexts[indexName] as Map<String, Any>).forEach {
-
-                            val seq_no = it.value.toString().toLongOrNull()
+                            val seqNo = it.value.toString().toLongOrNull()
                             if (
                                 it.key != "shards_count" &&
                                 it.key != "index" &&
-                                seq_no != null &&
-                                seq_no >= 0L
+                                seqNo != null &&
+                                seqNo >= 0L
                             ) {
-                                indexLastRunContext[it.key] = seq_no
+                                indexLastRunContext[it.key] = seqNo
                             }
                         }
                     }
@@ -297,16 +325,18 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
                     if (documentLevelTriggerRunResult != null) {
                         if (false == triggerResults.contains(triggerId)) {
                             triggerResults[triggerId] = documentLevelTriggerRunResult
-                            triggerErrorMap[triggerId] = if (documentLevelTriggerRunResult.error != null) {
-                                val error = if (documentLevelTriggerRunResult.error is AlertingException) {
-                                    documentLevelTriggerRunResult.error as AlertingException
+                            triggerErrorMap[triggerId] =
+                                if (documentLevelTriggerRunResult.error != null) {
+                                    val error =
+                                        if (documentLevelTriggerRunResult.error is AlertingException) {
+                                            documentLevelTriggerRunResult.error as AlertingException
+                                        } else {
+                                            AlertingException.wrap(documentLevelTriggerRunResult.error!!) as AlertingException
+                                        }
+                                    mutableListOf(error)
                                 } else {
-                                    AlertingException.wrap(documentLevelTriggerRunResult.error!!) as AlertingException
+                                    mutableListOf()
                                 }
-                                mutableListOf(error)
-                            } else {
-                                mutableListOf()
-                            }
                         } else {
                             val currVal = triggerResults[triggerId]
                             val newTriggeredDocs = mutableListOf<String>()
@@ -315,10 +345,11 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
                             val newActionResults = mutableMapOf<String, MutableMap<String, ActionRunResult>>()
                             newActionResults.putAll(currVal.actionResultsMap)
                             newActionResults.putAll(documentLevelTriggerRunResult.actionResultsMap)
-                            triggerResults[triggerId] = currVal.copy(
-                                triggeredDocs = newTriggeredDocs,
-                                actionResultsMap = newActionResults
-                            )
+                            triggerResults[triggerId] =
+                                currVal.copy(
+                                    triggeredDocs = newTriggeredDocs,
+                                    actionResultsMap = newActionResults,
+                                )
 
                             if (documentLevelTriggerRunResult.error != null) {
                                 triggerErrorMap[triggerId]!!.add(documentLevelTriggerRunResult.error as AlertingException)
@@ -364,7 +395,7 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         monitor: Monitor,
         periodStart: Instant,
         periodEnd: Instant,
-        indexMetadata: IndexMetadata
+        indexMetadata: IndexMetadata,
     ): Boolean {
         val lastExecutionTime = if (periodStart == periodEnd) monitor.lastUpdateTime else periodStart
         val indexCreationDate = indexMetadata.settings.get("index.creation_date")?.toLong() ?: 0L

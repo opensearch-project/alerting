@@ -10,8 +10,10 @@ import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomAlertWithAggregationResultBucket
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class AlertTests : OpenSearchTestCase() {
+    @Test
     fun `test alert as template args`() {
         val alert = randomAlert().copy(acknowledgedTime = null, lastNotificationTime = null)
 
@@ -28,6 +30,7 @@ class AlertTests : OpenSearchTestCase() {
         assertEquals("Template args severity does not match", templateArgs[Alert.SEVERITY_FIELD], alert.severity)
     }
 
+    @Test
     fun `test agg alert as template args`() {
         val alert = randomAlertWithAggregationResultBucket().copy(acknowledgedTime = null, lastNotificationTime = null)
 
@@ -44,14 +47,17 @@ class AlertTests : OpenSearchTestCase() {
         assertEquals("Template args severity does not match", templateArgs[Alert.SEVERITY_FIELD], alert.severity)
         Assert.assertEquals(
             "Template args bucketKeys do not match",
-            templateArgs[Alert.BUCKET_KEYS], alert.aggregationResultBucket?.bucketKeys?.joinToString(",")
+            templateArgs[Alert.BUCKET_KEYS],
+            alert.aggregationResultBucket?.bucketKeys?.joinToString(","),
         )
         Assert.assertEquals(
             "Template args parentBucketPath does not match",
-            templateArgs[Alert.PARENTS_BUCKET_PATH], alert.aggregationResultBucket?.parentBucketPath
+            templateArgs[Alert.PARENTS_BUCKET_PATH],
+            alert.aggregationResultBucket?.parentBucketPath,
         )
     }
 
+    @Test
     fun `test alert acknowledged`() {
         val ackAlert = randomAlert().copy(state = Alert.State.ACKNOWLEDGED)
         assertTrue("Alert is not acknowledged", ackAlert.isAcknowledged())

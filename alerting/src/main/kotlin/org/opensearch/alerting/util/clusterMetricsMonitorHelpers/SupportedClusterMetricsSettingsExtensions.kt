@@ -41,7 +41,10 @@ import org.opensearch.transport.client.Client
  * @param client The [Client] used to call the respective transport action.
  * @throws IllegalArgumentException When the requested API is not supported by this feature.
  */
-suspend fun executeTransportAction(clusterMetricsInput: ClusterMetricsInput, client: Client): ActionResponse {
+suspend fun executeTransportAction(
+    clusterMetricsInput: ClusterMetricsInput,
+    client: Client,
+): ActionResponse {
     val request = resolveToActionRequest(clusterMetricsInput)
     return when (clusterMetricsInput.clusterMetricType) {
         ClusterMetricsInput.ClusterMetricType.CAT_INDICES -> {
@@ -55,12 +58,17 @@ suspend fun executeTransportAction(clusterMetricsInput: ClusterMetricsInput, cli
                 client.suspendUntil { admin().cluster().state(request.clusterStateRequest, it) }
             return CatIndicesResponseWrapper(healthResponse, stateResponse, indexSettingsResponse, indicesResponse)
         }
-        ClusterMetricsInput.ClusterMetricType.CAT_PENDING_TASKS ->
+
+        ClusterMetricsInput.ClusterMetricType.CAT_PENDING_TASKS -> {
             client.suspendUntil<Client, PendingClusterTasksResponse> {
                 admin().cluster().pendingClusterTasks(request as PendingClusterTasksRequest, it)
             }
-        ClusterMetricsInput.ClusterMetricType.CAT_RECOVERY ->
+        }
+
+        ClusterMetricsInput.ClusterMetricType.CAT_RECOVERY -> {
             client.suspendUntil<Client, RecoveryResponse> { admin().indices().recoveries(request as RecoveryRequest, it) }
+        }
+
         ClusterMetricsInput.ClusterMetricType.CAT_SHARDS -> {
             request as CatShardsRequestWrapper
             val stateResponse: ClusterStateResponse =
@@ -69,23 +77,37 @@ suspend fun executeTransportAction(clusterMetricsInput: ClusterMetricsInput, cli
                 client.suspendUntil { admin().indices().stats(request.indicesStatsRequest, it) }
             return CatShardsResponseWrapper(stateResponse, indicesResponse)
         }
-        ClusterMetricsInput.ClusterMetricType.CAT_SNAPSHOTS ->
+
+        ClusterMetricsInput.ClusterMetricType.CAT_SNAPSHOTS -> {
             client.suspendUntil<Client, GetSnapshotsResponse> { admin().cluster().getSnapshots(request as GetSnapshotsRequest, it) }
-        ClusterMetricsInput.ClusterMetricType.CAT_TASKS ->
+        }
+
+        ClusterMetricsInput.ClusterMetricType.CAT_TASKS -> {
             client.suspendUntil<Client, ListTasksResponse> { admin().cluster().listTasks(request as ListTasksRequest, it) }
-        ClusterMetricsInput.ClusterMetricType.CLUSTER_HEALTH ->
+        }
+
+        ClusterMetricsInput.ClusterMetricType.CLUSTER_HEALTH -> {
             client.suspendUntil<Client, ClusterHealthResponse> { admin().cluster().health(request as ClusterHealthRequest, it) }
+        }
+
         ClusterMetricsInput.ClusterMetricType.CLUSTER_SETTINGS -> {
             val stateResponse: ClusterStateResponse =
                 client.suspendUntil { admin().cluster().state(request as ClusterStateRequest, it) }
             val metadata: Metadata = stateResponse.state.metadata
             return ClusterGetSettingsResponse(metadata.persistentSettings(), metadata.transientSettings(), Settings.EMPTY)
         }
-        ClusterMetricsInput.ClusterMetricType.CLUSTER_STATS ->
+
+        ClusterMetricsInput.ClusterMetricType.CLUSTER_STATS -> {
             client.suspendUntil<Client, ClusterStatsResponse> { admin().cluster().clusterStats(request as ClusterStatsRequest, it) }
-        ClusterMetricsInput.ClusterMetricType.NODES_STATS ->
+        }
+
+        ClusterMetricsInput.ClusterMetricType.NODES_STATS -> {
             client.suspendUntil<Client, NodesStatsResponse> { admin().cluster().nodesStats(request as NodesStatsRequest, it) }
-        else -> throw IllegalArgumentException("Unsupported API request type: ${request.javaClass.name}")
+        }
+
+        else -> {
+            throw IllegalArgumentException("Unsupported API request type: ${request.javaClass.name}")
+        }
     }
 }
 
@@ -94,51 +116,84 @@ suspend fun executeTransportAction(clusterMetricsInput: ClusterMetricsInput, cli
  * @return The [ActionResponse] values formatted in a [HashMap].
  * @throws IllegalArgumentException when the [ActionResponse] is not supported by this feature.
  */
-fun ActionResponse.toMap(): Map<String, Any> {
-    return when (this) {
-        is ClusterHealthResponse -> redactFieldsFromResponse(
-            this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CLUSTER_HEALTH.defaultPath)
-        )
-        is ClusterStatsResponse -> redactFieldsFromResponse(
-            this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CLUSTER_STATS.defaultPath)
-        )
-        is ClusterGetSettingsResponse -> redactFieldsFromResponse(
-            this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CLUSTER_SETTINGS.defaultPath)
-        )
-        is CatIndicesResponseWrapper -> redactFieldsFromResponse(
-            this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_INDICES.defaultPath)
-        )
-        is CatShardsResponseWrapper -> redactFieldsFromResponse(
-            this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_SHARDS.defaultPath)
-        )
-        is NodesStatsResponse -> redactFieldsFromResponse(
-            this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.NODES_STATS.defaultPath)
-        )
-        is PendingClusterTasksResponse -> redactFieldsFromResponse(
-            this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_PENDING_TASKS.defaultPath)
-        )
-        is RecoveryResponse -> redactFieldsFromResponse(
-            this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_RECOVERY.defaultPath)
-        )
-        is GetSnapshotsResponse -> redactFieldsFromResponse(
-            this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_SNAPSHOTS.defaultPath)
-        )
-        is ListTasksResponse -> redactFieldsFromResponse(
-            this.convertToMap(),
-            SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_TASKS.defaultPath)
-        )
-        else -> throw IllegalArgumentException("Unsupported ActionResponse type: ${this.javaClass.name}")
+fun ActionResponse.toMap(): Map<String, Any> =
+    when (this) {
+        is ClusterHealthResponse -> {
+            redactFieldsFromResponse(
+                this.convertToMap(),
+                SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CLUSTER_HEALTH.defaultPath),
+            )
+        }
+
+        is ClusterStatsResponse -> {
+            redactFieldsFromResponse(
+                this.convertToMap(),
+                SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CLUSTER_STATS.defaultPath),
+            )
+        }
+
+        is ClusterGetSettingsResponse -> {
+            redactFieldsFromResponse(
+                this.convertToMap(),
+                SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CLUSTER_SETTINGS.defaultPath),
+            )
+        }
+
+        is CatIndicesResponseWrapper -> {
+            redactFieldsFromResponse(
+                this.convertToMap(),
+                SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_INDICES.defaultPath),
+            )
+        }
+
+        is CatShardsResponseWrapper -> {
+            redactFieldsFromResponse(
+                this.convertToMap(),
+                SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_SHARDS.defaultPath),
+            )
+        }
+
+        is NodesStatsResponse -> {
+            redactFieldsFromResponse(
+                this.convertToMap(),
+                SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.NODES_STATS.defaultPath),
+            )
+        }
+
+        is PendingClusterTasksResponse -> {
+            redactFieldsFromResponse(
+                this.convertToMap(),
+                SupportedClusterMetricsSettings.getSupportedJsonPayload(
+                    ClusterMetricsInput.ClusterMetricType.CAT_PENDING_TASKS.defaultPath,
+                ),
+            )
+        }
+
+        is RecoveryResponse -> {
+            redactFieldsFromResponse(
+                this.convertToMap(),
+                SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_RECOVERY.defaultPath),
+            )
+        }
+
+        is GetSnapshotsResponse -> {
+            redactFieldsFromResponse(
+                this.convertToMap(),
+                SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_SNAPSHOTS.defaultPath),
+            )
+        }
+
+        is ListTasksResponse -> {
+            redactFieldsFromResponse(
+                this.convertToMap(),
+                SupportedClusterMetricsSettings.getSupportedJsonPayload(ClusterMetricsInput.ClusterMetricType.CAT_TASKS.defaultPath),
+            )
+        }
+
+        else -> {
+            throw IllegalArgumentException("Unsupported ActionResponse type: ${this.javaClass.name}")
+        }
     }
-}
 
 /**
  * Populates a [HashMap] with only the values that support being exposed to users.
@@ -149,22 +204,31 @@ fun ActionResponse.toMap(): Map<String, Any> {
 @Suppress("UNCHECKED_CAST")
 fun redactFieldsFromResponse(
     mappedActionResponse: Map<String, Any>,
-    supportedJsonPayload: Map<String, ArrayList<String>>
-): Map<String, Any> {
-    return when {
-        supportedJsonPayload.isEmpty() -> mappedActionResponse
+    supportedJsonPayload: Map<String, ArrayList<String>>,
+): Map<String, Any> =
+    when {
+        supportedJsonPayload.isEmpty() -> {
+            mappedActionResponse
+        }
+
         else -> {
             val output = hashMapOf<String, Any>()
             for ((key, value) in supportedJsonPayload) {
                 when (val mappedValue = mappedActionResponse[key]) {
-                    is Map<*, *> -> output[key] = XContentMapValues.filter(
-                        mappedActionResponse[key] as MutableMap<String, *>?,
-                        value.toTypedArray(), arrayOf()
-                    )
-                    else -> output[key] = mappedValue ?: hashMapOf<String, Any>()
+                    is Map<*, *> -> {
+                        output[key] =
+                            XContentMapValues.filter(
+                                mappedActionResponse[key] as MutableMap<String, *>?,
+                                value.toTypedArray(),
+                                arrayOf(),
+                            )
+                    }
+
+                    else -> {
+                        output[key] = mappedValue ?: hashMapOf<String, Any>()
+                    }
                 }
             }
             output
         }
     }
-}

@@ -12,16 +12,19 @@ import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class ExecuteMonitorV2RequestTests : OpenSearchTestCase() {
+    @Test
     fun `test execute monitor v2 request`() {
-        val req = ExecuteMonitorV2Request(
-            dryrun = true,
-            manual = false,
-            monitorV2Id = "abc",
-            monitorV2 = randomPPLMonitor(),
-            requestEnd = TimeValue.timeValueMinutes(30L)
-        )
+        val req =
+            ExecuteMonitorV2Request(
+                dryrun = true,
+                manual = false,
+                monitorV2Id = "abc",
+                monitorV2 = randomPPLMonitor(),
+                requestEnd = TimeValue.timeValueMinutes(30L),
+            )
         assertNotNull(req)
 
         val out = BytesStreamOutput()

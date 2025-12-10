@@ -14,9 +14,8 @@ import org.opensearch.alerting.triggercondition.tokens.TriggerExpressionOperator
  * @param triggerExpression String containing the trigger expression for the monitor
  */
 class TriggerExpressionParser(
-    triggerExpression: String
+    triggerExpression: String,
 ) : TriggerExpressionRPNBaseParser(triggerExpression) {
-
     override fun parse(): TriggerExpressionRPNResolver {
         val expression = expressionToParse.replace(" ", "")
 
@@ -30,7 +29,9 @@ class TriggerExpressionParser(
                 breaks[ind].let {
                     if (it.length > 1) {
                         a.addAll(breakString(breaks[ind], s))
-                    } else a.add(it)
+                    } else {
+                        a.add(it)
+                    }
                 }
             }
             breaks.clear()
@@ -40,7 +41,10 @@ class TriggerExpressionParser(
         return TriggerExpressionRPNResolver(convertInfixToPostfix(breaks))
     }
 
-    private fun breakString(input: String, delimeter: String): ArrayList<String> {
+    private fun breakString(
+        input: String,
+        delimeter: String,
+    ): ArrayList<String> {
         val tokens = input.split(delimeter)
         val array = ArrayList<String>()
         for (t in tokens) {

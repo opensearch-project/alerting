@@ -10,11 +10,11 @@ import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class GetEmailGroupResponseTests : OpenSearchTestCase() {
-
+    @Test
     fun `test get email group response`() {
-
         val res = GetEmailGroupResponse("1234", 1L, 2L, 0L, RestStatus.OK, null)
         assertNotNull(res)
 
@@ -28,8 +28,8 @@ class GetEmailGroupResponseTests : OpenSearchTestCase() {
         assertEquals(null, newRes.emailGroup)
     }
 
+    @Test
     fun `test get email group with email group`() {
-
         val emailGroup = randomEmailGroup(name = "test-email-group")
         val res = GetEmailGroupResponse("1234", 1L, 2L, 0L, RestStatus.OK, emailGroup)
         assertNotNull(res)

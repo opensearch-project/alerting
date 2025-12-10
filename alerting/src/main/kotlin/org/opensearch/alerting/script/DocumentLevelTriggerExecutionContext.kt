@@ -19,16 +19,22 @@ data class DocumentLevelTriggerExecutionContext(
     val alerts: List<AlertContext> = listOf(),
     val triggeredDocs: List<String>,
     val relatedFindings: List<String>,
-    override val error: Exception? = null
+    override val error: Exception? = null,
 ) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error) {
-
     constructor(
         monitor: Monitor,
         trigger: DocumentLevelTrigger,
-        alerts: List<AlertContext> = listOf()
+        alerts: List<AlertContext> = listOf(),
     ) : this(
-        monitor, trigger, emptyList(), Instant.now(), Instant.now(),
-        alerts, emptyList(), emptyList(), null
+        monitor,
+        trigger,
+        emptyList(),
+        Instant.now(),
+        Instant.now(),
+        alerts,
+        emptyList(),
+        emptyList(),
+        null,
     )
 
     /**

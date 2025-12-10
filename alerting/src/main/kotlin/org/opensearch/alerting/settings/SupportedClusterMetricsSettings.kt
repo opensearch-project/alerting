@@ -61,9 +61,11 @@ class SupportedClusterMetricsSettings : org.opensearch.commons.alerting.settings
             val supportedJsonPayloads = SupportedClusterMetricsSettings::class.java.getResource(RESOURCE_FILE)
 
             @Suppress("UNCHECKED_CAST")
-            if (supportedJsonPayloads != null)
-                supportedApiList = XContentHelper.convertToMap(JsonXContent.jsonXContent, supportedJsonPayloads.readText(), false)
-                    as HashMap<String, Map<String, ArrayList<String>>>
+            if (supportedJsonPayloads != null) {
+                supportedApiList =
+                    XContentHelper.convertToMap(JsonXContent.jsonXContent, supportedJsonPayloads.readText(), false)
+                        as HashMap<String, Map<String, ArrayList<String>>>
+            }
         }
 
         /**
@@ -72,9 +74,8 @@ class SupportedClusterMetricsSettings : org.opensearch.commons.alerting.settings
          * @return The map of the supported json payload for the requested API.
          * @throws IllegalArgumentException When supportedApiList does not contain a value for the provided key.
          */
-        fun getSupportedJsonPayload(path: String): Map<String, ArrayList<String>> {
-            return supportedApiList[path] ?: throw IllegalArgumentException("API path not in supportedApiList.")
-        }
+        fun getSupportedJsonPayload(path: String): Map<String, ArrayList<String>> =
+            supportedApiList[path] ?: throw IllegalArgumentException("API path not in supportedApiList.")
 
         /**
          * Will return an [ActionRequest] for the API associated with that path.
@@ -86,47 +87,71 @@ class SupportedClusterMetricsSettings : org.opensearch.commons.alerting.settings
         fun resolveToActionRequest(clusterMetricsInput: ClusterMetricsInput): ActionRequest {
             val pathParams = clusterMetricsInput.parsePathParams()
             return when (clusterMetricsInput.clusterMetricType) {
-                ClusterMetricType.CAT_INDICES -> CatIndicesRequestWrapper(pathParams)
-                ClusterMetricType.CAT_PENDING_TASKS -> PendingClusterTasksRequest()
+                ClusterMetricType.CAT_INDICES -> {
+                    CatIndicesRequestWrapper(pathParams)
+                }
+
+                ClusterMetricType.CAT_PENDING_TASKS -> {
+                    PendingClusterTasksRequest()
+                }
+
                 ClusterMetricType.CAT_RECOVERY -> {
                     if (pathParams.isEmpty()) return RecoveryRequest()
                     val pathParamsArray = pathParams.split(",").toTypedArray()
                     return RecoveryRequest(*pathParamsArray)
                 }
-                ClusterMetricType.CAT_SHARDS -> CatShardsRequestWrapper(pathParams)
+
+                ClusterMetricType.CAT_SHARDS -> {
+                    CatShardsRequestWrapper(pathParams)
+                }
+
                 ClusterMetricType.CAT_SNAPSHOTS -> {
                     return GetSnapshotsRequest(pathParams, arrayOf(GetSnapshotsRequest.ALL_SNAPSHOTS))
                 }
-                ClusterMetricType.CAT_TASKS -> ListTasksRequest()
+
+                ClusterMetricType.CAT_TASKS -> {
+                    ListTasksRequest()
+                }
+
                 ClusterMetricType.CLUSTER_HEALTH -> {
                     if (pathParams.isEmpty()) return ClusterHealthRequest()
                     val pathParamsArray = pathParams.split(",").toTypedArray()
                     return ClusterHealthRequest(*pathParamsArray)
                 }
-                ClusterMetricType.CLUSTER_SETTINGS -> ClusterStateRequest().routingTable(false).nodes(false)
+
+                ClusterMetricType.CLUSTER_SETTINGS -> {
+                    ClusterStateRequest().routingTable(false).nodes(false)
+                }
+
                 ClusterMetricType.CLUSTER_STATS -> {
                     if (pathParams.isEmpty()) return ClusterStatsRequest()
                     val pathParamsArray = pathParams.split(",").toTypedArray()
                     return ClusterStatsRequest(*pathParamsArray)
                 }
-                ClusterMetricType.NODES_STATS -> NodesStatsRequest().addMetrics(
-                    "os",
-                    "process",
-                    "jvm",
-                    "thread_pool",
-                    "fs",
-                    "transport",
-                    "http",
-                    "breaker",
-                    "script",
-                    "discovery",
-                    "ingest",
-                    "adaptive_selection",
-                    "script_cache",
-                    "indexing_pressure",
-                    "shard_indexing_pressure"
-                )
-                else -> throw IllegalArgumentException("Unsupported API.")
+
+                ClusterMetricType.NODES_STATS -> {
+                    NodesStatsRequest().addMetrics(
+                        "os",
+                        "process",
+                        "jvm",
+                        "thread_pool",
+                        "fs",
+                        "transport",
+                        "http",
+                        "breaker",
+                        "script",
+                        "discovery",
+                        "ingest",
+                        "adaptive_selection",
+                        "script_cache",
+                        "indexing_pressure",
+                        "shard_indexing_pressure",
+                    )
+                }
+
+                else -> {
+                    throw IllegalArgumentException("Unsupported API.")
+                }
             }
         }
 
@@ -137,8 +162,9 @@ class SupportedClusterMetricsSettings : org.opensearch.commons.alerting.settings
          * @throws IllegalArgumentException when supportedApiList does not contain the provided path.
          */
         fun validateApiTyped(clusterMetricsInput: ClusterMetricsInput) {
-            if (!supportedApiList.keys.contains(clusterMetricsInput.clusterMetricType.defaultPath))
+            if (!supportedApiList.keys.contains(clusterMetricsInput.clusterMetricType.defaultPath)) {
                 throw IllegalArgumentException("API path not in supportedApiList.")
+            }
         }
     }
 

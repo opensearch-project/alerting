@@ -10,4 +10,7 @@ import org.opensearch.alerting.spi.RemoteMonitorRunner
 /**
  * Class to store monitorType to monitorRunner tuples.
  */
-class RemoteMonitorRegistry(val monitorType: String, val monitorRunner: RemoteMonitorRunner)
+class RemoteMonitorRegistry(
+    val monitorType: String,
+    val monitorRunner: RemoteMonitorRunner,
+)

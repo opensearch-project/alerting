@@ -23,23 +23,22 @@ import org.opensearch.transport.client.node.NodeClient
  * @opensearch.experimental
  */
 class RestGetAlertsV2Action : BaseRestHandler() {
-
     private val log = LogManager.getLogger(RestGetAlertsV2Action::class.java)
 
-    override fun getName(): String {
-        return "get_alerts_v2_action"
-    }
+    override fun getName(): String = "get_alerts_v2_action"
 
-    override fun routes(): List<Route> {
-        return listOf(
+    override fun routes(): List<Route> =
+        listOf(
             Route(
                 GET,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/alerts"
-            )
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/alerts",
+            ),
         )
-    }
 
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.MONITOR_V2_BASE_URI}/alerts")
 
         val sortString = request.param("sortString", "monitor_v2_name.keyword")
@@ -50,22 +49,23 @@ class RestGetAlertsV2Action : BaseRestHandler() {
         val searchString = request.param("searchString", "")
         val severityLevel = request.param("severityLevel", "ALL")
         val monitorId: String? = request.param("monitorId")
-        val table = Table(
-            sortOrder,
-            sortString,
-            missing,
-            size,
-            startIndex,
-            searchString
-        )
+        val table =
+            Table(
+                sortOrder,
+                sortString,
+                missing,
+                size,
+                startIndex,
+                searchString,
+            )
 
-        val getAlertsV2Request = GetAlertsV2Request(
-            table,
-            severityLevel,
-            monitorId?.let { listOf(monitorId) }
-        )
-        return RestChannelConsumer {
-                channel ->
+        val getAlertsV2Request =
+            GetAlertsV2Request(
+                table,
+                severityLevel,
+                monitorId?.let { listOf(monitorId) },
+            )
+        return RestChannelConsumer { channel ->
             client.execute(GetAlertsV2Action.INSTANCE, getAlertsV2Request, RestToXContentListener(channel))
         }
     }

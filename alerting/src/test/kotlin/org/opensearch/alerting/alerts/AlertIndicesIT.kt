@@ -25,9 +25,10 @@ import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.test.OpenSearchTestCase
 import java.util.concurrent.TimeUnit
+import kotlin.test.Test
 
 class AlertIndicesIT : AlertingRestTestCase() {
-
+    @Test
     fun `test create alert index`() {
         executeMonitor(randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN))))
 
@@ -35,6 +36,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         assertIndexExists(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
     }
 
+    @Test
     fun `test create finding index`() {
         val testIndex = createTestIndex()
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
@@ -47,14 +49,18 @@ class AlertIndicesIT : AlertingRestTestCase() {
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
     }
 
+    @Test
     fun `test update alert index mapping with new schema version`() {
         wipeAllODFEIndices()
         assertIndexDoesNotExist(AlertIndices.ALERT_INDEX)
         assertIndexDoesNotExist(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
 
         putAlertMappings(
-            AlertIndices.alertMapping().trimStart('{').trimEnd('}')
-                .replace("\"schema_version\": 5", "\"schema_version\": 0")
+            AlertIndices
+                .alertMapping()
+                .trimStart('{')
+                .trimEnd('}')
+                .replace("\"schema_version\": 5", "\"schema_version\": 0"),
         )
         assertIndexExists(AlertIndices.ALERT_INDEX)
         assertIndexExists(AlertIndices.ALERT_HISTORY_WRITE_INDEX)
@@ -69,13 +75,17 @@ class AlertIndicesIT : AlertingRestTestCase() {
         verifyIndexSchemaVersion(AlertIndices.ALERT_HISTORY_WRITE_INDEX, 5)
     }
 
+    @Test
     fun `test update finding index mapping with new schema version`() {
         wipeAllODFEIndices()
         assertIndexDoesNotExist(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
 
         putFindingMappings(
-            AlertIndices.findingMapping().trimStart('{').trimEnd('}')
-                .replace("\"schema_version\": 4", "\"schema_version\": 0")
+            AlertIndices
+                .findingMapping()
+                .trimStart('{')
+                .trimEnd('}')
+                .replace("\"schema_version\": 4", "\"schema_version\": 0"),
         )
         assertIndexExists(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 0)
@@ -92,6 +102,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         verifyIndexSchemaVersion(AlertIndices.FINDING_HISTORY_WRITE_INDEX, 4)
     }
 
+    @Test
     fun `test alert index gets recreated automatically if deleted`() {
         wipeAllODFEIndices()
         assertIndexDoesNotExist(AlertIndices.ALERT_INDEX)
@@ -110,6 +121,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         assertNull("Error running a monitor after wiping alert indices", output["error"])
     }
 
+    @Test
     fun `test finding index gets recreated automatically if deleted`() {
         wipeAllODFEIndices()
         assertIndexDoesNotExist(AlertIndices.FINDING_HISTORY_WRITE_INDEX)
@@ -131,6 +143,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         assertNull("Error running a monitor after wiping finding indices", output["error"])
     }
 
+    @Test
     fun `test rollover alert history index`() {
         // Update the rollover check to be every 1 second and the index max age to be 1 second
         client().updateSettings(AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD.key, "1s")
@@ -146,6 +159,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         assertTrue("Did not find 3 alert indices", getAlertIndices().size >= 3)
     }
 
+    @Test
     fun `test rollover finding history index`() {
         // Update the rollover check to be every 1 second and the index max age to be 1 second
         client().updateSettings(AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD.key, "1s")
@@ -165,6 +179,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         assertTrue("Did not find 2 alert indices", getFindingIndices().size >= 2)
     }
 
+    @Test
     fun `test alert history disabled`() {
         resetHistorySettings()
 
@@ -209,6 +224,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         assertEquals(1, getAlertHistoryDocCount())
     }
 
+    @Test
     fun `test short retention period`() {
         resetHistorySettings()
 
@@ -259,6 +275,7 @@ class AlertIndicesIT : AlertingRestTestCase() {
         assertEquals(0, getAlertHistoryDocCount())
     }
 
+    @Test
     fun `test short finding retention period`() {
         resetHistorySettings()
 
@@ -358,18 +375,25 @@ class AlertIndicesIT : AlertingRestTestCase() {
     }
 
     private fun getAlertHistoryDocCount(): Long {
-        val request = """
+        val request =
+            """
             {
                 "query": {
                     "match_all": {}
                 }
             }
-        """.trimIndent()
-        val response = adminClient().makeRequest(
-            "POST", "${AlertIndices.ALERT_HISTORY_ALL}/_search", emptyMap(),
-            StringEntity(request, APPLICATION_JSON)
-        )
+            """.trimIndent()
+        val response =
+            adminClient().makeRequest(
+                "POST",
+                "${AlertIndices.ALERT_HISTORY_ALL}/_search",
+                emptyMap(),
+                StringEntity(request, APPLICATION_JSON),
+            )
         assertEquals("Request to get alert history failed", RestStatus.OK, response.restStatus())
-        return SearchResponse.fromXContent(createParser(jsonXContent, response.entity.content)).hits.totalHits!!.value
+        return SearchResponse
+            .fromXContent(createParser(jsonXContent, response.entity.content))
+            .hits.totalHits!!
+            .value
     }
 }

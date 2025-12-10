@@ -46,20 +46,27 @@ data class Destination(
     val chime: Chime?,
     val slack: Slack?,
     val customWebhook: CustomWebhook?,
-    val email: Email?
+    val email: Email?,
 ) : ToXContent {
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder = createXContentBuilder(builder, params, true)
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        return createXContentBuilder(builder, params, true)
-    }
+    fun toXContentWithUser(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder = createXContentBuilder(builder, params, false)
 
-    fun toXContentWithUser(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        return createXContentBuilder(builder, params, false)
-    }
-    private fun createXContentBuilder(builder: XContentBuilder, params: ToXContent.Params, secure: Boolean): XContentBuilder {
+    private fun createXContentBuilder(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+        secure: Boolean,
+    ): XContentBuilder {
         builder.startObject()
         if (params.paramAsBoolean("with_type", false)) builder.startObject(DESTINATION)
-        builder.field(ID_FIELD, id)
+        builder
+            .field(ID_FIELD, id)
             .field(TYPE_FIELD, type.value)
             .field(NAME_FIELD, name)
 
@@ -67,7 +74,8 @@ data class Destination(
             builder.optionalUserField(USER_FIELD, user)
         }
 
-        builder.field(SCHEMA_VERSION, schemaVersion)
+        builder
+            .field(SCHEMA_VERSION, schemaVersion)
             .field(SEQ_NO_FIELD, seqNo)
             .field(PRIMARY_TERM_FIELD, primaryTerm)
             .optionalTimeField(LAST_UPDATE_TIME_FIELD, lastUpdateTime)
@@ -75,9 +83,8 @@ data class Destination(
         if (params.paramAsBoolean("with_type", false)) builder.endObject()
         return builder.endObject()
     }
-    fun toXContent(builder: XContentBuilder): XContentBuilder {
-        return toXContent(builder, ToXContent.EMPTY_PARAMS)
-    }
+
+    fun toXContent(builder: XContentBuilder): XContentBuilder = toXContent(builder, ToXContent.EMPTY_PARAMS)
 
     @Throws(IOException::class)
     fun writeTo(out: StreamOutput) {
@@ -133,9 +140,8 @@ data class Destination(
             id: String = NO_ID,
             version: Long = NO_VERSION,
             seqNo: Int = NO_SEQ_NO,
-            primaryTerm: Int = NO_PRIMARY_TERM
+            primaryTerm: Int = NO_PRIMARY_TERM,
         ): Destination {
-
             lateinit var name: String
             var user: User? = null
             lateinit var type: String
@@ -152,8 +158,14 @@ data class Destination(
                 xcp.nextToken()
 
                 when (fieldName) {
-                    NAME_FIELD -> name = xcp.text()
-                    USER_FIELD -> user = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else User.parse(xcp)
+                    NAME_FIELD -> {
+                        name = xcp.text()
+                    }
+
+                    USER_FIELD -> {
+                        user = if (xcp.currentToken() == XContentParser.Token.VALUE_NULL) null else User.parse(xcp)
+                    }
+
                     TYPE_FIELD -> {
                         type = xcp.text()
                         val allowedTypes = DestinationType.values().map { it.value }
@@ -161,25 +173,35 @@ data class Destination(
                             throw IllegalStateException("Type should be one of the $allowedTypes")
                         }
                     }
-                    LAST_UPDATE_TIME_FIELD -> lastUpdateTime = xcp.instant()
+
+                    LAST_UPDATE_TIME_FIELD -> {
+                        lastUpdateTime = xcp.instant()
+                    }
+
                     CHIME -> {
                         chime = Chime.parse(xcp)
                     }
+
                     SLACK -> {
                         slack = Slack.parse(xcp)
                     }
+
                     CUSTOMWEBHOOK -> {
                         customWebhook = CustomWebhook.parse(xcp)
                     }
+
                     EMAIL -> {
                         email = Email.parse(xcp)
                     }
+
                     TEST_ACTION -> {
                         // This condition is for integ tests to avoid parsing
                     }
+
                     SCHEMA_VERSION -> {
                         schemaVersion = xcp.intValue()
                     }
+
                     else -> {
                         xcp.skipChildren()
                     }
@@ -198,13 +220,17 @@ data class Destination(
                 chime,
                 slack,
                 customWebhook,
-                email
+                email,
             )
         }
 
         @JvmStatic
         @Throws(IOException::class)
-        fun parseWithType(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): Destination {
+        fun parseWithType(
+            xcp: XContentParser,
+            id: String = NO_ID,
+            version: Long = NO_VERSION,
+        ): Destination {
             ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
             ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
             ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
@@ -215,8 +241,8 @@ data class Destination(
 
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): Destination {
-            return Destination(
+        fun readFrom(sin: StreamInput): Destination =
+            Destination(
                 id = sin.readString(),
                 version = sin.readLong(),
                 schemaVersion = sin.readInt(),
@@ -224,59 +250,76 @@ data class Destination(
                 primaryTerm = sin.readInt(),
                 type = sin.readEnum(DestinationType::class.java),
                 name = sin.readString(),
-                user = if (sin.readBoolean()) {
-                    User(sin)
-                } else null,
+                user =
+                    if (sin.readBoolean()) {
+                        User(sin)
+                    } else {
+                        null
+                    },
                 lastUpdateTime = sin.readInstant(),
                 chime = Chime.readFrom(sin),
                 slack = Slack.readFrom(sin),
                 customWebhook = CustomWebhook.readFrom(sin),
-                email = Email.readFrom(sin)
+                email = Email.readFrom(sin),
             )
-        }
     }
 
     fun buildLegacyBaseMessage(
         compiledSubject: String?,
         compiledMessage: String,
-        destinationCtx: DestinationContext
+        destinationCtx: DestinationContext,
     ): LegacyBaseMessage {
-
         val destinationMessage: LegacyBaseMessage
         when (type) {
             DestinationType.CHIME -> {
                 val messageContent = chime?.constructMessageContent(compiledSubject, compiledMessage)
-                destinationMessage = LegacyChimeMessage.Builder(name)
-                    .withUrl(chime?.url)
-                    .withMessage(messageContent)
-                    .build()
+                destinationMessage =
+                    LegacyChimeMessage
+                        .Builder(name)
+                        .withUrl(chime?.url)
+                        .withMessage(messageContent)
+                        .build()
             }
+
             DestinationType.SLACK -> {
                 val messageContent = slack?.constructMessageContent(compiledSubject, compiledMessage)
-                destinationMessage = LegacySlackMessage.Builder(name)
-                    .withUrl(slack?.url)
-                    .withMessage(messageContent)
-                    .build()
+                destinationMessage =
+                    LegacySlackMessage
+                        .Builder(name)
+                        .withUrl(slack?.url)
+                        .withMessage(messageContent)
+                        .build()
             }
+
             DestinationType.CUSTOM_WEBHOOK -> {
-                destinationMessage = LegacyCustomWebhookMessage.Builder(name)
-                    .withUrl(getLegacyCustomWebhookMessageURL(customWebhook, compiledMessage))
-                    .withHeaderParams(customWebhook?.headerParams)
-                    .withMessage(compiledMessage).build()
+                destinationMessage =
+                    LegacyCustomWebhookMessage
+                        .Builder(name)
+                        .withUrl(getLegacyCustomWebhookMessageURL(customWebhook, compiledMessage))
+                        .withHeaderParams(customWebhook?.headerParams)
+                        .withMessage(compiledMessage)
+                        .build()
             }
+
             DestinationType.EMAIL -> {
                 val emailAccount = destinationCtx.emailAccount
-                destinationMessage = LegacyEmailMessage.Builder(name)
-                    .withAccountName(emailAccount?.name)
-                    .withHost(emailAccount?.host)
-                    .withPort(emailAccount?.port)
-                    .withMethod(emailAccount?.method?.let { convertAlertingToNotificationMethodType(it).toString() })
-                    .withFrom(emailAccount?.email)
-                    .withRecipients(destinationCtx.recipients)
-                    .withSubject(compiledSubject)
-                    .withMessage(compiledMessage).build()
+                destinationMessage =
+                    LegacyEmailMessage
+                        .Builder(name)
+                        .withAccountName(emailAccount?.name)
+                        .withHost(emailAccount?.host)
+                        .withPort(emailAccount?.port)
+                        .withMethod(emailAccount?.method?.let { convertAlertingToNotificationMethodType(it).toString() })
+                        .withFrom(emailAccount?.email)
+                        .withRecipients(destinationCtx.recipients)
+                        .withSubject(compiledSubject)
+                        .withMessage(compiledMessage)
+                        .build()
             }
-            else -> throw IllegalArgumentException("Unsupported Destination type [$type] for building legacy message")
+
+            else -> {
+                throw IllegalArgumentException("Unsupported Destination type [$type] for building legacy message")
+            }
         }
         return destinationMessage
     }
@@ -296,8 +339,12 @@ data class Destination(
         return content
     }
 
-    private fun getLegacyCustomWebhookMessageURL(customWebhook: CustomWebhook?, message: String): String {
-        return LegacyCustomWebhookMessage.Builder(name)
+    private fun getLegacyCustomWebhookMessageURL(
+        customWebhook: CustomWebhook?,
+        message: String,
+    ): String =
+        LegacyCustomWebhookMessage
+            .Builder(name)
             .withUrl(customWebhook?.url)
             .withScheme(customWebhook?.scheme)
             .withHost(customWebhook?.host)
@@ -305,6 +352,7 @@ data class Destination(
             .withPath(customWebhook?.path)
             .withQueryParams(customWebhook?.queryParams)
             .withMessage(message)
-            .build().uri.toString()
-    }
+            .build()
+            .uri
+            .toString()
 }

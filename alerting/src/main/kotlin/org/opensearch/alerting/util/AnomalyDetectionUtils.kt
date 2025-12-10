@@ -32,7 +32,10 @@ fun isADMonitor(monitor: Monitor): Boolean {
     return false
 }
 
-fun addUserBackendRolesFilter(user: User?, searchSourceBuilder: SearchSourceBuilder): SearchSourceBuilder {
+fun addUserBackendRolesFilter(
+    user: User?,
+    searchSourceBuilder: SearchSourceBuilder,
+): SearchSourceBuilder {
     var boolQueryBuilder = BoolQueryBuilder()
     val userFieldName = "user"
     val userBackendRoleFieldName = "user.backend_roles.keyword"

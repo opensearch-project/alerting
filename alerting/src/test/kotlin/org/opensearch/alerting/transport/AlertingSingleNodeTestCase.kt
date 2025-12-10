@@ -80,7 +80,6 @@ import java.util.concurrent.TimeUnit
  */
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
-
     protected val index: String = randomAlphaOfLength(10).lowercase(Locale.ROOT)
 
     override fun setUp() {
@@ -89,30 +88,42 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     }
 
     protected fun getAllIndicesFromPattern(pattern: String): List<String> {
-        val getIndexResponse = (
-            client().admin().indices().prepareGetIndex()
-                .setIndices(pattern) as GetIndexRequestBuilder
+        val getIndexResponse =
+            (
+                client()
+                    .admin()
+                    .indices()
+                    .prepareGetIndex()
+                    .setIndices(pattern) as GetIndexRequestBuilder
             ).get() as GetIndexResponse
         getIndexResponse
         return getIndexResponse.indices().toList()
     }
 
-    protected fun executeMonitor(monitor: Monitor, id: String?, dryRun: Boolean = true): ExecuteMonitorResponse? {
+    protected fun executeMonitor(
+        monitor: Monitor,
+        id: String?,
+        dryRun: Boolean = true,
+    ): ExecuteMonitorResponse? {
         val request = ExecuteMonitorRequest(dryRun, TimeValue(Instant.now().toEpochMilli()), id, monitor)
         return client().execute(ExecuteMonitorAction.INSTANCE, request).get()
     }
 
-    protected fun insertSampleTimeSerializedData(index: String, data: List<String>) {
+    protected fun insertSampleTimeSerializedData(
+        index: String,
+        data: List<String>,
+    ) {
         data.forEachIndexed { i, value ->
             val twoMinsAgo = ZonedDateTime.now().minus(2, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MILLIS)
             val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(twoMinsAgo)
-            val testDoc = """
+            val testDoc =
+                """
                 {
                   "test_strict_date_time": "$testTime",
                   "test_field_1": "$value",
                   "number": "$i"
                 }
-            """.trimIndent()
+                """.trimIndent()
             // Indexing documents with deterministic doc id to allow for easy selected deletion during testing
             indexDoc(index, (i + 1).toString(), testDoc)
         }
@@ -127,7 +138,8 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     /** A test index that can be used across tests. Feel free to add new fields but don't remove any. */
     protected fun createTestIndex() {
         val mapping = XContentFactory.jsonBuilder()
-        mapping.startObject()
+        mapping
+            .startObject()
             .startObject("properties")
             .startObject("test_strict_date_time")
             .field("type", "date")
@@ -140,13 +152,16 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             .endObject()
 
         createIndex(
-            index, Settings.EMPTY, mapping
+            index,
+            Settings.EMPTY,
+            mapping,
         )
     }
 
     protected fun createTestIndex(index: String) {
         val mapping = XContentFactory.jsonBuilder()
-        mapping.startObject()
+        mapping
+            .startObject()
             .startObject("properties")
             .startObject("test_strict_date_time")
             .field("type", "date")
@@ -159,7 +174,9 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             .endObject()
 
         createIndex(
-            index, Settings.EMPTY, mapping
+            index,
+            Settings.EMPTY,
+            mapping,
         )
     }
 
@@ -168,85 +185,123 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         settings: Settings?,
         mappings: XContentBuilder?,
     ): IndexService? {
-        val createIndexRequestBuilder = client().admin().indices().prepareCreate(index).setSettings(settings)
+        val createIndexRequestBuilder =
+            client()
+                .admin()
+                .indices()
+                .prepareCreate(index)
+                .setSettings(settings)
         if (mappings != null) {
             createIndexRequestBuilder.setMapping(mappings)
         }
         return this.createIndex(index, createIndexRequestBuilder)
     }
 
-    protected fun indexDoc(index: String, id: String, doc: String) {
-        client().prepareIndex(index).setId(id)
-            .setSource(doc, XContentType.JSON).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).get()
+    protected fun indexDoc(
+        index: String,
+        id: String,
+        doc: String,
+    ) {
+        client()
+            .prepareIndex(index)
+            .setId(id)
+            .setSource(doc, XContentType.JSON)
+            .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+            .get()
     }
 
     protected fun assertIndexExists(index: String) {
         val getIndexResponse =
-            client().admin().indices().getIndex(
-                GetIndexRequest().indices(index).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN)
-            ).get()
+            client()
+                .admin()
+                .indices()
+                .getIndex(
+                    GetIndexRequest().indices(index).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
+                ).get()
         assertTrue(getIndexResponse.indices.size > 0)
     }
 
     protected fun assertIndexNotExists(index: String) {
         val getIndexResponse =
-            client().admin().indices().getIndex(
-                GetIndexRequest().indices(index).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN)
-            ).get()
+            client()
+                .admin()
+                .indices()
+                .getIndex(
+                    GetIndexRequest().indices(index).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
+                ).get()
         assertFalse(getIndexResponse.indices.size > 0)
     }
 
     protected fun assertAliasNotExists(alias: String) {
-        val aliasesResponse = client().admin().indices().getAliases(GetAliasesRequest()).get()
-        val foundAlias = aliasesResponse.aliases.values.forEach {
-            it.forEach { it1 ->
-                if (it1.alias == alias) {
-                    fail("alias exists, but it shouldn't")
+        val aliasesResponse =
+            client()
+                .admin()
+                .indices()
+                .getAliases(GetAliasesRequest())
+                .get()
+        val foundAlias =
+            aliasesResponse.aliases.values.forEach {
+                it.forEach { it1 ->
+                    if (it1.alias == alias) {
+                        fail("alias exists, but it shouldn't")
+                    }
                 }
             }
-        }
     }
 
     protected fun assertAliasExists(alias: String) {
-        val aliasesResponse = client().admin().indices().getAliases(GetAliasesRequest()).get()
-        val foundAlias = aliasesResponse.aliases.values.forEach {
-            it.forEach { it1 ->
-                if (it1.alias == alias) {
-                    return
+        val aliasesResponse =
+            client()
+                .admin()
+                .indices()
+                .getAliases(GetAliasesRequest())
+                .get()
+        val foundAlias =
+            aliasesResponse.aliases.values.forEach {
+                it.forEach { it1 ->
+                    if (it1.alias == alias) {
+                        return
+                    }
                 }
             }
-        }
         fail("alias doesn't exists, but it should")
     }
 
     protected fun createMonitor(monitor: Monitor): IndexMonitorResponse? {
-        val request = IndexMonitorRequest(
-            monitorId = Monitor.NO_ID,
-            seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
-            primaryTerm = SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
-            refreshPolicy = WriteRequest.RefreshPolicy.parse("true"),
-            method = RestRequest.Method.POST,
-            monitor = monitor
-        )
+        val request =
+            IndexMonitorRequest(
+                monitorId = Monitor.NO_ID,
+                seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
+                primaryTerm = SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
+                refreshPolicy = WriteRequest.RefreshPolicy.parse("true"),
+                method = RestRequest.Method.POST,
+                monitor = monitor,
+            )
         return client().execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, request).actionGet()
     }
 
-    protected fun updateMonitor(monitor: Monitor, monitorId: String): IndexMonitorResponse? {
-        val request = IndexMonitorRequest(
-            monitorId = monitorId,
-            seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
-            primaryTerm = SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
-            refreshPolicy = WriteRequest.RefreshPolicy.parse("true"),
-            method = RestRequest.Method.PUT,
-            monitor = monitor
-        )
+    protected fun updateMonitor(
+        monitor: Monitor,
+        monitorId: String,
+    ): IndexMonitorResponse? {
+        val request =
+            IndexMonitorRequest(
+                monitorId = monitorId,
+                seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
+                primaryTerm = SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
+                refreshPolicy = WriteRequest.RefreshPolicy.parse("true"),
+                method = RestRequest.Method.PUT,
+                monitor = monitor,
+            )
         return client().execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, request).actionGet()
     }
 
     protected fun deleteMonitor(monitorId: String): Boolean {
-        client().execute(
-            AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorId, WriteRequest.RefreshPolicy.IMMEDIATE)
-        ).get()
+        client()
+            .execute(
+                AlertingActions.DELETE_MONITOR_ACTION_TYPE,
+                DeleteMonitorRequest(monitorId, WriteRequest.RefreshPolicy.IMMEDIATE),
+            ).get()
         return true
     }
 
@@ -270,7 +325,12 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
             bqb.must(TermQueryBuilder(Alert.EXECUTION_ID_FIELD, executionId))
         }
         ssb.query(bqb)
-        val searchResponse = client().prepareSearch(indices).setRouting(monitorId).setSource(ssb).get()
+        val searchResponse =
+            client()
+                .prepareSearch(indices)
+                .setRouting(monitorId)
+                .setSource(ssb)
+                .get()
 
         return searchResponse.hits.hits.map {
             val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
@@ -286,22 +346,22 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         associatedAlertsIndex: String? = "",
         alertIds: List<String>? = emptyList(),
         table: Table? = Table("asc", "monitor_id", null, 100, 0, null),
-    ): GetWorkflowAlertsResponse {
-        return client().execute(
-            AlertingActions.GET_WORKFLOW_ALERTS_ACTION_TYPE,
-            GetWorkflowAlertsRequest(
-                table = table!!,
-                severityLevel = "ALL",
-                alertState = alertState!!.name,
-                alertIndex = alertIndex,
-                associatedAlertsIndex = associatedAlertsIndex,
-                monitorIds = emptyList(),
-                workflowIds = listOf(workflowId),
-                alertIds = alertIds,
-                getAssociatedAlerts = getAssociatedAlerts!!
-            )
-        ).get()
-    }
+    ): GetWorkflowAlertsResponse =
+        client()
+            .execute(
+                AlertingActions.GET_WORKFLOW_ALERTS_ACTION_TYPE,
+                GetWorkflowAlertsRequest(
+                    table = table!!,
+                    severityLevel = "ALL",
+                    alertState = alertState!!.name,
+                    alertIndex = alertIndex,
+                    associatedAlertsIndex = associatedAlertsIndex,
+                    monitorIds = emptyList(),
+                    workflowIds = listOf(workflowId),
+                    alertIds = alertIds,
+                    getAssociatedAlerts = getAssociatedAlerts!!,
+                ),
+            ).get()
 
     protected fun refreshIndex(index: String) {
         client().execute(RefreshAction.INSTANCE, RefreshRequest(index)).get()
@@ -317,12 +377,18 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         val ssb = SearchSourceBuilder()
         ssb.version(true)
         ssb.query(TermQueryBuilder(Alert.MONITOR_ID_FIELD, id))
-        val searchResponse = client().prepareSearch(indices).setRouting(id).setSource(ssb).get()
+        val searchResponse =
+            client()
+                .prepareSearch(indices)
+                .setRouting(id)
+                .setSource(ssb)
+                .get()
 
-        return searchResponse.hits.hits.map {
-            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
-            Finding.parse(xcp)
-        }.filter { finding -> finding.monitorId == id }
+        return searchResponse.hits.hits
+            .map {
+                val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+                Finding.parse(xcp)
+            }.filter { finding -> finding.monitorId == id }
     }
 
     protected fun getFindings(
@@ -330,13 +396,13 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         monitorId: String?,
         findingIndexName: String?,
     ): List<Finding> {
-
-        val getFindingsRequest = GetFindingsRequest(
-            findingId,
-            Table("asc", "monitor_id", null, 100, 0, null),
-            monitorId,
-            findingIndexName
-        )
+        val getFindingsRequest =
+            GetFindingsRequest(
+                findingId,
+                Table("asc", "monitor_id", null, 100, 0, null),
+                monitorId,
+                findingIndexName,
+            )
         val getFindingsResponse: GetFindingsResponse = client().execute(AlertingActions.GET_FINDINGS_ACTION_TYPE, getFindingsRequest).get()
 
         return getFindingsResponse.findings.map { it.finding }.toList()
@@ -346,29 +412,32 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         monitorId: String,
         version: Long = 1L,
         fetchSourceContext: FetchSourceContext = FetchSourceContext.FETCH_SOURCE,
-    ) = client().execute(
-        AlertingActions.GET_MONITOR_ACTION_TYPE,
-        GetMonitorRequest(monitorId, version, RestRequest.Method.GET, fetchSourceContext)
-    ).get()
+    ) = client()
+        .execute(
+            AlertingActions.GET_MONITOR_ACTION_TYPE,
+            GetMonitorRequest(monitorId, version, RestRequest.Method.GET, fetchSourceContext),
+        ).get()
 
-    override fun getPlugins(): List<Class<out Plugin>> {
-        return listOf(
+    override fun getPlugins(): List<Class<out Plugin>> =
+        listOf(
             AlertingPlugin::class.java,
             ReindexModulePlugin::class.java,
             MustacheModulePlugin::class.java,
             PainlessModulePlugin::class.java,
-            ParentJoinModulePlugin::class.java
+            ParentJoinModulePlugin::class.java,
         )
-    }
 
     protected fun deleteIndex(index: String) {
-        val response = client().admin().indices().delete(DeleteIndexRequest(index)).get()
+        val response =
+            client()
+                .admin()
+                .indices()
+                .delete(DeleteIndexRequest(index))
+                .get()
         assertTrue("Unable to delete index", response.isAcknowledged())
     }
 
-    override fun resetNodeAfterTest(): Boolean {
-        return false
-    }
+    override fun resetNodeAfterTest(): Boolean = false
 
     // merged WorkflowSingleNodeTestCase with this class as we are seeing test setup failures
     // when multiple test classes implement AlertingSingleNodeTestCase or its child class
@@ -386,19 +455,25 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         val ssb = SearchSourceBuilder()
         ssb.version(true)
         ssb.query(TermQueryBuilder("_id", id))
-        val searchResponse = client().prepareSearch(indices).setRouting(id).setSource(ssb).get()
+        val searchResponse =
+            client()
+                .prepareSearch(indices)
+                .setRouting(id)
+                .setSource(ssb)
+                .get()
 
-        return searchResponse.hits.hits.map { it ->
-            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
-            lateinit var workflow: Workflow
-            while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
-                xcp.nextToken()
-                when (xcp.currentName()) {
-                    "workflow" -> workflow = Workflow.parse(xcp)
+        return searchResponse.hits.hits
+            .map { it ->
+                val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+                lateinit var workflow: Workflow
+                while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
+                    xcp.nextToken()
+                    when (xcp.currentName()) {
+                        "workflow" -> workflow = Workflow.parse(xcp)
+                    }
                 }
-            }
-            workflow.copy(id = it.id, version = it.version)
-        }.first()
+                workflow.copy(id = it.id, version = it.version)
+            }.first()
     }
 
     protected fun searchWorkflowMetadata(
@@ -415,19 +490,25 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         val ssb = SearchSourceBuilder()
         ssb.version(true)
         ssb.query(TermQueryBuilder("workflow_metadata.workflow_id", id))
-        val searchResponse = client().prepareSearch(indices).setRouting(id).setSource(ssb).get()
+        val searchResponse =
+            client()
+                .prepareSearch(indices)
+                .setRouting(id)
+                .setSource(ssb)
+                .get()
 
-        return searchResponse.hits.hits.map { it ->
-            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
-            lateinit var workflowMetadata: WorkflowMetadata
-            while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
-                xcp.nextToken()
-                when (xcp.currentName()) {
-                    "workflow_metadata" -> workflowMetadata = WorkflowMetadata.parse(xcp)
+        return searchResponse.hits.hits
+            .map { it ->
+                val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+                lateinit var workflowMetadata: WorkflowMetadata
+                while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
+                    xcp.nextToken()
+                    when (xcp.currentName()) {
+                        "workflow_metadata" -> workflowMetadata = WorkflowMetadata.parse(xcp)
+                    }
                 }
-            }
-            workflowMetadata.copy(id = it.id)
-        }.first()
+                workflowMetadata.copy(id = it.id)
+            }.first()
     }
 
     protected fun searchMonitorMetadata(
@@ -444,19 +525,25 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         val ssb = SearchSourceBuilder()
         ssb.version(true)
         ssb.query(TermQueryBuilder("_id", id))
-        val searchResponse = client().prepareSearch(indices).setRouting(id).setSource(ssb).get()
+        val searchResponse =
+            client()
+                .prepareSearch(indices)
+                .setRouting(id)
+                .setSource(ssb)
+                .get()
 
-        return searchResponse.hits.hits.map { it ->
-            val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
-            lateinit var monitorMetadata: MonitorMetadata
-            while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
-                xcp.nextToken()
-                when (xcp.currentName()) {
-                    "metadata" -> monitorMetadata = MonitorMetadata.parse(xcp)
+        return searchResponse.hits.hits
+            .map { it ->
+                val xcp = createParser(JsonXContent.jsonXContent, it.sourceRef).also { it.nextToken() }
+                lateinit var monitorMetadata: MonitorMetadata
+                while (xcp.nextToken() != XContentParser.Token.END_OBJECT) {
+                    xcp.nextToken()
+                    when (xcp.currentName()) {
+                        "metadata" -> monitorMetadata = MonitorMetadata.parse(xcp)
+                    }
                 }
-            }
-            monitorMetadata.copy(id = it.id)
-        }.first()
+                monitorMetadata.copy(id = it.id)
+            }.first()
     }
 
     protected fun upsertWorkflow(
@@ -464,47 +551,60 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
         id: String = Workflow.NO_ID,
         method: RestRequest.Method = RestRequest.Method.POST,
     ): IndexWorkflowResponse? {
-        val request = IndexWorkflowRequest(
-            workflowId = id,
-            seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
-            primaryTerm = SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
-            refreshPolicy = WriteRequest.RefreshPolicy.parse("true"),
-            method = method,
-            workflow = workflow
-        )
+        val request =
+            IndexWorkflowRequest(
+                workflowId = id,
+                seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
+                primaryTerm = SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
+                refreshPolicy = WriteRequest.RefreshPolicy.parse("true"),
+                method = method,
+                workflow = workflow,
+            )
 
         return client().execute(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, request).actionGet()
     }
 
-    protected fun getWorkflowById(id: String): GetWorkflowResponse {
-        return client().execute(
-            AlertingActions.GET_WORKFLOW_ACTION_TYPE,
-            GetWorkflowRequest(id, RestRequest.Method.GET)
-        ).get()
+    protected fun getWorkflowById(id: String): GetWorkflowResponse =
+        client()
+            .execute(
+                AlertingActions.GET_WORKFLOW_ACTION_TYPE,
+                GetWorkflowRequest(id, RestRequest.Method.GET),
+            ).get()
+
+    protected fun deleteWorkflow(
+        workflowId: String,
+        deleteDelegateMonitors: Boolean? = null,
+    ) {
+        client()
+            .execute(
+                AlertingActions.DELETE_WORKFLOW_ACTION_TYPE,
+                DeleteWorkflowRequest(workflowId, deleteDelegateMonitors),
+            ).get()
     }
 
-    protected fun deleteWorkflow(workflowId: String, deleteDelegateMonitors: Boolean? = null) {
-        client().execute(
-            AlertingActions.DELETE_WORKFLOW_ACTION_TYPE,
-            DeleteWorkflowRequest(workflowId, deleteDelegateMonitors)
-        ).get()
-    }
-
-    protected fun executeWorkflow(workflow: Workflow? = null, id: String? = null, dryRun: Boolean = true): ExecuteWorkflowResponse? {
+    protected fun executeWorkflow(
+        workflow: Workflow? = null,
+        id: String? = null,
+        dryRun: Boolean = true,
+    ): ExecuteWorkflowResponse? {
         val request = ExecuteWorkflowRequest(dryRun, TimeValue(Instant.now().toEpochMilli()), id, workflow)
         return client().execute(ExecuteWorkflowAction.INSTANCE, request).get()
     }
 
     protected fun getIndexSettings(index: String): GetSettingsResponse? {
         val request = GetSettingsRequest().indices(index)
-        return client().admin().indices().getSettings(request).get()
+        return client()
+            .admin()
+            .indices()
+            .getSettings(request)
+            .get()
     }
 
-    override fun nodeSettings(): Settings {
-        return Settings.builder()
+    override fun nodeSettings(): Settings =
+        Settings
+            .builder()
             .put(super.nodeSettings())
             .put("opendistro.scheduled_jobs.sweeper.period", TimeValue(5, TimeUnit.SECONDS))
             .put("opendistro.scheduled_jobs.enabled", true)
             .build()
-    }
 }

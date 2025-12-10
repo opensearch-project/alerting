@@ -14,9 +14,10 @@ import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class WriteableTests : OpenSearchTestCase() {
-
+    @Test
     fun `test searchinput as stream`() {
         val input = SearchInput(emptyList(), SearchSourceBuilder())
         val out = BytesStreamOutput()
@@ -26,6 +27,7 @@ class WriteableTests : OpenSearchTestCase() {
         assertEquals("Round tripping MonitorRunResult doesn't work", input, newInput)
     }
 
+    @Test
     fun `test emailaccount as stream`() {
         val emailAccount = randomEmailAccount()
         val out = BytesStreamOutput()
@@ -35,6 +37,7 @@ class WriteableTests : OpenSearchTestCase() {
         assertEquals("Round tripping EmailAccount doesn't work", emailAccount, newEmailAccount)
     }
 
+    @Test
     fun `test emailgroup as stream`() {
         val emailGroup = randomEmailGroup()
         val out = BytesStreamOutput()

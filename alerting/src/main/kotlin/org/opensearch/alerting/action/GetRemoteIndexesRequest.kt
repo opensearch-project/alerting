@@ -25,12 +25,10 @@ class GetRemoteIndexesRequest : ActionRequest {
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         sin.readStringList(),
-        sin.readBoolean()
+        sin.readBoolean(),
     )
 
-    override fun validate(): ActionRequestValidationException? {
-        return null
-    }
+    override fun validate(): ActionRequestValidationException? = null
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
@@ -42,9 +40,7 @@ class GetRemoteIndexesRequest : ActionRequest {
      * Validates the request [indexes].
      * @return TRUE if all entries are valid; else FALSE.
      */
-    fun isValid(): Boolean {
-        return indexes.isNotEmpty() && indexes.all { validPattern(it) }
-    }
+    fun isValid(): Boolean = indexes.isNotEmpty() && indexes.all { validPattern(it) }
 
     /**
      * Validates individual entries in the request [indexes].

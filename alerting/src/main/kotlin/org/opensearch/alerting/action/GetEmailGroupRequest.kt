@@ -23,7 +23,7 @@ class GetEmailGroupRequest : ActionRequest {
         emailGroupID: String,
         version: Long,
         method: RestRequest.Method,
-        srcContext: FetchSourceContext?
+        srcContext: FetchSourceContext?,
     ) : super() {
         this.emailGroupID = emailGroupID
         this.version = version
@@ -38,12 +38,12 @@ class GetEmailGroupRequest : ActionRequest {
         sin.readEnum(RestRequest.Method::class.java), // method
         if (sin.readBoolean()) {
             FetchSourceContext(sin) // srcContext
-        } else null
+        } else {
+            null
+        },
     )
 
-    override fun validate(): ActionRequestValidationException? {
-        return null
-    }
+    override fun validate(): ActionRequestValidationException? = null
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {

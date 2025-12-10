@@ -56,24 +56,32 @@ import kotlin.coroutines.suspendCoroutine
 
 private val log = LogManager.getLogger(DocLevelMonitorQueries::class.java)
 
-class DocLevelMonitorQueries(private val client: Client, private val clusterService: ClusterService) {
+class DocLevelMonitorQueries(
+    private val client: Client,
+    private val clusterService: ClusterService,
+) {
     companion object {
-
         const val PROPERTIES = "properties"
         const val NESTED = "nested"
         const val TYPE = "type"
         const val INDEX_PATTERN_SUFFIX = "-000001"
         const val QUERY_INDEX_BASE_FIELDS_COUNT = 8 // 3 fields we defined and 5 builtin additional metadata fields
+
         @JvmStatic
-        fun docLevelQueriesMappings(): String {
-            return DocLevelMonitorQueries::class.java.classLoader.getResource("mappings/doc-level-queries.json").readText()
-        }
-        fun docLevelQueriesSettings(): Settings {
-            return Settings.builder().loadFromSource(
-                DocLevelMonitorQueries::class.java.classLoader.getResource("settings/doc-level-queries.json").readText(),
-                XContentType.JSON
-            ).build()
-        }
+        fun docLevelQueriesMappings(): String =
+            DocLevelMonitorQueries::class.java.classLoader
+                .getResource("mappings/doc-level-queries.json")
+                .readText()
+
+        fun docLevelQueriesSettings(): Settings =
+            Settings
+                .builder()
+                .loadFromSource(
+                    DocLevelMonitorQueries::class.java.classLoader
+                        .getResource("settings/doc-level-queries.json")
+                        .readText(),
+                    XContentType.JSON,
+                ).build()
     }
 
     suspend fun initDocLevelQueryIndex(): Boolean {
@@ -81,9 +89,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             // Since we changed queryIndex to be alias now, for backwards compatibility, we have to delete index with same name
             // as our alias, to avoid name clash.
             if (clusterService.state().metadata.hasIndex(ScheduledJob.DOC_LEVEL_QUERIES_INDEX)) {
-                val acknowledgedResponse: AcknowledgedResponse = client.suspendUntil {
-                    admin().indices().delete(DeleteIndexRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX), it)
-                }
+                val acknowledgedResponse: AcknowledgedResponse =
+                    client.suspendUntil {
+                        admin().indices().delete(DeleteIndexRequest(ScheduledJob.DOC_LEVEL_QUERIES_INDEX), it)
+                    }
                 if (!acknowledgedResponse.isAcknowledged) {
                     val errorMessage = "Deletion of old queryIndex [${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}] index is not acknowledged!"
                     log.error(errorMessage)
@@ -92,10 +101,11 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             }
             val alias = ScheduledJob.DOC_LEVEL_QUERIES_INDEX
             val indexPattern = ScheduledJob.DOC_LEVEL_QUERIES_INDEX + INDEX_PATTERN_SUFFIX
-            val indexRequest = CreateIndexRequest(indexPattern)
-                .mapping(docLevelQueriesMappings())
-                .alias(Alias(alias))
-                .settings(docLevelQueriesSettings())
+            val indexRequest =
+                CreateIndexRequest(indexPattern)
+                    .mapping(docLevelQueriesMappings())
+                    .alias(Alias(alias))
+                    .settings(docLevelQueriesSettings())
             return try {
                 val createIndexResponse: CreateIndexResponse = client.suspendUntil { client.admin().indices().create(indexRequest, it) }
                 createIndexResponse.isAcknowledged
@@ -109,6 +119,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         }
         return true
     }
+
     suspend fun initDocLevelQueryIndex(dataSources: DataSources): Boolean {
         if (dataSources.queryIndex == ScheduledJob.DOC_LEVEL_QUERIES_INDEX) {
             return initDocLevelQueryIndex()
@@ -116,9 +127,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         // Since we changed queryIndex to be alias now, for backwards compatibility, we have to delete index with same name
         // as our alias, to avoid name clash.
         if (clusterService.state().metadata.hasIndex(dataSources.queryIndex)) {
-            val acknowledgedResponse: AcknowledgedResponse = client.suspendUntil {
-                admin().indices().delete(DeleteIndexRequest(dataSources.queryIndex), it)
-            }
+            val acknowledgedResponse: AcknowledgedResponse =
+                client.suspendUntil {
+                    admin().indices().delete(DeleteIndexRequest(dataSources.queryIndex), it)
+                }
             if (!acknowledgedResponse.isAcknowledged) {
                 log.warn("Deletion of old queryIndex [${dataSources.queryIndex}] index is not acknowledged!")
             }
@@ -126,15 +138,18 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         val alias = dataSources.queryIndex
         val indexPattern = dataSources.queryIndex + INDEX_PATTERN_SUFFIX
         if (!clusterService.state().metadata.hasAlias(alias)) {
-            val indexRequest = CreateIndexRequest(indexPattern)
-                .mapping(docLevelQueriesMappings())
-                .alias(Alias(alias))
-                .settings(
-                    Settings.builder().put("index.hidden", true)
-                        .put(IndexMetadata.SETTING_NUMBER_OF_SHARDS, 1)
-                        .put(IndexMetadata.SETTING_AUTO_EXPAND_REPLICAS, "0-1")
-                        .build()
-                )
+            val indexRequest =
+                CreateIndexRequest(indexPattern)
+                    .mapping(docLevelQueriesMappings())
+                    .alias(Alias(alias))
+                    .settings(
+                        Settings
+                            .builder()
+                            .put("index.hidden", true)
+                            .put(IndexMetadata.SETTING_NUMBER_OF_SHARDS, 1)
+                            .put(IndexMetadata.SETTING_AUTO_EXPAND_REPLICAS, "0-1")
+                            .build(),
+                    )
             return try {
                 val createIndexResponse: CreateIndexResponse = client.suspendUntil { client.admin().indices().create(indexRequest, it) }
                 createIndexResponse.isAcknowledged
@@ -160,22 +175,26 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     return
                 }
 
-                val queryBuilder = QueryBuilders.boolQuery()
-                    .must(QueryBuilders.existsQuery("monitor_id"))
-                    .mustNot(QueryBuilders.wildcardQuery("monitor_id", "*"))
+                val queryBuilder =
+                    QueryBuilders
+                        .boolQuery()
+                        .must(QueryBuilders.existsQuery("monitor_id"))
+                        .mustNot(QueryBuilders.wildcardQuery("monitor_id", "*"))
 
-                val response: BulkByScrollResponse = suspendCoroutine { cont ->
-                    DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                        .source(queryIndex)
-                        .filter(queryBuilder)
-                        .refresh(true)
-                        .execute(
-                            object : ActionListener<BulkByScrollResponse> {
-                                override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
-                                override fun onFailure(t: Exception) = cont.resumeWithException(t)
-                            }
-                        )
-                }
+                val response: BulkByScrollResponse =
+                    suspendCoroutine { cont ->
+                        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                            .source(queryIndex)
+                            .filter(queryBuilder)
+                            .refresh(true)
+                            .execute(
+                                object : ActionListener<BulkByScrollResponse> {
+                                    override fun onResponse(response: BulkByScrollResponse) = cont.resume(response)
+
+                                    override fun onFailure(t: Exception) = cont.resumeWithException(t)
+                                },
+                            )
+                    }
                 response.bulkFailures.forEach {
                     log.error("Failed deleting queries while removing dry run queries: [${it.id}] cause: [${it.cause}] ")
                 }
@@ -186,12 +205,13 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
     }
 
     suspend fun deleteDocLevelQueryIndex(dataSources: DataSources): Boolean {
-        val ack: AcknowledgedResponse = client.suspendUntil {
-            client.admin().indices().delete(
-                DeleteIndexRequest(dataSources.queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
-                it
-            )
-        }
+        val ack: AcknowledgedResponse =
+            client.suspendUntil {
+                client.admin().indices().delete(
+                    DeleteIndexRequest(dataSources.queryIndex).indicesOptions(IndicesOptions.LENIENT_EXPAND_OPEN_HIDDEN),
+                    it,
+                )
+            }
         return ack.isAcknowledged
     }
 
@@ -218,7 +238,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         node: MutableMap<String, Any>,
         currentPath: String,
         processLeafFn: (String, String, MutableMap<String, Any>) -> Triple<String, String, MutableMap<String, Any>>,
-        flattenPaths: MutableMap<String, MutableMap<String, Any>>
+        flattenPaths: MutableMap<String, MutableMap<String, Any>>,
     ) {
         // If node contains "properties" property then it is internal(non-leaf) node
         log.debug("Node in traverse: $node")
@@ -226,8 +246,12 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         var newNodes = ArrayList<Triple<String, String, Any>>(node.size)
         node.entries.forEach {
             // Compute full path relative to root
-            val fullPath = if (currentPath.isEmpty()) it.key
-            else "$currentPath.${it.key}"
+            val fullPath =
+                if (currentPath.isEmpty()) {
+                    it.key
+                } else {
+                    "$currentPath.${it.key}"
+                }
             val nodeProps = it.value as MutableMap<String, Any>
             // If it has type property and type is not "nested" then this is a leaf
             if (nodeProps.containsKey(TYPE) && nodeProps[TYPE] != NESTED) {
@@ -258,7 +282,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         monitorId: String,
         monitorMetadata: MonitorMetadata,
         refreshPolicy: RefreshPolicy = RefreshPolicy.IMMEDIATE,
-        indexTimeout: TimeValue
+        indexTimeout: TimeValue,
     ) {
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
@@ -268,11 +292,12 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
 
         // Run through each backing index and apply appropriate mappings to query index
         indices.forEach { indexName ->
-            var concreteIndices = IndexUtils.resolveAllIndices(
-                listOf(indexName),
-                monitorCtx.clusterService!!,
-                monitorCtx.indexNameExpressionResolver!!
-            )
+            var concreteIndices =
+                IndexUtils.resolveAllIndices(
+                    listOf(indexName),
+                    monitorCtx.clusterService!!,
+                    monitorCtx.indexNameExpressionResolver!!,
+                )
             if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                 IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
             ) {
@@ -280,11 +305,12 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 if (lastWriteIndex != null) {
                     val lastWriteIndexCreationDate =
                         IndexUtils.getCreationDateForIndex(lastWriteIndex, monitorCtx.clusterService!!.state())
-                    concreteIndices = IndexUtils.getNewestIndicesByCreationDate(
-                        concreteIndices,
-                        monitorCtx.clusterService!!.state(),
-                        lastWriteIndexCreationDate
-                    )
+                    concreteIndices =
+                        IndexUtils.getNewestIndicesByCreationDate(
+                            concreteIndices,
+                            monitorCtx.clusterService!!.state(),
+                            lastWriteIndexCreationDate,
+                        )
                 }
             }
             val updatedIndexName = indexName.replace("*", "_")
@@ -300,12 +326,15 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         val properties = (
                             (indexMetadata.mapping()?.sourceAsMap?.get("properties"))
                                 as MutableMap<String, Any>
-                            )
+                        )
                         // Node processor function is used to process leaves of index mappings tree
                         //
                         val leafNodeProcessor =
-                            fun(fieldName: String, fullPath: String, props: MutableMap<String, Any>):
-                                Triple<String, String, MutableMap<String, Any>> {
+                            fun(
+                                fieldName: String,
+                                fullPath: String,
+                                props: MutableMap<String, Any>,
+                            ): Triple<String, String, MutableMap<String, Any>> {
                                 val newProps = props.toMutableMap()
                                 if (monitor.dataSources.queryIndexMappingsByType.isNotEmpty()) {
                                     val mappingsByType = monitor.dataSources.queryIndexMappingsByType
@@ -341,10 +370,11 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                             ) {
                             } else {
                                 if (updatedProperties.containsKey(it.key) && updatedProperties[it.key] != it.value) {
-                                    val mergedField = mergeConflictingFields(
-                                        updatedProperties[it.key] as Map<String, Any>,
-                                        it.value as Map<String, Any>
-                                    )
+                                    val mergedField =
+                                        mergeConflictingFields(
+                                            updatedProperties[it.key] as Map<String, Any>,
+                                            it.value as Map<String, Any>,
+                                        )
                                     updatedProperties[it.key] = mergedField
                                 } else {
                                     updatedProperties[it.key] = it.value
@@ -356,14 +386,15 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 }
             }
             // Updates mappings of concrete queryIndex. This can rollover queryIndex if field mapping limit is reached.
-            val (updateMappingResponse, concreteQueryIndex) = updateQueryIndexMappings(
-                monitor,
-                monitorMetadata,
-                updatedIndexName,
-                sourceIndexFieldLimit,
-                updatedProperties,
-                indexTimeout
-            )
+            val (updateMappingResponse, concreteQueryIndex) =
+                updateQueryIndexMappings(
+                    monitor,
+                    monitorMetadata,
+                    updatedIndexName,
+                    sourceIndexFieldLimit,
+                    updatedProperties,
+                    indexTimeout,
+                )
 
             if (updateMappingResponse.isAcknowledged) {
                 doIndexAllQueries(
@@ -374,7 +405,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     allFlattenPaths,
                     conflictingFields,
                     refreshPolicy,
-                    indexTimeout
+                    indexTimeout,
                 )
             }
         }
@@ -388,7 +419,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         flattenPaths: MutableSet<Pair<String, String>>,
         conflictingPaths: Set<String>,
         refreshPolicy: RefreshPolicy,
-        indexTimeout: TimeValue
+        indexTimeout: TimeValue,
     ) {
         val indexRequests = mutableListOf<IndexRequest>()
         val conflictingPathToConcreteIndices = mutableMapOf<String, MutableSet<String>>()
@@ -420,10 +451,11 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
 
             if (filteredConcreteIndices.isNotEmpty()) {
                 filteredConcreteIndices.forEach { filteredConcreteIndex ->
-                    val newQuery = it.copy(
-                        id = "${it.id}_$filteredConcreteIndex",
-                        query = query.replace("<index>", filteredConcreteIndex)
-                    )
+                    val newQuery =
+                        it.copy(
+                            id = "${it.id}_$filteredConcreteIndex",
+                            query = query.replace("<index>", filteredConcreteIndex),
+                        )
                     newQueries.add(newQuery)
                 }
             } else {
@@ -439,25 +471,28 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     query = query.replace("${fieldPath.first}:", "${fieldPath.first}_${sourceIndex}_$monitorId:")
                 }
             }
-            val indexRequest = IndexRequest(concreteQueryIndex)
-                .id(it.id + "_$monitorId")
-                .source(
-                    mapOf(
-                        "query" to mapOf("query_string" to mapOf("query" to query, "fields" to it.fields)),
-                        "monitor_id" to monitorId,
-                        "index" to sourceIndex
+            val indexRequest =
+                IndexRequest(concreteQueryIndex)
+                    .id(it.id + "_$monitorId")
+                    .source(
+                        mapOf(
+                            "query" to mapOf("query_string" to mapOf("query" to query, "fields" to it.fields)),
+                            "monitor_id" to monitorId,
+                            "index" to sourceIndex,
+                        ),
                     )
-                )
             indexRequests.add(indexRequest)
             log.debug("query $query added for execution of monitor $monitorId on index $sourceIndex")
         }
         log.debug("bulk inserting percolate [${queries.size}] queries")
         if (indexRequests.isNotEmpty()) {
-            val bulkResponse: BulkResponse = client.suspendUntil {
-                client.bulk(
-                    BulkRequest().setRefreshPolicy(refreshPolicy).timeout(indexTimeout).add(indexRequests), it
-                )
-            }
+            val bulkResponse: BulkResponse =
+                client.suspendUntil {
+                    client.bulk(
+                        BulkRequest().setRefreshPolicy(refreshPolicy).timeout(indexTimeout).add(indexRequests),
+                        it,
+                    )
+                }
             bulkResponse.forEach { bulkItemResponse ->
                 if (bulkItemResponse.isFailed) {
                     log.error(bulkItemResponse.failureMessage)
@@ -469,22 +504,30 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
     /**
      * Transforms the query if it includes an _exists_ clause to append the index name and the monitor id to the field value
      */
-    private fun transformExistsQuery(query: String, conflictingPath: String, indexName: String, monitorId: String): String {
-        return query
+    private fun transformExistsQuery(
+        query: String,
+        conflictingPath: String,
+        indexName: String,
+        monitorId: String,
+    ): String =
+        query
             .replace("_exists_: ", "_exists_:") // remove space to read exists query as one string
             .split("\\s+".toRegex())
             .joinToString(separator = " ") { segment ->
                 if (segment.contains("_exists_:")) {
                     val trimSegement = segment.trim { it == '(' || it == ')' } // remove any delimiters from ends
                     val (_, value) = trimSegement.split(":", limit = 2) // split into key and value
-                    val newString = if (value == conflictingPath)
-                        segment.replace(conflictingPath, "${conflictingPath}_${indexName}_$monitorId") else segment
+                    val newString =
+                        if (value == conflictingPath) {
+                            segment.replace(conflictingPath, "${conflictingPath}_${indexName}_$monitorId")
+                        } else {
+                            segment
+                        }
                     newString
                 } else {
                     segment
                 }
             }
-    }
 
     private suspend fun updateQueryIndexMappings(
         monitor: Monitor,
@@ -492,14 +535,14 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         sourceIndex: String,
         sourceIndexFieldLimit: Long,
         updatedProperties: MutableMap<String, Any>,
-        indexTimeout: TimeValue
+        indexTimeout: TimeValue,
     ): Pair<AcknowledgedResponse, String> {
         var targetQueryIndex = monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id]
         if (
             targetQueryIndex == null || (
                 targetQueryIndex != monitor.dataSources.queryIndex &&
                     monitor.deleteQueryIndexInEveryRun == true
-                )
+            )
         ) {
             // queryIndex is alias which will always have only 1 backing index which is writeIndex
             // This is due to a fact that that _rollover API would maintain only single index under alias
@@ -509,7 +552,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 val message = "Failed to get write index for queryIndex alias:${monitor.dataSources.queryIndex}"
                 log.error(message)
                 throw AlertingException.wrap(
-                    OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR)
+                    OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR),
                 )
             }
             monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id] = targetQueryIndex
@@ -520,9 +563,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         try {
             // Adjust max field limit in mappings for query index, if needed.
             adjustMaxFieldLimitForQueryIndex(sourceIndexFieldLimit, targetQueryIndex)
-            updateMappingResponse = client.suspendUntil {
-                client.admin().indices().putMapping(updateMappingRequest, it)
-            }
+            updateMappingResponse =
+                client.suspendUntil {
+                    client.admin().indices().putMapping(updateMappingRequest, it)
+                }
             return Pair(updateMappingResponse, targetQueryIndex)
         } catch (e: Exception) {
             val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
@@ -537,9 +581,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     // PUT mappings to newly created index
                     val updateMappingRequest = PutMappingRequest(targetQueryIndex)
                     updateMappingRequest.source(mapOf<String, Any>("properties" to updatedProperties))
-                    updateMappingResponse = client.suspendUntil {
-                        client.admin().indices().putMapping(updateMappingRequest, it)
-                    }
+                    updateMappingResponse =
+                        client.suspendUntil {
+                            client.admin().indices().putMapping(updateMappingRequest, it)
+                        }
                 } catch (e: Exception) {
                     // If we reached limit for total number of fields in mappings after rollover
                     // it means that source index has more then (FIELD_LIMIT - 3) fields (every query index has 3 fields defined)
@@ -562,14 +607,14 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         log.error(
                             "unknown exception during PUT mapping on queryIndex: $targetQueryIndex, " +
                                 "retrying with deletion of query index",
-                            e
+                            e,
                         )
                         if (docLevelQueryIndexExists(monitor.dataSources)) {
                             val ack = monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueryIndex(monitor.dataSources)
                             if (!ack) {
                                 log.error(
                                     "Deletion of concrete queryIndex:${monitor.dataSources.queryIndex} is not ack'd! " +
-                                        "for monitor ${monitor.id}"
+                                        "for monitor ${monitor.id}",
                                 )
                             }
                         }
@@ -578,13 +623,13 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                             monitor = monitor,
                             monitorId = monitor.id,
                             monitorMetadata,
-                            indexTimeout = indexTimeout
+                            indexTimeout = indexTimeout,
                         )
                     } catch (e: Exception) {
                         log.error(
                             "Doc level monitor ${monitor.id}: unknown exception during " +
                                 "PUT mapping on queryIndex: $targetQueryIndex",
-                            e
+                            e,
                         )
                         val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
                         throw AlertingException.wrap(unwrappedException)
@@ -593,7 +638,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     log.error(
                         "Doc level monitor ${monitor.id}: unknown exception during " +
                             "PUT mapping on queryIndex: $targetQueryIndex",
-                        e
+                        e,
                     )
                     val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
                     throw AlertingException.wrap(unwrappedException)
@@ -615,7 +660,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
     /**
      * merge conflicting leaf fields in the mapping tree
      */
-    private fun mergeConflictingFields(oldField: Map<String, Any>, newField: Map<String, Any>): Map<String, Any> {
+    private fun mergeConflictingFields(
+        oldField: Map<String, Any>,
+        newField: Map<String, Any>,
+    ): Map<String, Any> {
         val mergedField = mutableMapOf<String, Any>()
         oldField.entries.forEach {
             if (newField.containsKey(it.key)) {
@@ -641,7 +689,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
     /**
      * get all fields which have same name but different mappings belonging to an index pattern
      */
-    fun getAllConflictingFields(clusterState: ClusterState, concreteIndices: List<String>): Set<String> {
+    fun getAllConflictingFields(
+        clusterState: ClusterState,
+        concreteIndices: List<String>,
+    ): Set<String> {
         val conflictingFields = mutableSetOf<String>()
         val allFlattenPaths = mutableMapOf<String, MutableMap<String, Any>>()
         concreteIndices.forEach { concreteIndexName ->
@@ -651,13 +702,15 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     val properties = (
                         (indexMetadata.mapping()?.sourceAsMap?.get("properties"))
                             as MutableMap<String, Any>
-                        )
+                    )
                     // Node processor function is used to process leaves of index mappings tree
                     //
                     val leafNodeProcessor =
-                        fun(fieldName: String, _: String, props: MutableMap<String, Any>): Triple<String, String, MutableMap<String, Any>> {
-                            return Triple(fieldName, fieldName, props)
-                        }
+                        fun(
+                            fieldName: String,
+                            _: String,
+                            props: MutableMap<String, Any>,
+                        ): Triple<String, String, MutableMap<String, Any>> = Triple(fieldName, fieldName, props)
                     // Traverse and update index mappings here while extracting flatten field paths
                     val flattenPaths = mutableMapOf<String, MutableMap<String, Any>>()
                     traverseMappingsAndUpdate(properties, "", leafNodeProcessor, flattenPaths)
@@ -678,9 +731,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
      * checks the max field limit for a concrete index
      */
     private suspend fun checkMaxFieldLimit(sourceIndex: String): Long {
-        val getSettingsResponse: GetSettingsResponse = client.suspendUntil {
-            admin().indices().getSettings(GetSettingsRequest().indices(sourceIndex), it)
-        }
+        val getSettingsResponse: GetSettingsResponse =
+            client.suspendUntil {
+                admin().indices().getSettings(GetSettingsRequest().indices(sourceIndex), it)
+            }
         return getSettingsResponse.getSetting(sourceIndex, INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.key)?.toLong() ?: 1000L
     }
 
@@ -688,25 +742,30 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
      * Adjusts max field limit index setting for query index if source index has higher limit.
      * This will prevent max field limit exception, when source index has more fields then query index limit
      */
-    private suspend fun adjustMaxFieldLimitForQueryIndex(sourceIndexFieldLimit: Long, concreteQueryIndex: String) {
-        val getSettingsResponse: GetSettingsResponse = client.suspendUntil {
-            admin().indices().getSettings(GetSettingsRequest().indices(concreteQueryIndex), it)
-        }
+    private suspend fun adjustMaxFieldLimitForQueryIndex(
+        sourceIndexFieldLimit: Long,
+        concreteQueryIndex: String,
+    ) {
+        val getSettingsResponse: GetSettingsResponse =
+            client.suspendUntil {
+                admin().indices().getSettings(GetSettingsRequest().indices(concreteQueryIndex), it)
+            }
         val queryIndexLimit =
             getSettingsResponse.getSetting(concreteQueryIndex, INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.key)?.toLong() ?: 1000L
         // Our query index initially has 3 fields we defined and 5 more builtin metadata fields in mappings so we have to account for that
         if (sourceIndexFieldLimit > (queryIndexLimit - QUERY_INDEX_BASE_FIELDS_COUNT)) {
-            val updateSettingsResponse: AcknowledgedResponse = client.suspendUntil {
-                admin().indices().updateSettings(
-                    UpdateSettingsRequest(concreteQueryIndex).settings(
-                        Settings.builder().put(
-                            INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.key,
-                            sourceIndexFieldLimit + QUERY_INDEX_BASE_FIELDS_COUNT
-                        )
-                    ),
-                    it
-                )
-            }
+            val updateSettingsResponse: AcknowledgedResponse =
+                client.suspendUntil {
+                    admin().indices().updateSettings(
+                        UpdateSettingsRequest(concreteQueryIndex).settings(
+                            Settings.builder().put(
+                                INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.key,
+                                sourceIndexFieldLimit + QUERY_INDEX_BASE_FIELDS_COUNT,
+                            ),
+                        ),
+                        it,
+                    )
+                }
         }
     }
 
@@ -715,23 +774,31 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         val queryIndexPattern = monitor.dataSources.queryIndex + INDEX_PATTERN_SUFFIX
 
         val request = RolloverRequest(queryIndex, null)
-        request.createIndexRequest.index(queryIndexPattern)
+        request.createIndexRequest
+            .index(queryIndexPattern)
             .mapping(docLevelQueriesMappings())
             .settings(docLevelQueriesSettings())
-        val response: RolloverResponse = client.suspendUntil {
-            client.admin().indices().rolloverIndex(request, it)
-        }
+        val response: RolloverResponse =
+            client.suspendUntil {
+                client.admin().indices().rolloverIndex(request, it)
+            }
         if (response.isRolledOver == false) {
             val message = "failed to rollover queryIndex:$queryIndex queryIndexPattern:$queryIndexPattern"
             log.error(message)
             throw AlertingException.wrap(
-                OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR)
+                OpenSearchStatusException(message, RestStatus.INTERNAL_SERVER_ERROR),
             )
         }
         return response.newIndex
     }
 
-    private fun getWriteIndexNameForAlias(alias: String): String? {
-        return this.clusterService.state().metadata().indicesLookup?.get(alias)?.writeIndex?.index?.name
-    }
+    private fun getWriteIndexNameForAlias(alias: String): String? =
+        this.clusterService
+            .state()
+            .metadata()
+            .indicesLookup
+            ?.get(alias)
+            ?.writeIndex
+            ?.index
+            ?.name
 }

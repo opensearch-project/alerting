@@ -47,102 +47,117 @@ private val log = LogManager.getLogger(TransportDeleteMonitorV2Action::class.jav
  *
  * @opensearch.experimental
  */
-class TransportDeleteMonitorV2Action @Inject constructor(
-    transportService: TransportService,
-    val client: Client,
-    actionFilters: ActionFilters,
-    val clusterService: ClusterService,
-    settings: Settings,
-    val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<DeleteMonitorV2Request, DeleteMonitorV2Response>(
-    DeleteMonitorV2Action.NAME, transportService, actionFilters, ::DeleteMonitorV2Request
-),
-    SecureTransportAction {
+class TransportDeleteMonitorV2Action
+    @Inject
+    constructor(
+        transportService: TransportService,
+        val client: Client,
+        actionFilters: ActionFilters,
+        val clusterService: ClusterService,
+        settings: Settings,
+        val xContentRegistry: NamedXContentRegistry,
+    ) : HandledTransportAction<DeleteMonitorV2Request, DeleteMonitorV2Response>(
+            DeleteMonitorV2Action.NAME,
+            transportService,
+            actionFilters,
+            ::DeleteMonitorV2Request,
+        ),
+        SecureTransportAction {
+        @Volatile private var alertingV2Enabled = ALERTING_V2_ENABLED.get(settings)
 
-    @Volatile private var alertingV2Enabled = ALERTING_V2_ENABLED.get(settings)
+        @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
-    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+        init {
+            clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_ENABLED) { alertingV2Enabled = it }
+            listenFilterBySettingChange(clusterService)
+        }
 
-    init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_ENABLED) { alertingV2Enabled = it }
-        listenFilterBySettingChange(clusterService)
-    }
-
-    override fun doExecute(task: Task, request: DeleteMonitorV2Request, actionListener: ActionListener<DeleteMonitorV2Response>) {
-        if (!alertingV2Enabled) {
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    OpenSearchStatusException(
-                        "Alerting V2 is currently disabled, please enable it with the " +
-                            "cluster setting: ${ALERTING_V2_ENABLED.key}.",
-                        RestStatus.FORBIDDEN
+        override fun doExecute(
+            task: Task,
+            request: DeleteMonitorV2Request,
+            actionListener: ActionListener<DeleteMonitorV2Response>,
+        ) {
+            if (!alertingV2Enabled) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "Alerting V2 is currently disabled, please enable it with the " +
+                                "cluster setting: ${ALERTING_V2_ENABLED.key}.",
+                            RestStatus.FORBIDDEN,
+                        ),
                     ),
                 )
-            )
-            return
-        }
-
-        val user = readUserFromThreadContext(client)
-
-        if (!validateUserBackendRoles(user, actionListener)) {
-            return
-        }
-
-        scope.launch {
-            try {
-                val monitorV2 = getMonitorV2(request.monitorV2Id, actionListener) ?: return@launch
-
-                val canDelete = user == null || !doFilterForUser(user) ||
-                    checkUserPermissionsWithResource(user, monitorV2!!.user, actionListener, "monitor_v2", request.monitorV2Id)
-
-                if (canDelete) {
-                    val deleteResponse =
-                        DeleteMonitorService.deleteMonitorV2(request.monitorV2Id, request.refreshPolicy)
-                    actionListener.onResponse(deleteResponse)
-                } else {
-                    actionListener.onFailure(
-                        AlertingException(
-                            "Not allowed to delete this Monitor V2",
-                            RestStatus.FORBIDDEN,
-                            IllegalStateException()
-                        )
-                    )
-                }
-            } catch (e: Exception) {
-                actionListener.onFailure(e)
+                return
             }
 
-            // scheduled AlertV2Mover will sweep the alerts and find that this monitor no longer exists,
-            // and expire this monitor's alerts accordingly
+            val user = readUserFromThreadContext(client)
+
+            if (!validateUserBackendRoles(user, actionListener)) {
+                return
+            }
+
+            scope.launch {
+                try {
+                    val monitorV2 = getMonitorV2(request.monitorV2Id, actionListener) ?: return@launch
+
+                    val canDelete =
+                        user == null || !doFilterForUser(user) ||
+                            checkUserPermissionsWithResource(user, monitorV2!!.user, actionListener, "monitor_v2", request.monitorV2Id)
+
+                    if (canDelete) {
+                        val deleteResponse =
+                            DeleteMonitorService.deleteMonitorV2(request.monitorV2Id, request.refreshPolicy)
+                        actionListener.onResponse(deleteResponse)
+                    } else {
+                        actionListener.onFailure(
+                            AlertingException(
+                                "Not allowed to delete this Monitor V2",
+                                RestStatus.FORBIDDEN,
+                                IllegalStateException(),
+                            ),
+                        )
+                    }
+                } catch (e: Exception) {
+                    actionListener.onFailure(e)
+                }
+
+                // scheduled AlertV2Mover will sweep the alerts and find that this monitor no longer exists,
+                // and expire this monitor's alerts accordingly
+            }
         }
-    }
 
-    private suspend fun getMonitorV2(monitorV2Id: String, actionListener: ActionListener<DeleteMonitorV2Response>): MonitorV2? {
-        val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorV2Id)
+        private suspend fun getMonitorV2(
+            monitorV2Id: String,
+            actionListener: ActionListener<DeleteMonitorV2Response>,
+        ): MonitorV2? {
+            val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorV2Id)
 
-        val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
-        if (!getResponse.isExists) {
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    OpenSearchStatusException("Monitor V2 with $monitorV2Id is not found", RestStatus.NOT_FOUND)
+            val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
+            if (!getResponse.isExists) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException("Monitor V2 with $monitorV2Id is not found", RestStatus.NOT_FOUND),
+                    ),
                 )
-            )
-            return null
+                return null
+            }
+
+            val xcp =
+                XContentHelper.createParser(
+                    xContentRegistry,
+                    LoggingDeprecationHandler.INSTANCE,
+                    getResponse.sourceAsBytesRef,
+                    XContentType.JSON,
+                )
+            val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
+
+            AlertingV2Utils.validateMonitorV2(scheduledJob)?.let {
+                actionListener.onFailure(AlertingException.wrap(it))
+                return null
+            }
+
+            val monitorV2 = scheduledJob as MonitorV2
+
+            return monitorV2
         }
-
-        val xcp = XContentHelper.createParser(
-            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-            getResponse.sourceAsBytesRef, XContentType.JSON
-        )
-        val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
-
-        AlertingV2Utils.validateMonitorV2(scheduledJob)?.let {
-            actionListener.onFailure(AlertingException.wrap(it))
-            return null
-        }
-
-        val monitorV2 = scheduledJob as MonitorV2
-
-        return monitorV2
     }
-}

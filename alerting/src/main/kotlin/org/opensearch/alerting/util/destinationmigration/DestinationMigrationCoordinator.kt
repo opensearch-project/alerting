@@ -26,9 +26,10 @@ class DestinationMigrationCoordinator(
     private val client: Client,
     private val clusterService: ClusterService,
     private val threadPool: ThreadPool,
-    private val scheduledJobIndices: ScheduledJobIndices
-) : ClusterStateListener, CoroutineScope, LifecycleListener() {
-
+    private val scheduledJobIndices: ScheduledJobIndices,
+) : LifecycleListener(),
+    ClusterStateListener,
+    CoroutineScope {
     private val logger = LogManager.getLogger(javaClass)
 
     override val coroutineContext: CoroutineContext
@@ -85,21 +86,22 @@ class DestinationMigrationCoordinator(
             return
         }
 
-        val scheduledJob = Runnable {
-            launch {
-                try {
-                    if (DestinationMigrationUtilService.finishFlag) {
-                        logger.info("Cancel background destination migration process.")
-                        scheduledMigration?.cancel()
-                    }
+        val scheduledJob =
+            Runnable {
+                launch {
+                    try {
+                        if (DestinationMigrationUtilService.finishFlag) {
+                            logger.info("Cancel background destination migration process.")
+                            scheduledMigration?.cancel()
+                        }
 
-                    logger.info("Performing migration of destination data.")
-                    DestinationMigrationUtilService.migrateDestinations(client as NodeClient)
-                } catch (e: Exception) {
-                    logger.error("Failed to migrate destination data", e)
+                        logger.info("Performing migration of destination data.")
+                        DestinationMigrationUtilService.migrateDestinations(client as NodeClient)
+                    } catch (e: Exception) {
+                        logger.error("Failed to migrate destination data", e)
+                    }
                 }
             }
-        }
 
         scheduledMigration = threadPool.scheduleWithFixedDelay(scheduledJob, TimeValue.timeValueMinutes(1), ThreadPool.Names.MANAGEMENT)
     }

@@ -20,7 +20,7 @@ class GetMonitorV2Request : ActionRequest {
     constructor(
         monitorV2Id: String,
         version: Long,
-        srcContext: FetchSourceContext?
+        srcContext: FetchSourceContext?,
     ) : super() {
         this.monitorV2Id = monitorV2Id
         this.version = version
@@ -35,12 +35,10 @@ class GetMonitorV2Request : ActionRequest {
             FetchSourceContext(sin) // srcContext
         } else {
             null
-        }
+        },
     )
 
-    override fun validate(): ActionRequestValidationException? {
-        return null
-    }
+    override fun validate(): ActionRequestValidationException? = null
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {

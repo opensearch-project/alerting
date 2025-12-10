@@ -71,7 +71,7 @@ fun <T> BackoffPolicy.retry(block: () -> T): T {
  */
 suspend fun <T> BackoffPolicy.retryForNotification(
     logger: Logger,
-    block: suspend () -> T
+    block: suspend () -> T,
 ): T {
     val iter = iterator()
     do {
@@ -107,7 +107,7 @@ suspend fun <T> BackoffPolicy.retryForNotification(
 suspend fun <T> BackoffPolicy.retry(
     logger: Logger,
     retryOn: List<RestStatus> = emptyList(),
-    block: suspend () -> T
+    block: suspend () -> T,
 ): T {
     val iter = iterator()
     do {
@@ -129,15 +129,15 @@ suspend fun <T> BackoffPolicy.retry(
  * Retries on 502, 503 and 504 per elastic client's behavior: https://github.com/elastic/elasticsearch-net/issues/2061
  * 429 must be retried manually as it's not clear if it's ok to retry for requests other than Bulk requests.
  */
-fun OpenSearchException.isRetriable(): Boolean {
-    return (status() in listOf(BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT))
-}
+fun OpenSearchException.isRetriable(): Boolean = (status() in listOf(BAD_GATEWAY, SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT))
 
-fun SearchResponse.firstFailureOrNull(): ShardSearchFailure? {
-    return shardFailures?.getOrNull(0)
-}
+fun SearchResponse.firstFailureOrNull(): ShardSearchFailure? = shardFailures?.getOrNull(0)
 
-fun addFilter(user: User, searchSourceBuilder: SearchSourceBuilder, fieldName: String) {
+fun addFilter(
+    user: User,
+    searchSourceBuilder: SearchSourceBuilder,
+    fieldName: String,
+) {
     val filterBackendRoles = QueryBuilders.termsQuery(fieldName, user.backendRoles)
     val queryBuilder = searchSourceBuilder.query() as BoolQueryBuilder
     searchSourceBuilder.query(queryBuilder.filter(filterBackendRoles))
@@ -150,11 +150,13 @@ fun addFilter(user: User, searchSourceBuilder: SearchSourceBuilder, fieldName: S
  */
 suspend fun <C : OpenSearchClient, T> C.suspendUntil(block: C.(ActionListener<T>) -> Unit): T =
     suspendCoroutine { cont ->
-        block(object : ActionListener<T> {
-            override fun onResponse(response: T) = cont.resume(response)
+        block(
+            object : ActionListener<T> {
+                override fun onResponse(response: T) = cont.resume(response)
 
-            override fun onFailure(e: Exception) = cont.resumeWithException(e)
-        })
+                override fun onFailure(e: Exception) = cont.resumeWithException(e)
+            },
+        )
     }
 
 /**
@@ -164,11 +166,13 @@ suspend fun <C : OpenSearchClient, T> C.suspendUntil(block: C.(ActionListener<T>
  */
 suspend fun <T> NotificationsPluginInterface.suspendUntil(block: NotificationsPluginInterface.(ActionListener<T>) -> Unit): T =
     suspendCoroutine { cont ->
-        block(object : ActionListener<T> {
-            override fun onResponse(response: T) = cont.resume(response)
+        block(
+            object : ActionListener<T> {
+                override fun onResponse(response: T) = cont.resume(response)
 
-            override fun onFailure(e: Exception) = cont.resumeWithException(e)
-        })
+                override fun onFailure(e: Exception) = cont.resumeWithException(e)
+            },
+        )
     }
 
 /**
@@ -178,11 +182,13 @@ suspend fun <T> NotificationsPluginInterface.suspendUntil(block: NotificationsPl
  */
 suspend fun <T> PPLPluginInterface.suspendUntil(block: PPLPluginInterface.(ActionListener<T>) -> Unit): T =
     suspendCoroutine { cont ->
-        block(object : ActionListener<T> {
-            override fun onResponse(response: T) = cont.resume(response)
+        block(
+            object : ActionListener<T> {
+                override fun onResponse(response: T) = cont.resume(response)
 
-            override fun onFailure(e: Exception) = cont.resumeWithException(e)
-        })
+                override fun onFailure(e: Exception) = cont.resumeWithException(e)
+            },
+        )
     }
 
 class InjectorContextElement(
@@ -190,10 +196,10 @@ class InjectorContextElement(
     settings: Settings,
     threadContext: ThreadContext,
     private val roles: List<String>?,
-    private val user: User? = null
+    private val user: User? = null,
 ) : ThreadContextElement<Unit> {
-
     companion object Key : CoroutineContext.Key<InjectorContextElement>
+
     override val key: CoroutineContext.Key<*>
         get() = Key
 
@@ -205,14 +211,17 @@ class InjectorContextElement(
         rolesInjectorHelper.injectUserInfo(user)
     }
 
-    override fun restoreThreadContext(context: CoroutineContext, oldState: Unit) {
+    override fun restoreThreadContext(
+        context: CoroutineContext,
+        oldState: Unit,
+    ) {
         rolesInjectorHelper.close()
     }
 }
 
 suspend fun <T> withClosableContext(
     context: InjectorContextElement,
-    block: suspend CoroutineScope.() -> T
+    block: suspend CoroutineScope.() -> T,
 ): T {
     try {
         return withContext(context) { block() }

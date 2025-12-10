@@ -23,33 +23,30 @@ import java.lang.IllegalArgumentException
  * Rest handlers to retrieve an EmailGroup
  */
 class RestGetEmailGroupAction : BaseRestHandler() {
+    override fun getName(): String = "get_email_group_action"
 
-    override fun getName(): String {
-        return "get_email_group_action"
-    }
+    override fun routes(): List<Route> = listOf()
 
-    override fun routes(): List<Route> {
-        return listOf()
-    }
-
-    override fun replacedRoutes(): MutableList<ReplacedRoute> {
-        return mutableListOf(
+    override fun replacedRoutes(): MutableList<ReplacedRoute> =
+        mutableListOf(
             ReplacedRoute(
                 RestRequest.Method.GET,
                 "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}",
                 RestRequest.Method.GET,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI}/{emailGroupID}"
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI}/{emailGroupID}",
             ),
             ReplacedRoute(
                 RestRequest.Method.HEAD,
                 "${AlertingPlugin.EMAIL_GROUP_BASE_URI}/{emailGroupID}",
                 RestRequest.Method.HEAD,
-                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI}/{emailGroupID}"
-            )
+                "${AlertingPlugin.LEGACY_OPENDISTRO_EMAIL_GROUP_BASE_URI}/{emailGroupID}",
+            ),
         )
-    }
 
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         val emailGroupID = request.param("emailGroupID")
         if (emailGroupID == null || emailGroupID.isEmpty()) {
             throw IllegalArgumentException("Missing email group ID")

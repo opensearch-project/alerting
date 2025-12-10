@@ -13,5 +13,9 @@ interface JobRunner {
 
     fun postIndex(job: ScheduledJob)
 
-    fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant)
+    fun runJob(
+        job: ScheduledJob,
+        periodStart: Instant,
+        periodEnd: Instant,
+    )
 }

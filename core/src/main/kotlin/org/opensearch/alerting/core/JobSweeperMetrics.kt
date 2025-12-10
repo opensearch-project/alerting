@@ -12,8 +12,11 @@ import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.ToXContentFragment
 import org.opensearch.core.xcontent.XContentBuilder
 
-data class JobSweeperMetrics(val lastFullSweepTimeMillis: Long, val fullSweepOnTime: Boolean) : ToXContentFragment, Writeable {
-
+data class JobSweeperMetrics(
+    val lastFullSweepTimeMillis: Long,
+    val fullSweepOnTime: Boolean,
+) : ToXContentFragment,
+    Writeable {
     constructor(si: StreamInput) : this(si.readLong(), si.readBoolean())
 
     override fun writeTo(out: StreamOutput) {
@@ -21,7 +24,10 @@ data class JobSweeperMetrics(val lastFullSweepTimeMillis: Long, val fullSweepOnT
         out.writeBoolean(fullSweepOnTime)
     }
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
         builder.field("last_full_sweep_time_millis", lastFullSweepTimeMillis)
         builder.field("full_sweep_on_time", fullSweepOnTime)
         return builder

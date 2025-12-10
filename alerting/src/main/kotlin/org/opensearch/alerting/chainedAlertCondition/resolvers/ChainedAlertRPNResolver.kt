@@ -18,7 +18,6 @@ import java.util.Stack
 class ChainedAlertRPNResolver(
     private val polishNotation: ArrayList<ExpressionToken>,
 ) : ChainedAlertTriggerResolver {
-
     private val eqString by lazy {
         val stringBuilder = StringBuilder()
         for (expToken in polishNotation) {
@@ -45,15 +44,19 @@ class ChainedAlertRPNResolver(
         val res = true
         for (expToken in polishNotation) {
             when (expToken) {
-                is CAExpressionToken -> tokenStack.push(resolveMonitorExpression(expToken.value, alertGeneratingMonitors))
+                is CAExpressionToken -> {
+                    tokenStack.push(resolveMonitorExpression(expToken.value, alertGeneratingMonitors))
+                }
+
                 is CAExpressionOperator -> {
                     val right = tokenStack.pop()
-                    val expr = when (expToken) {
-                        CAExpressionOperator.AND -> ChainedAlertTriggerExpression.And(tokenStack.pop(), right)
-                        CAExpressionOperator.OR -> ChainedAlertTriggerExpression.Or(tokenStack.pop(), right)
-                        CAExpressionOperator.NOT -> ChainedAlertTriggerExpression.Not(res, right)
-                        else -> throw IllegalArgumentException("No matching operator.")
-                    }
+                    val expr =
+                        when (expToken) {
+                            CAExpressionOperator.AND -> ChainedAlertTriggerExpression.And(tokenStack.pop(), right)
+                            CAExpressionOperator.OR -> ChainedAlertTriggerExpression.Or(tokenStack.pop(), right)
+                            CAExpressionOperator.NOT -> ChainedAlertTriggerExpression.Not(res, right)
+                            else -> throw IllegalArgumentException("No matching operator.")
+                        }
                     tokenStack.push(expr.resolve())
                 }
             }
@@ -67,10 +70,13 @@ class ChainedAlertRPNResolver(
             when (expToken) {
                 is CAExpressionToken -> {
                     val monitorExpString = expToken.value
-                    if (!monitorExpString.startsWith(ChainedAlertExpressionConstant.ConstantType.MONITOR.ident))
+                    if (!monitorExpString.startsWith(ChainedAlertExpressionConstant.ConstantType.MONITOR.ident)) {
                         continue
-                    val token = monitorExpString.substringAfter(ChainedAlertExpressionConstant.ConstantType.BRACKET_LEFT.ident)
-                        .substringBefore(ChainedAlertExpressionConstant.ConstantType.BRACKET_RIGHT.ident)
+                    }
+                    val token =
+                        monitorExpString
+                            .substringAfter(ChainedAlertExpressionConstant.ConstantType.BRACKET_LEFT.ident)
+                            .substringBefore(ChainedAlertExpressionConstant.ConstantType.BRACKET_RIGHT.ident)
                     if (token.isEmpty()) continue
                     val tokens = token.split(ChainedAlertExpressionConstant.ConstantType.EQUALS.ident)
                     if (tokens.isEmpty() || tokens.size != 2) continue
@@ -82,6 +88,7 @@ class ChainedAlertRPNResolver(
                         }
                     }
                 }
+
                 is CAExpressionOperator -> {
                     continue
                 }
@@ -90,10 +97,15 @@ class ChainedAlertRPNResolver(
         return monitorIds
     }
 
-    private fun resolveMonitorExpression(monitorExpString: String, alertGeneratingMonitors: Set<String>): Boolean {
+    private fun resolveMonitorExpression(
+        monitorExpString: String,
+        alertGeneratingMonitors: Set<String>,
+    ): Boolean {
         if (!monitorExpString.startsWith(ChainedAlertExpressionConstant.ConstantType.MONITOR.ident)) return false
-        val token = monitorExpString.substringAfter(ChainedAlertExpressionConstant.ConstantType.BRACKET_LEFT.ident)
-            .substringBefore(ChainedAlertExpressionConstant.ConstantType.BRACKET_RIGHT.ident)
+        val token =
+            monitorExpString
+                .substringAfter(ChainedAlertExpressionConstant.ConstantType.BRACKET_LEFT.ident)
+                .substringBefore(ChainedAlertExpressionConstant.ConstantType.BRACKET_RIGHT.ident)
         if (token.isEmpty()) return false
 
         val tokens = token.split(ChainedAlertExpressionConstant.ConstantType.EQUALS.ident)

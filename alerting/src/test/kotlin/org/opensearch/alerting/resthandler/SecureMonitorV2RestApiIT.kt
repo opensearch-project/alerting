@@ -38,6 +38,7 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.temporal.ChronoUnit.MINUTES
+import kotlin.test.Test
 
 /***
  * Tests Alerting V2 CRUD with role-based access control
@@ -47,7 +48,6 @@ import java.time.temporal.ChronoUnit.MINUTES
  * --tests "org.opensearch.alerting.resthandler.SecureMonitorV2RestApiIT"
  */
 class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
-
     companion object {
         @BeforeClass
         @JvmStatic fun setup() {
@@ -64,10 +64,11 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         client().updateSettings(AlertingV2Settings.ALERTING_V2_ENABLED.key, "true")
         if (userClient == null) {
             createUser(user, arrayOf())
-            userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
-                .setSocketTimeout(60000)
-                .setConnectionRequestTimeout(180000)
-                .build()
+            userClient =
+                SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
+                    .setSocketTimeout(60000)
+                    .setConnectionRequestTimeout(180000)
+                    .build()
         }
     }
 
@@ -77,6 +78,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         deleteUser(user)
     }
 
+    @Test
     fun `test create monitor as user without alerting access fails`() {
         if (!isHttps()) {
             return
@@ -89,13 +91,13 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             TEST_INDEX_NAME,
             "custom_role",
             listOf(),
-            null
+            null,
         )
 
         try {
             createMonitorV2WithClient(
                 userClient!!,
-                monitorV2 = pplMonitorConfig
+                monitorV2 = pplMonitorConfig,
             )
             fail("Expected create monitor to fail as user does not have permissions to call alerting APIs")
         } catch (e: ResponseException) {
@@ -105,6 +107,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         ensureNumMonitorV2s(0)
     }
 
+    @Test
     fun `test create monitor that queries index user doesn't have access to fails`() {
         if (!isHttps()) {
             return
@@ -112,22 +115,23 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
 
         createIndex("some_index", Settings.EMPTY)
 
-        val pplMonitorConfig = randomPPLMonitor(
-            query = "source = some_index | head 10"
-        )
+        val pplMonitorConfig =
+            randomPPLMonitor(
+                query = "source = some_index | head 10",
+            )
 
         createUserWithTestDataAndCustomRole(
             user,
             "other_index",
             "custom_role",
             listOf(),
-            getClusterPermissionsFromCustomRole(ALL_ACCESS_ROLE)
+            getClusterPermissionsFromCustomRole(ALL_ACCESS_ROLE),
         )
 
         try {
             createMonitorV2WithClient(
                 userClient!!,
-                monitorV2 = pplMonitorConfig
+                monitorV2 = pplMonitorConfig,
             )
             fail("Expected create monitor to fail as user does not have permissions to index that monitor queries")
         } catch (e: ResponseException) {
@@ -137,6 +141,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         ensureNumMonitorV2s(0)
     }
 
+    @Test
     fun `test update monitor that queries index user doesn't have access to fails`() {
         if (!isHttps()) {
             return
@@ -153,7 +158,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf(backendRole),
-            false
+            false,
         )
 
         // this function automatically creates index TEST_INDEX_NAME, then a monitor that queries it
@@ -175,13 +180,14 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             "unrelated_index",
             "unrelated_role",
             listOf(backendRole),
-            listOf(ROLE_TO_PERMISSION_MAPPING[ALL_ACCESS_ROLE])
+            listOf(ROLE_TO_PERMISSION_MAPPING[ALL_ACCESS_ROLE]),
         )
 
-        val noIndicesUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), noIndicesUser, password)
-            .setSocketTimeout(60000)
-            .setConnectionRequestTimeout(180000)
-            .build()
+        val noIndicesUserClient =
+            SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), noIndicesUser, password)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
 
         // update some field that isn't the PPL query and the index it's querying
         val newMonitor = pplMonitorConfig.makeCopy(name = "some_random_name")
@@ -194,7 +200,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
                 "PUT",
                 "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
                 newMonitor.toHttpEntity(),
-                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
             )
             fail("Expected update monitor to fail as user does not have permissions to index that monitor queries")
         } catch (e: ResponseException) {
@@ -205,6 +211,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         noIndicesUserClient.close()
     }
 
+    @Test
     fun `test RBAC create monitor with backend roles user has access to succeeds`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -217,7 +224,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
         createMonitorV2WithClient(userClient!!, monitorV2 = pplMonitorConfig, listOf("backend_role_a"))
@@ -225,6 +232,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         ensureNumMonitorV2s(1)
     }
 
+    @Test
     fun `test RBAC create monitor with backend roles user has no access to fails`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -237,14 +245,14 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
         try {
             createMonitorV2WithClient(
                 userClient!!,
                 monitorV2 = pplMonitorConfig,
-                listOf("backend_role_a", "backend_role_b", "backend_role_c")
+                listOf("backend_role_a", "backend_role_b", "backend_role_c"),
             )
             fail("Expected create monitor to fail as user does not have backend_role_c backend role")
         } catch (e: ResponseException) {
@@ -254,6 +262,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         ensureNumMonitorV2s(0)
     }
 
+    @Test
     fun `test RBAC update monitorV2 as user with correct backend roles succeeds`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -265,7 +274,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
         val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
@@ -277,27 +286,30 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             updateUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a"),
-            true
+            true,
         )
 
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, password)
-            .setSocketTimeout(60000)
-            .setConnectionRequestTimeout(180000)
-            .build()
+        val getUserClient =
+            SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, password)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
 
         val newMonitor = randomPPLMonitor()
-        val updateMonitorResponse = getUserClient!!.makeRequest(
-            "PUT",
-            "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
-            newMonitor.toHttpEntity(),
-            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-        )
+        val updateMonitorResponse =
+            getUserClient!!.makeRequest(
+                "PUT",
+                "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
+                newMonitor.toHttpEntity(),
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+            )
         assertEquals("Update monitorV2 failed", RestStatus.OK, updateMonitorResponse.restStatus())
 
         // cleanup
         getUserClient.close()
     }
 
+    @Test
     fun `test RBAC update monitorV2 as user without correct backend roles fails`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -309,7 +321,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
         val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
@@ -321,13 +333,14 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             updateUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_c"),
-            true
+            true,
         )
 
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, password)
-            .setSocketTimeout(60000)
-            .setConnectionRequestTimeout(180000)
-            .build()
+        val getUserClient =
+            SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, password)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
 
         val newMonitor = randomPPLMonitor()
 
@@ -336,7 +349,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
                 "PUT",
                 "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
                 newMonitor.toHttpEntity(),
-                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
             )
             fail("Expected update monitor to fail as user does not have the correct backend roles")
         } catch (e: ResponseException) {
@@ -347,6 +360,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         getUserClient.close()
     }
 
+    @Test
     fun `test RBAC get monitorV2 as user with correct backend roles succeeds`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -358,7 +372,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
         val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
@@ -370,26 +384,29 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             getUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a"),
-            true
+            true,
         )
 
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
-            .setSocketTimeout(60000)
-            .setConnectionRequestTimeout(180000)
-            .build()
+        val getUserClient =
+            SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
 
-        val getMonitorResponse = getUserClient!!.makeRequest(
-            "GET",
-            "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
-            null,
-            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-        )
+        val getMonitorResponse =
+            getUserClient!!.makeRequest(
+                "GET",
+                "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
+                null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+            )
         assertEquals("Get monitorV2 failed", RestStatus.OK, getMonitorResponse.restStatus())
 
         // cleanup
         getUserClient.close()
     }
 
+    @Test
     fun `test RBAC get monitorV2 as user without correct backend roles fails`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -401,7 +418,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
         val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
@@ -413,20 +430,21 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             getUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_c"),
-            true
+            true,
         )
 
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
-            .setSocketTimeout(60000)
-            .setConnectionRequestTimeout(180000)
-            .build()
+        val getUserClient =
+            SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
 
         try {
             getUserClient!!.makeRequest(
                 "GET",
                 "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
                 null,
-                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
             )
             fail("Expected Forbidden exception")
         } catch (e: ResponseException) {
@@ -436,6 +454,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test RBAC search monitorV2 as user with correct backend roles returns results`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -447,7 +466,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
         createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
@@ -459,21 +478,23 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             searchUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a"),
-            true
+            true,
         )
 
-        val searchUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), searchUser, password)
-            .setSocketTimeout(60000)
-            .setConnectionRequestTimeout(180000)
-            .build()
+        val searchUserClient =
+            SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), searchUser, password)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
 
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
-        val searchMonitorResponse = searchUserClient!!.makeRequest(
-            "POST",
-            "$MONITOR_V2_BASE_URI/_search",
-            StringEntity(search, ContentType.APPLICATION_JSON),
-            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-        )
+        val searchMonitorResponse =
+            searchUserClient!!.makeRequest(
+                "POST",
+                "$MONITOR_V2_BASE_URI/_search",
+                StringEntity(search, ContentType.APPLICATION_JSON),
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+            )
         assertEquals("Search monitorV2 failed", RestStatus.OK, searchMonitorResponse.restStatus())
 
         createParser(XContentType.JSON.xContent(), searchMonitorResponse.entity.content).use { xcp ->
@@ -487,6 +508,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         searchUserClient.close()
     }
 
+    @Test
     fun `test RBAC search monitorV2 as user without correct backend roles returns no results`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -498,7 +520,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
         createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
@@ -510,21 +532,23 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             searchUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_c"),
-            true
+            true,
         )
 
-        val searchUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), searchUser, password)
-            .setSocketTimeout(60000)
-            .setConnectionRequestTimeout(180000)
-            .build()
+        val searchUserClient =
+            SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), searchUser, password)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
 
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
-        val searchMonitorResponse = searchUserClient!!.makeRequest(
-            "POST",
-            "$MONITOR_V2_BASE_URI/_search",
-            StringEntity(search, ContentType.APPLICATION_JSON),
-            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-        )
+        val searchMonitorResponse =
+            searchUserClient!!.makeRequest(
+                "POST",
+                "$MONITOR_V2_BASE_URI/_search",
+                StringEntity(search, ContentType.APPLICATION_JSON),
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+            )
         assertEquals("Search monitorV2 failed", RestStatus.OK, searchMonitorResponse.restStatus())
 
         createParser(XContentType.JSON.xContent(), searchMonitorResponse.entity.content).use { xcp ->
@@ -537,6 +561,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         searchUserClient.close()
     }
 
+    @Test
     fun `test RBAC execute monitorV2 as user with correct backend roles succeeds`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -548,7 +573,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
         val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
@@ -560,26 +585,29 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             executeUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a"),
-            true
+            true,
         )
 
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), executeUser, password)
-            .setSocketTimeout(60000)
-            .setConnectionRequestTimeout(180000)
-            .build()
+        val getUserClient =
+            SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), executeUser, password)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
 
-        val getMonitorResponse = getUserClient!!.makeRequest(
-            "POST",
-            "$MONITOR_V2_BASE_URI/${pplMonitor.id}/_execute",
-            null,
-            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-        )
+        val getMonitorResponse =
+            getUserClient!!.makeRequest(
+                "POST",
+                "$MONITOR_V2_BASE_URI/${pplMonitor.id}/_execute",
+                null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+            )
         assertEquals("Get monitorV2 failed", RestStatus.OK, getMonitorResponse.restStatus())
 
         // cleanup
         getUserClient.close()
     }
 
+    @Test
     fun `test RBAC execute monitorV2 as user without correct backend roles fails`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -591,7 +619,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
         val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
@@ -603,20 +631,21 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             executeUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_c"),
-            true
+            true,
         )
 
-        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), executeUser, password)
-            .setSocketTimeout(60000)
-            .setConnectionRequestTimeout(180000)
-            .build()
+        val getUserClient =
+            SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), executeUser, password)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
 
         try {
             getUserClient!!.makeRequest(
                 "POST",
                 "$MONITOR_V2_BASE_URI/${pplMonitor.id}/_execute",
                 null,
-                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
             )
             fail("Expected Forbidden exception")
         } catch (e: ResponseException) {
@@ -626,6 +655,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test RBAC get alerts v2 as user with correct backend roles succeeds`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -635,38 +665,41 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
 
-        val pplMonitorConfig = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        expireDuration = 5,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
+        val pplMonitorConfig =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                    lookBackWindow = null,
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = null,
+                                expireDuration = 5,
+                                mode = TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                customCondition = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | head 10",
                 ),
-                query = "source = $TEST_INDEX_NAME | head 10"
             )
-        )
 
         createUserWithRoles(
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
-        val pplMonitor = createMonitorV2WithClient(
-            userClient!!,
-            pplMonitorConfig,
-            null
-        ) as PPLSQLMonitor
+        val pplMonitor =
+            createMonitorV2WithClient(
+                userClient!!,
+                pplMonitorConfig,
+                null,
+            ) as PPLSQLMonitor
 
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
@@ -682,20 +715,22 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             getAlertsUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a"),
-            true
+            true,
         )
 
-        val getAlertsUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getAlertsUser, password)
-            .setSocketTimeout(60000)
-            .setConnectionRequestTimeout(180000)
-            .build()
+        val getAlertsUserClient =
+            SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getAlertsUser, password)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
 
-        val getAlertsResponse = getAlertsUserClient!!.makeRequest(
-            "GET",
-            "$MONITOR_V2_BASE_URI/alerts",
-            null,
-            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-        )
+        val getAlertsResponse =
+            getAlertsUserClient!!.makeRequest(
+                "GET",
+                "$MONITOR_V2_BASE_URI/alerts",
+                null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+            )
         assertEquals("Get alerts v2 failed", RestStatus.OK, getAlertsResponse.restStatus())
 
         val alertsGenerated = numAlerts(getAlertsResponse) > 0
@@ -705,6 +740,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         getAlertsUserClient.close()
     }
 
+    @Test
     fun `test RBAC get alerts v2 as user without correct backend roles fails`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -714,38 +750,41 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
 
-        val pplMonitorConfig = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        expireDuration = 5,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
+        val pplMonitorConfig =
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    enabled = true,
+                    schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                    lookBackWindow = null,
+                    triggers =
+                        listOf(
+                            randomPPLTrigger(
+                                throttleDuration = null,
+                                expireDuration = 5,
+                                mode = TriggerMode.RESULT_SET,
+                                conditionType = ConditionType.NUMBER_OF_RESULTS,
+                                numResultsCondition = NumResultsCondition.GREATER_THAN,
+                                numResultsValue = 0L,
+                                customCondition = null,
+                            ),
+                        ),
+                    query = "source = $TEST_INDEX_NAME | head 10",
                 ),
-                query = "source = $TEST_INDEX_NAME | head 10"
             )
-        )
 
         createUserWithRoles(
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
-        val pplMonitor = createMonitorV2WithClient(
-            userClient!!,
-            pplMonitorConfig,
-            null
-        ) as PPLSQLMonitor
+        val pplMonitor =
+            createMonitorV2WithClient(
+                userClient!!,
+                pplMonitorConfig,
+                null,
+            ) as PPLSQLMonitor
 
         val executeResponse = executeMonitorV2(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
@@ -757,20 +796,22 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             getAlertsUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_c"),
-            true
+            true,
         )
 
-        val getAlertsUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getAlertsUser, password)
-            .setSocketTimeout(60000)
-            .setConnectionRequestTimeout(180000)
-            .build()
+        val getAlertsUserClient =
+            SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getAlertsUser, password)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
 
-        val getAlertsResponse = getAlertsUserClient!!.makeRequest(
-            "GET",
-            "$MONITOR_V2_BASE_URI/alerts",
-            null,
-            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-        )
+        val getAlertsResponse =
+            getAlertsUserClient!!.makeRequest(
+                "GET",
+                "$MONITOR_V2_BASE_URI/alerts",
+                null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+            )
         assertEquals("Get alerts v2 failed", RestStatus.OK, getAlertsResponse.restStatus())
 
         val alertsGenerated = numAlerts(getAlertsResponse) > 0
@@ -780,6 +821,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         getAlertsUserClient.close()
     }
 
+    @Test
     fun `test RBAC delete monitorV2 as user with correct backend roles succeeds`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -791,7 +833,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
         val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
@@ -803,20 +845,22 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             deleteUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a"),
-            true
+            true,
         )
 
-        val deleteUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), deleteUser, password)
-            .setSocketTimeout(60000)
-            .setConnectionRequestTimeout(180000)
-            .build()
+        val deleteUserClient =
+            SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), deleteUser, password)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
 
-        val getMonitorResponse = deleteUserClient!!.makeRequest(
-            "DELETE",
-            "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
-            null,
-            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-        )
+        val getMonitorResponse =
+            deleteUserClient!!.makeRequest(
+                "DELETE",
+                "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
+                null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
+            )
         assertEquals("Get monitorV2 failed", RestStatus.OK, getMonitorResponse.restStatus())
 
         ensureNumMonitorV2s(0)
@@ -825,6 +869,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         deleteUserClient.close()
     }
 
+    @Test
     fun `test RBAC delete monitorV2 as user without correct backend roles fails`() {
         enableFilterBy()
         if (!isHttps()) {
@@ -836,7 +881,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_a", "backend_role_b"),
-            false
+            false,
         )
 
         val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
@@ -848,20 +893,21 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             deleteUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, PPL_FULL_ACCESS_ROLE),
             listOf("backend_role_c"),
-            true
+            true,
         )
 
-        val deleteUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), deleteUser, password)
-            .setSocketTimeout(60000)
-            .setConnectionRequestTimeout(180000)
-            .build()
+        val deleteUserClient =
+            SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), deleteUser, password)
+                .setSocketTimeout(60000)
+                .setConnectionRequestTimeout(180000)
+                .build()
 
         try {
             deleteUserClient!!.makeRequest(
                 "DELETE",
                 "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
                 null,
-                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"),
             )
             fail("Expected Forbidden exception")
         } catch (e: ResponseException) {

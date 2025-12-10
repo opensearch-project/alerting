@@ -17,7 +17,6 @@ import java.time.Instant
  * @opensearch.experimental
  */
 interface TriggerV2 : BaseModel {
-
     val id: String
     val name: String
     val severity: Severity
@@ -26,26 +25,28 @@ interface TriggerV2 : BaseModel {
     var lastTriggeredTime: Instant?
     val actions: List<Action>
 
-    enum class TriggerV2Type(val value: String) {
-        PPL_TRIGGER(PPL_SQL_TRIGGER_FIELD);
+    enum class TriggerV2Type(
+        val value: String,
+    ) {
+        PPL_TRIGGER(PPL_SQL_TRIGGER_FIELD),
+        ;
 
-        override fun toString(): String {
-            return value
-        }
+        override fun toString(): String = value
     }
 
-    enum class Severity(val value: String) {
+    enum class Severity(
+        val value: String,
+    ) {
         INFO("info"),
         ERROR("error"),
         LOW("low"),
         MEDIUM("medium"),
         HIGH("high"),
-        CRITICAL("critical");
+        CRITICAL("critical"),
+        ;
 
         companion object {
-            fun enumFromString(value: String): Severity? {
-                return entries.find { it.value == value }
-            }
+            fun enumFromString(value: String): Severity? = entries.find { it.value == value }
         }
     }
 

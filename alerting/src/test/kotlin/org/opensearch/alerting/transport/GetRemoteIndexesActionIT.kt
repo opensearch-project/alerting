@@ -22,24 +22,28 @@ import org.opensearch.cluster.health.ClusterHealthStatus
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.commons.alerting.util.string
 import org.opensearch.core.rest.RestStatus
-import java.util.*
+import java.util.Locale
+import kotlin.test.Test
 
 @Suppress("UNCHECKED_CAST")
 class GetRemoteIndexesActionIT : AlertingRestTestCase() {
     private var remoteMonitoringEnabled = true
     private var remoteClusters = listOf<String>()
 
-    private val mappingFieldToTypePairs1 = listOf(
-        "timestamp" to "date",
-        "color" to "keyword",
-        "message" to "text",
-    )
+    private val mappingFieldToTypePairs1 =
+        listOf(
+            "timestamp" to "date",
+            "color" to "keyword",
+            "message" to "text",
+        )
 
-    private val mappingFieldToTypePairs2 = listOf(
-        "timestamp" to "date",
-        "message" to "text",
-    )
+    private val mappingFieldToTypePairs2 =
+        listOf(
+            "timestamp" to "date",
+            "message" to "text",
+        )
 
+    @Test
     fun `test with remote monitoring disabled`() {
         // Disable remote monitoring if not already disabled
         toggleRemoteMonitoring(false)
@@ -50,11 +54,12 @@ class GetRemoteIndexesActionIT : AlertingRestTestCase() {
             assertEquals(RestStatus.FORBIDDEN, e.response.restStatus())
             assertEquals(
                 "Remote monitoring is not enabled.",
-                (e.response.asMap()["error"] as Map<String, Any>)["reason"]
+                (e.response.asMap()["error"] as Map<String, Any>)["reason"],
             )
         }
     }
 
+    @Test
     fun `test with blank indexes param`() {
         // Enable remote monitoring if not already enabled
         toggleRemoteMonitoring(true)
@@ -65,25 +70,28 @@ class GetRemoteIndexesActionIT : AlertingRestTestCase() {
             assertEquals(RestStatus.BAD_REQUEST, e.response.restStatus())
             assertEquals(
                 INVALID_PATTERN_MESSAGE,
-                (e.response.asMap()["error"] as Map<String, Any>)["reason"]
+                (e.response.asMap()["error"] as Map<String, Any>)["reason"],
             )
         }
     }
 
+    @Test
     fun `test with blank include_mappings param`() {
         // Enable remote monitoring if not already enabled
         toggleRemoteMonitoring(true)
 
         // Create test indexes
-        val index1 = createTestIndex(
-            index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
-            mapping = formatMappingsJson(mappingFieldToTypePairs1)
-        )
+        val index1 =
+            createTestIndex(
+                index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
+                mapping = formatMappingsJson(mappingFieldToTypePairs1),
+            )
 
-        val index2 = createTestIndex(
-            index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
-            mapping = formatMappingsJson(mappingFieldToTypePairs2)
-        )
+        val index2 =
+            createTestIndex(
+                index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
+                mapping = formatMappingsJson(mappingFieldToTypePairs2),
+            )
 
         val expectedNames = listOf(index1, index2)
 
@@ -117,20 +125,23 @@ class GetRemoteIndexesActionIT : AlertingRestTestCase() {
         deleteIndex(index2)
     }
 
+    @Test
     fun `test with FALSE include_mappings param`() {
         // Enable remote monitoring if not already enabled
         toggleRemoteMonitoring(true)
 
         // Create test indexes
-        val index1 = createTestIndex(
-            index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
-            mapping = formatMappingsJson(mappingFieldToTypePairs1)
-        )
+        val index1 =
+            createTestIndex(
+                index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
+                mapping = formatMappingsJson(mappingFieldToTypePairs1),
+            )
 
-        val index2 = createTestIndex(
-            index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
-            mapping = formatMappingsJson(mappingFieldToTypePairs2)
-        )
+        val index2 =
+            createTestIndex(
+                index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
+                mapping = formatMappingsJson(mappingFieldToTypePairs2),
+            )
 
         val expectedNames = listOf(index1, index2)
 
@@ -164,20 +175,23 @@ class GetRemoteIndexesActionIT : AlertingRestTestCase() {
         deleteIndex(index2)
     }
 
+    @Test
     fun `test with TRUE include_mappings param`() {
         // Enable remote monitoring if not already enabled
         toggleRemoteMonitoring(true)
 
         // Create test indexes
-        val index1 = createTestIndex(
-            index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
-            mapping = formatMappingsJson(mappingFieldToTypePairs1)
-        )
+        val index1 =
+            createTestIndex(
+                index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
+                mapping = formatMappingsJson(mappingFieldToTypePairs1),
+            )
 
-        val index2 = createTestIndex(
-            index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
-            mapping = formatMappingsJson(mappingFieldToTypePairs2)
-        )
+        val index2 =
+            createTestIndex(
+                index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
+                mapping = formatMappingsJson(mappingFieldToTypePairs2),
+            )
 
         val expectedNames = listOf(index1, index2)
 
@@ -224,20 +238,23 @@ class GetRemoteIndexesActionIT : AlertingRestTestCase() {
         deleteIndex(index2)
     }
 
+    @Test
     fun `test with specific index name`() {
         // Enable remote monitoring if not already enabled
         toggleRemoteMonitoring(true)
 
         // Create test indexes
-        val index1 = createTestIndex(
-            index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
-            mapping = formatMappingsJson(mappingFieldToTypePairs1)
-        )
+        val index1 =
+            createTestIndex(
+                index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
+                mapping = formatMappingsJson(mappingFieldToTypePairs1),
+            )
 
-        val index2 = createTestIndex(
-            index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
-            mapping = formatMappingsJson(mappingFieldToTypePairs2)
-        )
+        val index2 =
+            createTestIndex(
+                index = randomAlphaOfLength(10).lowercase(Locale.ROOT),
+                mapping = formatMappingsJson(mappingFieldToTypePairs2),
+            )
 
         val expectedNames = listOf(index1)
 
@@ -278,9 +295,7 @@ class GetRemoteIndexesActionIT : AlertingRestTestCase() {
         deleteIndex(index2)
     }
 
-    private fun getRemoteIndexes(params: String): Response {
-        return client().makeRequest("GET", "${RestGetRemoteIndexesAction.ROUTE}?$params")
-    }
+    private fun getRemoteIndexes(params: String): Response = client().makeRequest("GET", "${RestGetRemoteIndexesAction.ROUTE}?$params")
 
     private fun toggleRemoteMonitoring(setting: Boolean) {
         if (remoteMonitoringEnabled != setting) {
@@ -289,8 +304,11 @@ class GetRemoteIndexesActionIT : AlertingRestTestCase() {
             val settings = client().getSettings()
             val updatedSetting = getEnabledSetting(settings)
 
-            if (setting) assertTrue(updatedSetting)
-            else assertFalse(updatedSetting)
+            if (setting) {
+                assertTrue(updatedSetting)
+            } else {
+                assertFalse(updatedSetting)
+            }
 
             remoteMonitoringEnabled = updatedSetting
 
@@ -313,11 +331,14 @@ class GetRemoteIndexesActionIT : AlertingRestTestCase() {
     }
 
     private fun formatMappingsJson(fieldToTypePairs: List<Pair<String, String>>): String {
-        val builder = XContentFactory.jsonBuilder()
-            .startObject()
-            .startObject("properties")
+        val builder =
+            XContentFactory
+                .jsonBuilder()
+                .startObject()
+                .startObject("properties")
         fieldToTypePairs.forEach {
-            builder.startObject(it.first)
+            builder
+                .startObject(it.first)
                 .field("type", it.second)
                 .endObject()
         }

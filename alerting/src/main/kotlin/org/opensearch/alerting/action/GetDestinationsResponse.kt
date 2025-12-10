@@ -15,8 +15,11 @@ import org.opensearch.core.xcontent.ToXContentObject
 import org.opensearch.core.xcontent.XContentBuilder
 import java.io.IOException
 
-class GetDestinationsResponse : ActionResponse, ToXContentObject {
+class GetDestinationsResponse :
+    ActionResponse,
+    ToXContentObject {
     var status: RestStatus
+
     // totalDestinations is not the same as the size of destinations because there can be 30 destinations from the request, but
     // the request only asked for 5 destinations, so totalDestinations will be 30, but alerts will only contain 5 destinations
     var totalDestinations: Int?
@@ -25,7 +28,7 @@ class GetDestinationsResponse : ActionResponse, ToXContentObject {
     constructor(
         status: RestStatus,
         totalDestinations: Int?,
-        destinations: List<Destination>
+        destinations: List<Destination>,
     ) : super() {
         this.status = status
         this.totalDestinations = totalDestinations
@@ -55,8 +58,12 @@ class GetDestinationsResponse : ActionResponse, ToXContentObject {
     }
 
     @Throws(IOException::class)
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        builder.startObject()
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
+        builder
+            .startObject()
             .field("totalDestinations", totalDestinations)
             .field("destinations", destinations)
 

@@ -20,7 +20,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class JobSchedulerTest {
-
     private var testSettings: Settings = Settings.builder().put("node.name", "node-0").build()
     private val testThreadPool = ThreadPool(testSettings)
     private var jobRunner: MockJobRunner = MockJobRunner()
@@ -34,16 +33,17 @@ class JobSchedulerTest {
 
     @Test
     fun `schedule and deschedule`() {
-        val mockScheduledJob = MockScheduledJob(
-            "mockScheduledJob-id",
-            1L,
-            "mockScheduledJob-name",
-            "MockScheduledJob",
-            true,
-            IntervalSchedule(1, ChronoUnit.MINUTES),
-            Instant.now(),
-            Instant.now()
-        )
+        val mockScheduledJob =
+            MockScheduledJob(
+                "mockScheduledJob-id",
+                1L,
+                "mockScheduledJob-name",
+                "MockScheduledJob",
+                true,
+                IntervalSchedule(1, ChronoUnit.MINUTES),
+                Instant.now(),
+                Instant.now(),
+            )
 
         assertTrue(jobScheduler.schedule(mockScheduledJob))
 
@@ -58,16 +58,17 @@ class JobSchedulerTest {
         val cronExpression = "0/5 * 30 2 *"
         val jobRunner = MockJobRunner()
         val jobScheduler = JobScheduler(testThreadPool, jobRunner)
-        val mockScheduledJob = MockScheduledJob(
-            "mockScheduledJob-id",
-            1L,
-            "mockScheduledJob-name",
-            "MockScheduledJob",
-            true,
-            CronSchedule(cronExpression, ZoneId.of("UTC")),
-            Instant.now(),
-            Instant.now()
-        )
+        val mockScheduledJob =
+            MockScheduledJob(
+                "mockScheduledJob-id",
+                1L,
+                "mockScheduledJob-name",
+                "MockScheduledJob",
+                true,
+                CronSchedule(cronExpression, ZoneId.of("UTC")),
+                Instant.now(),
+                Instant.now(),
+            )
 
         assertTrue(jobScheduler.schedule(mockScheduledJob))
         assertEquals(setOf("mockScheduledJob-id"), jobScheduler.scheduledJobs(), "List of ScheduledJobs are not the same.")
@@ -82,16 +83,17 @@ class JobSchedulerTest {
         val cronExpression = "0/5 * * * *"
         val jobRunner = MockJobRunner()
         val jobScheduler = JobScheduler(testThreadPool, jobRunner)
-        val mockScheduledJob = MockScheduledJob(
-            "mockScheduledJob-id",
-            1L,
-            "mockScheduledJob-name",
-            "MockScheduledJob",
-            false,
-            CronSchedule(cronExpression, ZoneId.of("UTC")),
-            Instant.now(),
-            Instant.now()
-        )
+        val mockScheduledJob =
+            MockScheduledJob(
+                "mockScheduledJob-id",
+                1L,
+                "mockScheduledJob-name",
+                "MockScheduledJob",
+                false,
+                CronSchedule(cronExpression, ZoneId.of("UTC")),
+                Instant.now(),
+                Instant.now(),
+            )
 
         assertFalse(jobScheduler.schedule(mockScheduledJob), "We should return false if we try to schedule disabled schedule.")
         assertEquals(setOf(), jobScheduler.scheduledJobs(), "List of ScheduledJobs are not the same.")
@@ -102,16 +104,17 @@ class JobSchedulerTest {
         val cronExpression = "0/5 * * * *"
         val jobRunner = MockJobRunner()
         val jobScheduler = JobScheduler(testThreadPool, jobRunner)
-        val mockScheduledJob = MockScheduledJob(
-            "mockScheduledJob-id",
-            1L,
-            "mockScheduledJob-name",
-            "MockScheduledJob",
-            true,
-            CronSchedule(cronExpression, ZoneId.of("UTC")),
-            Instant.now(),
-            Instant.now()
-        )
+        val mockScheduledJob =
+            MockScheduledJob(
+                "mockScheduledJob-id",
+                1L,
+                "mockScheduledJob-name",
+                "MockScheduledJob",
+                true,
+                CronSchedule(cronExpression, ZoneId.of("UTC")),
+                Instant.now(),
+                Instant.now(),
+            )
 
         assertTrue(jobScheduler.schedule(mockScheduledJob))
         assertEquals(setOf("mockScheduledJob-id"), jobScheduler.scheduledJobs(), "List of ScheduledJobs are not the same.")
@@ -125,26 +128,28 @@ class JobSchedulerTest {
     @Test
     fun `schedule multiple jobs`() {
         val cronExpression = "0/5 * * * *"
-        val mockScheduledJob1 = MockScheduledJob(
-            "mockScheduledJob-1",
-            1L,
-            "mockScheduledJob-name",
-            "MockScheduledJob",
-            true,
-            CronSchedule(cronExpression, ZoneId.of("UTC")),
-            Instant.now(),
-            Instant.now()
-        )
-        val mockScheduledJob2 = MockScheduledJob(
-            "mockScheduledJob-2",
-            1L,
-            "mockScheduledJob-name",
-            "MockScheduledJob",
-            true,
-            CronSchedule(cronExpression, ZoneId.of("UTC")),
-            Instant.now(),
-            Instant.now()
-        )
+        val mockScheduledJob1 =
+            MockScheduledJob(
+                "mockScheduledJob-1",
+                1L,
+                "mockScheduledJob-name",
+                "MockScheduledJob",
+                true,
+                CronSchedule(cronExpression, ZoneId.of("UTC")),
+                Instant.now(),
+                Instant.now(),
+            )
+        val mockScheduledJob2 =
+            MockScheduledJob(
+                "mockScheduledJob-2",
+                1L,
+                "mockScheduledJob-name",
+                "MockScheduledJob",
+                true,
+                CronSchedule(cronExpression, ZoneId.of("UTC")),
+                Instant.now(),
+                Instant.now(),
+            )
 
         assertTrue(jobScheduler.schedule(mockScheduledJob1, mockScheduledJob2).isEmpty())
     }
@@ -152,10 +157,17 @@ class JobSchedulerTest {
     @Test
     fun `schedule null enabled time job`() {
         val cronExpression = "0/5 * * * *"
-        val mockScheduledJob2 = MockScheduledJob(
-            "mockScheduledJob-2", 1L, "mockScheduledJob-name", "MockScheduledJob", true,
-            CronSchedule(cronExpression, ZoneId.of("UTC")), Instant.now(), null
-        )
+        val mockScheduledJob2 =
+            MockScheduledJob(
+                "mockScheduledJob-2",
+                1L,
+                "mockScheduledJob-name",
+                "MockScheduledJob",
+                true,
+                CronSchedule(cronExpression, ZoneId.of("UTC")),
+                Instant.now(),
+                null,
+            )
 
         assertFalse(jobScheduler.schedule(mockScheduledJob2))
     }
@@ -163,10 +175,17 @@ class JobSchedulerTest {
     @Test
     fun `schedule disabled job`() {
         val cronExpression = "0/5 * * * *"
-        val mockScheduledJob1 = MockScheduledJob(
-            "mockScheduledJob-1", 1L, "mockScheduledJob-name", "MockScheduledJob", false,
-            CronSchedule(cronExpression, ZoneId.of("UTC")), Instant.now(), Instant.now()
-        )
+        val mockScheduledJob1 =
+            MockScheduledJob(
+                "mockScheduledJob-1",
+                1L,
+                "mockScheduledJob-name",
+                "MockScheduledJob",
+                false,
+                CronSchedule(cronExpression, ZoneId.of("UTC")),
+                Instant.now(),
+                Instant.now(),
+            )
 
         assertFalse(jobScheduler.schedule(mockScheduledJob1))
     }
@@ -174,16 +193,17 @@ class JobSchedulerTest {
     @Test
     fun `run Job`() {
         val cronExpression = "0/5 * * * *"
-        val mockScheduledJob = MockScheduledJob(
-            "mockScheduledJob-id",
-            1L,
-            "mockScheduledJob-name",
-            "MockScheduledJob",
-            true,
-            CronSchedule(cronExpression, ZoneId.of("UTC")),
-            Instant.now(),
-            Instant.now()
-        )
+        val mockScheduledJob =
+            MockScheduledJob(
+                "mockScheduledJob-id",
+                1L,
+                "mockScheduledJob-name",
+                "MockScheduledJob",
+                true,
+                CronSchedule(cronExpression, ZoneId.of("UTC")),
+                Instant.now(),
+                Instant.now(),
+            )
 
         jobRunner.runJob(mockScheduledJob, Instant.now(), Instant.now())
     }

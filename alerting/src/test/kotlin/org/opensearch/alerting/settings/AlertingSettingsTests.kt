@@ -13,9 +13,9 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.test.OpenSearchTestCase
 import java.util.concurrent.TimeUnit
+import kotlin.test.Test
 
 class AlertingSettingsTests : OpenSearchTestCase() {
-
     private lateinit var plugin: AlertingPlugin
 
     @Before
@@ -23,6 +23,7 @@ class AlertingSettingsTests : OpenSearchTestCase() {
         plugin = AlertingPlugin()
     }
 
+    @Test
     fun `test all opendistro settings returned`() {
         val settings = plugin.settings
         assertTrue(
@@ -50,12 +51,13 @@ class AlertingSettingsTests : OpenSearchTestCase() {
                     LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
                     LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
                     LegacyOpenDistroScheduledJobSettings.SWEEPER_ENABLED,
-                    LegacyOpenDistroScheduledJobSettings.REQUEST_TIMEOUT
-                )
-            )
+                    LegacyOpenDistroScheduledJobSettings.REQUEST_TIMEOUT,
+                ),
+            ),
         )
     }
 
+    @Test
     fun `test all opensearch settings returned`() {
         val settings = plugin.settings
         assertTrue(
@@ -85,23 +87,25 @@ class AlertingSettingsTests : OpenSearchTestCase() {
                     ScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
                     ScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
                     ScheduledJobSettings.SWEEPER_ENABLED,
-                    ScheduledJobSettings.REQUEST_TIMEOUT
-                )
-            )
+                    ScheduledJobSettings.REQUEST_TIMEOUT,
+                ),
+            ),
         )
     }
 
+    @Test
     fun `test opendistro settings fallback`() {
         assertEquals(
             AlertingSettings.MOVE_ALERTS_BACKOFF_COUNT.get(Settings.EMPTY),
-            LegacyOpenDistroAlertingSettings.MOVE_ALERTS_BACKOFF_COUNT.get(Settings.EMPTY)
+            LegacyOpenDistroAlertingSettings.MOVE_ALERTS_BACKOFF_COUNT.get(Settings.EMPTY),
         )
         assertEquals(
             ScheduledJobSettings.REQUEST_TIMEOUT.get(Settings.EMPTY),
-            LegacyOpenDistroScheduledJobSettings.REQUEST_TIMEOUT.get(Settings.EMPTY)
+            LegacyOpenDistroScheduledJobSettings.REQUEST_TIMEOUT.get(Settings.EMPTY),
         )
     }
 
+    @Test
     fun `test settings get Value`() {
         val settings = Settings.builder().put("plugins.alerting.move_alerts_backoff_count", 1).build()
         assertEquals(AlertingSettings.MOVE_ALERTS_BACKOFF_COUNT.get(settings), 1)
@@ -111,30 +115,34 @@ class AlertingSettingsTests : OpenSearchTestCase() {
         assertEquals(LegacyOpenDistroScheduledJobSettings.SWEEPER_ENABLED.get(scheduledJobSettings), true)
     }
 
+    @Test
     fun `test settings get value with legacy Fallback`() {
-        val settings = Settings.builder()
-            .put("opendistro.alerting.monitor.max_monitors", 1000)
-            .put("opendistro.alerting.input_timeout", TimeValue.timeValueSeconds(30))
-            .put("opendistro.alerting.index_timeout", TimeValue.timeValueSeconds(60))
-            .put("opendistro.alerting.bulk_timeout", TimeValue.timeValueSeconds(120))
-            .put("opendistro.alerting.alert_backoff_millis", TimeValue.timeValueMillis(50))
-            .put("opendistro.alerting.alert_backoff_count", 2)
-            .put("opendistro.alerting.move_alerts_backoff_millis", TimeValue.timeValueMillis(250))
-            .put("opendistro.alerting.move_alerts_backoff_count", 3)
-            .put("opendistro.alerting.alert_history_enabled", true)
-            .put("opendistro.alerting.alert_history_rollover_period", TimeValue.timeValueHours(12))
-            .put("opendistro.alerting.alert_history_max_age", TimeValue(30, TimeUnit.DAYS))
-            .put("opendistro.alerting.alert_history_max_docs", 1000L)
-            .put("opendistro.alerting.alert_history_retention_period", TimeValue(60, TimeUnit.DAYS))
-            .put("opendistro.alerting.request_timeout", TimeValue.timeValueSeconds(10))
-            .put("opendistro.alerting.action_throttle_max_value", TimeValue.timeValueHours(24))
-            .put("opendistro.alerting.filter_by_backend_roles", false)
-            .put("opendistro.scheduled_jobs.enabled", false)
-            .put("opendistro.scheduled_jobs.request_timeout", TimeValue.timeValueSeconds(10))
-            .put("opendistro.scheduled_jobs.sweeper.backoff_millis", TimeValue.timeValueMillis(50))
-            .put("opendistro.scheduled_jobs.retry_count", 3)
-            .put("opendistro.scheduled_jobs.sweeper.period", TimeValue.timeValueMinutes(5))
-            .put("opendistro.scheduled_jobs.sweeper.page_size", 100).build()
+        val settings =
+            Settings
+                .builder()
+                .put("opendistro.alerting.monitor.max_monitors", 1000)
+                .put("opendistro.alerting.input_timeout", TimeValue.timeValueSeconds(30))
+                .put("opendistro.alerting.index_timeout", TimeValue.timeValueSeconds(60))
+                .put("opendistro.alerting.bulk_timeout", TimeValue.timeValueSeconds(120))
+                .put("opendistro.alerting.alert_backoff_millis", TimeValue.timeValueMillis(50))
+                .put("opendistro.alerting.alert_backoff_count", 2)
+                .put("opendistro.alerting.move_alerts_backoff_millis", TimeValue.timeValueMillis(250))
+                .put("opendistro.alerting.move_alerts_backoff_count", 3)
+                .put("opendistro.alerting.alert_history_enabled", true)
+                .put("opendistro.alerting.alert_history_rollover_period", TimeValue.timeValueHours(12))
+                .put("opendistro.alerting.alert_history_max_age", TimeValue(30, TimeUnit.DAYS))
+                .put("opendistro.alerting.alert_history_max_docs", 1000L)
+                .put("opendistro.alerting.alert_history_retention_period", TimeValue(60, TimeUnit.DAYS))
+                .put("opendistro.alerting.request_timeout", TimeValue.timeValueSeconds(10))
+                .put("opendistro.alerting.action_throttle_max_value", TimeValue.timeValueHours(24))
+                .put("opendistro.alerting.filter_by_backend_roles", false)
+                .put("opendistro.scheduled_jobs.enabled", false)
+                .put("opendistro.scheduled_jobs.request_timeout", TimeValue.timeValueSeconds(10))
+                .put("opendistro.scheduled_jobs.sweeper.backoff_millis", TimeValue.timeValueMillis(50))
+                .put("opendistro.scheduled_jobs.retry_count", 3)
+                .put("opendistro.scheduled_jobs.sweeper.period", TimeValue.timeValueMinutes(5))
+                .put("opendistro.scheduled_jobs.sweeper.page_size", 100)
+                .build()
 
         assertEquals(AlertingSettings.ALERTING_MAX_MONITORS.get(settings), 1000)
         assertEquals(AlertingSettings.INPUT_TIMEOUT.get(settings), TimeValue.timeValueSeconds(30))
@@ -182,8 +190,8 @@ class AlertingSettingsTests : OpenSearchTestCase() {
                 LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
                 LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
                 LegacyOpenDistroScheduledJobSettings.SWEEP_PAGE_SIZE,
-                LegacyOpenDistroScheduledJobSettings.SWEEP_PERIOD
-            )
+                LegacyOpenDistroScheduledJobSettings.SWEEP_PERIOD,
+            ),
         )
     }
 }

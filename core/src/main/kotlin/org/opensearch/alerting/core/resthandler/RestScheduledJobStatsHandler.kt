@@ -18,46 +18,45 @@ import org.opensearch.transport.client.node.NodeClient
 /**
  * RestScheduledJobStatsHandler is handler for getting ScheduledJob Stats.
  */
-class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler() {
+class RestScheduledJobStatsHandler(
+    private val path: String,
+) : BaseRestHandler() {
+    override fun getName(): String = "${path}_jobs_stats"
 
-    override fun getName(): String {
-        return "${path}_jobs_stats"
-    }
+    override fun routes(): List<Route> = listOf()
 
-    override fun routes(): List<Route> {
-        return listOf()
-    }
-
-    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> {
-        return mutableListOf(
+    override fun replacedRoutes(): MutableList<RestHandler.ReplacedRoute> =
+        mutableListOf(
             RestHandler.ReplacedRoute(
                 GET,
                 "/_plugins/$path/{nodeId}/stats/",
                 GET,
-                "/_opendistro/$path/{nodeId}/stats/"
+                "/_opendistro/$path/{nodeId}/stats/",
             ),
             RestHandler.ReplacedRoute(
                 GET,
                 "/_plugins/$path/{nodeId}/stats/{metric}",
                 GET,
-                "/_opendistro/$path/{nodeId}/stats/{metric}"
+                "/_opendistro/$path/{nodeId}/stats/{metric}",
             ),
             RestHandler.ReplacedRoute(
                 GET,
                 "/_plugins/$path/stats/",
                 GET,
-                "/_opendistro/$path/stats/"
+                "/_opendistro/$path/stats/",
             ),
             RestHandler.ReplacedRoute(
                 GET,
                 "/_plugins/$path/stats/{metric}",
                 GET,
-                "/_opendistro/$path/stats/{metric}"
-            )
+                "/_opendistro/$path/stats/{metric}",
+            ),
         )
-    }
 
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         val alertingVersion = request.param("version")
         if (alertingVersion != null && alertingVersion !in listOf("v1", "v2")) {
             throw IllegalArgumentException("Version parameter must be one of v1 or v2")
@@ -70,7 +69,7 @@ class RestScheduledJobStatsHandler(private val path: String) : BaseRestHandler()
             client.execute(
                 ScheduledJobsStatsAction.INSTANCE,
                 scheduledJobNodesStatsRequest,
-                RestActions.NodesResponseRestListener(channel)
+                RestActions.NodesResponseRestListener(channel),
             )
         }
     }

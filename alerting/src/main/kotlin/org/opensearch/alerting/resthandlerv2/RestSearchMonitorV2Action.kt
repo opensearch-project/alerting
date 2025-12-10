@@ -47,41 +47,41 @@ class RestSearchMonitorV2Action(
     val settings: Settings,
     clusterService: ClusterService,
 ) : BaseRestHandler() {
-
     @Volatile private var filterBy = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FILTER_BY_BACKEND_ROLES) { filterBy = it }
     }
 
-    override fun getName(): String {
-        return "search_monitor_v2_action"
-    }
+    override fun getName(): String = "search_monitor_v2_action"
 
-    override fun routes(): List<Route> {
-        return listOf(
+    override fun routes(): List<Route> =
+        listOf(
             Route(
                 POST,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/_search"
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/_search",
             ),
             Route(
                 GET,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/_search"
-            )
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/_search",
+            ),
         )
-    }
 
     @Throws(IOException::class)
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.MONITOR_V2_BASE_URI}/_search")
 
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.parseXContent(request.contentOrSourceParamParser())
         searchSourceBuilder.fetchSource(context(request))
 
-        val searchRequest = SearchRequest()
-            .source(searchSourceBuilder)
-            .indices(SCHEDULED_JOBS_INDEX)
+        val searchRequest =
+            SearchRequest()
+                .source(searchSourceBuilder)
+                .indices(SCHEDULED_JOBS_INDEX)
 
         val searchMonitorV2Request = SearchMonitorV2Request(searchRequest)
         return RestChannelConsumer { channel ->
@@ -101,21 +101,24 @@ class RestSearchMonitorV2Action(
 
                 try {
                     for (hit in response.hits) {
-                        XContentType.JSON.xContent().createParser(
-                            channel.request().xContentRegistry,
-                            LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
-                        ).use { hitsParser ->
-                            // when reconstructing XContent, intentionally leave out
-                            // user field in response for security reasons by
-                            // calling ScheduledJob.toXContent instead of
-                            // a MonitorV2's toXContentWithUser
-                            val monitorV2 = ScheduledJob.parse(hitsParser, hit.id, hit.version)
-                            val xcb = monitorV2.toXContent(jsonBuilder(), EMPTY_PARAMS)
+                        XContentType.JSON
+                            .xContent()
+                            .createParser(
+                                channel.request().xContentRegistry,
+                                LoggingDeprecationHandler.INSTANCE,
+                                hit.sourceAsString,
+                            ).use { hitsParser ->
+                                // when reconstructing XContent, intentionally leave out
+                                // user field in response for security reasons by
+                                // calling ScheduledJob.toXContent instead of
+                                // a MonitorV2's toXContentWithUser
+                                val monitorV2 = ScheduledJob.parse(hitsParser, hit.id, hit.version)
+                                val xcb = monitorV2.toXContent(jsonBuilder(), EMPTY_PARAMS)
 
-                            // rewrite the search hit as just the MonitorV2 source,
-                            // without the extra "monitor_v2" JSON object wrapper
-                            hit.sourceRef(BytesReference.bytes(xcb))
-                        }
+                                // rewrite the search hit as just the MonitorV2 source,
+                                // without the extra "monitor_v2" JSON object wrapper
+                                hit.sourceRef(BytesReference.bytes(xcb))
+                            }
                     }
                 } catch (e: Exception) {
                     // Swallow exception and return response as is

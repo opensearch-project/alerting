@@ -19,7 +19,7 @@ import java.util.Stack
  * @param expressionToParse Complete string containing the trigger expression
  */
 abstract class TriggerExpressionRPNBaseParser(
-    protected val expressionToParse: String
+    protected val expressionToParse: String,
 ) : ExpressionParser {
     /**
      * To perform the Infix-to-postfix conversion of the trigger expression
@@ -31,24 +31,32 @@ abstract class TriggerExpressionRPNBaseParser(
         for (tokenString in expTokens) {
             if (tokenString.isEmpty()) continue
             when (val expToken = assignToken(tokenString)) {
-                is TriggerExpressionToken -> outputExpTokens.add(expToken)
+                is TriggerExpressionToken -> {
+                    outputExpTokens.add(expToken)
+                }
+
                 is TriggerExpressionOperator -> {
                     when (expToken) {
-                        TriggerExpressionOperator.PAR_LEFT -> expTokenStack.push(expToken)
+                        TriggerExpressionOperator.PAR_LEFT -> {
+                            expTokenStack.push(expToken)
+                        }
+
                         TriggerExpressionOperator.PAR_RIGHT -> {
                             var topExpToken = expTokenStack.popExpTokenOrNull<TriggerExpressionOperator>()
                             while (topExpToken != null && topExpToken != TriggerExpressionOperator.PAR_LEFT) {
                                 outputExpTokens.add(topExpToken)
                                 topExpToken = expTokenStack.popExpTokenOrNull<TriggerExpressionOperator>()
                             }
-                            if (topExpToken != TriggerExpressionOperator.PAR_LEFT)
+                            if (topExpToken != TriggerExpressionOperator.PAR_LEFT) {
                                 throw java.lang.IllegalArgumentException("No matching left parenthesis.")
+                            }
                         }
+
                         else -> {
                             var op2 = expTokenStack.peekExpTokenOrNull<TriggerExpressionOperator>()
                             while (op2 != null) {
                                 val c = expToken.precedence.compareTo(op2.precedence)
-                                if (c < 0 || !expToken.rightAssociative && c <= 0) {
+                                if (c < 0 || (!expToken.rightAssociative && c <= 0)) {
                                     outputExpTokens.add(expTokenStack.pop())
                                 } else {
                                     break
@@ -64,8 +72,9 @@ abstract class TriggerExpressionRPNBaseParser(
 
         while (!expTokenStack.isEmpty()) {
             expTokenStack.peekExpTokenOrNull<TriggerExpressionOperator>()?.let {
-                if (it == TriggerExpressionOperator.PAR_LEFT)
+                if (it == TriggerExpressionOperator.PAR_LEFT) {
                     throw java.lang.IllegalArgumentException("No matching right parenthesis.")
+                }
             }
             val top = expTokenStack.pop()
             outputExpTokens.add(top)
@@ -78,10 +87,10 @@ abstract class TriggerExpressionRPNBaseParser(
      * Looks up and maps the expression token that matches the string version of that expression unit
      */
     private fun assignToken(tokenString: String): ExpressionToken {
-
         // Check "query" string in trigger expression such as in 'query[name="abc"]'
-        if (tokenString.startsWith(TriggerExpressionConstant.ConstantType.QUERY.ident))
+        if (tokenString.startsWith(TriggerExpressionConstant.ConstantType.QUERY.ident)) {
             return TriggerExpressionToken(tokenString)
+        }
 
         // Check operators in trigger expression such as in [&&, ||, !]
         for (op in TriggerExpressionOperator.values()) {
@@ -96,19 +105,17 @@ abstract class TriggerExpressionRPNBaseParser(
         throw IllegalArgumentException("Error while processing the trigger expression '$tokenString'")
     }
 
-    private inline fun <reified T> Stack<ExpressionToken>.popExpTokenOrNull(): T? {
-        return try {
+    private inline fun <reified T> Stack<ExpressionToken>.popExpTokenOrNull(): T? =
+        try {
             pop() as T
         } catch (e: java.lang.Exception) {
             null
         }
-    }
 
-    private inline fun <reified T> Stack<ExpressionToken>.peekExpTokenOrNull(): T? {
-        return try {
+    private inline fun <reified T> Stack<ExpressionToken>.peekExpTokenOrNull(): T? =
+        try {
             peek() as T
         } catch (e: java.lang.Exception) {
             null
         }
-    }
 }

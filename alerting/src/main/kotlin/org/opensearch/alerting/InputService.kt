@@ -60,9 +60,8 @@ class InputService(
     val xContentRegistry: NamedXContentRegistry,
     val clusterService: ClusterService,
     val settings: Settings,
-    val indexNameExpressionResolver: IndexNameExpressionResolver
+    val indexNameExpressionResolver: IndexNameExpressionResolver,
 ) {
-
     private val logger = LogManager.getLogger(InputService::class.java)
 
     suspend fun collectInputResults(
@@ -70,9 +69,9 @@ class InputService(
         periodStart: Instant,
         periodEnd: Instant,
         prevResult: InputRunResults? = null,
-        workflowRunContext: WorkflowRunContext? = null
-    ): InputRunResults {
-        return try {
+        workflowRunContext: WorkflowRunContext? = null,
+    ): InputRunResults =
+        try {
             val results = mutableListOf<Map<String, Any>>()
             val aggTriggerAfterKey: MutableMap<String, TriggerAfterKey> = mutableMapOf()
 
@@ -84,26 +83,30 @@ class InputService(
             monitor.inputs.forEach { input ->
                 when (input) {
                     is SearchInput -> {
-                        val searchRequest = getSearchRequest(
-                            monitor = monitor,
-                            searchInput = input,
-                            periodStart = periodStart,
-                            periodEnd = periodEnd,
-                            prevResult = prevResult,
-                            matchingDocIdsPerIndex = matchingDocIdsPerIndex,
-                            returnSampleDocs = false
-                        )
+                        val searchRequest =
+                            getSearchRequest(
+                                monitor = monitor,
+                                searchInput = input,
+                                periodStart = periodStart,
+                                periodEnd = periodEnd,
+                                prevResult = prevResult,
+                                matchingDocIdsPerIndex = matchingDocIdsPerIndex,
+                                returnSampleDocs = false,
+                            )
                         val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-                        aggTriggerAfterKey += AggregationQueryRewriter.getAfterKeysFromSearchResponse(
-                            searchResponse,
-                            monitor.triggers,
-                            prevResult?.aggTriggersAfterKey
-                        )
+                        aggTriggerAfterKey +=
+                            AggregationQueryRewriter.getAfterKeysFromSearchResponse(
+                                searchResponse,
+                                monitor.triggers,
+                                prevResult?.aggTriggersAfterKey,
+                            )
                         results += searchResponse.convertToMap()
                     }
+
                     is ClusterMetricsInput -> {
                         results += handleClusterMetricsInput(input)
                     }
+
                     else -> {
                         throw IllegalArgumentException("Unsupported input type: ${input.name()}.")
                     }
@@ -114,7 +117,6 @@ class InputService(
             logger.info("Error collecting inputs for monitor: ${monitor.id}", e)
             InputRunResults(emptyList(), e)
         }
-    }
 
     /**
      * Extends the given query builder with query that filters the given indices with the given doc ids per index
@@ -136,14 +138,13 @@ class InputService(
                 .add(
                     BoolQueryBuilder()
                         .must(MatchQueryBuilder("_index", entry.key))
-                        .must(TermsQueryBuilder("_id", entry.value))
+                        .must(TermsQueryBuilder("_id", entry.value)),
                 )
         }
         return queryBuilder.must(shouldQuery)
     }
 
-    private fun chainedFindingExist(indexToDocIds: Map<String, List<String>>?) =
-        !indexToDocIds.isNullOrEmpty()
+    private fun chainedFindingExist(indexToDocIds: Map<String, List<String>>?) = !indexToDocIds.isNullOrEmpty()
 
     private fun deepCopyQuery(query: SearchSourceBuilder): SearchSourceBuilder {
         val out = BytesStreamOutput()
@@ -163,25 +164,33 @@ class InputService(
      * other user's detector id and use it to create monitor, this method will only return anomaly
      * results they can read.
      */
-    suspend fun collectInputResultsForADMonitor(monitor: Monitor, periodStart: Instant, periodEnd: Instant): InputRunResults {
-        return try {
+    suspend fun collectInputResultsForADMonitor(
+        monitor: Monitor,
+        periodStart: Instant,
+        periodEnd: Instant,
+    ): InputRunResults =
+        try {
             val results = mutableListOf<Map<String, Any>>()
             val input = monitor.inputs[0] as SearchInput
 
             val searchParams = mapOf("period_start" to periodStart.toEpochMilli(), "period_end" to periodEnd.toEpochMilli())
-            val searchSource = scriptService.compile(
-                Script(
-                    ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                    input.query.toString(), searchParams
-                ),
-                TemplateScript.CONTEXT
-            )
-                .newInstance(searchParams)
-                .execute()
+            val searchSource =
+                scriptService
+                    .compile(
+                        Script(
+                            ScriptType.INLINE,
+                            Script.DEFAULT_TEMPLATE_LANG,
+                            input.query.toString(),
+                            searchParams,
+                        ),
+                        TemplateScript.CONTEXT,
+                    ).newInstance(searchParams)
+                    .execute()
 
-            val searchRequest = SearchRequest()
-                .indices(*input.indices.toTypedArray())
-                .preference(Preference.PRIMARY_FIRST.type())
+            val searchRequest =
+                SearchRequest()
+                    .indices(*input.indices.toTypedArray())
+                    .preference(Preference.PRIMARY_FIRST.type())
             XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
                 searchRequest.source(SearchSourceBuilder.fromXContent(it))
             }
@@ -207,7 +216,6 @@ class InputService(
             logger.info("Error collecting anomaly result inputs for monitor: ${monitor.id}", e)
             InputRunResults(emptyList(), e)
         }
-    }
 
     fun getSearchRequest(
         monitor: Monitor,
@@ -216,22 +224,24 @@ class InputService(
         periodEnd: Instant,
         prevResult: InputRunResults?,
         matchingDocIdsPerIndex: Map<String, List<String>>?,
-        returnSampleDocs: Boolean = false
+        returnSampleDocs: Boolean = false,
     ): SearchRequest {
         // TODO: Figure out a way to use SearchTemplateRequest without bringing in the entire TransportClient
-        val searchParams = mapOf(
-            "period_start" to periodStart.toEpochMilli(),
-            "period_end" to periodEnd.toEpochMilli()
-        )
+        val searchParams =
+            mapOf(
+                "period_start" to periodStart.toEpochMilli(),
+                "period_end" to periodEnd.toEpochMilli(),
+            )
 
         // Deep copying query before passing it to rewriteQuery since otherwise, the monitor.input is modified directly
         // which causes a strange bug where the rewritten query persists on the Monitor across executions
-        val rewrittenQuery = AggregationQueryRewriter.rewriteQuery(
-            deepCopyQuery(searchInput.query),
-            prevResult,
-            monitor.triggers,
-            returnSampleDocs
-        )
+        val rewrittenQuery =
+            AggregationQueryRewriter.rewriteQuery(
+                deepCopyQuery(searchInput.query),
+                prevResult,
+                monitor.triggers,
+                returnSampleDocs,
+            )
 
         // Rewrite query to consider the doc ids per given index
         if (chainedFindingExist(matchingDocIdsPerIndex) && rewrittenQuery.query() != null) {
@@ -239,31 +249,38 @@ class InputService(
             rewrittenQuery.query(updatedSourceQuery)
         }
 
-        val searchSource = scriptService.compile(
-            Script(
-                ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                rewrittenQuery.toString(), searchParams
-            ),
-            TemplateScript.CONTEXT
-        )
-            .newInstance(searchParams)
-            .execute()
+        val searchSource =
+            scriptService
+                .compile(
+                    Script(
+                        ScriptType.INLINE,
+                        Script.DEFAULT_TEMPLATE_LANG,
+                        rewrittenQuery.toString(),
+                        searchParams,
+                    ),
+                    TemplateScript.CONTEXT,
+                ).newInstance(searchParams)
+                .execute()
 
         val indexes = CrossClusterMonitorUtils.parseIndexesForRemoteSearch(searchInput.indices, clusterService)
 
-        val resolvedIndexes = if (searchInput.query.query() == null) indexes else {
-            val query = searchInput.query.query()
-            resolveOnlyQueryableIndicesFromLocalClusterAliases(
-                monitor,
-                periodEnd,
-                query,
+        val resolvedIndexes =
+            if (searchInput.query.query() == null) {
                 indexes
-            )
-        }
+            } else {
+                val query = searchInput.query.query()
+                resolveOnlyQueryableIndicesFromLocalClusterAliases(
+                    monitor,
+                    periodEnd,
+                    query,
+                    indexes,
+                )
+            }
 
-        val searchRequest = SearchRequest()
-            .indices(*resolvedIndexes.toTypedArray())
-            .preference(Preference.PRIMARY_FIRST.type())
+        val searchRequest =
+            SearchRequest()
+                .indices(*resolvedIndexes.toTypedArray())
+                .preference(Preference.PRIMARY_FIRST.type())
 
         XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
             searchRequest.source(SearchSourceBuilder.fromXContent(it))
@@ -295,17 +312,18 @@ class InputService(
         val resolvedIndexes = ArrayList<String>()
         indexes.forEach {
             // we don't optimize for remote cluster aliases. we directly pass them to search request
-            if (CrossClusterMonitorUtils.isRemoteClusterIndex(it, clusterService))
+            if (CrossClusterMonitorUtils.isRemoteClusterIndex(it, clusterService)) {
                 resolvedIndexes.add(it)
-            else {
+            } else {
                 val state = clusterService.state()
                 if (IndexUtils.isAlias(it, state)) {
                     val resolveStartTimeOfQueryTimeRange = resolveStartTimeofQueryTimeRange(monitor, query, periodEnd)
                     if (resolveStartTimeOfQueryTimeRange != null) {
                         val indices = IndexUtils.resolveAllIndices(listOf(it), clusterService, indexNameExpressionResolver)
-                        val sortedIndices = indices
-                            .mapNotNull { state.metadata().index(it) } // Get IndexMetadata for each index
-                            .sortedBy { it.creationDate } // Sort by creation date
+                        val sortedIndices =
+                            indices
+                                .mapNotNull { state.metadata().index(it) } // Get IndexMetadata for each index
+                                .sortedBy { it.creationDate } // Sort by creation date
 
                         var includePrevious = true
                         for (i in sortedIndices.indices) {
@@ -319,7 +337,7 @@ class InputService(
                                 includePrevious && (
                                     i == sortedIndices.lastIndex ||
                                         sortedIndices[i + 1].creationDate >= resolveStartTimeOfQueryTimeRange.toEpochMilli()
-                                    )
+                                )
                             ) {
                                 // Include the index immediately before the timestamp
                                 resolvedIndexes.add(indexMetadata.index.name)
@@ -372,7 +390,11 @@ class InputService(
         return results
     }
 
-    fun resolveStartTimeofQueryTimeRange(monitor: Monitor, query: QueryBuilder, periodEnd: Instant): Instant? {
+    fun resolveStartTimeofQueryTimeRange(
+        monitor: Monitor,
+        query: QueryBuilder,
+        periodEnd: Instant,
+    ): Instant? {
         try {
             val rangeQuery = findRangeQuery(query) ?: return null
             val searchParameter = rangeQuery.from().toString() // we are looking for 'timeframe' variable {{period_end}}||-<timeframe>
@@ -380,22 +402,24 @@ class InputService(
             val timeframeString = searchParameter.substringAfter("||-")
             val timeframeRegex = Regex("(\\d+)([a-zA-Z]+)")
             val matchResult = timeframeRegex.find(timeframeString)
-            val (amount, unit) = matchResult?.destructured?.let { (a, u) -> a to u }
-                ?: throw IllegalArgumentException("Invalid timeframe format: $timeframeString")
-            val duration = when (unit) {
-                "s" -> Duration.ofSeconds(amount.toLong())
-                "m" -> Duration.ofMinutes(amount.toLong())
-                "h" -> Duration.ofHours(amount.toLong())
-                "d" -> Duration.ofDays(amount.toLong())
-                else -> throw IllegalArgumentException("Invalid time unit: $unit")
-            }
+            val (amount, unit) =
+                matchResult?.destructured?.let { (a, u) -> a to u }
+                    ?: throw IllegalArgumentException("Invalid timeframe format: $timeframeString")
+            val duration =
+                when (unit) {
+                    "s" -> Duration.ofSeconds(amount.toLong())
+                    "m" -> Duration.ofMinutes(amount.toLong())
+                    "h" -> Duration.ofHours(amount.toLong())
+                    "d" -> Duration.ofDays(amount.toLong())
+                    else -> throw IllegalArgumentException("Invalid time unit: $unit")
+                }
 
             return periodEnd.minus(duration)
         } catch (e: Exception) {
             logger.error(
                 "Monitor ${monitor.id}:" +
                     " Failed to resolve time frame of search query while optimizing to query only on few of alias' concrete indices",
-                e
+                e,
             )
             return null // won't do optimization as we failed to resolve the timeframe due to unexpected error
         }

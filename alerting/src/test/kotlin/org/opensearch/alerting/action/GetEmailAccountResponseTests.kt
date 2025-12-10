@@ -10,11 +10,11 @@ import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class GetEmailAccountResponseTests : OpenSearchTestCase() {
-
+    @Test
     fun `test get email account response`() {
-
         val res = GetEmailAccountResponse("1234", 1L, 2L, 0L, RestStatus.OK, null)
         assertNotNull(res)
 
@@ -28,8 +28,8 @@ class GetEmailAccountResponseTests : OpenSearchTestCase() {
         assertEquals(null, newRes.emailAccount)
     }
 
+    @Test
     fun `test get email account with email account`() {
-
         val emailAccount = randomEmailAccount(name = "test_email_account")
         val res = GetEmailAccountResponse("1234", 1L, 2L, 0L, RestStatus.OK, emailAccount)
         assertNotNull(res)
