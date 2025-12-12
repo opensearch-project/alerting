@@ -188,8 +188,10 @@ class TriggerService(val scriptService: ScriptService) {
         ctx: BucketLevelTriggerExecutionContext
     ): BucketLevelTriggerRunResult {
         return try {
-            val bucketIndices =
-                ((ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)[trigger.id] as HashMap<*, *>)[BUCKET_INDICES] as List<*>
+            val bucketIndices = (
+                (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
+                    .get(trigger.id) as HashMap<*, *>
+                )[BUCKET_INDICES] as List<*>
             val parentBucketPath = (
                 (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
                     .get(trigger.id) as HashMap<*, *>
