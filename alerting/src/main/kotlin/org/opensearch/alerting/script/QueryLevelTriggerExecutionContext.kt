@@ -19,17 +19,21 @@ data class QueryLevelTriggerExecutionContext(
     override val periodStart: Instant,
     override val periodEnd: Instant,
     val alert: AlertContext? = null,
-    override val error: Exception? = null
+    override val error: Exception? = null,
 ) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error) {
-
     constructor(
         monitor: Monitor,
         trigger: QueryLevelTrigger,
         monitorRunResult: MonitorRunResult<QueryLevelTriggerRunResult>,
-        alertContext: AlertContext? = null
+        alertContext: AlertContext? = null,
     ) : this(
-        monitor, trigger, monitorRunResult.inputResults.results, monitorRunResult.periodStart, monitorRunResult.periodEnd,
-        alertContext, monitorRunResult.scriptContextError(trigger)
+        monitor,
+        trigger,
+        monitorRunResult.inputResults.results,
+        monitorRunResult.periodStart,
+        monitorRunResult.periodEnd,
+        alertContext,
+        monitorRunResult.scriptContextError(trigger),
     )
 
     /**

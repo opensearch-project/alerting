@@ -24,23 +24,28 @@ import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
 import java.lang.IllegalArgumentException
 import java.time.Instant
+import kotlin.test.Test
 
 class MonitorV2Tests : OpenSearchTestCase() {
+    @Test
     fun `test enabled time`() {
         val pplMonitor = randomPPLMonitor(enabled = true, enabledTime = Instant.now())
         try {
             pplMonitor.makeCopy(enabled = false)
             fail("Disabling monitor with enabled time set should fail.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
 
         val disabledMonitor = pplMonitor.copy(enabled = false, enabledTime = null)
 
         try {
             disabledMonitor.makeCopy(enabled = true)
             fail("Enabling monitor without enabled time should fail")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test max triggers`() {
         val tooManyTriggers = mutableListOf<PPLSQLTrigger>()
         for (i in 0..10) { // 11 times
@@ -50,9 +55,11 @@ class MonitorV2Tests : OpenSearchTestCase() {
         try {
             randomPPLMonitor(triggers = tooManyTriggers)
             fail("Monitor with too many triggers should be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test monitor name too long`() {
         var monitorName = ""
         for (i in 0 until ALERTING_V2_MAX_NAME_LENGTH + 1) {
@@ -62,47 +69,57 @@ class MonitorV2Tests : OpenSearchTestCase() {
         try {
             randomPPLMonitor(name = monitorName)
             fail("Monitor with too long a name should be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test monitor min look back window`() {
         try {
             randomPPLMonitor(
-                lookBackWindow = MONITOR_V2_MIN_LOOK_BACK_WINDOW - 1
+                lookBackWindow = MONITOR_V2_MIN_LOOK_BACK_WINDOW - 1,
             )
             fail("Monitor with too long a name should be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test monitor no triggers`() {
         try {
             randomPPLMonitor(
-                triggers = listOf()
+                triggers = listOf(),
             )
             fail("Monitor without triggers be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test monitor with look back window without timestamp field`() {
         try {
             randomPPLMonitor(
                 lookBackWindow = randomLongBetween(1, 10),
-                timestampField = null
+                timestampField = null,
             )
             fail("Monitor with look back window but without timestamp field be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test monitor without look back window with timestamp field`() {
         try {
             randomPPLMonitor(
                 lookBackWindow = null,
-                timestampField = "some_timestamp_field"
+                timestampField = "some_timestamp_field",
             )
             fail("Monitor without look back window but with timestamp field be rejected.")
-        } catch (_: IllegalArgumentException) {}
+        } catch (_: IllegalArgumentException) {
+        }
     }
 
+    @Test
     fun `test monitor v2 as stream`() {
         val pplMonitor = randomPPLMonitor()
         val monitorV2 = pplMonitor as MonitorV2
@@ -114,6 +131,7 @@ class MonitorV2Tests : OpenSearchTestCase() {
         assertPplMonitorsEqual(pplMonitor, newPplMonitor)
     }
 
+    @Test
     fun `test ppl monitor as stream`() {
         val pplMonitor = randomPPLMonitor()
         val out = BytesStreamOutput()
@@ -123,6 +141,7 @@ class MonitorV2Tests : OpenSearchTestCase() {
         assertPplMonitorsEqual(pplMonitor, newPplMonitor)
     }
 
+    @Test
     fun `test ppl monitor asTemplateArgs`() {
         val pplMonitor = randomPPLMonitor()
         val templateArgs = pplMonitor.asTemplateArg()
@@ -130,43 +149,43 @@ class MonitorV2Tests : OpenSearchTestCase() {
         assertEquals(
             "Template args field $_ID doesn't match",
             pplMonitor.id,
-            templateArgs[_ID]
+            templateArgs[_ID],
         )
         assertEquals(
             "Template args field $_VERSION doesn't match",
             pplMonitor.version,
-            templateArgs[_VERSION]
+            templateArgs[_VERSION],
         )
         assertEquals(
             "Template args field $NAME_FIELD doesn't match",
             pplMonitor.name,
-            templateArgs[NAME_FIELD]
+            templateArgs[NAME_FIELD],
         )
         assertEquals(
             "Template args field $ENABLED_FIELD doesn't match",
             pplMonitor.enabled,
-            templateArgs[ENABLED_FIELD]
+            templateArgs[ENABLED_FIELD],
         )
         assertNotNull(templateArgs[SCHEDULE_FIELD])
         assertEquals(
             "Template args field $LOOK_BACK_WINDOW_FIELD doesn't match",
             pplMonitor.lookBackWindow,
-            templateArgs[LOOK_BACK_WINDOW_FIELD]
+            templateArgs[LOOK_BACK_WINDOW_FIELD],
         )
         assertEquals(
             "Template args field $LAST_UPDATE_TIME_FIELD doesn't match",
             pplMonitor.lastUpdateTime.toEpochMilli(),
-            templateArgs[LAST_UPDATE_TIME_FIELD]
+            templateArgs[LAST_UPDATE_TIME_FIELD],
         )
         assertEquals(
             "Template args field $ENABLED_TIME_FIELD doesn't match",
             pplMonitor.enabledTime?.toEpochMilli(),
-            templateArgs[ENABLED_TIME_FIELD]
+            templateArgs[ENABLED_TIME_FIELD],
         )
         assertEquals(
             "Template args field $QUERY_FIELD doesn't match",
             pplMonitor.query,
-            templateArgs[QUERY_FIELD]
+            templateArgs[QUERY_FIELD],
         )
     }
 }

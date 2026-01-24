@@ -40,10 +40,15 @@ import org.opensearch.search.aggregations.Aggregations
 import org.opensearch.search.aggregations.support.AggregationPath
 
 /** Service that handles executing Triggers */
-class TriggerService(val scriptService: ScriptService) {
-
+class TriggerService(
+    val scriptService: ScriptService,
+) {
     private val logger = LogManager.getLogger(TriggerService::class.java)
+
+    @Suppress("ktlint:standard:property-naming")
     private val ALWAYS_RUN = Script("return true")
+
+    @Suppress("ktlint:standard:property-naming")
     private val NEVER_RUN = Script("return false")
 
     fun isQueryLevelTriggerActionable(
@@ -69,25 +74,26 @@ class TriggerService(val scriptService: ScriptService) {
     fun runQueryLevelTrigger(
         monitor: Monitor,
         trigger: QueryLevelTrigger,
-        ctx: QueryLevelTriggerExecutionContext
-    ): QueryLevelTriggerRunResult {
-        return try {
-            val triggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
-                .newInstance(trigger.condition.params)
-                .execute(ctx)
+        ctx: QueryLevelTriggerExecutionContext,
+    ): QueryLevelTriggerRunResult =
+        try {
+            val triggered =
+                scriptService
+                    .compile(trigger.condition, TriggerScript.CONTEXT)
+                    .newInstance(trigger.condition.params)
+                    .execute(ctx)
             QueryLevelTriggerRunResult(trigger.name, triggered, null)
         } catch (e: Exception) {
             logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
             // if the script fails we need to send an alert so set triggered = true
             QueryLevelTriggerRunResult(trigger.name, true, e)
         }
-    }
 
     fun runClusterMetricsTrigger(
         monitor: Monitor,
         trigger: QueryLevelTrigger,
         ctx: QueryLevelTriggerExecutionContext,
-        clusterService: ClusterService
+        clusterService: ClusterService,
     ): ClusterMetricsTriggerRunResult {
         var runResult: ClusterMetricsTriggerRunResult?
         try {
@@ -99,9 +105,11 @@ class TriggerService(val scriptService: ScriptService) {
                     // Reducing the inputResults to only include results from 1 cluster at a time
                     val clusterTriggerCtx = ctx.copy(results = listOf(mapOf(clusterResult.toPair())))
 
-                    val clusterTriggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
-                        .newInstance(trigger.condition.params)
-                        .execute(clusterTriggerCtx)
+                    val clusterTriggered =
+                        scriptService
+                            .compile(trigger.condition, TriggerScript.CONTEXT)
+                            .newInstance(trigger.condition.params)
+                            .execute(clusterTriggerCtx)
 
                     if (clusterTriggered) {
                         triggered = clusterTriggered
@@ -109,18 +117,23 @@ class TriggerService(val scriptService: ScriptService) {
                     }
                 }
             } else {
-                triggered = scriptService.compile(trigger.condition, TriggerScript.CONTEXT)
-                    .newInstance(trigger.condition.params)
-                    .execute(ctx)
-                if (triggered) clusterTriggerResults
-                    .add(ClusterTriggerResult(cluster = clusterService.clusterName.value(), triggered = triggered))
+                triggered =
+                    scriptService
+                        .compile(trigger.condition, TriggerScript.CONTEXT)
+                        .newInstance(trigger.condition.params)
+                        .execute(ctx)
+                if (triggered) {
+                    clusterTriggerResults
+                        .add(ClusterTriggerResult(cluster = clusterService.clusterName.value(), triggered = triggered))
+                }
             }
-            runResult = ClusterMetricsTriggerRunResult(
-                triggerName = trigger.name,
-                triggered = triggered,
-                error = null,
-                clusterTriggerResults = clusterTriggerResults
-            )
+            runResult =
+                ClusterMetricsTriggerRunResult(
+                    triggerName = trigger.name,
+                    triggered = triggered,
+                    error = null,
+                    clusterTriggerResults = clusterTriggerResults,
+                )
         } catch (e: Exception) {
             logger.info("Error running script for monitor ${monitor.id}, trigger: ${trigger.id}", e)
             // if the script fails we need to send an alert so set triggered = true
@@ -133,9 +146,9 @@ class TriggerService(val scriptService: ScriptService) {
     fun runDocLevelTrigger(
         monitor: Monitor,
         trigger: DocumentLevelTrigger,
-        queryToDocIds: Map<DocLevelQuery, Set<String>>
-    ): DocumentLevelTriggerRunResult {
-        return try {
+        queryToDocIds: Map<DocLevelQuery, Set<String>>,
+    ): DocumentLevelTriggerRunResult =
+        try {
             var triggeredDocs = mutableListOf<String>()
 
             if (trigger.condition.idOrCode.equals(ALWAYS_RUN.idOrCode)) {
@@ -143,8 +156,11 @@ class TriggerService(val scriptService: ScriptService) {
                     triggeredDocs.addAll(value)
                 }
             } else if (!trigger.condition.idOrCode.equals(NEVER_RUN.idOrCode)) {
-                triggeredDocs = TriggerExpressionParser(trigger.condition.idOrCode).parse()
-                    .evaluate(queryToDocIds).toMutableList()
+                triggeredDocs =
+                    TriggerExpressionParser(trigger.condition.idOrCode)
+                        .parse()
+                        .evaluate(queryToDocIds)
+                        .toMutableList()
             }
 
             DocumentLevelTriggerRunResult(trigger.name, triggeredDocs, null)
@@ -153,7 +169,6 @@ class TriggerService(val scriptService: ScriptService) {
             // if the script fails we need to send an alert so set triggered = true
             DocumentLevelTriggerRunResult(trigger.name, emptyList(), e)
         }
-    }
 
     fun runChainedAlertTrigger(
         workflow: Workflow,
@@ -176,7 +191,7 @@ class TriggerService(val scriptService: ScriptService) {
                 triggerName = trigger.name,
                 triggered = false,
                 error = e,
-                associatedAlertIds = emptySet()
+                associatedAlertIds = emptySet(),
             )
         }
     }
@@ -185,14 +200,15 @@ class TriggerService(val scriptService: ScriptService) {
     fun runBucketLevelTrigger(
         monitor: Monitor,
         trigger: BucketLevelTrigger,
-        ctx: BucketLevelTriggerExecutionContext
-    ): BucketLevelTriggerRunResult {
-        return try {
+        ctx: BucketLevelTriggerExecutionContext,
+    ): BucketLevelTriggerRunResult =
+        try {
             val bucketIndices =
                 ((ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)[trigger.id] as HashMap<*, *>)[BUCKET_INDICES] as List<*>
-            val parentBucketPath = (
-                (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
-                    .get(trigger.id) as HashMap<*, *>
+            val parentBucketPath =
+                (
+                    (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
+                        .get(trigger.id) as HashMap<*, *>
                 )[PARENT_BUCKET_PATH] as String
             val aggregationPath = AggregationPath.parse(parentBucketPath)
             // TODO test this part by passing sub-aggregation path
@@ -213,22 +229,34 @@ class TriggerService(val scriptService: ScriptService) {
             logger.info("Error running trigger [${trigger.id}] for monitor [${monitor.id}]", e)
             BucketLevelTriggerRunResult(trigger.name, e, emptyMap())
         }
-    }
 
     @Suppress("UNCHECKED_CAST")
     private fun getBucketKeyValuesList(bucket: Map<String, Any>): List<String> {
         val keyField = Aggregation.CommonFields.KEY.preferredName
         val keyValuesList = mutableListOf<String>()
         when {
-            bucket[keyField] is List<*> && bucket.containsKey(Aggregation.CommonFields.KEY_AS_STRING.preferredName) ->
+            bucket[keyField] is List<*> && bucket.containsKey(Aggregation.CommonFields.KEY_AS_STRING.preferredName) -> {
                 keyValuesList.add(bucket[Aggregation.CommonFields.KEY_AS_STRING.preferredName] as String)
-            bucket[keyField] is String -> keyValuesList.add(bucket[keyField] as String)
+            }
+
+            bucket[keyField] is String -> {
+                keyValuesList.add(bucket[keyField] as String)
+            }
+
             // In the case where the key field is an Int
-            bucket[keyField] is Int -> keyValuesList.add(bucket[keyField].toString())
+            bucket[keyField] is Int -> {
+                keyValuesList.add(bucket[keyField].toString())
+            }
+
             // In the case where the key field is an object with multiple values (such as a composite aggregation with more than one source)
             // the values will be iterated through and converted into a string
-            bucket[keyField] is Map<*, *> -> (bucket[keyField] as Map<String, Any>).values.map { keyValuesList.add(it.toString()) }
-            else -> throw IllegalArgumentException("Unexpected format for key in bucket [$bucket]")
+            bucket[keyField] is Map<*, *> -> {
+                (bucket[keyField] as Map<String, Any>).values.map { keyValuesList.add(it.toString()) }
+            }
+
+            else -> {
+                throw IllegalArgumentException("Unexpected format for key in bucket [$bucket]")
+            }
         }
 
         return keyValuesList

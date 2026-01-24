@@ -52,43 +52,50 @@ import org.opensearch.transport.client.Client
 private val log = LogManager.getLogger(TransportGetMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
-class TransportGetMonitorAction @Inject constructor(
-    transportService: TransportService,
-    val client: Client,
-    actionFilters: ActionFilters,
-    val xContentRegistry: NamedXContentRegistry,
-    val clusterService: ClusterService,
-    settings: Settings,
-) : HandledTransportAction<ActionRequest, GetMonitorResponse>(
-    AlertingActions.GET_MONITOR_ACTION_NAME,
-    transportService,
-    actionFilters,
-    ::GetMonitorRequest
-),
-    SecureTransportAction {
+class TransportGetMonitorAction
+    @Inject
+    constructor(
+        transportService: TransportService,
+        val client: Client,
+        actionFilters: ActionFilters,
+        val xContentRegistry: NamedXContentRegistry,
+        val clusterService: ClusterService,
+        settings: Settings,
+    ) : HandledTransportAction<ActionRequest, GetMonitorResponse>(
+            AlertingActions.GET_MONITOR_ACTION_NAME,
+            transportService,
+            actionFilters,
+            ::GetMonitorRequest,
+        ),
+        SecureTransportAction {
+        @Volatile
+        override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
-    @Volatile
-    override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
-
-    init {
-        listenFilterBySettingChange(clusterService)
-    }
-
-    override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<GetMonitorResponse>) {
-        val transformedRequest = request as? GetMonitorRequest
-            ?: recreateObject(request) {
-                GetMonitorRequest(it)
-            }
-
-        val user = readUserFromThreadContext(client)
-
-        val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, transformedRequest.monitorId)
-            .version(transformedRequest.version)
-            .fetchSourceContext(transformedRequest.srcContext)
-
-        if (!validateUserBackendRoles(user, actionListener)) {
-            return
+        init {
+            listenFilterBySettingChange(clusterService)
         }
+
+        override fun doExecute(
+            task: Task,
+            request: ActionRequest,
+            actionListener: ActionListener<GetMonitorResponse>,
+        ) {
+            val transformedRequest =
+                request as? GetMonitorRequest
+                    ?: recreateObject(request) {
+                        GetMonitorRequest(it)
+                    }
+
+            val user = readUserFromThreadContext(client)
+
+            val getRequest =
+                GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, transformedRequest.monitorId)
+                    .version(transformedRequest.version)
+                    .fetchSourceContext(transformedRequest.srcContext)
+
+            if (!validateUserBackendRoles(user, actionListener)) {
+                return
+            }
 
         /*
          * Remove security context before you call elasticsearch api's. By this time, permissions required
@@ -96,119 +103,124 @@ class TransportGetMonitorAction @Inject constructor(
          * Once system-indices [https://github.com/opendistro-for-elasticsearch/security/issues/666] is done, we
          * might further improve this logic. Also change try to kotlin-use for auto-closable.
          */
-        client.threadPool().threadContext.stashContext().use {
-            client.get(
-                getRequest,
-                object : ActionListener<GetResponse> {
-                    override fun onResponse(response: GetResponse) {
-                        if (!response.isExists) {
-                            actionListener.onFailure(
-                                AlertingException.wrap(OpenSearchStatusException("Monitor not found.", RestStatus.NOT_FOUND))
-                            )
-                            return
-                        }
+            client.threadPool().threadContext.stashContext().use {
+                client.get(
+                    getRequest,
+                    object : ActionListener<GetResponse> {
+                        override fun onResponse(response: GetResponse) {
+                            if (!response.isExists) {
+                                actionListener.onFailure(
+                                    AlertingException.wrap(OpenSearchStatusException("Monitor not found.", RestStatus.NOT_FOUND)),
+                                )
+                                return
+                            }
 
-                        var monitor: Monitor? = null
-                        if (!response.isSourceEmpty) {
-                            XContentHelper.createParser(
-                                xContentRegistry,
-                                LoggingDeprecationHandler.INSTANCE,
-                                response.sourceAsBytesRef,
-                                XContentType.JSON
-                            ).use { xcp ->
-                                val scheduledJob = ScheduledJob.parse(xcp, response.id, response.version)
+                            var monitor: Monitor? = null
+                            if (!response.isSourceEmpty) {
+                                XContentHelper
+                                    .createParser(
+                                        xContentRegistry,
+                                        LoggingDeprecationHandler.INSTANCE,
+                                        response.sourceAsBytesRef,
+                                        XContentType.JSON,
+                                    ).use { xcp ->
+                                        val scheduledJob = ScheduledJob.parse(xcp, response.id, response.version)
 
-                                validateMonitorV1(scheduledJob)?.let {
-                                    actionListener.onFailure(AlertingException.wrap(it))
-                                    return
-                                }
+                                        validateMonitorV1(scheduledJob)?.let {
+                                            actionListener.onFailure(AlertingException.wrap(it))
+                                            return
+                                        }
 
-                                monitor = scheduledJob as Monitor
+                                        monitor = scheduledJob as Monitor
 
-                                // security is enabled and filterby is enabled
-                                if (!checkUserPermissionsWithResource(
-                                        user,
-                                        monitor?.user,
-                                        actionListener,
-                                        "monitor",
-                                        transformedRequest.monitorId
+                                        // security is enabled and filterby is enabled
+                                        if (!checkUserPermissionsWithResource(
+                                                user,
+                                                monitor?.user,
+                                                actionListener,
+                                                "monitor",
+                                                transformedRequest.monitorId,
+                                            )
+                                        ) {
+                                            return
+                                        }
+                                    }
+                            }
+                            try {
+                                scope.launch {
+                                    val associatedCompositeMonitors = getAssociatedWorkflows(response.id)
+                                    actionListener.onResponse(
+                                        GetMonitorResponse(
+                                            response.id,
+                                            response.version,
+                                            response.seqNo,
+                                            response.primaryTerm,
+                                            monitor,
+                                            associatedCompositeMonitors,
+                                        ),
                                     )
-                                ) {
-                                    return
                                 }
+                            } catch (e: Exception) {
+                                log.error("Failed to get associate workflows in get monitor action", e)
                             }
                         }
-                        try {
-                            scope.launch {
-                                val associatedCompositeMonitors = getAssociatedWorkflows(response.id)
-                                actionListener.onResponse(
-                                    GetMonitorResponse(
-                                        response.id,
-                                        response.version,
-                                        response.seqNo,
-                                        response.primaryTerm,
-                                        monitor,
-                                        associatedCompositeMonitors
-                                    )
+
+                        override fun onFailure(ex: Exception) {
+                            if (isIndexNotFoundException(ex)) {
+                                log.error("Index not found while getting monitor", ex)
+                                actionListener.onFailure(
+                                    AlertingException.wrap(
+                                        OpenSearchStatusException("Monitor not found. Backing index is missing.", RestStatus.NOT_FOUND, ex),
+                                    ),
                                 )
+                            } else {
+                                log.error("Unexpected error while getting monitor", ex)
+                                actionListener.onFailure(AlertingException.wrap(ex))
                             }
-                        } catch (e: Exception) {
-                            log.error("Failed to get associate workflows in get monitor action", e)
                         }
-                    }
-
-                    override fun onFailure(ex: Exception) {
-                        if (isIndexNotFoundException(ex)) {
-                            log.error("Index not found while getting monitor", ex)
-                            actionListener.onFailure(
-                                AlertingException.wrap(
-                                    OpenSearchStatusException("Monitor not found. Backing index is missing.", RestStatus.NOT_FOUND, ex)
-                                )
-                            )
-                        } else {
-                            log.error("Unexpected error while getting monitor", ex)
-                            actionListener.onFailure(AlertingException.wrap(ex))
-                        }
-                    }
-                }
-            )
-        }
-    }
-
-    private suspend fun getAssociatedWorkflows(id: String): List<AssociatedWorkflow> {
-        try {
-            val associatedWorkflows = mutableListOf<AssociatedWorkflow>()
-            val queryBuilder = QueryBuilders.nestedQuery(
-                WORKFLOW_DELEGATE_PATH,
-                QueryBuilders.boolQuery().must(
-                    QueryBuilders.matchQuery(
-                        WORKFLOW_MONITOR_PATH,
-                        id
-                    )
-                ),
-                ScoreMode.None
-            )
-            val searchRequest = SearchRequest()
-                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                .source(SearchSourceBuilder().query(queryBuilder).fetchField("_id"))
-            val response: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-
-            for (hit in response.hits) {
-                XContentType.JSON.xContent().createParser(
-                    xContentRegistry,
-                    LoggingDeprecationHandler.INSTANCE,
-                    hit.sourceAsString
-                ).use { hitsParser ->
-                    val workflow = ScheduledJob.parse(hitsParser, hit.id, hit.version)
-                    if (workflow is Workflow) {
-                        associatedWorkflows.add(AssociatedWorkflow(hit.id, workflow.name))
-                    }
-                }
+                    },
+                )
             }
-            return associatedWorkflows
-        } catch (e: java.lang.Exception) {
-            log.error("failed to fetch associated workflows for monitor $id", e)
-            return emptyList()
+        }
+
+        private suspend fun getAssociatedWorkflows(id: String): List<AssociatedWorkflow> {
+            try {
+                val associatedWorkflows = mutableListOf<AssociatedWorkflow>()
+                val queryBuilder =
+                    QueryBuilders.nestedQuery(
+                        WORKFLOW_DELEGATE_PATH,
+                        QueryBuilders.boolQuery().must(
+                            QueryBuilders.matchQuery(
+                                WORKFLOW_MONITOR_PATH,
+                                id,
+                            ),
+                        ),
+                        ScoreMode.None,
+                    )
+                val searchRequest =
+                    SearchRequest()
+                        .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                        .source(SearchSourceBuilder().query(queryBuilder).fetchField("_id"))
+                val response: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
+
+                for (hit in response.hits) {
+                    XContentType.JSON
+                        .xContent()
+                        .createParser(
+                            xContentRegistry,
+                            LoggingDeprecationHandler.INSTANCE,
+                            hit.sourceAsString,
+                        ).use { hitsParser ->
+                            val workflow = ScheduledJob.parse(hitsParser, hit.id, hit.version)
+                            if (workflow is Workflow) {
+                                associatedWorkflows.add(AssociatedWorkflow(hit.id, workflow.name))
+                            }
+                        }
+                }
+                return associatedWorkflows
+            } catch (e: java.lang.Exception) {
+                log.error("failed to fetch associated workflows for monitor $id", e)
+                return emptyList()
+            }
         }
     }
-}

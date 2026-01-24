@@ -78,14 +78,13 @@ private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
  * initiated on the cluster manager node to ensure only a single node tries to roll it over.  Once we have a curator functionality
  * in Scheduled Jobs we can migrate to using that to rollover the index.
  */
-// TODO: reafactor to make a generic version of this class for finding and alerts
 class AlertIndices(
     settings: Settings,
     private val client: Client,
     private val threadPool: ThreadPool,
-    private val clusterService: ClusterService
+    private val clusterService: ClusterService,
 ) : ClusterStateListener {
-
+    // TODO: reafactor to make a generic version of this class for finding and alerts
     init {
         clusterService.addListener(this)
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERT_HISTORY_ENABLED) { alertHistoryEnabled = it }
@@ -113,7 +112,6 @@ class AlertIndices(
     }
 
     companion object {
-
         /** The in progress alert history index. */
         const val ALERT_INDEX = ".opendistro-alerting-alerts"
 
@@ -142,12 +140,10 @@ class AlertIndices(
         const val ALL_FINDING_INDEX_PATTERN = ".opensearch-alerting-finding*"
 
         @JvmStatic
-        fun alertMapping() =
-            AlertIndices::class.java.getResource("alert_mapping.json").readText()
+        fun alertMapping() = AlertIndices::class.java.getResource("alert_mapping.json").readText()
 
         @JvmStatic
-        fun findingMapping() =
-            AlertIndices::class.java.getResource("finding_mapping.json").readText()
+        fun findingMapping() = AlertIndices::class.java.getResource("finding_mapping.json").readText()
 
         private val logger = LogManager.getLogger(AlertIndices::class.java)
     }
@@ -195,16 +191,18 @@ class AlertIndices(
             rolloverAlertHistoryIndex()
             rolloverFindingHistoryIndex()
             // schedule the next rollover for approx MAX_AGE later
-            scheduledAlertRollover = threadPool
-                .scheduleWithFixedDelay({ rolloverAndDeleteAlertHistoryIndices() }, alertHistoryRolloverPeriod, executorName())
-            scheduledFindingRollover = threadPool
-                .scheduleWithFixedDelay({ rolloverAndDeleteFindingHistoryIndices() }, findingHistoryRolloverPeriod, executorName())
+            scheduledAlertRollover =
+                threadPool
+                    .scheduleWithFixedDelay({ rolloverAndDeleteAlertHistoryIndices() }, alertHistoryRolloverPeriod, executorName())
+            scheduledFindingRollover =
+                threadPool
+                    .scheduleWithFixedDelay({ rolloverAndDeleteFindingHistoryIndices() }, findingHistoryRolloverPeriod, executorName())
         } catch (e: Exception) {
             // This should be run on cluster startup
             logger.error(
                 "Error creating alert/finding indices. " +
                     "Alerts/Findings can't be recorded until clustermanager node is restarted.",
-                e
+                e,
             )
         }
     }
@@ -214,9 +212,7 @@ class AlertIndices(
         scheduledFindingRollover?.cancel()
     }
 
-    private fun executorName(): String {
-        return ThreadPool.Names.MANAGEMENT
-    }
+    private fun executorName(): String = ThreadPool.Names.MANAGEMENT
 
     override fun clusterChanged(event: ClusterChangedEvent) {
         // Instead of using a LocalNodeClusterManagerListener to track clustermanager changes, this service will
@@ -240,22 +236,22 @@ class AlertIndices(
     private fun rescheduleAlertRollover() {
         if (clusterService.state().nodes.isLocalNodeElectedClusterManager) {
             scheduledAlertRollover?.cancel()
-            scheduledAlertRollover = threadPool
-                .scheduleWithFixedDelay({ rolloverAndDeleteAlertHistoryIndices() }, alertHistoryRolloverPeriod, executorName())
+            scheduledAlertRollover =
+                threadPool
+                    .scheduleWithFixedDelay({ rolloverAndDeleteAlertHistoryIndices() }, alertHistoryRolloverPeriod, executorName())
         }
     }
 
     private fun rescheduleFindingRollover() {
         if (clusterService.state().nodes.isLocalNodeElectedClusterManager) {
             scheduledFindingRollover?.cancel()
-            scheduledFindingRollover = threadPool
-                .scheduleWithFixedDelay({ rolloverAndDeleteFindingHistoryIndices() }, findingHistoryRolloverPeriod, executorName())
+            scheduledFindingRollover =
+                threadPool
+                    .scheduleWithFixedDelay({ rolloverAndDeleteFindingHistoryIndices() }, findingHistoryRolloverPeriod, executorName())
         }
     }
 
-    fun isAlertInitialized(): Boolean {
-        return alertIndexInitialized && alertHistoryIndexInitialized
-    }
+    fun isAlertInitialized(): Boolean = alertIndexInitialized && alertHistoryIndexInitialized
 
     fun isAlertInitialized(dataSources: DataSources): Boolean {
         val alertsIndex = dataSources.alertsIndex
@@ -264,7 +260,10 @@ class AlertIndices(
             return alertIndexInitialized && alertHistoryIndexInitialized
         }
         if (
-            clusterService.state().metadata.indices.containsKey(alertsIndex) &&
+            clusterService
+                .state()
+                .metadata.indices
+                .containsKey(alertsIndex) &&
             clusterService.state().metadata.hasAlias(alertsHistoryIndex)
         ) {
             return true
@@ -272,9 +271,7 @@ class AlertIndices(
         return false
     }
 
-    fun isAlertHistoryEnabled(): Boolean {
-        return alertHistoryEnabled
-    }
+    fun isAlertHistoryEnabled(): Boolean = alertHistoryEnabled
 
     fun isFindingHistoryEnabled(): Boolean = findingHistoryEnabled
 
@@ -287,6 +284,7 @@ class AlertIndices(
         }
         alertIndexInitialized
     }
+
     suspend fun createOrUpdateAlertIndex(dataSources: DataSources) {
         if (dataSources.alertsIndex == ALERT_INDEX) {
             return createOrUpdateAlertIndex()
@@ -307,24 +305,27 @@ class AlertIndices(
             createIndex(
                 dataSources.alertsHistoryIndexPattern ?: ALERT_HISTORY_INDEX_PATTERN,
                 alertMapping(),
-                dataSources.alertsHistoryIndex
+                dataSources.alertsHistoryIndex,
             )
         } else {
             updateIndexMapping(
                 dataSources.alertsHistoryIndex ?: ALERT_HISTORY_WRITE_INDEX,
                 alertMapping(),
-                true
+                true,
             )
         }
     }
+
     suspend fun createOrUpdateInitialAlertHistoryIndex() {
         if (!alertHistoryIndexInitialized) {
             alertHistoryIndexInitialized = createIndex(ALERT_HISTORY_INDEX_PATTERN, alertMapping(), ALERT_HISTORY_WRITE_INDEX)
-            if (alertHistoryIndexInitialized)
-                IndexUtils.lastUpdatedAlertHistoryIndex = IndexUtils.getIndexNameWithAlias(
-                    clusterService.state(),
-                    ALERT_HISTORY_WRITE_INDEX
-                )
+            if (alertHistoryIndexInitialized) {
+                IndexUtils.lastUpdatedAlertHistoryIndex =
+                    IndexUtils.getIndexNameWithAlias(
+                        clusterService.state(),
+                        ALERT_HISTORY_WRITE_INDEX,
+                    )
+            }
         } else {
             updateIndexMapping(ALERT_HISTORY_WRITE_INDEX, alertMapping(), true)
         }
@@ -335,10 +336,11 @@ class AlertIndices(
         if (!findingHistoryIndexInitialized) {
             findingHistoryIndexInitialized = createIndex(FINDING_HISTORY_INDEX_PATTERN, findingMapping(), FINDING_HISTORY_WRITE_INDEX)
             if (findingHistoryIndexInitialized) {
-                IndexUtils.lastUpdatedFindingHistoryIndex = IndexUtils.getIndexNameWithAlias(
-                    clusterService.state(),
-                    FINDING_HISTORY_WRITE_INDEX
-                )
+                IndexUtils.lastUpdatedFindingHistoryIndex =
+                    IndexUtils.getIndexNameWithAlias(
+                        clusterService.state(),
+                        FINDING_HISTORY_WRITE_INDEX,
+                    )
             }
         } else {
             updateIndexMapping(FINDING_HISTORY_WRITE_INDEX, findingMapping(), true)
@@ -356,26 +358,32 @@ class AlertIndices(
             createIndex(
                 findingsIndexPattern,
                 findingMapping(),
-                findingsIndex
+                findingsIndex,
             )
         } else {
             updateIndexMapping(findingsIndex, findingMapping(), true)
         }
     }
 
-    private suspend fun createIndex(index: String, schemaMapping: String, alias: String? = null): Boolean {
+    private suspend fun createIndex(
+        index: String,
+        schemaMapping: String,
+        alias: String? = null,
+    ): Boolean {
         // This should be a fast check of local cluster state. Should be exceedingly rare that the local cluster
         // state does not contain the index and multiple nodes concurrently try to create the index.
         // If it does happen that error is handled we catch the ResourceAlreadyExistsException
-        val existsResponse: IndicesExistsResponse = client.admin().indices().suspendUntil {
-            exists(IndicesExistsRequest(index).local(true), it)
-        }
+        val existsResponse: IndicesExistsResponse =
+            client.admin().indices().suspendUntil {
+                exists(IndicesExistsRequest(index).local(true), it)
+            }
         if (existsResponse.isExists) return true
 
         logger.debug("index: [$index] schema mappings: [$schemaMapping]")
-        val request = CreateIndexRequest(index)
-            .mapping(schemaMapping)
-            .settings(Settings.builder().put("index.hidden", true).build())
+        val request =
+            CreateIndexRequest(index)
+                .mapping(schemaMapping)
+                .settings(Settings.builder().put("index.hidden", true).build())
 
         if (alias != null) request.alias(Alias(alias))
         return try {
@@ -390,7 +398,11 @@ class AlertIndices(
         }
     }
 
-    private suspend fun updateIndexMapping(index: String, mapping: String, alias: Boolean = false) {
+    private suspend fun updateIndexMapping(
+        index: String,
+        mapping: String,
+        alias: Boolean = false,
+    ) {
         val clusterState = clusterService.state()
         var targetIndex = index
         if (alias) {
@@ -402,8 +414,9 @@ class AlertIndices(
             return
         }
 
-        val putMappingRequest: PutMappingRequest = PutMappingRequest(targetIndex)
-            .source(mapping, XContentType.JSON)
+        val putMappingRequest: PutMappingRequest =
+            PutMappingRequest(targetIndex)
+                .source(mapping, XContentType.JSON)
         val updateResponse: AcknowledgedResponse = client.admin().indices().suspendUntil { putMapping(putMappingRequest, it) }
         if (updateResponse.isAcknowledged) {
             logger.info("Index mapping of $targetIndex is updated")
@@ -413,7 +426,10 @@ class AlertIndices(
         }
     }
 
-    private fun setIndexUpdateFlag(index: String, targetIndex: String) {
+    private fun setIndexUpdateFlag(
+        index: String,
+        targetIndex: String,
+    ) {
         when (index) {
             ALERT_INDEX -> IndexUtils.alertIndexUpdated()
             ALERT_HISTORY_WRITE_INDEX -> IndexUtils.lastUpdatedAlertHistoryIndex = targetIndex
@@ -438,7 +454,7 @@ class AlertIndices(
         map: String,
         docsCondition: Long,
         ageCondition: TimeValue,
-        writeIndex: String
+        writeIndex: String,
     ) {
         if (!initialized) {
             return
@@ -446,7 +462,8 @@ class AlertIndices(
 
         // We have to pass null for newIndexName in order to get Elastic to increment the index count.
         val request = RolloverRequest(index, null)
-        request.createIndexRequest.index(pattern)
+        request.createIndexRequest
+            .index(pattern)
             .mapping(map)
             .settings(Settings.builder().put("index.hidden", true).build())
         request.addMaxIndexDocsCondition(docsCondition)
@@ -461,10 +478,11 @@ class AlertIndices(
                         lastRolloverTime = TimeValue.timeValueMillis(threadPool.absoluteTimeInMillis())
                     }
                 }
+
                 override fun onFailure(e: Exception) {
                     logger.error("$writeIndex not roll over failed.")
                 }
-            }
+            },
         )
     }
 
@@ -476,7 +494,7 @@ class AlertIndices(
             alertMapping(),
             alertHistoryMaxDocs,
             alertHistoryMaxAge,
-            ALERT_HISTORY_WRITE_INDEX
+            ALERT_HISTORY_WRITE_INDEX,
         )
     }
 
@@ -488,23 +506,29 @@ class AlertIndices(
             findingMapping(),
             findingHistoryMaxDocs,
             findingHistoryMaxAge,
-            FINDING_HISTORY_WRITE_INDEX
+            FINDING_HISTORY_WRITE_INDEX,
         )
     }
 
-    private fun deleteOldIndices(tag: String, indices: String) {
+    private fun deleteOldIndices(
+        tag: String,
+        indices: String,
+    ) {
         logger.info("info deleteOldIndices")
-        val clusterStateRequest = ClusterStateRequest()
-            .clear()
-            .indices(indices)
-            .metadata(true)
-            .local(true)
-            .indicesOptions(IndicesOptions.strictExpand())
+        val clusterStateRequest =
+            ClusterStateRequest()
+                .clear()
+                .indices(indices)
+                .metadata(true)
+                .local(true)
+                .indicesOptions(IndicesOptions.strictExpand())
         client.admin().cluster().state(
             clusterStateRequest,
             object : ActionListener<ClusterStateResponse> {
                 override fun onResponse(clusterStateResponse: ClusterStateResponse) {
-                    if (clusterStateResponse.state.metadata.indices.isNotEmpty()) {
+                    if (clusterStateResponse.state.metadata.indices
+                            .isNotEmpty()
+                    ) {
                         scope.launch {
                             val indicesToDelete = getIndicesToDelete(clusterStateResponse)
                             logger.info("Deleting old $tag indices viz $indicesToDelete")
@@ -517,10 +541,11 @@ class AlertIndices(
                         logger.info("No Old $tag Indices to delete")
                     }
                 }
+
                 override fun onFailure(e: Exception) {
                     logger.error("Error fetching cluster state")
                 }
-            }
+            },
         )
     }
 
@@ -540,7 +565,7 @@ class AlertIndices(
         indexMetadata: IndexMetadata,
         retentionPeriodMillis: Long,
         writeIndex: String,
-        historyEnabled: Boolean
+        historyEnabled: Boolean,
     ): String? {
         val creationTime = indexMetadata.creationDate
         if ((Instant.now().toEpochMilli() - creationTime) > retentionPeriodMillis) {
@@ -572,16 +597,17 @@ class AlertIndices(
                     override fun onResponse(deleteIndicesResponse: AcknowledgedResponse) {
                         if (!deleteIndicesResponse.isAcknowledged) {
                             logger.error(
-                                "Could not delete one or more Alerting/Finding history indices: $indicesToDelete. Retrying one by one."
+                                "Could not delete one or more Alerting/Finding history indices: $indicesToDelete. Retrying one by one.",
                             )
                             deleteOldHistoryIndex(indicesToDelete)
                         }
                     }
+
                     override fun onFailure(e: Exception) {
                         logger.error("Delete for Alerting/Finding History Indices $indicesToDelete Failed. Retrying one By one.")
                         deleteOldHistoryIndex(indicesToDelete)
                     }
-                }
+                },
             )
         }
     }
@@ -599,10 +625,11 @@ class AlertIndices(
                             }
                         }
                     }
+
                     override fun onFailure(e: Exception) {
                         logger.debug("Exception ${e.message} while deleting the index $index")
                     }
-                }
+                },
             )
         }
     }
@@ -617,26 +644,30 @@ class AlertIndices(
 
     private suspend fun getAlertIDsFromAlertHistoryIndex(indexName: String): List<String> {
         val queryBuilder = QueryBuilders.matchAllQuery()
-        val searchSourceBuilder = SearchSourceBuilder()
-            .query(queryBuilder)
-            .version(true)
+        val searchSourceBuilder =
+            SearchSourceBuilder()
+                .query(queryBuilder)
+                .version(true)
 
-        val searchRequest = SearchRequest()
-            .indices(indexName)
-            .source(searchSourceBuilder)
+        val searchRequest =
+            SearchRequest()
+                .indices(indexName)
+                .source(searchSourceBuilder)
 
         val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
-        val alertIDs = searchResponse.hits.map { hit ->
-            val xcp = XContentHelper.createParser(
-                NamedXContentRegistry.EMPTY,
-                LoggingDeprecationHandler.INSTANCE,
-                hit.sourceRef,
-                XContentType.JSON
-            )
-            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-            val alert = Alert.parse(xcp, hit.id, hit.version)
-            alert.id
-        }
+        val alertIDs =
+            searchResponse.hits.map { hit ->
+                val xcp =
+                    XContentHelper.createParser(
+                        NamedXContentRegistry.EMPTY,
+                        LoggingDeprecationHandler.INSTANCE,
+                        hit.sourceRef,
+                        XContentType.JSON,
+                    )
+                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                val alert = Alert.parse(xcp, hit.id, hit.version)
+                alert.id
+            }
 
         return alertIDs.distinct()
     }

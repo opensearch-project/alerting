@@ -22,28 +22,31 @@ import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import kotlin.test.Test
 
 class DestinationMigrationUtilServiceIT : AlertingRestTestCase() {
-
+    @Test
     fun `test migrateData`() {
         if (isNotificationPluginInstalled()) {
             // Create alerting config index
             createRandomMonitor()
 
-            val emailAccount = EmailAccount(
-                name = "test",
-                email = "test@email.com",
-                host = "smtp.com",
-                port = 25,
-                method = EmailAccount.MethodType.NONE,
-                username = null,
-                password = null
-            )
+            val emailAccount =
+                EmailAccount(
+                    name = "test",
+                    email = "test@email.com",
+                    host = "smtp.com",
+                    port = 25,
+                    method = EmailAccount.MethodType.NONE,
+                    username = null,
+                    password = null,
+                )
             val emailAccountDoc = "{\"email_account\" : ${emailAccount.toJsonString()}}"
-            val emailGroup = EmailGroup(
-                name = "test",
-                emails = listOf(EmailEntry("test@email.com"))
-            )
+            val emailGroup =
+                EmailGroup(
+                    name = "test",
+                    emails = listOf(EmailEntry("test@email.com")),
+                )
             val emailGroupDoc = "{\"email_group\" : ${emailGroup.toJsonString()}}"
             val emailAccountId = UUID.randomUUID().toString()
             val emailGroupId = UUID.randomUUID().toString()
@@ -52,17 +55,18 @@ class DestinationMigrationUtilServiceIT : AlertingRestTestCase() {
 
             val recipient = Recipient(Recipient.RecipientType.EMAIL, null, "test@email.com")
             val email = Email(emailAccountId, listOf(recipient))
-            val emailDest = Destination(
-                id = UUID.randomUUID().toString(),
-                type = DestinationType.EMAIL,
-                name = "test",
-                user = randomUser(),
-                lastUpdateTime = Instant.now(),
-                chime = null,
-                slack = null,
-                customWebhook = null,
-                email = email
-            )
+            val emailDest =
+                Destination(
+                    id = UUID.randomUUID().toString(),
+                    type = DestinationType.EMAIL,
+                    name = "test",
+                    user = randomUser(),
+                    lastUpdateTime = Instant.now(),
+                    chime = null,
+                    slack = null,
+                    customWebhook = null,
+                    email = email,
+                )
             val slackDestination = getSlackDestination().copy(id = UUID.randomUUID().toString())
             val chimeDestination = getChimeDestination().copy(id = UUID.randomUUID().toString())
             val customWebhookDestination = getCustomWebhookDestination().copy(id = UUID.randomUUID().toString())
@@ -71,11 +75,12 @@ class DestinationMigrationUtilServiceIT : AlertingRestTestCase() {
 
             val ids = mutableListOf(emailAccountId, emailGroupId)
             for (destination in destinations) {
-                val dest = """
+                val dest =
+                    """
                     {
                       "destination" : ${destination.toJsonString()}
                     }
-                """.trimIndent()
+                    """.trimIndent()
                 indexDocWithAdminClient(SCHEDULED_JOBS_INDEX, destination.id, dest)
                 ids.add(destination.id)
             }
@@ -87,16 +92,17 @@ class DestinationMigrationUtilServiceIT : AlertingRestTestCase() {
             }, 2, TimeUnit.MINUTES)
 
             for (id in ids) {
-                val response = client().makeRequest(
-                    "GET",
-                    "_plugins/_notifications/configs/$id"
-                )
+                val response =
+                    client().makeRequest(
+                        "GET",
+                        "_plugins/_notifications/configs/$id",
+                    )
                 assertEquals(RestStatus.OK, response.restStatus())
 
                 try {
                     client().makeRequest(
                         "GET",
-                        ".opendistro-alerting-config/_doc/$id"
+                        ".opendistro-alerting-config/_doc/$id",
                     )
                     fail("Expecting ResponseException")
                 } catch (e: ResponseException) {

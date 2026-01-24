@@ -30,7 +30,7 @@ class IndexMonitorV2Request : ActionRequest {
         refreshPolicy: WriteRequest.RefreshPolicy,
         method: RestRequest.Method,
         monitorV2: MonitorV2,
-        rbacRoles: List<String>? = null
+        rbacRoles: List<String>? = null,
     ) : super() {
         this.monitorId = monitorId
         this.seqNo = seqNo
@@ -49,12 +49,10 @@ class IndexMonitorV2Request : ActionRequest {
         refreshPolicy = WriteRequest.RefreshPolicy.readFrom(sin),
         method = sin.readEnum(RestRequest.Method::class.java),
         monitorV2 = MonitorV2.readFrom(sin),
-        rbacRoles = sin.readOptionalStringList()
+        rbacRoles = sin.readOptionalStringList(),
     )
 
-    override fun validate(): ActionRequestValidationException? {
-        return null
-    }
+    override fun validate(): ActionRequestValidationException? = null
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {

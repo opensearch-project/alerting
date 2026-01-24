@@ -24,48 +24,61 @@ class ScheduledJobUtils {
     companion object {
         const val WORKFLOW_DELEGATE_PATH = "workflow.inputs.composite_input.sequence.delegates"
         const val WORKFLOW_MONITOR_PATH = "workflow.inputs.composite_input.sequence.delegates.monitor_id"
-        fun parseWorkflowFromScheduledJobDocSource(xContentRegistry: NamedXContentRegistry, response: GetResponse): Workflow {
-            XContentHelper.createParser(
-                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                response.sourceAsBytesRef, XContentType.JSON
-            ).use { xcp ->
-                try {
-                    val workflow = ScheduledJob.parse(xcp, response.id, response.version)
-                    if (workflow is Workflow) {
-                        return workflow
-                    } else {
-                        log.error("Unable to parse workflow from ${response.source}")
-                        throw OpenSearchStatusException(
-                            "Unable to parse workflow from ${response.source}",
-                            RestStatus.INTERNAL_SERVER_ERROR
-                        )
+
+        fun parseWorkflowFromScheduledJobDocSource(
+            xContentRegistry: NamedXContentRegistry,
+            response: GetResponse,
+        ): Workflow {
+            XContentHelper
+                .createParser(
+                    xContentRegistry,
+                    LoggingDeprecationHandler.INSTANCE,
+                    response.sourceAsBytesRef,
+                    XContentType.JSON,
+                ).use { xcp ->
+                    try {
+                        val workflow = ScheduledJob.parse(xcp, response.id, response.version)
+                        if (workflow is Workflow) {
+                            return workflow
+                        } else {
+                            log.error("Unable to parse workflow from ${response.source}")
+                            throw OpenSearchStatusException(
+                                "Unable to parse workflow from ${response.source}",
+                                RestStatus.INTERNAL_SERVER_ERROR,
+                            )
+                        }
+                    } catch (e: java.lang.Exception) {
+                        throw AlertingException("Unable to parse workflow from ${response.source}", RestStatus.INTERNAL_SERVER_ERROR, e)
                     }
-                } catch (e: java.lang.Exception) {
-                    throw AlertingException("Unable to parse workflow from ${response.source}", RestStatus.INTERNAL_SERVER_ERROR, e)
                 }
-            }
         }
 
-        fun parseMonitorFromScheduledJobDocSource(xContentRegistry: NamedXContentRegistry, response: GetResponse): Monitor {
-            XContentHelper.createParser(
-                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                response.sourceAsBytesRef, XContentType.JSON
-            ).use { xcp ->
-                try {
-                    val monitor = ScheduledJob.parse(xcp, response.id, response.version)
-                    if (monitor is Monitor) {
-                        return monitor
-                    } else {
-                        log.error("Unable to parse monitor from ${response.source}")
-                        throw OpenSearchStatusException(
-                            "Unable to parse monitor from ${response.source}",
-                            RestStatus.INTERNAL_SERVER_ERROR
-                        )
+        fun parseMonitorFromScheduledJobDocSource(
+            xContentRegistry: NamedXContentRegistry,
+            response: GetResponse,
+        ): Monitor {
+            XContentHelper
+                .createParser(
+                    xContentRegistry,
+                    LoggingDeprecationHandler.INSTANCE,
+                    response.sourceAsBytesRef,
+                    XContentType.JSON,
+                ).use { xcp ->
+                    try {
+                        val monitor = ScheduledJob.parse(xcp, response.id, response.version)
+                        if (monitor is Monitor) {
+                            return monitor
+                        } else {
+                            log.error("Unable to parse monitor from ${response.source}")
+                            throw OpenSearchStatusException(
+                                "Unable to parse monitor from ${response.source}",
+                                RestStatus.INTERNAL_SERVER_ERROR,
+                            )
+                        }
+                    } catch (e: java.lang.Exception) {
+                        throw AlertingException("Unable to parse monitor from ${response.source}", RestStatus.INTERNAL_SERVER_ERROR, e)
                     }
-                } catch (e: java.lang.Exception) {
-                    throw AlertingException("Unable to parse monitor from ${response.source}", RestStatus.INTERNAL_SERVER_ERROR, e)
                 }
-            }
         }
     }
 }

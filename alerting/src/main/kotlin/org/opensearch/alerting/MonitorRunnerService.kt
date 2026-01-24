@@ -99,7 +99,6 @@ import java.util.UUID
 import kotlin.coroutines.CoroutineContext
 
 object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleComponent() {
-
     private val logger = LogManager.getLogger(javaClass)
 
     var monitorCtx: MonitorRunnerExecutionContext = MonitorRunnerExecutionContext()
@@ -189,10 +188,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     // Must be called after registerClusterService and registerSettings in AlertingPlugin
     fun registerConsumers(): MonitorRunnerService {
-        monitorCtx.retryPolicy = BackoffPolicy.constantBackoff(
-            ALERT_BACKOFF_MILLIS.get(monitorCtx.settings),
-            ALERT_BACKOFF_COUNT.get(monitorCtx.settings)
-        )
+        monitorCtx.retryPolicy =
+            BackoffPolicy.constantBackoff(
+                ALERT_BACKOFF_MILLIS.get(monitorCtx.settings),
+                ALERT_BACKOFF_COUNT.get(monitorCtx.settings),
+            )
 
         monitorCtx.cancelAfterTimeInterval = SEARCH_CANCEL_AFTER_TIME_INTERVAL_SETTING.get(monitorCtx.settings)
 
@@ -203,11 +203,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         monitorCtx.moveAlertsRetryPolicy =
             BackoffPolicy.exponentialBackoff(
                 MOVE_ALERTS_BACKOFF_MILLIS.get(monitorCtx.settings),
-                MOVE_ALERTS_BACKOFF_COUNT.get(monitorCtx.settings)
+                MOVE_ALERTS_BACKOFF_COUNT.get(monitorCtx.settings),
             )
         monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(
             MOVE_ALERTS_BACKOFF_MILLIS,
-            MOVE_ALERTS_BACKOFF_COUNT
+            MOVE_ALERTS_BACKOFF_COUNT,
         ) { millis, count ->
             monitorCtx.moveAlertsRetryPolicy = BackoffPolicy.exponentialBackoff(millis, count)
         }
@@ -257,14 +257,16 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
         monitorCtx.percQueryDocsSizeMemoryPercentageLimit =
             PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT.get(monitorCtx.settings)
-        monitorCtx.clusterService!!.clusterSettings
+        monitorCtx.clusterService!!
+            .clusterSettings
             .addSettingsUpdateConsumer(PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT) {
                 monitorCtx.percQueryDocsSizeMemoryPercentageLimit = it
             }
 
         monitorCtx.docLevelMonitorShardFetchSize =
             DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE.get(monitorCtx.settings)
-        monitorCtx.clusterService!!.clusterSettings
+        monitorCtx.clusterService!!
+            .clusterSettings
             .addSettingsUpdateConsumer(DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE) {
                 monitorCtx.docLevelMonitorShardFetchSize = it
             }
@@ -378,7 +380,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         }
     }
 
-    override fun runJob(job: ScheduledJob, periodStart: Instant, periodEnd: Instant) {
+    override fun runJob(
+        job: ScheduledJob,
+        periodStart: Instant,
+        periodEnd: Instant,
+    ) {
         when (job) {
             is Workflow -> {
                 launch {
@@ -397,9 +403,9 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                                     TimeValue(periodEnd.toEpochMilli()),
                                     job.id,
                                     job,
-                                    TimeValue(periodStart.toEpochMilli())
+                                    TimeValue(periodStart.toEpochMilli()),
                                 ),
-                                it
+                                it,
                             )
                         }
                     } catch (e: Exception) {
@@ -410,6 +416,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     }
                 }
             }
+
             is Monitor -> {
                 launch {
                     var monitorLock: LockModel? = null
@@ -420,20 +427,24 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         logger.debug("lock ${monitorLock.lockId} acquired")
                         logger.debug(
                             "PERF_DEBUG: executing ${job.monitorType} ${job.id} on node " +
-                                monitorCtx.clusterService!!.state().nodes().localNode.id
+                                monitorCtx.clusterService!!
+                                    .state()
+                                    .nodes()
+                                    .localNode.id,
                         )
-                        val executeMonitorRequest = ExecuteMonitorRequest(
-                            false,
-                            TimeValue(periodEnd.toEpochMilli()),
-                            job.id,
-                            job,
-                            TimeValue(periodStart.toEpochMilli())
-                        )
+                        val executeMonitorRequest =
+                            ExecuteMonitorRequest(
+                                false,
+                                TimeValue(periodEnd.toEpochMilli()),
+                                job.id,
+                                job,
+                                TimeValue(periodStart.toEpochMilli()),
+                            )
                         monitorCtx.client!!.suspendUntil<Client, ExecuteMonitorResponse> {
                             monitorCtx.client!!.execute(
                                 ExecuteMonitorAction.INSTANCE,
                                 executeMonitorRequest,
-                                it
+                                it,
                             )
                         }
                     } catch (e: Exception) {
@@ -444,6 +455,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     }
                 }
             }
+
             is MonitorV2 -> {
                 if (job !is PPLSQLMonitor) {
                     throw IllegalStateException("Invalid MonitorV2 type: ${job.javaClass.name}")
@@ -458,20 +470,24 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         logger.debug("lock ${monitorLock!!.lockId} acquired")
                         logger.debug(
                             "PERF_DEBUG: executing $PPL_SQL_MONITOR_TYPE ${job.id} on node " +
-                                monitorCtx.clusterService!!.state().nodes().localNode.id
+                                monitorCtx.clusterService!!
+                                    .state()
+                                    .nodes()
+                                    .localNode.id,
                         )
-                        val executeMonitorV2Request = ExecuteMonitorV2Request(
-                            false,
-                            false,
-                            job.id, // only need to pass in MonitorV2 ID
-                            null, // no need to pass in MonitorV2 object itself
-                            TimeValue(periodEnd.toEpochMilli())
-                        )
+                        val executeMonitorV2Request =
+                            ExecuteMonitorV2Request(
+                                false,
+                                false,
+                                job.id, // only need to pass in MonitorV2 ID
+                                null, // no need to pass in MonitorV2 object itself
+                                TimeValue(periodEnd.toEpochMilli()),
+                            )
                         monitorCtx.client!!.suspendUntil<Client, ExecuteMonitorV2Response> {
                             monitorCtx.client!!.execute(
                                 ExecuteMonitorV2Action.INSTANCE,
                                 executeMonitorV2Request,
-                                it
+                                it,
                             )
                         }
                     } catch (e: Exception) {
@@ -482,6 +498,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     }
                 }
             }
+
             else -> {
                 throw IllegalArgumentException("Invalid job type")
             }
@@ -493,17 +510,15 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
-        transportService: TransportService
-    ): WorkflowRunResult {
-        return CompositeWorkflowRunner.runWorkflow(workflow, monitorCtx, periodStart, periodEnd, dryrun, transportService)
-    }
+        transportService: TransportService,
+    ): WorkflowRunResult = CompositeWorkflowRunner.runWorkflow(workflow, monitorCtx, periodStart, periodEnd, dryrun, transportService)
 
     suspend fun runJob(
         job: ScheduledJob,
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
-        transportService: TransportService
+        transportService: TransportService,
     ): MonitorRunResult<*> {
         // Updating the scheduled job index at the start of monitor execution runs for when there is an upgrade the the schema mapping
         // has not been updated.
@@ -526,44 +541,45 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 throw AlertingException(
                     "Index patterns are not supported in doc level monitors.",
                     RestStatus.BAD_REQUEST,
-                    IllegalArgumentException("Index patterns are not supported in doc level monitors.")
+                    IllegalArgumentException("Index patterns are not supported in doc level monitors."),
                 )
             }
             logger.info(
                 "Executing scheduled monitor - id: ${monitor.id}, type: ${monitor.monitorType}, periodStart: $periodStart, " +
-                    "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
+                    "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId",
             )
-            val runResult = if (monitor.isBucketLevelMonitor()) {
-                BucketLevelMonitorRunner.runMonitor(
-                    monitor,
-                    monitorCtx,
-                    periodStart,
-                    periodEnd,
-                    dryrun,
-                    executionId = executionId,
-                    transportService = transportService
-                )
-            } else if (monitor.isDocLevelMonitor()) {
-                DocumentLevelMonitorRunner().runMonitor(
-                    monitor,
-                    monitorCtx,
-                    periodStart,
-                    periodEnd,
-                    dryrun,
-                    executionId = executionId,
-                    transportService = transportService
-                )
-            } else {
-                QueryLevelMonitorRunner.runMonitor(
-                    monitor,
-                    monitorCtx,
-                    periodStart,
-                    periodEnd,
-                    dryrun,
-                    executionId = executionId,
-                    transportService = transportService
-                )
-            }
+            val runResult =
+                if (monitor.isBucketLevelMonitor()) {
+                    BucketLevelMonitorRunner.runMonitor(
+                        monitor,
+                        monitorCtx,
+                        periodStart,
+                        periodEnd,
+                        dryrun,
+                        executionId = executionId,
+                        transportService = transportService,
+                    )
+                } else if (monitor.isDocLevelMonitor()) {
+                    DocumentLevelMonitorRunner().runMonitor(
+                        monitor,
+                        monitorCtx,
+                        periodStart,
+                        periodEnd,
+                        dryrun,
+                        executionId = executionId,
+                        transportService = transportService,
+                    )
+                } else {
+                    QueryLevelMonitorRunner.runMonitor(
+                        monitor,
+                        monitorCtx,
+                        periodStart,
+                        periodEnd,
+                        dryrun,
+                        executionId = executionId,
+                        transportService = transportService,
+                    )
+                }
             return runResult
         } else {
             if (monitorCtx.remoteMonitors.containsKey(monitor.monitorType)) {
@@ -576,7 +592,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         periodEnd,
                         dryrun,
                         executionId = executionId,
-                        transportService = transportService
+                        transportService = transportService,
                     )
                 } else {
                     logger.info("Executing remote monitor of type ${monitor.monitorType} id ${monitor.id}")
@@ -586,7 +602,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         periodEnd,
                         dryrun,
                         executionId,
-                        transportService
+                        transportService,
                     )
                 }
             } else {
@@ -594,7 +610,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     monitor.name,
                     periodStart,
                     periodEnd,
-                    OpenSearchStatusException("Monitor Type ${monitor.monitorType} not known", RestStatus.BAD_REQUEST)
+                    OpenSearchStatusException("Monitor Type ${monitor.monitorType} not known", RestStatus.BAD_REQUEST),
                 )
             }
         }
@@ -613,28 +629,30 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         updateAlertingConfigIndexSchema()
 
         val executionId = "${monitorV2.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
-        val monitorV2Type = when (monitorV2) {
-            is PPLSQLMonitor -> PPL_SQL_MONITOR_TYPE
-            else -> throw IllegalStateException("Unexpected MonitorV2 type: ${monitorV2.javaClass.name}")
-        }
+        val monitorV2Type =
+            when (monitorV2) {
+                is PPLSQLMonitor -> PPL_SQL_MONITOR_TYPE
+                else -> throw IllegalStateException("Unexpected MonitorV2 type: ${monitorV2.javaClass.name}")
+            }
 
         logger.info(
             "Executing scheduled monitor v2 - id: ${monitorV2.id}, type: $monitorV2Type, " +
-                "periodEnd: $periodEnd, dryrun: $dryrun, manual: $manual, executionId: $executionId"
+                "periodEnd: $periodEnd, dryrun: $dryrun, manual: $manual, executionId: $executionId",
         )
 
         // for now, always call PPLSQLMonitorRunner since only PPL Monitors are initially supported
         // to introduce new MonitorV2 type, create its MonitorRunner, and if/else branch
         // to the corresponding MonitorRunners based on type. For now, default to PPLSQLMonitorRunner
-        val runResult = PPLSQLMonitorRunner.runMonitorV2(
-            monitorV2,
-            monitorCtx,
-            periodEnd,
-            dryrun,
-            manual,
-            executionId = executionId,
-            transportService = transportService,
-        )
+        val runResult =
+            PPLSQLMonitorRunner.runMonitorV2(
+                monitorV2,
+                monitorCtx,
+                periodEnd,
+                dryrun,
+                manual,
+                executionId = executionId,
+                transportService = transportService,
+            )
         return runResult
     }
 
@@ -661,9 +679,13 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     //  'threadPool.absoluteTimeInMillis()' is referring to a cached value of System.currentTimeMillis() that by default updates every 200ms
     internal fun currentTime() = Instant.ofEpochMilli(monitorCtx.threadPool!!.absoluteTimeInMillis())
 
-    internal fun isActionActionable(action: Action, alert: Alert?): Boolean {
-        if (alert != null && alert.state == Alert.State.AUDIT)
+    internal fun isActionActionable(
+        action: Action,
+        alert: Alert?,
+    ): Boolean {
+        if (alert != null && alert.state == Alert.State.AUDIT) {
             return false
+        }
         if (alert == null || action.throttle == null) {
             return true
         }
@@ -676,23 +698,31 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         return true
     }
 
-    internal fun compileTemplate(template: Script, ctx: TriggerExecutionContext): String {
-        return monitorCtx.scriptService!!.compile(template, TemplateScript.CONTEXT)
+    internal fun compileTemplate(
+        template: Script,
+        ctx: TriggerExecutionContext,
+    ): String =
+        monitorCtx.scriptService!!
+            .compile(template, TemplateScript.CONTEXT)
             .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
             .execute()
-    }
 
-    internal fun compileTemplateV2(template: Script, ctx: TriggerV2ExecutionContext): String {
-        return monitorCtx.scriptService!!.compile(template, TemplateScript.CONTEXT)
+    internal fun compileTemplateV2(
+        template: Script,
+        ctx: TriggerV2ExecutionContext,
+    ): String =
+        monitorCtx.scriptService!!
+            .compile(template, TemplateScript.CONTEXT)
             .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
             .execute()
-    }
 
     private fun updateAlertingConfigIndexSchema() {
         if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {
             IndexUtils.updateIndexMapping(
                 ScheduledJob.SCHEDULED_JOBS_INDEX,
-                ScheduledJobIndices.scheduledJobMappings(), monitorCtx.clusterService!!.state(), monitorCtx.client!!.admin().indices(),
+                ScheduledJobIndices.scheduledJobMappings(),
+                monitorCtx.clusterService!!.state(),
+                monitorCtx.client!!.admin().indices(),
                 object : ActionListener<AcknowledgedResponse> {
                     override fun onResponse(response: AcknowledgedResponse) {
                     }
@@ -700,7 +730,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     override fun onFailure(t: Exception) {
                         logger.error("Failed to update config index schema", t)
                     }
-                }
+                },
             )
         }
     }

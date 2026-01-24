@@ -8,8 +8,10 @@ package org.opensearch.alerting.model
 import org.opensearch.alerting.randomFinding
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class FindingTests : OpenSearchTestCase() {
+    @Test
     fun `test finding asTemplateArgs`() {
         // GIVEN
         val finding = randomFinding()
@@ -22,19 +24,19 @@ class FindingTests : OpenSearchTestCase() {
         assertEquals(
             "Template args 'relatedDocIds' field does not match:",
             templateArgs[Finding.RELATED_DOC_IDS_FIELD],
-            finding.relatedDocIds
+            finding.relatedDocIds,
         )
         assertEquals("Template args 'monitorId' field does not match:", templateArgs[Finding.MONITOR_ID_FIELD], finding.monitorId)
         assertEquals(
             "Template args 'monitorName' field does not match:",
             templateArgs[Finding.MONITOR_NAME_FIELD],
-            finding.monitorName
+            finding.monitorName,
         )
         assertEquals("Template args 'queries' field does not match:", templateArgs[Finding.QUERIES_FIELD], finding.docLevelQueries)
         assertEquals(
             "Template args 'timestamp' field does not match:",
             templateArgs[Finding.TIMESTAMP_FIELD],
-            finding.timestamp.toEpochMilli()
+            finding.timestamp.toEpochMilli(),
         )
     }
 }

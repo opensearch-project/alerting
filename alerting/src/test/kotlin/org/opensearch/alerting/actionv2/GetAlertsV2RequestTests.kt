@@ -9,16 +9,19 @@ import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class GetAlertsV2RequestTests : OpenSearchTestCase() {
+    @Test
     fun `test get alerts request as stream`() {
         val table = Table("asc", "sortString", null, 1, 0, "")
 
-        val req = GetAlertsV2Request(
-            table = table,
-            severityLevel = "1",
-            monitorV2Ids = listOf("1", "2"),
-        )
+        val req =
+            GetAlertsV2Request(
+                table = table,
+                severityLevel = "1",
+                monitorV2Ids = listOf("1", "2"),
+            )
         assertNotNull(req)
 
         val out = BytesStreamOutput()
@@ -32,6 +35,7 @@ class GetAlertsV2RequestTests : OpenSearchTestCase() {
         assertTrue(newReq.monitorV2Ids!!.contains("2"))
     }
 
+    @Test
     fun `test get alerts request with filter as stream`() {
         val table = Table("asc", "sortString", null, 1, 0, "")
         val req = GetAlertsV2Request(table, "1", null)

@@ -16,13 +16,15 @@ import org.opensearch.core.xcontent.ToXContent
  *
  * @opensearch.experimental
  */
-interface MonitorV2RunResult<TriggerV2Result : TriggerV2RunResult> : Writeable, ToXContent {
+interface MonitorV2RunResult<TriggerV2Result : TriggerV2RunResult> :
+    Writeable,
+    ToXContent {
     val monitorName: String
     val error: Exception?
     val triggerResults: Map<String, TriggerV2Result>
 
     enum class MonitorV2RunResultType {
-        PPL_SQL_MONITOR_RUN_RESULT;
+        PPL_SQL_MONITOR_RUN_RESULT,
     }
 
     companion object {
@@ -37,7 +39,10 @@ interface MonitorV2RunResult<TriggerV2Result : TriggerV2RunResult> : Writeable, 
             }
         }
 
-        fun writeTo(out: StreamOutput, monitorV2RunResult: MonitorV2RunResult<*>) {
+        fun writeTo(
+            out: StreamOutput,
+            monitorV2RunResult: MonitorV2RunResult<*>,
+        ) {
             when (monitorV2RunResult) {
                 is PPLSQLMonitorRunResult -> {
                     out.writeEnum(MonitorV2RunResultType.PPL_SQL_MONITOR_RUN_RESULT)

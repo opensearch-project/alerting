@@ -40,20 +40,25 @@ val MAX_SEARCH_SIZE = 10000
  * Regex was based off of this post: https://stackoverflow.com/a/201378
  */
 fun isValidEmail(email: String): Boolean {
-    val validEmailPattern = Regex(
-        "(?:[a-z0-9!#\$%&'*+\\/=?^_`{|}~-]+(?:\\.[a-z0-9!#\$%&'*+\\/=?^_`{|}~-]+)*" +
-            "|\"(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")" +
-            "@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" +
-            "|\\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\\.){3}" +
-            "(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:" +
-            "(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])",
-        RegexOption.IGNORE_CASE
-    )
+    val validEmailPattern =
+        Regex(
+            "(?:[a-z0-9!#\$%&'*+\\/=?^_`{|}~-]+(?:\\.[a-z0-9!#\$%&'*+\\/=?^_`{|}~-]+)*" +
+                "|\"(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")" +
+                "@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?" +
+                "|\\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\\.){3}" +
+                "(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:" +
+                "(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])",
+            RegexOption.IGNORE_CASE,
+        )
 
     return validEmailPattern.matches(email)
 }
 
-fun getRoleFilterEnabled(clusterService: ClusterService, settings: Settings, settingPath: String): Boolean {
+fun getRoleFilterEnabled(
+    clusterService: ClusterService,
+    settings: Settings,
+    settingPath: String,
+): Boolean {
     var adBackendRoleFilterEnabled: Boolean
     val metaData = clusterService.state().metadata()
 
@@ -111,7 +116,7 @@ fun Action.getActionExecutionPolicy(monitor: Monitor): ActionExecutionPolicy? {
 }
 
 fun BucketLevelTriggerRunResult.getCombinedTriggerRunResult(
-    prevTriggerRunResult: BucketLevelTriggerRunResult?
+    prevTriggerRunResult: BucketLevelTriggerRunResult?,
 ): BucketLevelTriggerRunResult {
     if (prevTriggerRunResult == null) return this
 
@@ -131,13 +136,13 @@ fun defaultToPerExecutionAction(
     monitorId: String,
     triggerId: String,
     totalActionableAlertCount: Int,
-    monitorOrTriggerError: Exception?
+    monitorOrTriggerError: Exception?,
 ): Boolean {
     // If the monitorId or triggerResult has an error, then also default to PER_EXECUTION to communicate the error
     if (monitorOrTriggerError != null) {
         logger.debug(
             "Trigger [$triggerId] in monitor [$monitorId] encountered an error. Defaulting to " +
-                "[${ActionExecutionScope.Type.PER_EXECUTION}] for action execution to communicate error."
+                "[${ActionExecutionScope.Type.PER_EXECUTION}] for action execution to communicate error.",
         )
         return true
     }
@@ -151,7 +156,7 @@ fun defaultToPerExecutionAction(
         logger.debug(
             "The total actionable alerts for trigger [$triggerId] in monitor [$monitorId] is [$totalActionableAlertCount] " +
                 "which exceeds the maximum of [$maxActionableAlertCount]. " +
-                "Defaulting to [${ActionExecutionScope.Type.PER_EXECUTION}] for action execution."
+                "Defaulting to [${ActionExecutionScope.Type.PER_EXECUTION}] for action execution.",
         )
         return true
     }
@@ -197,14 +202,20 @@ fun getCancelAfterTimeInterval(): Long {
  *
  * The suppressed exception is added to the list of suppressed exceptions of [cause] exception.
  */
-fun ThreadContext.StoredContext.closeFinally(cause: Throwable?) = when (cause) {
-    null -> close()
-    else -> try {
-        close()
-    } catch (closeException: Throwable) {
-        cause.addSuppressed(closeException)
+fun ThreadContext.StoredContext.closeFinally(cause: Throwable?) =
+    when (cause) {
+        null -> {
+            close()
+        }
+
+        else -> {
+            try {
+                close()
+            } catch (closeException: Throwable) {
+                cause.addSuppressed(closeException)
+            }
+        }
     }
-}
 
 /**
  * Mustache template supports iterating through a list using a `{{#listVariable}}{{/listVariable}}` block.
@@ -229,10 +240,12 @@ fun parseSampleDocTags(messageTemplate: Script): Set<String> {
         // Sample start/end of -1 indicates there are no more complete sample blocks
         while (blockStart != -1 && blockEnd != -1) {
             // Isolate the sample block
-            val sampleBlock = messageTemplate.idOrCode.substring(blockStart, blockEnd)
-                // Remove the iteration wrapper tags
-                .removePrefix(sampleBlockPrefix)
-                .removeSuffix(sampleBlockSuffix)
+            val sampleBlock =
+                messageTemplate.idOrCode
+                    .substring(blockStart, blockEnd)
+                    // Remove the iteration wrapper tags
+                    .removePrefix(sampleBlockPrefix)
+                    .removeSuffix(sampleBlockSuffix)
 
             // Search for each tag
             tagRegex.findAll(sampleBlock).forEach { match ->
@@ -254,11 +267,11 @@ fun parseSampleDocTags(messageTemplate: Script): Set<String> {
     return tags
 }
 
-fun parseSampleDocTags(triggers: List<Trigger>): Set<String> {
-    return triggers.flatMap { trigger ->
-        trigger.actions.flatMap { action -> parseSampleDocTags(action.messageTemplate) }
-    }.toSet()
-}
+fun parseSampleDocTags(triggers: List<Trigger>): Set<String> =
+    triggers
+        .flatMap { trigger ->
+            trigger.actions.flatMap { action -> parseSampleDocTags(action.messageTemplate) }
+        }.toSet()
 
 /**
  * Checks the `message_template.source` in the [Script] for each [Action] in the [Trigger] for
@@ -267,23 +280,27 @@ fun parseSampleDocTags(triggers: List<Trigger>): Set<String> {
  */
 fun printsSampleDocData(trigger: Trigger): Boolean {
     return trigger.actions.any { action ->
-        val alertsField = when (trigger) {
-            is BucketLevelTrigger -> "{{ctx.${BucketLevelTriggerExecutionContext.NEW_ALERTS_FIELD}}}"
-            is DocumentLevelTrigger -> "{{ctx.${DocumentLevelTriggerExecutionContext.ALERTS_FIELD}}}"
-            // Only bucket, and document level monitors are supported currently.
-            else -> return false
-        }
+        val alertsField =
+            when (trigger) {
+                is BucketLevelTrigger -> "{{ctx.${BucketLevelTriggerExecutionContext.NEW_ALERTS_FIELD}}}"
+
+                is DocumentLevelTrigger -> "{{ctx.${DocumentLevelTriggerExecutionContext.ALERTS_FIELD}}}"
+
+                // Only bucket, and document level monitors are supported currently.
+                else -> return false
+            }
 
         // TODO: Consider excluding the following tags from TRUE criteria (especially for bucket-level triggers) as
         //  printing all of the sample documents could make the notification message too large to send.
         //  1. {{ctx}} - prints entire ctx object in the message string
         //  2. {{ctx.<alertsField>}} - prints entire alerts array in the message string, which includes the sample docs
         //  3. {{AlertContext.SAMPLE_DOCS_FIELD}} - prints entire sample docs array in the message string
-        val validTags = listOfNotNull(
-            "{{ctx}}",
-            alertsField,
-            AlertContext.SAMPLE_DOCS_FIELD
-        )
+        val validTags =
+            listOfNotNull(
+                "{{ctx}}",
+                alertsField,
+                AlertContext.SAMPLE_DOCS_FIELD,
+            )
         validTags.any { tag -> action.messageTemplate.idOrCode.contains(tag) }
     }
 }

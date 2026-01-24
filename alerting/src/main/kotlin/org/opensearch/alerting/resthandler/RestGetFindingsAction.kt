@@ -22,20 +22,19 @@ import org.opensearch.transport.client.node.NodeClient
  * This class consists of the REST handler to search findings .
  */
 class RestGetFindingsAction : BaseRestHandler() {
-
     private val log = LogManager.getLogger(RestGetFindingsAction::class.java)
 
-    override fun getName(): String {
-        return "get_findings_action"
-    }
+    override fun getName(): String = "get_findings_action"
 
-    override fun routes(): List<Route> {
-        return listOf(
-            Route(GET, "${AlertingPlugin.FINDING_BASE_URI}/_search")
+    override fun routes(): List<Route> =
+        listOf(
+            Route(GET, "${AlertingPlugin.FINDING_BASE_URI}/_search"),
         )
-    }
 
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.info("${request.method()} ${request.path()}")
 
         val findingID: String? = request.param("findingId")
@@ -46,21 +45,22 @@ class RestGetFindingsAction : BaseRestHandler() {
         val startIndex = request.paramAsInt("startIndex", 0)
         val searchString = request.param("searchString", "")
 
-        val table = Table(
-            sortOrder,
-            sortString,
-            missing,
-            size,
-            startIndex,
-            searchString
-        )
+        val table =
+            Table(
+                sortOrder,
+                sortString,
+                missing,
+                size,
+                startIndex,
+                searchString,
+            )
 
-        val getFindingsSearchRequest = GetFindingsRequest(
-            findingID,
-            table
-        )
-        return RestChannelConsumer {
-                channel ->
+        val getFindingsSearchRequest =
+            GetFindingsRequest(
+                findingID,
+                table,
+            )
+        return RestChannelConsumer { channel ->
             client.execute(AlertingActions.GET_FINDINGS_ACTION_TYPE, getFindingsSearchRequest, RestToXContentListener(channel))
         }
     }

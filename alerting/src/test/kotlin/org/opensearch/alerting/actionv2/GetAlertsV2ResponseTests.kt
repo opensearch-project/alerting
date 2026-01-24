@@ -17,8 +17,10 @@ import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 import java.util.Collections
+import kotlin.test.Test
 
 class GetAlertsV2ResponseTests : OpenSearchTestCase() {
+    @Test
     fun `test get alerts response with no alerts`() {
         val req = GetAlertsV2Response(Collections.emptyList(), 0)
         assertNotNull(req)
@@ -31,21 +33,23 @@ class GetAlertsV2ResponseTests : OpenSearchTestCase() {
         assertEquals(0, newReq.totalAlertV2s)
     }
 
+    @Test
     fun `test get alerts response with alerts`() {
-        val alert = AlertV2(
-            monitorId = "id",
-            monitorName = "name",
-            monitorVersion = AlertV2.NO_VERSION,
-            monitorUser = randomUser(),
-            triggerId = "triggerId",
-            triggerName = "triggerNamer",
-            query = "source = some_index",
-            queryResults = mapOf(),
-            triggeredTime = Instant.now(),
-            errorMessage = null,
-            severity = TriggerV2.Severity.LOW,
-            executionId = "executionId"
-        )
+        val alert =
+            AlertV2(
+                monitorId = "id",
+                monitorName = "name",
+                monitorVersion = AlertV2.NO_VERSION,
+                monitorUser = randomUser(),
+                triggerId = "triggerId",
+                triggerName = "triggerNamer",
+                query = "source = some_index",
+                queryResults = mapOf(),
+                triggeredTime = Instant.now(),
+                errorMessage = null,
+                severity = TriggerV2.Severity.LOW,
+                executionId = "executionId",
+            )
         val res = GetAlertsV2Response(listOf(alert), 1)
         assertNotNull(res)
 
@@ -58,32 +62,37 @@ class GetAlertsV2ResponseTests : OpenSearchTestCase() {
         assertEquals(1, newRes.totalAlertV2s)
     }
 
+    @Test
     fun `test toXContent for get alerts response`() {
         val now = Instant.now()
-        val alert = AlertV2(
-            monitorId = "id",
-            monitorName = "name",
-            monitorVersion = AlertV2.NO_VERSION,
-            monitorUser = randomUser(),
-            triggerId = "triggerId",
-            triggerName = "triggerName",
-            query = "source = some_index",
-            queryResults = mapOf(),
-            triggeredTime = now,
-            errorMessage = null,
-            severity = TriggerV2.Severity.LOW,
-            executionId = "executionId"
-        )
+        val alert =
+            AlertV2(
+                monitorId = "id",
+                monitorName = "name",
+                monitorVersion = AlertV2.NO_VERSION,
+                monitorUser = randomUser(),
+                triggerId = "triggerId",
+                triggerName = "triggerName",
+                query = "source = some_index",
+                queryResults = mapOf(),
+                triggeredTime = now,
+                errorMessage = null,
+                severity = TriggerV2.Severity.LOW,
+                executionId = "executionId",
+            )
 
         val req = GetAlertsV2Response(listOf(alert), 1)
-        var actualXContentString = req.toXContent(
-            XContentBuilder.builder(XContentType.JSON.xContent()),
-            ToXContent.EMPTY_PARAMS
-        ).string()
-        val expectedXContentString = "{\"alerts_v2\":[{\"id\":\"\",\"version\":-1,\"monitor_v2_id\":\"id\",\"schema_version\":0," +
-            "\"monitor_v2_version\":-1,\"monitor_v2_name\":\"name\",\"execution_id\":\"executionId\",\"trigger_v2_id\":\"triggerId\"," +
-            "\"trigger_v2_name\":\"triggerName\",\"query\":\"source = some_index\",\"query_results\":{},\"error_message\":null," +
-            "\"severity\":\"low\",\"triggered_time\":${now.toEpochMilli()}}],\"total_alerts_v2\":1}"
+        var actualXContentString =
+            req
+                .toXContent(
+                    XContentBuilder.builder(XContentType.JSON.xContent()),
+                    ToXContent.EMPTY_PARAMS,
+                ).string()
+        val expectedXContentString =
+            "{\"alerts_v2\":[{\"id\":\"\",\"version\":-1,\"monitor_v2_id\":\"id\",\"schema_version\":0," +
+                "\"monitor_v2_version\":-1,\"monitor_v2_name\":\"name\",\"execution_id\":\"executionId\",\"trigger_v2_id\":\"triggerId\"," +
+                "\"trigger_v2_name\":\"triggerName\",\"query\":\"source = some_index\",\"query_results\":{},\"error_message\":null," +
+                "\"severity\":\"low\",\"triggered_time\":${now.toEpochMilli()}}],\"total_alerts_v2\":1}"
 
         logger.info("expected: $expectedXContentString")
         logger.info("actual: $actualXContentString")

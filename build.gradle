@@ -79,7 +79,7 @@ configurations.ktlint.incoming.beforeResolve {
 }
 
 dependencies {
-    add("ktlint", "com.pinterest:ktlint:0.45.1") {
+    add("ktlint", "com.pinterest.ktlint:ktlint-cli:1.8.0") {
         attributes {
             attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
         }
@@ -90,24 +90,14 @@ task ktlint(type: JavaExec, group: "verification") {
     description = "Check Kotlin code style."
     mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
-    args "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
-    
-    // Skip on JDK 25
-    onlyIf {
-        JavaVersion.current() < JavaVersion.VERSION_25
-    }
+    args "alerting/**/*.kt", "sample-remote-monitor-plugin/**/*.kt", "core/**/*.kt", "spi/**/*.kt"
 }
 
 task ktlintFormat(type: JavaExec, group: "formatting") {
     description = "Fix Kotlin code style deviations."
     mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
-    args "-F", "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
-    
-    // Skip on JDK 25 until ktlint fully supports it
-    onlyIf {
-        JavaVersion.current() < JavaVersion.VERSION_25
-    }
+    args "-F", "alerting/**/*.kt", "sample-remote-monitor-plugin/**/*.kt", "core/**/*.kt", "spi/**/*.kt"
 }
 
 check.dependsOn ktlint

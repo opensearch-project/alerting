@@ -33,117 +33,128 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 
-class TransportGetWorkflowAction @Inject constructor(
-    transportService: TransportService,
-    val client: Client,
-    actionFilters: ActionFilters,
-    val xContentRegistry: NamedXContentRegistry,
-    val clusterService: ClusterService,
-    settings: Settings
-) : HandledTransportAction<GetWorkflowRequest, GetWorkflowResponse>(
-    AlertingActions.GET_WORKFLOW_ACTION_NAME, transportService, actionFilters, ::GetWorkflowRequest
-),
-    SecureTransportAction {
+class TransportGetWorkflowAction
+    @Inject
+    constructor(
+        transportService: TransportService,
+        val client: Client,
+        actionFilters: ActionFilters,
+        val xContentRegistry: NamedXContentRegistry,
+        val clusterService: ClusterService,
+        settings: Settings,
+    ) : HandledTransportAction<GetWorkflowRequest, GetWorkflowResponse>(
+            AlertingActions.GET_WORKFLOW_ACTION_NAME,
+            transportService,
+            actionFilters,
+            ::GetWorkflowRequest,
+        ),
+        SecureTransportAction {
+        private val log = LogManager.getLogger(javaClass)
 
-    private val log = LogManager.getLogger(javaClass)
+        @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
-    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
-
-    init {
-        listenFilterBySettingChange(clusterService)
-    }
-
-    override fun doExecute(task: Task, getWorkflowRequest: GetWorkflowRequest, actionListener: ActionListener<GetWorkflowResponse>) {
-        val user = readUserFromThreadContext(client)
-
-        val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, getWorkflowRequest.workflowId)
-
-        if (!validateUserBackendRoles(user, actionListener)) {
-            return
+        init {
+            listenFilterBySettingChange(clusterService)
         }
 
-        client.threadPool().threadContext.stashContext().use {
-            client.get(
-                getRequest,
-                object : ActionListener<GetResponse> {
-                    override fun onResponse(response: GetResponse) {
-                        if (!response.isExists) {
-                            log.error("Workflow with ${getWorkflowRequest.workflowId} not found")
-                            actionListener.onFailure(
-                                AlertingException.wrap(
-                                    OpenSearchStatusException(
-                                        "Workflow not found.",
-                                        RestStatus.NOT_FOUND
-                                    )
+        override fun doExecute(
+            task: Task,
+            getWorkflowRequest: GetWorkflowRequest,
+            actionListener: ActionListener<GetWorkflowResponse>,
+        ) {
+            val user = readUserFromThreadContext(client)
+
+            val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, getWorkflowRequest.workflowId)
+
+            if (!validateUserBackendRoles(user, actionListener)) {
+                return
+            }
+
+            client.threadPool().threadContext.stashContext().use {
+                client.get(
+                    getRequest,
+                    object : ActionListener<GetResponse> {
+                        override fun onResponse(response: GetResponse) {
+                            if (!response.isExists) {
+                                log.error("Workflow with ${getWorkflowRequest.workflowId} not found")
+                                actionListener.onFailure(
+                                    AlertingException.wrap(
+                                        OpenSearchStatusException(
+                                            "Workflow not found.",
+                                            RestStatus.NOT_FOUND,
+                                        ),
+                                    ),
                                 )
+                                return
+                            }
+
+                            var workflow: Workflow? = null
+                            if (!response.isSourceEmpty) {
+                                XContentHelper
+                                    .createParser(
+                                        xContentRegistry,
+                                        LoggingDeprecationHandler.INSTANCE,
+                                        response.sourceAsBytesRef,
+                                        XContentType.JSON,
+                                    ).use { xcp ->
+                                        val compositeMonitor = ScheduledJob.parse(xcp, response.id, response.version)
+                                        if (compositeMonitor is Workflow) {
+                                            workflow = compositeMonitor
+                                        } else {
+                                            log.error("Wrong monitor type returned")
+                                            actionListener.onFailure(
+                                                AlertingException.wrap(
+                                                    OpenSearchStatusException(
+                                                        "Workflow not found.",
+                                                        RestStatus.NOT_FOUND,
+                                                    ),
+                                                ),
+                                            )
+                                            return
+                                        }
+
+                                        // security is enabled and filterby is enabled
+                                        if (!checkUserPermissionsWithResource(
+                                                user,
+                                                workflow?.user,
+                                                actionListener,
+                                                "workflow",
+                                                getWorkflowRequest.workflowId,
+                                            )
+                                        ) {
+                                            return
+                                        }
+                                    }
+                            }
+
+                            actionListener.onResponse(
+                                GetWorkflowResponse(
+                                    response.id,
+                                    response.version,
+                                    response.seqNo,
+                                    response.primaryTerm,
+                                    RestStatus.OK,
+                                    workflow,
+                                ),
                             )
-                            return
                         }
 
-                        var workflow: Workflow? = null
-                        if (!response.isSourceEmpty) {
-                            XContentHelper.createParser(
-                                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                                response.sourceAsBytesRef, XContentType.JSON
-                            ).use { xcp ->
-                                val compositeMonitor = ScheduledJob.parse(xcp, response.id, response.version)
-                                if (compositeMonitor is Workflow) {
-                                    workflow = compositeMonitor
-                                } else {
-                                    log.error("Wrong monitor type returned")
-                                    actionListener.onFailure(
-                                        AlertingException.wrap(
-                                            OpenSearchStatusException(
-                                                "Workflow not found.",
-                                                RestStatus.NOT_FOUND
-                                            )
-                                        )
-                                    )
-                                    return
-                                }
+                        override fun onFailure(t: Exception) {
+                            log.error("Getting the workflow failed", t)
 
-                                // security is enabled and filterby is enabled
-                                if (!checkUserPermissionsWithResource(
-                                        user,
-                                        workflow?.user,
-                                        actionListener,
-                                        "workflow",
-                                        getWorkflowRequest.workflowId
-                                    )
-                                ) {
-                                    return
-                                }
+                            if (t is IndexNotFoundException) {
+                                actionListener.onFailure(
+                                    OpenSearchStatusException(
+                                        "Workflow not found",
+                                        RestStatus.NOT_FOUND,
+                                    ),
+                                )
+                            } else {
+                                actionListener.onFailure(AlertingException.wrap(t))
                             }
                         }
-
-                        actionListener.onResponse(
-                            GetWorkflowResponse(
-                                response.id,
-                                response.version,
-                                response.seqNo,
-                                response.primaryTerm,
-                                RestStatus.OK,
-                                workflow
-                            )
-                        )
-                    }
-
-                    override fun onFailure(t: Exception) {
-                        log.error("Getting the workflow failed", t)
-
-                        if (t is IndexNotFoundException) {
-                            actionListener.onFailure(
-                                OpenSearchStatusException(
-                                    "Workflow not found",
-                                    RestStatus.NOT_FOUND
-                                )
-                            )
-                        } else {
-                            actionListener.onFailure(AlertingException.wrap(t))
-                        }
-                    }
-                }
-            )
+                    },
+                )
+            }
         }
     }
-}

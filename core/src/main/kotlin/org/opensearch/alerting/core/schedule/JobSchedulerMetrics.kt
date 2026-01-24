@@ -13,7 +13,9 @@ import org.opensearch.core.xcontent.ToXContentFragment
 import org.opensearch.core.xcontent.XContentBuilder
 import java.time.Instant
 
-class JobSchedulerMetrics : ToXContentFragment, Writeable {
+class JobSchedulerMetrics :
+    ToXContentFragment,
+    Writeable {
     val scheduledJobId: String
     val lastExecutionTime: Long?
     val runningOnTime: Boolean
@@ -36,12 +38,17 @@ class JobSchedulerMetrics : ToXContentFragment, Writeable {
         out.writeBoolean(runningOnTime)
     }
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        if (lastExecutionTime != null)
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
+        if (lastExecutionTime != null) {
             builder.timeField(
-                "last_execution_time", "last_execution_time_in_millis",
-                Instant.ofEpochMilli(lastExecutionTime).toEpochMilli()
+                "last_execution_time",
+                "last_execution_time_in_millis",
+                Instant.ofEpochMilli(lastExecutionTime).toEpochMilli(),
             )
+        }
         builder.field("running_on_time", runningOnTime)
         return builder
     }

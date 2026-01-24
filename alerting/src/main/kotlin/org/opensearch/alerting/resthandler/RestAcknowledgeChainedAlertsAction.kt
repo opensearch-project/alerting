@@ -13,7 +13,6 @@ import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.rest.BaseRestHandler
-import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
 import org.opensearch.rest.RestRequest.Method.POST
@@ -28,24 +27,24 @@ private val log: Logger = LogManager.getLogger(RestAcknowledgeAlertAction::class
  * The user provides the workflowID to which these alerts pertain and in the content of the request provides
  * the ids to the chained alerts user would like to acknowledge.
  */
-class RestAcknowledgeChainedAlertAction : BaseRestHandler() {
-
-    override fun getName(): String {
-        return "acknowledge_chained_alert_action"
-    }
+class RestAcknowledgeChainedAlertsAction : BaseRestHandler() {
+    override fun getName(): String = "acknowledge_chained_alert_action"
 
     override fun routes(): List<Route> {
         // Acknowledge alerts
         return mutableListOf(
             Route(
                 POST,
-                "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}/_acknowledge/alerts"
-            )
+                "${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}/_acknowledge/alerts",
+            ),
         )
     }
 
     @Throws(IOException::class)
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         log.debug("${request.method()} ${AlertingPlugin.WORKFLOW_BASE_URI}/{workflowID}/_acknowledge/alerts")
 
         val workflowId = request.param("workflowID")

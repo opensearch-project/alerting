@@ -8,8 +8,9 @@ package org.opensearch.alerting.script
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptContext
 
-abstract class TriggerScript(_scriptParams: Map<String, Any>) {
-
+abstract class TriggerScript(
+    _scriptParams: Map<String, Any>,
+) {
     /**
      * [scriptParams] are the [user-defined parameters][Script.getParams] specified in the script definition.
      * The [scriptParams] are defined when the script is compiled and DON'T change every time the script executes. This field
@@ -17,7 +18,8 @@ abstract class TriggerScript(_scriptParams: Map<String, Any>) {
      * painless script context we surface it to the painless script as just `params` using a custom getter name.
      */
     val scriptParams: Map<String, Any> = _scriptParams
-        @JvmName("getParams") get
+        @JvmName("getParams")
+        get
 
     companion object {
         /**

@@ -31,22 +31,21 @@ private val log: Logger = LogManager.getLogger(RestDeleteMonitorV2Action::class.
  * @opensearch.experimental
  */
 class RestDeleteMonitorV2Action : BaseRestHandler() {
+    override fun getName(): String = "delete_monitor_v2_action"
 
-    override fun getName(): String {
-        return "delete_monitor_v2_action"
-    }
-
-    override fun routes(): List<Route> {
-        return mutableListOf(
+    override fun routes(): List<Route> =
+        mutableListOf(
             Route(
                 DELETE,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}"
-            )
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}",
+            ),
         )
-    }
 
     @Throws(IOException::class)
-    override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
+    override fun prepareRequest(
+        request: RestRequest,
+        client: NodeClient,
+    ): RestChannelConsumer {
         val monitorV2Id = request.param("monitor_id")
         log.info("${request.method()} ${AlertingPlugin.MONITOR_V2_BASE_URI}/$monitorV2Id")
 

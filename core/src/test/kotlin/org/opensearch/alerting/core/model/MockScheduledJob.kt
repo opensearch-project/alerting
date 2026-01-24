@@ -16,13 +16,19 @@ class MockScheduledJob(
     override val enabled: Boolean,
     override val schedule: Schedule,
     override var lastUpdateTime: Instant,
-    override val enabledTime: Instant?
+    override val enabledTime: Instant?,
 ) : ScheduledJob {
-    override fun fromDocument(id: String, version: Long): ScheduledJob {
+    override fun fromDocument(
+        id: String,
+        version: Long,
+    ): ScheduledJob {
         TODO("not implemented")
     }
 
-    override fun toXContent(builder: XContentBuilder?, params: ToXContent.Params?): XContentBuilder {
+    override fun toXContent(
+        builder: XContentBuilder?,
+        params: ToXContent.Params?,
+    ): XContentBuilder {
         TODO("not implemented")
     }
 

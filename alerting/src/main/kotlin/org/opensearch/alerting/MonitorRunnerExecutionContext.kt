@@ -27,7 +27,6 @@ import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
 
 data class MonitorRunnerExecutionContext(
-
     var clusterService: ClusterService? = null,
     var client: Client? = null,
     var xContentRegistry: NamedXContentRegistry? = null,
@@ -45,28 +44,26 @@ data class MonitorRunnerExecutionContext(
     var jvmStats: JvmStats? = null,
     var findingsToTriggeredQueries: Map<String, List<DocLevelQuery>>? = null,
     var remoteMonitors: Map<String, RemoteMonitorRegistry> = mapOf(),
-
     @Volatile var retryPolicy: BackoffPolicy? = null,
     @Volatile var moveAlertsRetryPolicy: BackoffPolicy? = null,
-
     @Volatile var allowList: List<String> = DestinationSettings.ALLOW_LIST_NONE,
     @Volatile var hostDenyList: List<String> = LegacyOpenDistroDestinationSettings.HOST_DENY_LIST_NONE,
-
     @Volatile var destinationSettings: Map<String, DestinationSettings.Companion.SecureDestinationSettings>? = null,
     @Volatile var destinationContextFactory: DestinationContextFactory? = null,
-
     @Volatile var maxActionableAlertCount: Long = AlertingSettings.DEFAULT_MAX_ACTIONABLE_ALERT_COUNT,
     @Volatile var indexTimeout: TimeValue? = null,
     @Volatile var cancelAfterTimeInterval: TimeValue? = null,
     @Volatile var findingsIndexBatchSize: Int = AlertingSettings.DEFAULT_FINDINGS_INDEXING_BATCH_SIZE,
     @Volatile var fetchOnlyQueryFieldNames: Boolean = true,
     @Volatile var percQueryMaxNumDocsInMemory: Int = AlertingSettings.DEFAULT_PERCOLATE_QUERY_NUM_DOCS_IN_MEMORY,
-    @Volatile var docLevelMonitorFanoutMaxDuration: TimeValue = TimeValue.timeValueMinutes(
-        AlertingSettings.DEFAULT_MAX_DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION_MINUTES
-    ),
-    @Volatile var docLevelMonitorExecutionMaxDuration: TimeValue = TimeValue.timeValueMinutes(
-        AlertingSettings.DEFAULT_MAX_DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION_MINUTES
-    ),
+    @Volatile var docLevelMonitorFanoutMaxDuration: TimeValue =
+        TimeValue.timeValueMinutes(
+            AlertingSettings.DEFAULT_MAX_DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION_MINUTES,
+        ),
+    @Volatile var docLevelMonitorExecutionMaxDuration: TimeValue =
+        TimeValue.timeValueMinutes(
+            AlertingSettings.DEFAULT_MAX_DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION_MINUTES,
+        ),
     @Volatile var percQueryDocsSizeMemoryPercentageLimit: Int =
         AlertingSettings.DEFAULT_PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT,
     @Volatile var docLevelMonitorShardFetchSize: Int =

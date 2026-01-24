@@ -19,21 +19,23 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.test.junit.annotations.TestLogging
+import kotlin.test.Test
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class EmailAccountRestApiIT : AlertingRestTestCase() {
-
+    @Test
     fun `test creating an email account`() {
-        val emailAccount = EmailAccount(
-            name = "test",
-            email = "test@email.com",
-            host = "smtp.com",
-            port = 25,
-            method = EmailAccount.MethodType.NONE,
-            username = null,
-            password = null
-        )
+        val emailAccount =
+            EmailAccount(
+                name = "test",
+                email = "test@email.com",
+                host = "smtp.com",
+                port = 25,
+                method = EmailAccount.MethodType.NONE,
+                username = null,
+                password = null,
+            )
         val createdEmailAccount = createEmailAccount(emailAccount = emailAccount)
         assertEquals("Incorrect email account name", createdEmailAccount.name, "test")
         assertEquals("Incorrect email account email", createdEmailAccount.email, "test@email.com")
@@ -42,6 +44,7 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         assertEquals("Incorrect email account method", createdEmailAccount.method, EmailAccount.MethodType.NONE)
     }
 
+    @Test
     fun `test creating an email account with PUT fails`() {
         try {
             val emailAccount = randomEmailAccount()
@@ -52,6 +55,7 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test creating an email account when email destination is disallowed fails`() {
         try {
             removeEmailFromAllowList()
@@ -62,12 +66,14 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test getting an email account`() {
         val emailAccount = createRandomEmailAccount()
         val storedEmailAccount = getEmailAccount(emailAccount.id)
         assertEquals("Indexed and retrieved email account differ", emailAccount, storedEmailAccount)
     }
 
+    @Test
     fun `test getting an email account that doesn't exist`() {
         try {
             getEmailAccount(randomAlphaOfLength(20))
@@ -77,6 +83,7 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test getting an email account when email destination is disallowed fails`() {
         val emailAccount = createRandomEmailAccount()
 
@@ -89,6 +96,7 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    @Test
     fun `test checking if an email account exists`() {
         val emailAccount = createRandomEmailAccount()
 
@@ -97,21 +105,24 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         assertNull("Response contains unexpected body", headResponse.entity)
     }
 
+    @Test
     fun `test checking if a non-existent email account exists`() {
         val headResponse = client().makeRequest("HEAD", "$EMAIL_ACCOUNT_BASE_URI/foobar")
         assertEquals("Unexpected status", RestStatus.NOT_FOUND, headResponse.restStatus())
     }
 
+    @Test
     fun `test querying an email account that exists`() {
         val emailAccount = createRandomEmailAccount()
 
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailAccount.id)).toString()
-        val searchResponse = client().makeRequest(
-            "GET",
-            "$EMAIL_ACCOUNT_BASE_URI/_search",
-            emptyMap(),
-            StringEntity(search, ContentType.APPLICATION_JSON)
-        )
+        val searchResponse =
+            client().makeRequest(
+                "GET",
+                "$EMAIL_ACCOUNT_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(search, ContentType.APPLICATION_JSON),
+            )
         assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -119,16 +130,18 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         assertEquals("Email account not found during search", 1, numberOfDocsFound)
     }
 
+    @Test
     fun `test querying an email account that exists with POST`() {
         val emailAccount = createRandomEmailAccount()
 
         val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", emailAccount.id)).toString()
-        val searchResponse = client().makeRequest(
-            "POST",
-            "$EMAIL_ACCOUNT_BASE_URI/_search",
-            emptyMap(),
-            StringEntity(search, ContentType.APPLICATION_JSON)
-        )
+        val searchResponse =
+            client().makeRequest(
+                "POST",
+                "$EMAIL_ACCOUNT_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(search, ContentType.APPLICATION_JSON),
+            )
         assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -136,23 +149,26 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         assertEquals("Email account not found during search", 1, numberOfDocsFound)
     }
 
+    @Test
     fun `test querying an email account that doesn't exist`() {
         // Create a random email account to create the ScheduledJob index. Otherwise the test will fail with a 404 index not found error.
         createRandomEmailAccount()
-        val search = SearchSourceBuilder()
-            .query(
-                QueryBuilders.termQuery(
-                    OpenSearchTestCase.randomAlphaOfLength(5),
-                    OpenSearchTestCase.randomAlphaOfLength(5)
-                )
-            ).toString()
+        val search =
+            SearchSourceBuilder()
+                .query(
+                    QueryBuilders.termQuery(
+                        OpenSearchTestCase.randomAlphaOfLength(5),
+                        OpenSearchTestCase.randomAlphaOfLength(5),
+                    ),
+                ).toString()
 
-        val searchResponse = client().makeRequest(
-            "GET",
-            "$EMAIL_ACCOUNT_BASE_URI/_search",
-            emptyMap(),
-            StringEntity(search, ContentType.APPLICATION_JSON)
-        )
+        val searchResponse =
+            client().makeRequest(
+                "GET",
+                "$EMAIL_ACCOUNT_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(search, ContentType.APPLICATION_JSON),
+            )
         assertEquals("Search email account failed", RestStatus.OK, searchResponse.restStatus())
         val xcp = createParser(XContentType.JSON.xContent(), searchResponse.entity.content)
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
@@ -160,6 +176,7 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
         assertEquals("Email account found during search when no document was present", 0, numberOfDocsFound)
     }
 
+    @Test
     fun `test querying an email account when email destination is disallowed fails`() {
         val emailAccount = createRandomEmailAccount()
 
@@ -170,7 +187,7 @@ class EmailAccountRestApiIT : AlertingRestTestCase() {
                 "GET",
                 "$EMAIL_ACCOUNT_BASE_URI/_search",
                 emptyMap(),
-                StringEntity(search, ContentType.APPLICATION_JSON)
+                StringEntity(search, ContentType.APPLICATION_JSON),
             )
             fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {

@@ -20,62 +20,65 @@ class LockModel(
     val lockTime: Instant,
     val released: Boolean,
     val seqNo: Long,
-    val primaryTerm: Long
+    val primaryTerm: Long,
 ) : ToXContentObject {
-
     constructor(
         copyLock: LockModel,
         seqNo: Long,
-        primaryTerm: Long
+        primaryTerm: Long,
     ) : this (
         copyLock.lockId,
         copyLock.scheduledJobId,
         copyLock.lockTime,
         copyLock.released,
         seqNo,
-        primaryTerm
+        primaryTerm,
     )
 
     constructor(
         copyLock: LockModel,
-        released: Boolean
+        released: Boolean,
     ) : this (
         copyLock.lockId,
         copyLock.scheduledJobId,
         copyLock.lockTime,
         released,
         copyLock.seqNo,
-        copyLock.primaryTerm
+        copyLock.primaryTerm,
     )
 
     constructor(
         copyLock: LockModel,
         updateLockTime: Instant,
-        released: Boolean
+        released: Boolean,
     ) : this (
         copyLock.lockId,
         copyLock.scheduledJobId,
         updateLockTime,
         released,
         copyLock.seqNo,
-        copyLock.primaryTerm
+        copyLock.primaryTerm,
     )
 
     constructor(
         scheduledJobId: String,
         lockTime: Instant,
-        released: Boolean
+        released: Boolean,
     ) : this (
         generateLockId(scheduledJobId),
         scheduledJobId,
         lockTime,
         released,
         SequenceNumbers.UNASSIGNED_SEQ_NO,
-        SequenceNumbers.UNASSIGNED_PRIMARY_TERM
+        SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
     )
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        builder.startObject()
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
+        builder
+            .startObject()
             .field(SCHEDULED_JOB_ID, scheduledJobId)
             .field(LOCK_TIME, lockTime.epochSecond)
             .field(RELEASED, released)
@@ -88,14 +91,16 @@ class LockModel(
         const val LOCK_TIME = "lock_time"
         const val RELEASED = "released"
 
-        fun generateLockId(scheduledJobId: String): String {
-            return "$scheduledJobId-lock"
-        }
+        fun generateLockId(scheduledJobId: String): String = "$scheduledJobId-lock"
 
         @JvmStatic
         @JvmOverloads
         @Throws(IOException::class)
-        fun parse(xcp: XContentParser, seqNo: Long, primaryTerm: Long): LockModel {
+        fun parse(
+            xcp: XContentParser,
+            seqNo: Long,
+            primaryTerm: Long,
+        ): LockModel {
             lateinit var scheduledJobId: String
             lateinit var lockTime: Instant
             var released: Boolean = false

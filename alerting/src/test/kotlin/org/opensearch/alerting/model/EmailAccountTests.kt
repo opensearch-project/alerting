@@ -7,19 +7,21 @@ package org.opensearch.alerting.model
 
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class EmailAccountTests : OpenSearchTestCase() {
-
+    @Test
     fun `test email account`() {
-        val emailAccount = EmailAccount(
-            name = "test",
-            email = "test@email.com",
-            host = "smtp.com",
-            port = 25,
-            method = EmailAccount.MethodType.NONE,
-            username = null,
-            password = null
-        )
+        val emailAccount =
+            EmailAccount(
+                name = "test",
+                email = "test@email.com",
+                host = "smtp.com",
+                port = 25,
+                method = EmailAccount.MethodType.NONE,
+                username = null,
+                password = null,
+            )
         assertEquals("Email account name was changed", emailAccount.name, "test")
         assertEquals("Email account email was changed", emailAccount.email, "test@email.com")
         assertEquals("Email account host was changed", emailAccount.host, "smtp.com")
@@ -27,6 +29,7 @@ class EmailAccountTests : OpenSearchTestCase() {
         assertEquals("Email account method was changed", emailAccount.method, EmailAccount.MethodType.NONE)
     }
 
+    @Test
     fun `test email account with invalid name`() {
         try {
             EmailAccount(
@@ -36,13 +39,14 @@ class EmailAccountTests : OpenSearchTestCase() {
                 port = 25,
                 method = EmailAccount.MethodType.NONE,
                 username = null,
-                password = null
+                password = null,
             )
             fail("Creating an email account with an invalid name did not fail.")
         } catch (ignored: IllegalArgumentException) {
         }
     }
 
+    @Test
     fun `test email account with invalid email`() {
         try {
             EmailAccount(
@@ -52,7 +56,7 @@ class EmailAccountTests : OpenSearchTestCase() {
                 port = 25,
                 method = EmailAccount.MethodType.NONE,
                 username = null,
-                password = null
+                password = null,
             )
             fail("Creating an email account with an invalid email did not fail.")
         } catch (ignored: IllegalArgumentException) {

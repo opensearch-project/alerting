@@ -57,208 +57,240 @@ import java.util.Locale
 private val log = LogManager.getLogger(TransportAcknowledgeAlertAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
-class TransportAcknowledgeAlertAction @Inject constructor(
-    transportService: TransportService,
-    val client: Client,
-    clusterService: ClusterService,
-    actionFilters: ActionFilters,
-    val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry,
-    val transportGetMonitorAction: TransportGetMonitorAction
-) : HandledTransportAction<ActionRequest, AcknowledgeAlertResponse>(
-    AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_NAME, transportService, actionFilters, ::AcknowledgeAlertRequest
-) {
+class TransportAcknowledgeAlertAction
+    @Inject
+    constructor(
+        transportService: TransportService,
+        val client: Client,
+        clusterService: ClusterService,
+        actionFilters: ActionFilters,
+        val settings: Settings,
+        val xContentRegistry: NamedXContentRegistry,
+        val transportGetMonitorAction: TransportGetMonitorAction,
+    ) : HandledTransportAction<ActionRequest, AcknowledgeAlertResponse>(
+            AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_NAME,
+            transportService,
+            actionFilters,
+            ::AcknowledgeAlertRequest,
+        ) {
+        @Volatile
+        private var isAlertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
 
-    @Volatile
-    private var isAlertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
+        init {
+            clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_ENABLED) { isAlertHistoryEnabled = it }
+        }
 
-    init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_ENABLED) { isAlertHistoryEnabled = it }
-    }
-
-    override fun doExecute(
-        task: Task,
-        acknowledgeAlertRequest: ActionRequest,
-        actionListener: ActionListener<AcknowledgeAlertResponse>
-    ) {
-        val request = acknowledgeAlertRequest as? AcknowledgeAlertRequest
-            ?: recreateObject(acknowledgeAlertRequest) { AcknowledgeAlertRequest(it) }
-        client.threadPool().threadContext.stashContext().use {
-            scope.launch {
-                val getMonitorResponse: GetMonitorResponse =
-                    transportGetMonitorAction.client.suspendUntil {
-                        val getMonitorRequest = GetMonitorRequest(
-                            monitorId = request.monitorId,
-                            -3L,
-                            RestRequest.Method.GET,
-                            FetchSourceContext.FETCH_SOURCE
-                        )
-                        execute(AlertingActions.GET_MONITOR_ACTION_TYPE, getMonitorRequest, it)
-                    }
-                if (getMonitorResponse.monitor == null) {
-                    actionListener.onFailure(
-                        AlertingException.wrap(
-                            ResourceNotFoundException(
-                                String.format(
-                                    Locale.ROOT,
-                                    "No monitor found with id [%s]",
-                                    request.monitorId
+        override fun doExecute(
+            task: Task,
+            acknowledgeAlertRequest: ActionRequest,
+            actionListener: ActionListener<AcknowledgeAlertResponse>,
+        ) {
+            val request =
+                acknowledgeAlertRequest as? AcknowledgeAlertRequest
+                    ?: recreateObject(acknowledgeAlertRequest) { AcknowledgeAlertRequest(it) }
+            client.threadPool().threadContext.stashContext().use {
+                scope.launch {
+                    val getMonitorResponse: GetMonitorResponse =
+                        transportGetMonitorAction.client.suspendUntil {
+                            val getMonitorRequest =
+                                GetMonitorRequest(
+                                    monitorId = request.monitorId,
+                                    -3L,
+                                    RestRequest.Method.GET,
+                                    FetchSourceContext.FETCH_SOURCE,
                                 )
-                            )
-                        )
-                    )
-                } else {
-                    AcknowledgeHandler(client, actionListener, request).start(getMonitorResponse.monitor!!)
-                }
-            }
-        }
-    }
-
-    inner class AcknowledgeHandler(
-        private val client: Client,
-        private val actionListener: ActionListener<AcknowledgeAlertResponse>,
-        private val request: AcknowledgeAlertRequest
-    ) {
-        val alerts = mutableMapOf<String, Alert>()
-
-        suspend fun start(monitor: Monitor) = findActiveAlerts(monitor)
-
-        private suspend fun findActiveAlerts(monitor: Monitor) {
-            val queryBuilder = QueryBuilders.boolQuery()
-                .filter(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, request.monitorId))
-                .filter(QueryBuilders.termsQuery("_id", request.alertIds))
-            val searchRequest = SearchRequest()
-                .indices(monitor.dataSources.alertsIndex)
-                .routing(request.monitorId)
-                .source(
-                    SearchSourceBuilder()
-                        .query(queryBuilder)
-                        .version(true)
-                        .seqNoAndPrimaryTerm(true)
-                        .size(request.alertIds.size)
-                )
-            try {
-                val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-                onSearchResponse(searchResponse, monitor)
-            } catch (t: Exception) {
-                actionListener.onFailure(AlertingException.wrap(t))
-            }
-        }
-
-        private suspend fun onSearchResponse(response: SearchResponse, monitor: Monitor) {
-            val alertsHistoryIndex = monitor.dataSources.alertsHistoryIndex
-            val updateRequests = mutableListOf<UpdateRequest>()
-            val copyRequests = mutableListOf<IndexRequest>()
-            response.hits.forEach { hit ->
-                val xcp = XContentHelper.createParser(
-                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                    hit.sourceRef, XContentType.JSON
-                )
-                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                val alert = Alert.parse(xcp, hit.id, hit.version)
-                alerts[alert.id] = alert
-
-                if (alert.state == Alert.State.ACTIVE) {
-                    if (
-                        alert.findingIds.isEmpty() ||
-                        !isAlertHistoryEnabled
-                    ) {
-                        val updateRequest = UpdateRequest(monitor.dataSources.alertsIndex, alert.id)
-                            .routing(request.monitorId)
-                            .setIfSeqNo(hit.seqNo)
-                            .setIfPrimaryTerm(hit.primaryTerm)
-                            .doc(
-                                XContentFactory.jsonBuilder().startObject()
-                                    .field(Alert.STATE_FIELD, Alert.State.ACKNOWLEDGED.toString())
-                                    .optionalTimeField(Alert.ACKNOWLEDGED_TIME_FIELD, Instant.now())
-                                    .endObject()
-                            )
-                        updateRequests.add(updateRequest)
-                    } else {
-                        val copyRequest = IndexRequest(alertsHistoryIndex)
-                            .routing(request.monitorId)
-                            .id(alert.id)
-                            .source(
-                                alert.copy(state = Alert.State.ACKNOWLEDGED, acknowledgedTime = Instant.now())
-                                    .toXContentWithUser(XContentFactory.jsonBuilder())
-                            )
-                        copyRequests.add(copyRequest)
-                    }
-                }
-            }
-
-            try {
-                val updateResponse: BulkResponse? = if (updateRequests.isNotEmpty())
-                    client.suspendUntil {
-                        client.bulk(BulkRequest().add(updateRequests).setRefreshPolicy(request.refreshPolicy), it)
-                    }
-                else null
-                val copyResponse: BulkResponse? = if (copyRequests.isNotEmpty())
-                    client.suspendUntil {
-                        client.bulk(BulkRequest().add(copyRequests).setRefreshPolicy(request.refreshPolicy), it)
-                    }
-                else null
-                onBulkResponse(updateResponse, copyResponse, monitor)
-            } catch (t: Exception) {
-                log.error("ack error: ${t.message}")
-                actionListener.onFailure(AlertingException.wrap(t))
-            }
-        }
-
-        private suspend fun onBulkResponse(updateResponse: BulkResponse?, copyResponse: BulkResponse?, monitor: Monitor) {
-            val deleteRequests = mutableListOf<DeleteRequest>()
-            val missing = request.alertIds.toMutableSet()
-            val acknowledged = mutableListOf<Alert>()
-            val failed = mutableListOf<Alert>()
-
-            alerts.values.forEach {
-                if (it.state != Alert.State.ACTIVE) {
-                    missing.remove(it.id)
-                    failed.add(it)
-                }
-            }
-
-            updateResponse?.items?.forEach { item ->
-                missing.remove(item.id)
-                if (item.isFailed) {
-                    failed.add(alerts[item.id]!!)
-                } else {
-                    acknowledged.add(alerts[item.id]!!)
-                }
-            }
-
-            copyResponse?.items?.forEach { item ->
-                log.info("got a copyResponse: $item")
-                missing.remove(item.id)
-                if (item.isFailed) {
-                    log.info("got a failureResponse: ${item.failureMessage}")
-                    failed.add(alerts[item.id]!!)
-                } else {
-                    val deleteRequest = DeleteRequest(monitor.dataSources.alertsIndex, item.id)
-                        .routing(request.monitorId)
-                    deleteRequests.add(deleteRequest)
-                }
-            }
-
-            if (deleteRequests.isNotEmpty()) {
-                try {
-                    val deleteResponse: BulkResponse = client.suspendUntil {
-                        client.bulk(BulkRequest().add(deleteRequests).setRefreshPolicy(request.refreshPolicy), it)
-                    }
-                    deleteResponse.items.forEach { item ->
-                        missing.remove(item.id)
-                        if (item.isFailed) {
-                            failed.add(alerts[item.id]!!)
-                        } else {
-                            acknowledged.add(alerts[item.id]!!)
+                            execute(AlertingActions.GET_MONITOR_ACTION_TYPE, getMonitorRequest, it)
                         }
+                    if (getMonitorResponse.monitor == null) {
+                        actionListener.onFailure(
+                            AlertingException.wrap(
+                                ResourceNotFoundException(
+                                    String.format(
+                                        Locale.ROOT,
+                                        "No monitor found with id [%s]",
+                                        request.monitorId,
+                                    ),
+                                ),
+                            ),
+                        )
+                    } else {
+                        AcknowledgeHandler(client, actionListener, request).start(getMonitorResponse.monitor!!)
                     }
+                }
+            }
+        }
+
+        inner class AcknowledgeHandler(
+            private val client: Client,
+            private val actionListener: ActionListener<AcknowledgeAlertResponse>,
+            private val request: AcknowledgeAlertRequest,
+        ) {
+            val alerts = mutableMapOf<String, Alert>()
+
+            suspend fun start(monitor: Monitor) = findActiveAlerts(monitor)
+
+            private suspend fun findActiveAlerts(monitor: Monitor) {
+                val queryBuilder =
+                    QueryBuilders
+                        .boolQuery()
+                        .filter(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, request.monitorId))
+                        .filter(QueryBuilders.termsQuery("_id", request.alertIds))
+                val searchRequest =
+                    SearchRequest()
+                        .indices(monitor.dataSources.alertsIndex)
+                        .routing(request.monitorId)
+                        .source(
+                            SearchSourceBuilder()
+                                .query(queryBuilder)
+                                .version(true)
+                                .seqNoAndPrimaryTerm(true)
+                                .size(request.alertIds.size),
+                        )
+                try {
+                    val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
+                    onSearchResponse(searchResponse, monitor)
                 } catch (t: Exception) {
                     actionListener.onFailure(AlertingException.wrap(t))
-                    return
                 }
             }
-            actionListener.onResponse(AcknowledgeAlertResponse(acknowledged.toList(), failed.toList(), missing.toList()))
+
+            private suspend fun onSearchResponse(
+                response: SearchResponse,
+                monitor: Monitor,
+            ) {
+                val alertsHistoryIndex = monitor.dataSources.alertsHistoryIndex
+                val updateRequests = mutableListOf<UpdateRequest>()
+                val copyRequests = mutableListOf<IndexRequest>()
+                response.hits.forEach { hit ->
+                    val xcp =
+                        XContentHelper.createParser(
+                            xContentRegistry,
+                            LoggingDeprecationHandler.INSTANCE,
+                            hit.sourceRef,
+                            XContentType.JSON,
+                        )
+                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                    val alert = Alert.parse(xcp, hit.id, hit.version)
+                    alerts[alert.id] = alert
+
+                    if (alert.state == Alert.State.ACTIVE) {
+                        if (
+                            alert.findingIds.isEmpty() ||
+                            !isAlertHistoryEnabled
+                        ) {
+                            val updateRequest =
+                                UpdateRequest(monitor.dataSources.alertsIndex, alert.id)
+                                    .routing(request.monitorId)
+                                    .setIfSeqNo(hit.seqNo)
+                                    .setIfPrimaryTerm(hit.primaryTerm)
+                                    .doc(
+                                        XContentFactory
+                                            .jsonBuilder()
+                                            .startObject()
+                                            .field(Alert.STATE_FIELD, Alert.State.ACKNOWLEDGED.toString())
+                                            .optionalTimeField(Alert.ACKNOWLEDGED_TIME_FIELD, Instant.now())
+                                            .endObject(),
+                                    )
+                            updateRequests.add(updateRequest)
+                        } else {
+                            val copyRequest =
+                                IndexRequest(alertsHistoryIndex)
+                                    .routing(request.monitorId)
+                                    .id(alert.id)
+                                    .source(
+                                        alert
+                                            .copy(state = Alert.State.ACKNOWLEDGED, acknowledgedTime = Instant.now())
+                                            .toXContentWithUser(XContentFactory.jsonBuilder()),
+                                    )
+                            copyRequests.add(copyRequest)
+                        }
+                    }
+                }
+
+                try {
+                    val updateResponse: BulkResponse? =
+                        if (updateRequests.isNotEmpty()) {
+                            client.suspendUntil {
+                                client.bulk(BulkRequest().add(updateRequests).setRefreshPolicy(request.refreshPolicy), it)
+                            }
+                        } else {
+                            null
+                        }
+                    val copyResponse: BulkResponse? =
+                        if (copyRequests.isNotEmpty()) {
+                            client.suspendUntil {
+                                client.bulk(BulkRequest().add(copyRequests).setRefreshPolicy(request.refreshPolicy), it)
+                            }
+                        } else {
+                            null
+                        }
+                    onBulkResponse(updateResponse, copyResponse, monitor)
+                } catch (t: Exception) {
+                    log.error("ack error: ${t.message}")
+                    actionListener.onFailure(AlertingException.wrap(t))
+                }
+            }
+
+            private suspend fun onBulkResponse(
+                updateResponse: BulkResponse?,
+                copyResponse: BulkResponse?,
+                monitor: Monitor,
+            ) {
+                val deleteRequests = mutableListOf<DeleteRequest>()
+                val missing = request.alertIds.toMutableSet()
+                val acknowledged = mutableListOf<Alert>()
+                val failed = mutableListOf<Alert>()
+
+                alerts.values.forEach {
+                    if (it.state != Alert.State.ACTIVE) {
+                        missing.remove(it.id)
+                        failed.add(it)
+                    }
+                }
+
+                updateResponse?.items?.forEach { item ->
+                    missing.remove(item.id)
+                    if (item.isFailed) {
+                        failed.add(alerts[item.id]!!)
+                    } else {
+                        acknowledged.add(alerts[item.id]!!)
+                    }
+                }
+
+                copyResponse?.items?.forEach { item ->
+                    log.info("got a copyResponse: $item")
+                    missing.remove(item.id)
+                    if (item.isFailed) {
+                        log.info("got a failureResponse: ${item.failureMessage}")
+                        failed.add(alerts[item.id]!!)
+                    } else {
+                        val deleteRequest =
+                            DeleteRequest(monitor.dataSources.alertsIndex, item.id)
+                                .routing(request.monitorId)
+                        deleteRequests.add(deleteRequest)
+                    }
+                }
+
+                if (deleteRequests.isNotEmpty()) {
+                    try {
+                        val deleteResponse: BulkResponse =
+                            client.suspendUntil {
+                                client.bulk(BulkRequest().add(deleteRequests).setRefreshPolicy(request.refreshPolicy), it)
+                            }
+                        deleteResponse.items.forEach { item ->
+                            missing.remove(item.id)
+                            if (item.isFailed) {
+                                failed.add(alerts[item.id]!!)
+                            } else {
+                                acknowledged.add(alerts[item.id]!!)
+                            }
+                        }
+                    } catch (t: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(t))
+                        return
+                    }
+                }
+                actionListener.onResponse(AcknowledgeAlertResponse(acknowledged.toList(), failed.toList(), missing.toList()))
+            }
         }
     }
-}

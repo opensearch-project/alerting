@@ -60,12 +60,12 @@ import java.time.temporal.ChronoUnit.MINUTES
 import java.util.concurrent.TimeUnit
 
 class MonitorRunnerServiceIT : AlertingRestTestCase() {
-
     fun `test execute monitor with dryrun`() {
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
-        val monitor = randomQueryLevelMonitor(
-            triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
-        )
+        val monitor =
+            randomQueryLevelMonitor(
+                triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))),
+            )
 
         val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
 
@@ -73,7 +73,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         for (triggerResult in output.objectMap("trigger_results").values) {
             for (actionResult in triggerResult.objectMap("action_results").values) {
-                @Suppress("UNCHECKED_CAST") val actionOutput = actionResult["output"] as Map<String, String>
+                @Suppress("UNCHECKED_CAST")
+                val actionOutput = actionResult["output"] as Map<String, String>
                 assertEquals("Hello ${monitor.name}", actionOutput["subject"])
                 assertEquals("Hello ${monitor.name}", actionOutput["message"])
             }
@@ -90,15 +91,18 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val testDoc = """{ "test_strict_date_time" : "$testTime" }"""
         indexDoc(testIndex, "1", testDoc)
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().query(query))
-        val triggerScript = """
+        val triggerScript =
+            """
             // make sure there is exactly one hit
             return ctx.results[0].hits.hits.size() == 1
-        """.trimIndent()
+            """.trimIndent()
 
         val trigger = randomQueryLevelTrigger(condition = Script(triggerScript))
         val monitor = randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger))
@@ -109,6 +113,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
         assertEquals("Incorrect search result", 1, total["value"])
@@ -130,11 +135,12 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test active alert is updated on each run`() {
-        val monitor = createMonitor(
-            randomQueryLevelMonitor(
-                triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, destinationId = createDestination().id))
+        val monitor =
+            createMonitor(
+                randomQueryLevelMonitor(
+                    triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, destinationId = createDestination().id)),
+                ),
             )
-        )
 
         executeMonitor(monitor.id)
         val firstRunAlert = searchAlerts(monitor).single()
@@ -152,7 +158,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals("Start time shouldn't change", firstRunAlert.startTime, secondRunAlert.startTime)
         assertNotEquals(
             "Last notification should be different.",
-            firstRunAlert.lastNotificationTime, secondRunAlert.lastNotificationTime
+            firstRunAlert.lastNotificationTime,
+            secondRunAlert.lastNotificationTime,
         )
     }
 
@@ -160,12 +167,13 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         // use a non-existent index to trigger an input error
         createIndex("foo", Settings.EMPTY)
         val input = SearchInput(indices = listOf("foo"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
-        val monitor = createMonitor(
-            randomQueryLevelMonitor(
-                inputs = listOf(input),
-                triggers = listOf(randomQueryLevelTrigger(condition = NEVER_RUN))
+        val monitor =
+            createMonitor(
+                randomQueryLevelMonitor(
+                    inputs = listOf(input),
+                    triggers = listOf(randomQueryLevelTrigger(condition = NEVER_RUN)),
+                ),
             )
-        )
 
         deleteIndex("foo")
         val response = executeMonitor(monitor.id)
@@ -185,12 +193,13 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         // use a non-existent monitoid to trigger a 404.
         createIndex("foo", Settings.EMPTY)
         val input = SearchInput(indices = listOf("foo"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
-        val monitor = createMonitor(
-            randomQueryLevelMonitor(
-                inputs = listOf(input),
-                triggers = listOf(randomQueryLevelTrigger(condition = NEVER_RUN))
+        val monitor =
+            createMonitor(
+                randomQueryLevelMonitor(
+                    inputs = listOf(input),
+                    triggers = listOf(randomQueryLevelTrigger(condition = NEVER_RUN)),
+                ),
             )
-        )
 
         var exception: ResponseException? = null
         try {
@@ -207,15 +216,17 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         createIndex(index, Settings.EMPTY)
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "1", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
-        val monitor = createMonitor(
-            randomDocumentLevelMonitor(
-                inputs = listOf(docLevelInput),
-                triggers = listOf()
+        val monitor =
+            createMonitor(
+                randomDocumentLevelMonitor(
+                    inputs = listOf(docLevelInput),
+                    triggers = listOf(),
+                ),
             )
-        )
-        val doc = """
+        val doc =
+            """
             { "test_field": "us-west-2" }
-        """.trimIndent()
+            """.trimIndent()
         indexDoc(index, "1", doc)
 
         val response = executeMonitor(monitor.id)
@@ -231,12 +242,13 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         createIndex("foo", Settings.EMPTY)
         val input = SearchInput(indices = listOf("foo"), query = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
-        val monitor = createMonitor(
-            randomQueryLevelMonitor(
-                inputs = listOf(input),
-                triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, destinationId = destinationId))
+        val monitor =
+            createMonitor(
+                randomQueryLevelMonitor(
+                    inputs = listOf(input),
+                    triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, destinationId = destinationId)),
+                ),
             )
-        )
 
         var response = executeMonitor(monitor.id)
 
@@ -258,11 +270,12 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test acknowledged alert is not updated unnecessarily`() {
-        val monitor = createMonitor(
-            randomQueryLevelMonitor(
-                triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, destinationId = createDestination().id))
+        val monitor =
+            createMonitor(
+                randomQueryLevelMonitor(
+                    triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, destinationId = createDestination().id)),
+                ),
             )
-        )
         executeMonitor(monitor.id)
         acknowledgeAlerts(monitor, searchAlerts(monitor).single())
         val acknowledgedAlert = searchAlerts(monitor).single()
@@ -318,9 +331,10 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     fun `test execute action template error`() {
         // Intentional syntax error in mustache template
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name"))
-        val monitor = randomQueryLevelMonitor(
-            triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
-        )
+        val monitor =
+            randomQueryLevelMonitor(
+                triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))),
+            )
 
         val response = executeMonitor(monitor)
 
@@ -344,15 +358,18 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val testDoc = """{ "test_strict_date_time" : "$testTime" }"""
         indexDoc(testIndex, "1", testDoc)
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
         val input = SearchInput(indices = listOf(".*"), query = SearchSourceBuilder().query(query))
-        val triggerScript = """
+        val triggerScript =
+            """
             // make sure there is at least one monitor
             return ctx.results[0].hits.hits.size() > 0
-        """.trimIndent()
+            """.trimIndent()
         val destinationId = createDestination().id
         val trigger = randomQueryLevelTrigger(condition = Script(triggerScript), destinationId = destinationId)
         val monitor = createMonitor(randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger)))
@@ -380,15 +397,18 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         // Queries that use period_start/end should expect these values to always be formatted as 'epoch_millis'. Either
         // the query should specify the format (like below) or the mapping for the index/field being queried should allow
         // epoch_millis as an alternative (OpenSearch's default mapping for date fields "strict_date_optional_time||epoch_millis")
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().query(query))
-        val triggerScript = """
+        val triggerScript =
+            """
             // make sure there is exactly one hit
             return ctx.results[0].hits.hits.size() == 1
-        """.trimIndent()
+            """.trimIndent()
         val trigger = randomQueryLevelTrigger(condition = Script(triggerScript))
         val monitor = randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger))
 
@@ -410,9 +430,10 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         // Give the index name in the date math format.
         val testIndex = "<my-index-{now/d{YYYY.MM.dd|+12:00}}>"
         // Add percent encoding for the http client to resolve the format.
-        val encodedTestIndex = createTestIndex(
-            URLEncoder.encode(testIndex, "utf-8")
-        )
+        val encodedTestIndex =
+            createTestIndex(
+                URLEncoder.encode(testIndex, "utf-8"),
+            )
 
         val fiveDaysAgo = ZonedDateTime.now().minus(5, DAYS).truncatedTo(MILLIS)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(fiveDaysAgo)
@@ -422,15 +443,18 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         // Queries that use period_start/end should expect these values to always be formatted as 'epoch_millis'. Either
         // the query should specify the format (like below) or the mapping for the index/field being queried should allow
         // epoch_millis as an alternative (OpenSearch's default mapping for date fields "strict_date_optional_time||epoch_millis")
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().query(query))
-        val triggerScript = """
+        val triggerScript =
+            """
             // make sure there is exactly one hit
             return ctx.results[0].hits.hits.size() == 1
-        """.trimIndent()
+            """.trimIndent()
         val trigger = randomQueryLevelTrigger(condition = Script(triggerScript))
         val monitor = randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger))
 
@@ -441,32 +465,37 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
         assertEquals("Incorrect search result", 1, total["value"])
     }
 
     fun `test monitor with one bad action and one good action`() {
-        val goodAction = randomAction(
-            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
-            destinationId = createDestination().id
-        )
-        val syntaxErrorAction = randomAction(
-            name = "bad syntax",
-            template = randomTemplateScript("{{foo"),
-            destinationId = createDestination().id
-        )
+        val goodAction =
+            randomAction(
+                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+                destinationId = createDestination().id,
+            )
+        val syntaxErrorAction =
+            randomAction(
+                name = "bad syntax",
+                template = randomTemplateScript("{{foo"),
+                destinationId = createDestination().id,
+            )
         val actions = listOf(goodAction, syntaxErrorAction)
-        val monitor = createMonitor(
-            randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = actions)))
-        )
+        val monitor =
+            createMonitor(
+                randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = actions))),
+            )
 
         val output = entityAsMap(executeMonitor(monitor.id))
 
         assertEquals(monitor.name, output["monitor_name"])
         for (triggerResult in output.objectMap("trigger_results").values) {
             for (actionResult in triggerResult.objectMap("action_results").values) {
-                @Suppress("UNCHECKED_CAST") val actionOutput = actionResult["output"] as Map<String, String>
+                @Suppress("UNCHECKED_CAST")
+                val actionOutput = actionResult["output"] as Map<String, String>
                 if (actionResult["name"] == goodAction.name) {
                     assertEquals("Hello ${monitor.name}", actionOutput["message"])
                 } else if (actionResult["name"] == syntaxErrorAction.name) {
@@ -489,12 +518,16 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val trigger = randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))
         val monitor = createMonitor(randomQueryLevelMonitor(triggers = listOf(trigger)))
         val listOfFiveErrorMessages = (1..5).map { i -> AlertError(timestamp = Instant.now(), message = "error message $i") }
-        val activeAlert = createAlert(
-            randomAlert(monitor).copy(
-                state = ACTIVE, errorHistory = listOfFiveErrorMessages,
-                triggerId = trigger.id, triggerName = trigger.name, severity = trigger.severity
+        val activeAlert =
+            createAlert(
+                randomAlert(monitor).copy(
+                    state = ACTIVE,
+                    errorHistory = listOfFiveErrorMessages,
+                    triggerId = trigger.id,
+                    triggerName = trigger.name,
+                    severity = trigger.severity,
+                ),
             )
-        )
 
         val response = executeMonitor(monitor.id)
 
@@ -512,17 +545,19 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
     fun `test latest error is not lost when alert is completed`() {
         // Creates an active alert the first time it's run and completes it the second time the monitor is run.
-        val trigger = randomQueryLevelTrigger(
-            condition = Script(
-                """
-            if (ctx.alert == null) {
-                throw new RuntimeException("foo");
-            } else {
-                return false;
-            }
-                """.trimIndent()
+        val trigger =
+            randomQueryLevelTrigger(
+                condition =
+                    Script(
+                        """
+                        if (ctx.alert == null) {
+                            throw new RuntimeException("foo");
+                        } else {
+                            return false;
+                        }
+                        """.trimIndent(),
+                    ),
             )
-        )
         val monitor = createMonitor(randomQueryLevelMonitor(triggers = listOf(trigger)))
 
         executeMonitor(monitor.id)
@@ -540,13 +575,15 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
     fun `test throw script exception`() {
         // Creates an active alert the first time it's run and completes it the second time the monitor is run.
-        val trigger = randomQueryLevelTrigger(
-            condition = Script(
-                """
-            param[0]; return true
-                """.trimIndent()
+        val trigger =
+            randomQueryLevelTrigger(
+                condition =
+                    Script(
+                        """
+                        param[0]; return true
+                        """.trimIndent(),
+                    ),
             )
-        )
         val monitor = createMonitor(randomQueryLevelMonitor(triggers = listOf(trigger)))
 
         executeMonitor(monitor.id)
@@ -555,7 +592,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         executeMonitor(monitor.id)
         assertEquals(
             "Error does not match",
-            "Failed evaluating trigger:\nparam[0]; return true\n     ^---- HERE", errorAlert.errorMessage
+            "Failed evaluating trigger:\nparam[0]; return true\n     ^---- HERE",
+            errorAlert.errorMessage,
         )
     }
 
@@ -566,12 +604,16 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val trigger = randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))
         val monitor = createMonitor(randomQueryLevelMonitor(triggers = listOf(trigger)))
         val listOfTenErrorMessages = (1..10).map { i -> AlertError(timestamp = Instant.now(), message = "error message $i") }
-        val activeAlert = createAlert(
-            randomAlert(monitor).copy(
-                state = ACTIVE, errorHistory = listOfTenErrorMessages,
-                triggerId = trigger.id, triggerName = trigger.name, severity = trigger.severity
+        val activeAlert =
+            createAlert(
+                randomAlert(monitor).copy(
+                    state = ACTIVE,
+                    errorHistory = listOfTenErrorMessages,
+                    triggerId = trigger.id,
+                    triggerName = trigger.name,
+                    severity = trigger.severity,
+                ),
             )
-        )
 
         val response = executeMonitor(monitor.id)
 
@@ -601,16 +643,18 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test execute monitor non-dryrun`() {
-        val monitor = createMonitor(
-            randomQueryLevelMonitor(
-                triggers = listOf(
-                    randomQueryLevelTrigger(
-                        condition = ALWAYS_RUN,
-                        actions = listOf(randomAction(destinationId = createDestination().id))
-                    )
-                )
+        val monitor =
+            createMonitor(
+                randomQueryLevelMonitor(
+                    triggers =
+                        listOf(
+                            randomQueryLevelTrigger(
+                                condition = ALWAYS_RUN,
+                                actions = listOf(randomAction(destinationId = createDestination().id)),
+                            ),
+                        ),
+                ),
             )
-        )
 
         val response = executeMonitor(monitor.id, mapOf("dryrun" to "false"))
 
@@ -621,16 +665,18 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test execute monitor with already active alert`() {
-        val monitor = createMonitor(
-            randomQueryLevelMonitor(
-                triggers = listOf(
-                    randomQueryLevelTrigger(
-                        condition = ALWAYS_RUN,
-                        actions = listOf(randomAction(destinationId = createDestination().id))
-                    )
-                )
+        val monitor =
+            createMonitor(
+                randomQueryLevelMonitor(
+                    triggers =
+                        listOf(
+                            randomQueryLevelTrigger(
+                                condition = ALWAYS_RUN,
+                                actions = listOf(randomAction(destinationId = createDestination().id)),
+                            ),
+                        ),
+                ),
             )
-        )
 
         val firstExecuteResponse = executeMonitor(monitor.id, mapOf("dryrun" to "false"))
 
@@ -650,11 +696,12 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     fun `test delete monitor with no alerts after alert indices is initialized`() {
         putAlertMappings()
 
-        val newMonitor = createMonitor(
-            randomQueryLevelMonitor(
-                triggers = listOf(randomQueryLevelTrigger(condition = NEVER_RUN, actions = listOf(randomAction())))
+        val newMonitor =
+            createMonitor(
+                randomQueryLevelMonitor(
+                    triggers = listOf(randomQueryLevelTrigger(condition = NEVER_RUN, actions = listOf(randomAction()))),
+                ),
             )
-        )
         val deleteNewMonitorResponse = client().makeRequest("DELETE", "$ALERTING_BASE_URI/${newMonitor.id}")
 
         assertEquals("Delete request not successful", RestStatus.OK, deleteNewMonitorResponse.restStatus())
@@ -690,39 +737,45 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     fun `test monitor with throttled action for same alert`() {
-        val actionThrottleEnabled = randomAction(
-            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
-            destinationId = createDestination().id,
-            throttleEnabled = true, throttle = Throttle(value = 5, unit = MINUTES)
-        )
-        val actionThrottleNotEnabled = randomAction(
-            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
-            destinationId = createDestination().id,
-            throttleEnabled = false, throttle = Throttle(value = 5, unit = MINUTES)
-        )
-        val actions = listOf(actionThrottleEnabled, actionThrottleNotEnabled)
-        val monitor = createMonitor(
-            randomQueryLevelMonitor(
-                triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = actions)),
-                schedule = IntervalSchedule(interval = 1, unit = MINUTES)
+        val actionThrottleEnabled =
+            randomAction(
+                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+                destinationId = createDestination().id,
+                throttleEnabled = true,
+                throttle = Throttle(value = 5, unit = MINUTES),
             )
-        )
+        val actionThrottleNotEnabled =
+            randomAction(
+                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+                destinationId = createDestination().id,
+                throttleEnabled = false,
+                throttle = Throttle(value = 5, unit = MINUTES),
+            )
+        val actions = listOf(actionThrottleEnabled, actionThrottleNotEnabled)
+        val monitor =
+            createMonitor(
+                randomQueryLevelMonitor(
+                    triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = actions)),
+                    schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                ),
+            )
         val monitorRunResultNotThrottled = entityAsMap(executeMonitor(monitor.id))
         verifyActionThrottleResults(
             monitorRunResultNotThrottled,
             mutableMapOf(
                 Pair(actionThrottleEnabled.id, false),
-                Pair(actionThrottleNotEnabled.id, false)
-            )
+                Pair(actionThrottleNotEnabled.id, false),
+            ),
         )
 
         val notThrottledAlert = searchAlerts(monitor)
         assertEquals("1 alert should be returned", 1, notThrottledAlert.size)
         verifyAlert(notThrottledAlert.single(), monitor, ACTIVE)
-        val notThrottledActionResults = verifyActionExecutionResultInAlert(
-            notThrottledAlert[0],
-            mutableMapOf(Pair(actionThrottleEnabled.id, 0), Pair(actionThrottleNotEnabled.id, 0))
-        )
+        val notThrottledActionResults =
+            verifyActionExecutionResultInAlert(
+                notThrottledAlert[0],
+                mutableMapOf(Pair(actionThrottleEnabled.id, 0), Pair(actionThrottleNotEnabled.id, 0)),
+            )
 
         assertEquals(notThrottledActionResults.size, 2)
         val monitorRunResultThrottled = entityAsMap(executeMonitor(monitor.id))
@@ -730,40 +783,44 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             monitorRunResultThrottled,
             mutableMapOf(
                 Pair(actionThrottleEnabled.id, true),
-                Pair(actionThrottleNotEnabled.id, false)
-            )
+                Pair(actionThrottleNotEnabled.id, false),
+            ),
         )
 
         val throttledAlert = searchAlerts(monitor)
         assertEquals("1 alert should be returned", 1, throttledAlert.size)
         verifyAlert(throttledAlert.single(), monitor, ACTIVE)
-        val throttledActionResults = verifyActionExecutionResultInAlert(
-            throttledAlert[0],
-            mutableMapOf(Pair(actionThrottleEnabled.id, 1), Pair(actionThrottleNotEnabled.id, 0))
-        )
+        val throttledActionResults =
+            verifyActionExecutionResultInAlert(
+                throttledAlert[0],
+                mutableMapOf(Pair(actionThrottleEnabled.id, 1), Pair(actionThrottleNotEnabled.id, 0)),
+            )
 
         assertEquals(notThrottledActionResults.size, 2)
 
         assertEquals(
             notThrottledActionResults[actionThrottleEnabled.id]!!.lastExecutionTime,
-            throttledActionResults[actionThrottleEnabled.id]!!.lastExecutionTime
+            throttledActionResults[actionThrottleEnabled.id]!!.lastExecutionTime,
         )
     }
 
     fun `test monitor with throttled action for different alerts`() {
-        val actionThrottleEnabled = randomAction(
-            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
-            destinationId = createDestination().id,
-            throttleEnabled = true, throttle = Throttle(value = 5, unit = MINUTES)
-        )
+        val actionThrottleEnabled =
+            randomAction(
+                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+                destinationId = createDestination().id,
+                throttleEnabled = true,
+                throttle = Throttle(value = 5, unit = MINUTES),
+            )
         val actions = listOf(actionThrottleEnabled)
         val trigger = randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = actions)
-        val monitor = createMonitor(
-            randomQueryLevelMonitor(
-                triggers = listOf(trigger),
-                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES)
+        val monitor =
+            createMonitor(
+                randomQueryLevelMonitor(
+                    triggers = listOf(trigger),
+                    schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES),
+                ),
             )
-        )
         val monitorRunResult1 = entityAsMap(executeMonitor(monitor.id))
         verifyActionThrottleResults(monitorRunResult1, mutableMapOf(Pair(actionThrottleEnabled.id, false)))
 
@@ -790,7 +847,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val actionResults2 = verifyActionExecutionResultInAlert(activeAlert2[0], mutableMapOf(Pair(actionThrottleEnabled.id, 0)))
         assertNotEquals(
             actionResults1[actionThrottleEnabled.id]!!.lastExecutionTime,
-            actionResults2[actionThrottleEnabled.id]!!.lastExecutionTime
+            actionResults2[actionThrottleEnabled.id]!!.lastExecutionTime,
         )
     }
 
@@ -799,26 +856,29 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         val emailAccount = createRandomEmailAccount()
         val emailGroup = createRandomEmailGroup()
-        val email = Email(
-            emailAccountID = emailAccount.id,
-            recipients = listOf(
-                Recipient(type = Recipient.RecipientType.EMAIL, emailGroupID = null, email = "test@email.com"),
-                Recipient(type = Recipient.RecipientType.EMAIL_GROUP, emailGroupID = emailGroup.id, email = null)
+        val email =
+            Email(
+                emailAccountID = emailAccount.id,
+                recipients =
+                    listOf(
+                        Recipient(type = Recipient.RecipientType.EMAIL, emailGroupID = null, email = "test@email.com"),
+                        Recipient(type = Recipient.RecipientType.EMAIL_GROUP, emailGroupID = emailGroup.id, email = null),
+                    ),
             )
-        )
 
-        val destination = createDestination(
-            Destination(
-                type = DestinationType.EMAIL,
-                name = "testDesination",
-                user = randomUser(),
-                lastUpdateTime = Instant.now(),
-                chime = null,
-                slack = null,
-                customWebhook = null,
-                email = email
+        val destination =
+            createDestination(
+                Destination(
+                    type = DestinationType.EMAIL,
+                    name = "testDesination",
+                    user = randomUser(),
+                    lastUpdateTime = Instant.now(),
+                    chime = null,
+                    slack = null,
+                    customWebhook = null,
+                    email = email,
+                ),
             )
-        )
         val action = randomAction(destinationId = destination.id)
         val trigger = randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))
         val monitor = createMonitor(randomQueryLevelMonitor(triggers = listOf(trigger)))
@@ -877,7 +937,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         assertTrue(
             "Monitor results should contain cluster_name, but found: $resultsContent",
-            resultsContent.toString().contains("cluster_name")
+            resultsContent.toString().contains("cluster_name"),
         )
         assertNull("There should not be an error message, but found: $errorMessage", errorMessage)
     }
@@ -900,7 +960,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         assertTrue(
             "Monitor results should contain monitor_name, but found: $resultsContent",
-            resultsContent.toString().contains("memory_size_in_bytes")
+            resultsContent.toString().contains("memory_size_in_bytes"),
         )
         assertNull("There should not be an error message, but found: $errorMessage", errorMessage)
     }
@@ -908,14 +968,16 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     fun `test create ClusterMetricsInput monitor with alert triggered`() {
         // GIVEN
         putAlertMappings()
-        val trigger = randomQueryLevelTrigger(
-            condition = Script(
-                """
-            return ctx.results[0].number_of_pending_tasks >= 0
-                """.trimIndent()
-            ),
-            destinationId = createDestination().id
-        )
+        val trigger =
+            randomQueryLevelTrigger(
+                condition =
+                    Script(
+                        """
+                        return ctx.results[0].number_of_pending_tasks >= 0
+                        """.trimIndent(),
+                    ),
+                destinationId = createDestination().id,
+            )
         val path = "/_cluster/health"
         val input = randomClusterMetricsInput(path = path)
         val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input), triggers = listOf(trigger)))
@@ -931,7 +993,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         for (triggerResult in triggerResults) {
             assertTrue(
                 "This triggerResult should be triggered: $triggerResult",
-                triggerResult.objectMap("action_results").isNotEmpty()
+                triggerResult.objectMap("action_results").isNotEmpty(),
             )
         }
 
@@ -943,13 +1005,15 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     fun `test create ClusterMetricsInput monitor with no alert triggered`() {
         // GIVEN
         putAlertMappings()
-        val trigger = randomQueryLevelTrigger(
-            condition = Script(
-                """
-            return ctx.results[0].status.equals("red")
-                """.trimIndent()
+        val trigger =
+            randomQueryLevelTrigger(
+                condition =
+                    Script(
+                        """
+                        return ctx.results[0].status.equals("red")
+                        """.trimIndent(),
+                    ),
             )
-        )
         val path = "/_cluster/stats"
         val input = randomClusterMetricsInput(path = path)
         val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input), triggers = listOf(trigger)))
@@ -965,7 +1029,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         for (triggerResult in triggerResults) {
             assertTrue(
                 "This triggerResult should not be triggered: $triggerResult",
-                triggerResult.objectMap("action_results").isEmpty()
+                triggerResult.objectMap("action_results").isEmpty(),
             )
         }
 
@@ -978,10 +1042,11 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val indices = (1..5).map { createTestIndex() }.toTypedArray()
         val pathParams = indices.joinToString(",")
         val path = "/_cluster/health"
-        val input = randomClusterMetricsInput(
-            path = path,
-            pathParams = pathParams
-        )
+        val input =
+            randomClusterMetricsInput(
+                path = path,
+                pathParams = pathParams,
+            )
         val monitor = createMonitor(randomClusterMetricsMonitor(inputs = listOf(input)))
 
         // WHEN
@@ -996,7 +1061,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         assertTrue(
             "Monitor results should contain cluster_name, but found: $resultsContent",
-            resultsContent.toString().contains("cluster_name")
+            resultsContent.toString().contains("cluster_name"),
         )
         assertNull("There should not be an error message, but found: $errorMessage", errorMessage)
     }
@@ -1008,21 +1073,21 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     //  the API from the list before executing the monitor.
 
     fun `test execute monitor with custom webhook destination and denied host`() {
-
         listOf("http://10.1.1.1", "127.0.0.1").forEach {
             val customWebhook = CustomWebhook(it, null, null, 80, null, "PUT", emptyMap(), emptyMap(), null, null)
-            val destination = createDestination(
-                Destination(
-                    type = DestinationType.CUSTOM_WEBHOOK,
-                    name = "testDesination",
-                    user = randomUser(),
-                    lastUpdateTime = Instant.now(),
-                    chime = null,
-                    slack = null,
-                    customWebhook = customWebhook,
-                    email = null
+            val destination =
+                createDestination(
+                    Destination(
+                        type = DestinationType.CUSTOM_WEBHOOK,
+                        name = "testDesination",
+                        user = randomUser(),
+                        lastUpdateTime = Instant.now(),
+                        chime = null,
+                        slack = null,
+                        customWebhook = customWebhook,
+                        email = null,
+                    ),
                 )
-            )
             val action = randomAction(destinationId = destination.id)
             val trigger = randomQueryLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))
             val monitor = createMonitor(randomQueryLevelMonitor(triggers = listOf(trigger)))
@@ -1047,13 +1112,13 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
-            (output["trigger_results"] as HashMap<String, Any>).forEach {
-                    _, v ->
+            (output["trigger_results"] as HashMap<String, Any>).forEach { _, v ->
                 assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             assertEquals(monitor.name, output["monitor_name"])
             @Suppress("UNCHECKED_CAST")
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
             assertEquals("Incorrect search result", 5, total["value"])
@@ -1070,20 +1135,22 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             val detectorId = randomAlphaOfLength(5)
             prepareTestAnomalyResult(detectorId, user)
             // for old monitor before enable FGAC, the user field is empty
-            val monitor = randomADMonitor(
-                inputs = listOf(adSearchInput(detectorId)), triggers = listOf(adMonitorTrigger()),
-                user = User(user.name, listOf(), user.roles, user.customAttributes)
-            )
+            val monitor =
+                randomADMonitor(
+                    inputs = listOf(adSearchInput(detectorId)),
+                    triggers = listOf(adMonitorTrigger()),
+                    user = User(user.name, listOf(), user.roles, user.customAttributes),
+                )
             val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
-            (output["trigger_results"] as HashMap<String, Any>).forEach {
-                    _, v ->
+            (output["trigger_results"] as HashMap<String, Any>).forEach { _, v ->
                 assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             assertEquals(monitor.name, output["monitor_name"])
             @Suppress("UNCHECKED_CAST")
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
             assertEquals("Incorrect search result", 5, total["value"])
@@ -1104,12 +1171,12 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
-            (output["trigger_results"] as HashMap<String, Any>).forEach {
-                    _, v ->
+            (output["trigger_results"] as HashMap<String, Any>).forEach { _, v ->
                 assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             @Suppress("UNCHECKED_CAST")
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
             assertEquals("Incorrect search result", 5, total["value"])
@@ -1126,19 +1193,21 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             val user = randomUser()
             prepareTestAnomalyResult(detectorId, user)
             // Test monitor with different user
-            val monitor = randomADMonitor(
-                inputs = listOf(adSearchInput(detectorId)),
-                triggers = listOf(adMonitorTrigger()), user = randomUser()
-            )
+            val monitor =
+                randomADMonitor(
+                    inputs = listOf(adSearchInput(detectorId)),
+                    triggers = listOf(adMonitorTrigger()),
+                    user = randomUser(),
+                )
             val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
             @Suppress("UNCHECKED_CAST")
-            (output["trigger_results"] as HashMap<String, Any>).forEach {
-                    _, v ->
+            (output["trigger_results"] as HashMap<String, Any>).forEach { _, v ->
                 assertTrue((v as HashMap<String, Boolean>)["triggered"] as Boolean)
             }
             @Suppress("UNCHECKED_CAST")
             val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
             @Suppress("UNCHECKED_CAST")
             val total = searchResult.stringMap("hits")?.get("total") as Map<String, String>
             assertEquals("Incorrect search result", 5, total["value"])
@@ -1152,33 +1221,39 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             listOf(
                 "test_value_1",
                 "test_value_1", // adding duplicate to verify aggregation
-                "test_value_2"
-            )
+                "test_value_2",
+            ),
         )
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field").field("test_field"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 0
-        """.trimIndent()
+            """.trimIndent()
 
         var trigger = randomBucketLevelTrigger()
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
         val response = executeMonitor(monitor.id, params = DRYRUN_MONITOR)
         val output = entityAsMap(response)
@@ -1186,6 +1261,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")?.get("buckets") as List<Map<String, Any>>
         assertEquals("Incorrect search result", 2, buckets.size)
@@ -1195,13 +1271,14 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val skipIndex = createTestIndex("to_skip_index")
         val previousIndex = createTestIndex("to_include_index")
 
-        val indexMapping = """
-                "properties" : {
-                  "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
-                  "test_field" : { "type" : "keyword" },
-                  "number" : { "type" : "keyword" }
-                }
-        """.trimIndent()
+        val indexMapping =
+            """
+            "properties" : {
+              "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
+              "test_field" : { "type" : "keyword" },
+              "number" : { "type" : "keyword" }
+            }
+            """.trimIndent()
         val alias = createTestAlias(randomAlphaOfLength(10), 10, true, indexMapping)
         val aliasName = alias.keys.first()
         insertSampleTimeSerializedDataCurrentTime(
@@ -1209,50 +1286,56 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             listOf(
                 "test_value_1",
                 "test_value_1", // adding duplicate to verify aggregation
-                "test_value_2"
-            )
+                "test_value_2",
+            ),
         )
         insertSampleTimeSerializedDataWithTime(
             previousIndex,
             listOf(
                 "test_value_3",
                 "test_value_4",
-                "test_value_5"
-            )
+                "test_value_5",
+            ),
         )
         insertSampleTimeSerializedDataWithTime(
             skipIndex,
             listOf(
                 "test_value_6",
                 "test_value_7",
-                "test_value_8"
-            )
+                "test_value_8",
+            ),
         )
         addIndexToAlias(previousIndex, aliasName)
         addIndexToAlias(skipIndex, aliasName)
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10s")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10s")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field").field("test_field"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(aliasName), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 0
-        """.trimIndent()
+            """.trimIndent()
 
         var trigger = randomBucketLevelTrigger()
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
         val response = executeMonitor(monitor.id, params = DRYRUN_MONITOR)
         val output = entityAsMap(response)
@@ -1260,6 +1343,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")?.get("buckets") as List<Map<String, Any>>
         Assert.assertEquals(buckets.size, 8)
@@ -1274,27 +1358,28 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             listOf(
                 "test_value_3",
                 "test_value_4",
-                "test_value_5"
+                "test_value_5",
             ),
-            ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS).plusSeconds(10)
+            ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS).plusSeconds(10),
         )
         insertSampleTimeSerializedDataWithTime(
             skipIndex,
             listOf(
                 "test_value_6",
                 "test_value_7",
-                "test_value_8"
+                "test_value_8",
             ),
-            ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS).plusSeconds(10)
+            ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS).plusSeconds(10),
         )
         Thread.sleep(10000)
-        val indexMapping = """
-                "properties" : {
-                  "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
-                  "test_field" : { "type" : "keyword" },
-                  "number" : { "type" : "keyword" }
-                }
-        """.trimIndent()
+        val indexMapping =
+            """
+            "properties" : {
+              "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
+              "test_field" : { "type" : "keyword" },
+              "number" : { "type" : "keyword" }
+            }
+            """.trimIndent()
         val alias = createTestAlias(randomAlphaOfLength(10), 10, true, indexMapping)
         val aliasName = alias.keys.first()
         insertSampleTimeSerializedDataCurrentTime(
@@ -1302,34 +1387,40 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             listOf(
                 "test_value_1",
                 "test_value_1", // adding duplicate to verify aggregation
-                "test_value_2"
-            )
+                "test_value_2",
+            ),
         )
         addIndexToAlias(previousIndex, aliasName)
         addIndexToAlias(skipIndex, aliasName)
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10s")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10s")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field").field("test_field"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(aliasName), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 0
-        """.trimIndent()
+            """.trimIndent()
 
         var trigger = randomBucketLevelTrigger()
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
         val response = executeMonitor(monitor.id, params = DRYRUN_MONITOR)
         val output = entityAsMap(response)
@@ -1337,6 +1428,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")?.get("buckets") as List<Map<String, Any>>
         Assert.assertTrue(buckets.size <= 5)
@@ -1347,64 +1439,71 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         indexDoc(
             index,
             "1",
-            """{"user_id": "1",
+            """
+            {"user_id": "1",
             "ip_addr": "12345678",
             "user_agent": "chrome"
             }
-            """.trimIndent()
+            """.trimIndent(),
         )
         indexDoc(
             index,
             "2",
-            """{"user_id": "2",
+            """
+            {"user_id": "2",
             "ip_addr": "12345678",
             "user_agent": "chrome"
             }
-            """.trimIndent()
+            """.trimIndent(),
         )
         indexDoc(
             index,
             "3",
-            """{"user_id": "2",
+            """
+            {"user_id": "2",
             "ip_addr": "3443534",
             "user_agent": "chrome"
             }
-            """.trimIndent()
+            """.trimIndent(),
         )
 
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 0
-        """.trimIndent()
+            """.trimIndent()
 
         var trigger = randomBucketLevelTrigger()
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("_value" to "distinct_user_count", "docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "hot",
-                filter = null
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("_value" to "distinct_user_count", "docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "hot",
+                        filter = null,
+                    ),
             )
-        )
 
-        val m = randomBucketLevelMonitor(
-            triggers = listOf(trigger),
-            inputs = listOf(
-                SearchInput(
-                    listOf(index),
-                    SearchSourceBuilder().aggregation(
-                        MultiTermsAggregationBuilder("hot")
-                            .terms(
-                                listOf(
-                                    MultiTermsValuesSourceConfig.Builder().setFieldName("ip_addr.keyword").build(),
-                                    MultiTermsValuesSourceConfig.Builder().setFieldName("user_agent.keyword").build()
-                                )
-                            )
-                            .subAggregation(CardinalityAggregationBuilder("distinct_user_count").field("user_id.keyword"))
-                    )
-                )
+        val m =
+            randomBucketLevelMonitor(
+                triggers = listOf(trigger),
+                inputs =
+                    listOf(
+                        SearchInput(
+                            listOf(index),
+                            SearchSourceBuilder().aggregation(
+                                MultiTermsAggregationBuilder("hot")
+                                    .terms(
+                                        listOf(
+                                            MultiTermsValuesSourceConfig.Builder().setFieldName("ip_addr.keyword").build(),
+                                            MultiTermsValuesSourceConfig.Builder().setFieldName("user_agent.keyword").build(),
+                                        ),
+                                    ).subAggregation(CardinalityAggregationBuilder("distinct_user_count").field("user_id.keyword")),
+                            ),
+                        ),
+                    ),
             )
-        )
         val monitor = createMonitor(m)
         val response = executeMonitor(monitor.id, params = DRYRUN_MONITOR)
         val output = entityAsMap(response)
@@ -1412,16 +1511,23 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.name, output["monitor_name"])
         @Suppress("UNCHECKED_CAST")
         val searchResult = (output.objectMap("input_results")["results"] as List<Map<String, Any>>).first()
+
         @Suppress("UNCHECKED_CAST")
         val buckets = searchResult.stringMap("aggregations")?.stringMap("hot")?.get("buckets") as List<Map<String, Any>>
         assertEquals("Incorrect search result", 2, buckets.size)
-        val distinctUserCountAgg1 = buckets.find {
-            it.get("key_as_string") == "12345678|chrome"
-        }!!.get("distinct_user_count") as Map<String, Integer>
+        val distinctUserCountAgg1 =
+            buckets
+                .find {
+                    it.get("key_as_string") == "12345678|chrome"
+                }!!
+                .get("distinct_user_count") as Map<String, Integer>
         assertEquals(2, distinctUserCountAgg1.get("value"))
-        val distinctUserCountAgg2 = buckets.find {
-            it.get("key_as_string") == "3443534|chrome"
-        }!!.get("distinct_user_count") as Map<String, Integer>
+        val distinctUserCountAgg2 =
+            buckets
+                .find {
+                    it.get("key_as_string") == "3443534|chrome"
+                }!!
+                .get("distinct_user_count") as Map<String, Integer>
         assertEquals(1, distinctUserCountAgg2.get("value"))
     }
 
@@ -1432,33 +1538,39 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             listOf(
                 "test_value_1",
                 "test_value_1", // adding duplicate to verify aggregation
-                "test_value_2"
-            )
+                "test_value_2",
+            ),
         )
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field").field("test_field"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 0
-        """.trimIndent()
+            """.trimIndent()
 
         var trigger = randomBucketLevelTrigger()
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
         executeMonitor(monitor.id)
 
@@ -1477,8 +1589,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             testIndex,
             listOf(
                 "1", // test_value_1
-                "2" // test_value_1
-            )
+                "2", // test_value_1
+            ),
         )
 
         // Execute monitor again
@@ -1498,47 +1610,55 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             testIndex,
             listOf(
                 "test_value_1",
-                "test_value_2"
-            )
+                "test_value_2",
+            ),
         )
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field").field("test_field"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 0
-        """.trimIndent()
+            """.trimIndent()
 
         // For the Actions ensure that there is at least one and any PER_ALERT actions contain ACTIVE, DEDUPED and COMPLETED in its policy
         // so that the assertions done later in this test don't fail.
         // The config is being mutated this way to still maintain the randomness in configuration (like including other ActionExecutionScope).
-        val actions = randomActionsForBucketLevelTrigger(min = 1).map {
-            if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
-                it.copy(
-                    actionExecutionPolicy = ActionExecutionPolicy(
-                        PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED))
+        val actions =
+            randomActionsForBucketLevelTrigger(min = 1).map {
+                if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
+                    it.copy(
+                        actionExecutionPolicy =
+                            ActionExecutionPolicy(
+                                PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED)),
+                            ),
                     )
-                )
-            } else {
-                it
+                } else {
+                    it
+                }
             }
-        }
         var trigger = randomBucketLevelTrigger(actions = actions)
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
         executeMonitor(monitor.id)
 
@@ -1575,8 +1695,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             testIndex,
             listOf(
                 "1", // test_value_1
-                "2" // test_value_2
-            )
+                "2", // test_value_2
+            ),
         )
 
         // Execute Monitor and check that both Alerts were updated
@@ -1591,11 +1711,11 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val previouslyActiveAlert = completedAlerts.single { it.aggregationResultBucket?.getBucketKeysHash().equals("test_value_2") }
         assertTrue(
             "Previously acknowledged alert was not updated when it moved to completed",
-            previouslyAcknowledgedAlert.lastNotificationTime!! > acknowledgedAlert2.lastNotificationTime
+            previouslyAcknowledgedAlert.lastNotificationTime!! > acknowledgedAlert2.lastNotificationTime,
         )
         assertTrue(
             "Previously active alert was not updated when it moved to completed",
-            previouslyActiveAlert.lastNotificationTime!! > activeAlert2.lastNotificationTime
+            previouslyActiveAlert.lastNotificationTime!! > activeAlert2.lastNotificationTime,
         )
     }
 
@@ -1605,52 +1725,60 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             testIndex,
             listOf(
                 "test_value_1",
-                "test_value_2"
-            )
+                "test_value_2",
+            ),
         )
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
         val termAgg = TermsAggregationBuilder("test_field").field("test_field")
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(termAgg))
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 0
-        """.trimIndent()
+            """.trimIndent()
 
         // For the Actions ensure that there is at least one and any PER_ALERT actions contain ACTIVE, DEDUPED and COMPLETED in its policy
         // so that the assertions done later in this test don't fail.
         // The config is being mutated this way to still maintain the randomness in configuration (like including other ActionExecutionScope).
-        val actions = randomActionsForBucketLevelTrigger(min = 1).map {
-            if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
-                it.copy(
-                    actionExecutionPolicy = ActionExecutionPolicy(
-                        PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED))
+        val actions =
+            randomActionsForBucketLevelTrigger(min = 1).map {
+                if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
+                    it.copy(
+                        actionExecutionPolicy =
+                            ActionExecutionPolicy(
+                                PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED)),
+                            ),
                     )
-                )
-            } else {
-                it
+                } else {
+                    it
+                }
             }
-        }
         var trigger = randomBucketLevelTrigger(actions = actions)
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "test_field",
-                filter = null
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "test_field",
+                        filter = null,
+                    ),
             )
-        )
-        val monitor = createMonitor(
-            randomBucketLevelMonitor(
-                inputs = listOf(input),
-                enabled = false,
-                triggers = listOf(trigger),
-                dataSources = DataSources(findingsEnabled = true)
+        val monitor =
+            createMonitor(
+                randomBucketLevelMonitor(
+                    inputs = listOf(input),
+                    enabled = false,
+                    triggers = listOf(trigger),
+                    dataSources = DataSources(findingsEnabled = true),
+                ),
             )
-        )
         executeMonitor(monitor.id)
 
         // Check created Alerts
@@ -1671,55 +1799,64 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             testIndex,
             listOf(
                 "test_value_1",
-                "test_value_2"
-            )
+                "test_value_2",
+            ),
         )
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field").field("test_field"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 0
-        """.trimIndent()
+            """.trimIndent()
 
         // For the Actions ensure that there is at least one and any PER_ALERT actions contain ACTIVE, DEDUPED and COMPLETED in its policy
         // so that the assertions done later in this test don't fail.
         // The config is being mutated this way to still maintain the randomness in configuration (like including other ActionExecutionScope).
-        val actions = randomActionsForBucketLevelTrigger(min = 1).map {
-            if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
-                it.copy(
-                    actionExecutionPolicy = ActionExecutionPolicy(
-                        PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED))
+        val actions =
+            randomActionsForBucketLevelTrigger(min = 1).map {
+                if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
+                    it.copy(
+                        actionExecutionPolicy =
+                            ActionExecutionPolicy(
+                                PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED)),
+                            ),
                     )
-                )
-            } else {
-                it
+                } else {
+                    it
+                }
             }
-        }
         var trigger = randomBucketLevelTrigger(actions = actions)
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
-        val monitor = createMonitor(
-            randomBucketLevelMonitor(
-                inputs = listOf(input),
-                enabled = false,
-                triggers = listOf(trigger),
-                dataSources = DataSources(findingsEnabled = true)
+        val monitor =
+            createMonitor(
+                randomBucketLevelMonitor(
+                    inputs = listOf(input),
+                    enabled = false,
+                    triggers = listOf(trigger),
+                    dataSources = DataSources(findingsEnabled = true),
+                ),
             )
-        )
         executeMonitor(monitor.id)
 
         // Check created Alerts
@@ -1740,56 +1877,65 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             testIndex,
             listOf(
                 "test_value_1",
-                "test_value_2"
-            )
+                "test_value_2",
+            ),
         )
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field"),
-            TermsValuesSourceBuilder("number").field("number")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field").field("test_field"),
+                TermsValuesSourceBuilder("number").field("number"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 0
-        """.trimIndent()
+            """.trimIndent()
 
         // For the Actions ensure that there is at least one and any PER_ALERT actions contain ACTIVE, DEDUPED and COMPLETED in its policy
         // so that the assertions done later in this test don't fail.
         // The config is being mutated this way to still maintain the randomness in configuration (like including other ActionExecutionScope).
-        val actions = randomActionsForBucketLevelTrigger(min = 1).map {
-            if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
-                it.copy(
-                    actionExecutionPolicy = ActionExecutionPolicy(
-                        PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED))
+        val actions =
+            randomActionsForBucketLevelTrigger(min = 1).map {
+                if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
+                    it.copy(
+                        actionExecutionPolicy =
+                            ActionExecutionPolicy(
+                                PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED)),
+                            ),
                     )
-                )
-            } else {
-                it
+                } else {
+                    it
+                }
             }
-        }
         var trigger = randomBucketLevelTrigger(actions = actions)
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
-        val monitor = createMonitor(
-            randomBucketLevelMonitor(
-                inputs = listOf(input),
-                enabled = false,
-                triggers = listOf(trigger),
-                dataSources = DataSources(findingsEnabled = true)
+        val monitor =
+            createMonitor(
+                randomBucketLevelMonitor(
+                    inputs = listOf(input),
+                    enabled = false,
+                    triggers = listOf(trigger),
+                    dataSources = DataSources(findingsEnabled = true),
+                ),
             )
-        )
         executeMonitor(monitor.id)
 
         // Check created Alerts
@@ -1812,42 +1958,49 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 "test_value_1",
                 "test_value_3",
                 "test_value_2",
-                "test_value_2"
-            )
+                "test_value_2",
+            ),
         )
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field").field("test_field"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
         // Trigger script should only create Alerts for 'test_value_1' and 'test_value_2'
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 1
-        """.trimIndent()
+            """.trimIndent()
 
         val goodAction = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
-        val syntaxErrorAction = randomAction(
-            name = "bad syntax",
-            template = randomTemplateScript("{{foo"),
-            destinationId = createDestination().id
-        )
+        val syntaxErrorAction =
+            randomAction(
+                name = "bad syntax",
+                template = randomTemplateScript("{{foo"),
+                destinationId = createDestination().id,
+            )
         val actions = listOf(goodAction, syntaxErrorAction)
 
         var trigger = randomBucketLevelTrigger(actions = actions)
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
 
         val output = entityAsMap(executeMonitor(monitor.id))
@@ -1890,39 +2043,46 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 "test_value_1",
                 "test_value_3",
                 "test_value_2",
-                "test_value_2"
-            )
+                "test_value_2",
+            ),
         )
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field").field("test_field"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
         // Trigger script should only create Alerts for 'test_value_1' and 'test_value_2'
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 1
-        """.trimIndent()
+            """.trimIndent()
 
-        val action = randomActionWithPolicy(
-            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
-            destinationId = createDestination().id,
-            actionExecutionPolicy = ActionExecutionPolicy(PerExecutionActionScope())
-        )
-        var trigger = randomBucketLevelTrigger(actions = listOf(action))
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null
+        val action =
+            randomActionWithPolicy(
+                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+                destinationId = createDestination().id,
+                actionExecutionPolicy = ActionExecutionPolicy(PerExecutionActionScope()),
             )
-        )
+        var trigger = randomBucketLevelTrigger(actions = listOf(action))
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
+            )
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
 
         val output = entityAsMap(executeMonitor(monitor.id))
@@ -1958,38 +2118,45 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 "test_value_1",
                 "test_value_1",
                 "test_value_2",
-                "test_value_2"
-            )
+                "test_value_2",
+            ),
         )
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field").field("test_field"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 1
-        """.trimIndent()
+            """.trimIndent()
 
-        val action = randomActionWithPolicy(
-            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
-            destinationId = createDestination().id,
-            actionExecutionPolicy = ActionExecutionPolicy(PerAlertActionScope(setOf(AlertCategory.DEDUPED, AlertCategory.NEW)))
-        )
-        var trigger = randomBucketLevelTrigger(actions = listOf(action))
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null
+        val action =
+            randomActionWithPolicy(
+                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+                destinationId = createDestination().id,
+                actionExecutionPolicy = ActionExecutionPolicy(PerAlertActionScope(setOf(AlertCategory.DEDUPED, AlertCategory.NEW))),
             )
-        )
+        var trigger = randomBucketLevelTrigger(actions = listOf(action))
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
+            )
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
         executeMonitor(monitor.id)
 
@@ -2007,8 +2174,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 "1", // test_value_1
                 "2", // test_value_1
                 "3", // test_value_2
-                "4" // test_value_2
-            )
+                "4", // test_value_2
+            ),
         )
 
         // Execute Monitor and check that both Alerts were moved to COMPLETED
@@ -2025,62 +2192,73 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             testIndex,
             listOf(
                 "test_value_1",
-                "test_value_2"
-            )
+                "test_value_2",
+            ),
         )
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field").field("test_field"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 0
-        """.trimIndent()
+            """.trimIndent()
 
-        val actionThrottleEnabled = randomActionWithPolicy(
-            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
-            destinationId = createDestination().id,
-            throttleEnabled = true,
-            throttle = Throttle(value = 5, unit = MINUTES),
-            actionExecutionPolicy = ActionExecutionPolicy(
-                actionExecutionScope = PerAlertActionScope(setOf(AlertCategory.DEDUPED, AlertCategory.NEW))
+        val actionThrottleEnabled =
+            randomActionWithPolicy(
+                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+                destinationId = createDestination().id,
+                throttleEnabled = true,
+                throttle = Throttle(value = 5, unit = MINUTES),
+                actionExecutionPolicy =
+                    ActionExecutionPolicy(
+                        actionExecutionScope = PerAlertActionScope(setOf(AlertCategory.DEDUPED, AlertCategory.NEW)),
+                    ),
             )
-        )
-        val actionThrottleNotEnabled = randomActionWithPolicy(
-            template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
-            destinationId = createDestination().id,
-            throttleEnabled = false,
-            throttle = Throttle(value = 5, unit = MINUTES),
-            actionExecutionPolicy = ActionExecutionPolicy(
-                actionExecutionScope = PerAlertActionScope(setOf(AlertCategory.DEDUPED, AlertCategory.NEW))
+        val actionThrottleNotEnabled =
+            randomActionWithPolicy(
+                template = randomTemplateScript("Hello {{ctx.monitor.name}}"),
+                destinationId = createDestination().id,
+                throttleEnabled = false,
+                throttle = Throttle(value = 5, unit = MINUTES),
+                actionExecutionPolicy =
+                    ActionExecutionPolicy(
+                        actionExecutionScope = PerAlertActionScope(setOf(AlertCategory.DEDUPED, AlertCategory.NEW)),
+                    ),
             )
-        )
         val actions = listOf(actionThrottleEnabled, actionThrottleNotEnabled)
         var trigger = randomBucketLevelTrigger(actions = actions)
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
 
         val monitorRunResultNotThrottled = entityAsMap(executeMonitor(monitor.id))
         verifyActionThrottleResultsForBucketLevelMonitor(
             monitorRunResult = monitorRunResultNotThrottled,
             expectedEvents = setOf("test_value_1", "test_value_2"),
-            expectedActionResults = mapOf(
-                Pair(actionThrottleEnabled.id, false),
-                Pair(actionThrottleNotEnabled.id, false)
-            )
+            expectedActionResults =
+                mapOf(
+                    Pair(actionThrottleEnabled.id, false),
+                    Pair(actionThrottleNotEnabled.id, false),
+                ),
         )
 
         val notThrottledAlerts = searchAlerts(monitor)
@@ -2088,10 +2266,11 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         val previousAlertExecutionTime: MutableMap<String, MutableMap<String, Instant?>> = mutableMapOf()
         notThrottledAlerts.forEach {
             verifyAlert(it, monitor, ACTIVE)
-            val notThrottledActionResults = verifyActionExecutionResultInAlert(
-                it,
-                mutableMapOf(Pair(actionThrottleEnabled.id, 0), Pair(actionThrottleNotEnabled.id, 0))
-            )
+            val notThrottledActionResults =
+                verifyActionExecutionResultInAlert(
+                    it,
+                    mutableMapOf(Pair(actionThrottleEnabled.id, 0), Pair(actionThrottleNotEnabled.id, 0)),
+                )
             assertEquals(notThrottledActionResults.size, 2)
 
             // Save the lastExecutionTimes of the actions for the Alert to be compared later against
@@ -2112,20 +2291,22 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         verifyActionThrottleResultsForBucketLevelMonitor(
             monitorRunResult = monitorRunResultThrottled,
             expectedEvents = setOf("test_value_1", "test_value_2"),
-            expectedActionResults = mapOf(
-                Pair(actionThrottleEnabled.id, true),
-                Pair(actionThrottleNotEnabled.id, false)
-            )
+            expectedActionResults =
+                mapOf(
+                    Pair(actionThrottleEnabled.id, true),
+                    Pair(actionThrottleNotEnabled.id, false),
+                ),
         )
 
         val throttledAlerts = searchAlerts(monitor)
         assertEquals("Alerts may not have been saved correctly", 2, throttledAlerts.size)
         throttledAlerts.forEach {
             verifyAlert(it, monitor, ACTIVE)
-            val throttledActionResults = verifyActionExecutionResultInAlert(
-                it,
-                mutableMapOf(Pair(actionThrottleEnabled.id, 1), Pair(actionThrottleNotEnabled.id, 0))
-            )
+            val throttledActionResults =
+                verifyActionExecutionResultInAlert(
+                    it,
+                    mutableMapOf(Pair(actionThrottleEnabled.id, 1), Pair(actionThrottleNotEnabled.id, 0)),
+                )
             assertEquals(throttledActionResults.size, 2)
 
             val prevthrottledActionLastExecutionTime = previousAlertExecutionTime[it.id]!![actionThrottleEnabled.id]
@@ -2133,11 +2314,11 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             assertEquals(
                 "Last execution time of a throttled action was updated for one of the Alerts",
                 prevthrottledActionLastExecutionTime,
-                throttledActionResults[actionThrottleEnabled.id]!!.lastExecutionTime
+                throttledActionResults[actionThrottleEnabled.id]!!.lastExecutionTime,
             )
             assertTrue(
                 "Last execution time of a non-throttled action was not updated for one of the Alerts",
-                throttledActionResults[actionThrottleNotEnabled.id]!!.lastExecutionTime!! > prevNotThrottledActionLastExecutionTime
+                throttledActionResults[actionThrottleNotEnabled.id]!!.lastExecutionTime!! > prevNotThrottledActionLastExecutionTime,
             )
         }
     }
@@ -2149,8 +2330,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             listOf(
                 "test_value_1",
                 "test_value_1",
-                "test_value_2"
-            )
+                "test_value_2",
+            ),
         )
 
         val messageSource = "{{#ctx.newAlerts}}\n{{#sample_documents}}\n (docId={{_id}}) \n{{/sample_documents}}\n{{/ctx.newAlerts}}"
@@ -2161,33 +2342,40 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             return@waitUntil false
         }, 200, TimeUnit.MILLISECONDS)
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field").field("test_field")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field").field("test_field"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(testIndex), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 1
-        """.trimIndent()
+            """.trimIndent()
 
-        val action = randomAction(
-            template = randomTemplateScript(source = messageSource),
-            destinationId = createDestination().id
-        )
-        var trigger = randomBucketLevelTrigger(actions = listOf(action))
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null
+        val action =
+            randomAction(
+                template = randomTemplateScript(source = messageSource),
+                destinationId = createDestination().id,
             )
-        )
+        var trigger = randomBucketLevelTrigger(actions = listOf(action))
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
+            )
         val monitor = createMonitor(randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger)))
 
         val output = entityAsMap(executeMonitor(monitor.id))
@@ -2203,17 +2391,22 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                     val actionOutput = actionResult["output"] as Map<String, String>
                     if (actionResult["name"] == action.name) {
                         when (alertEvent.key) {
-                            "test_value_1" -> bucket1DocIds.forEach { docEntry ->
-                                assertTrue(
-                                    "The notification message is missing docEntry $docEntry",
-                                    !actionOutput["message"].isNullOrEmpty() && actionOutput["message"]!!.contains(docEntry)
-                                )
+                            "test_value_1" -> {
+                                bucket1DocIds.forEach { docEntry ->
+                                    assertTrue(
+                                        "The notification message is missing docEntry $docEntry",
+                                        !actionOutput["message"].isNullOrEmpty() && actionOutput["message"]!!.contains(docEntry),
+                                    )
+                                }
                             }
-                            "test_value_2" -> bucket2DocIds.forEach { docEntry ->
-                                assertTrue(
-                                    "The notification message is missing docEntry $docEntry",
-                                    !actionOutput["message"].isNullOrEmpty() && actionOutput["message"]!!.contains(docEntry)
-                                )
+
+                            "test_value_2" -> {
+                                bucket2DocIds.forEach { docEntry ->
+                                    assertTrue(
+                                        "The notification message is missing docEntry $docEntry",
+                                        !actionOutput["message"].isNullOrEmpty() && actionOutput["message"]!!.contains(docEntry),
+                                    )
+                                }
                             }
                         }
                     } else {
@@ -2224,7 +2417,10 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         }
     }
 
-    private fun prepareTestAnomalyResult(detectorId: String, user: User) {
+    private fun prepareTestAnomalyResult(
+        detectorId: String,
+        user: User,
+    ) {
         val adResultIndex = ".opendistro-anomaly-results-history-2020.10.17"
         try {
             createTestIndex(adResultIndex, anomalyResultIndexMapping())
@@ -2235,37 +2431,52 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
         val twoMinsAgo = ZonedDateTime.now().minus(2, MINUTES).truncatedTo(MILLIS)
         val testTime = twoMinsAgo.toEpochSecond() * 1000
-        val testResult1 = randomAnomalyResult(
-            detectorId = detectorId, executionEndTime = testTime, user = user,
-            anomalyGrade = 0.1
-        )
+        val testResult1 =
+            randomAnomalyResult(
+                detectorId = detectorId,
+                executionEndTime = testTime,
+                user = user,
+                anomalyGrade = 0.1,
+            )
         indexDoc(adResultIndex, "1", testResult1)
-        val testResult2 = randomAnomalyResult(
-            detectorId = detectorId, executionEndTime = testTime, user = user,
-            anomalyGrade = 0.8
-        )
+        val testResult2 =
+            randomAnomalyResult(
+                detectorId = detectorId,
+                executionEndTime = testTime,
+                user = user,
+                anomalyGrade = 0.8,
+            )
         indexDoc(adResultIndex, "2", testResult2)
-        val testResult3 = randomAnomalyResult(
-            detectorId = detectorId, executionEndTime = testTime, user = user,
-            anomalyGrade = 0.5
-        )
+        val testResult3 =
+            randomAnomalyResult(
+                detectorId = detectorId,
+                executionEndTime = testTime,
+                user = user,
+                anomalyGrade = 0.5,
+            )
         indexDoc(adResultIndex, "3", testResult3)
-        val testResult4 = randomAnomalyResult(
-            detectorId = detectorId, executionEndTime = testTime,
-            user = User(user.name, listOf(), user.roles, user.customAttributes),
-            anomalyGrade = 0.9
-        )
+        val testResult4 =
+            randomAnomalyResult(
+                detectorId = detectorId,
+                executionEndTime = testTime,
+                user = User(user.name, listOf(), user.roles, user.customAttributes),
+                anomalyGrade = 0.9,
+            )
         indexDoc(adResultIndex, "4", testResult4)
         // User is null
-        val testResult5 = randomAnomalyResultWithoutUser(
-            detectorId = detectorId, executionEndTime = testTime,
-            anomalyGrade = 0.75
-        )
+        val testResult5 =
+            randomAnomalyResultWithoutUser(
+                detectorId = detectorId,
+                executionEndTime = testTime,
+                anomalyGrade = 0.75,
+            )
         indexDoc(adResultIndex, "5", testResult5)
     }
 
-    private fun verifyActionExecutionResultInAlert(alert: Alert, expectedResult: Map<String, Int>):
-        MutableMap<String, ActionExecutionResult> {
+    private fun verifyActionExecutionResultInAlert(
+        alert: Alert,
+        expectedResult: Map<String, Int>,
+    ): MutableMap<String, ActionExecutionResult> {
         val actionResult = mutableMapOf<String, ActionExecutionResult>()
         for (result in alert.actionExecutionResults) {
             val expected = expectedResult[result.actionId]
@@ -2275,7 +2486,10 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         return actionResult
     }
 
-    private fun verifyActionThrottleResults(output: MutableMap<String, Any>, expectedResult: Map<String, Boolean>) {
+    private fun verifyActionThrottleResults(
+        output: MutableMap<String, Any>,
+        expectedResult: Map<String, Boolean>,
+    ) {
         for (triggerResult in output.objectMap("trigger_results").values) {
             for (actionResult in triggerResult.objectMap("action_results").values) {
                 val expected = expectedResult[actionResult["id"]]
@@ -2288,7 +2502,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     private fun verifyActionThrottleResultsForBucketLevelMonitor(
         monitorRunResult: MutableMap<String, Any>,
         expectedEvents: Set<String>,
-        expectedActionResults: Map<String, Boolean>
+        expectedActionResults: Map<String, Boolean>,
     ) {
         for (triggerResult in monitorRunResult.objectMap("trigger_results").values) {
             for (alertEvent in triggerResult.objectMap("action_results")) {
@@ -2306,7 +2520,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         alert: Alert,
         monitor: Monitor,
         expectedState: State = ACTIVE,
-        expectNotification: Boolean = true
+        expectNotification: Boolean = true,
     ) {
         assertNotNull(alert.id)
         assertNotNull(alert.startTime)
@@ -2334,15 +2548,18 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
     }
 
     @Suppress("UNCHECKED_CAST")
-    /** helper that returns a field in a json map whose values are all json objects */
-    private fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
-        return this[key] as Map<String, Map<String, Any>>
-    }
+    // helper that returns a field in a json map whose values are all json objects
+    private fun Map<String, Any>.objectMap(
+        key: String,
+    ): Map<String, Map<String, Any>> = this[key] as Map<String, Map<String, Any>>
 
-    fun addIndexToAlias(index: String, alias: String) {
+    fun addIndexToAlias(
+        index: String,
+        alias: String,
+    ) {
         val request = Request("POST", "/_aliases")
         request.setJsonEntity(
-            """{"actions": [{"add": {"index": "$index","alias": "$alias"}} ]}""".trimIndent()
+            """{"actions": [{"add": {"index": "$index","alias": "$alias"}} ]}""".trimIndent(),
         )
 
         try {

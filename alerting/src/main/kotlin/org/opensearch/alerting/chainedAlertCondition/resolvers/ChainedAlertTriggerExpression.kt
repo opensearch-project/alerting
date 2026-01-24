@@ -6,27 +6,41 @@
 package org.opensearch.alerting.chainedAlertCondition.resolvers
 
 sealed class ChainedAlertTriggerExpression {
+    fun resolve(): Boolean =
+        when (this) {
+            is And -> resolveAnd(boolean1, boolean2)
+            is Or -> resolveOr(boolean1, boolean2)
+            is Not -> resolveNot(result, boolean2)
+        }
 
-    fun resolve(): Boolean = when (this) {
-        is And -> resolveAnd(boolean1, boolean2)
-        is Or -> resolveOr(boolean1, boolean2)
-        is Not -> resolveNot(result, boolean2)
-    }
+    private fun resolveAnd(
+        boolean1: Boolean,
+        boolean2: Boolean,
+    ): Boolean = boolean1 && boolean2
 
-    private fun resolveAnd(boolean1: Boolean, boolean2: Boolean): Boolean {
-        return boolean1 && boolean2
-    }
+    private fun resolveOr(
+        boolean1: Boolean,
+        boolean2: Boolean,
+    ): Boolean = boolean1 || boolean2
 
-    private fun resolveOr(boolean1: Boolean, boolean2: Boolean): Boolean {
-        return boolean1 || boolean2
-    }
-
-    private fun resolveNot(result: Boolean, boolean2: Boolean): Boolean {
-        return result && !boolean2
-    }
+    private fun resolveNot(
+        result: Boolean,
+        boolean2: Boolean,
+    ): Boolean = result && !boolean2
 
     // Operators implemented as operator functions
-    class And(val boolean1: Boolean, val boolean2: Boolean) : ChainedAlertTriggerExpression()
-    class Or(val boolean1: Boolean, val boolean2: Boolean) : ChainedAlertTriggerExpression()
-    class Not(val result: Boolean, val boolean2: Boolean) : ChainedAlertTriggerExpression()
+    class And(
+        val boolean1: Boolean,
+        val boolean2: Boolean,
+    ) : ChainedAlertTriggerExpression()
+
+    class Or(
+        val boolean1: Boolean,
+        val boolean2: Boolean,
+    ) : ChainedAlertTriggerExpression()
+
+    class Not(
+        val result: Boolean,
+        val boolean2: Boolean,
+    ) : ChainedAlertTriggerExpression()
 }

@@ -14,7 +14,9 @@ import org.opensearch.core.xcontent.ToXContentObject
 import org.opensearch.core.xcontent.XContentBuilder
 import java.io.IOException
 
-class ExecuteMonitorV2Response : ActionResponse, ToXContentObject {
+class ExecuteMonitorV2Response :
+    ActionResponse,
+    ToXContentObject {
     val monitorV2RunResult: MonitorV2RunResult<*>
 
     constructor(monitorV2RunResult: MonitorV2RunResult<*>) : super() {
@@ -23,7 +25,7 @@ class ExecuteMonitorV2Response : ActionResponse, ToXContentObject {
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
-        MonitorV2RunResult.readFrom(sin) // monitorRunResult
+        MonitorV2RunResult.readFrom(sin), // monitorRunResult
     )
 
     @Throws(IOException::class)
@@ -32,7 +34,8 @@ class ExecuteMonitorV2Response : ActionResponse, ToXContentObject {
     }
 
     @Throws(IOException::class)
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        return monitorV2RunResult.toXContent(builder, ToXContent.EMPTY_PARAMS)
-    }
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder = monitorV2RunResult.toXContent(builder, ToXContent.EMPTY_PARAMS)
 }

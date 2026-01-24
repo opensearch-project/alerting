@@ -11,9 +11,10 @@ import org.opensearch.alerting.randomQueryLevelMonitorRunResult
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class ExecuteMonitorResponseTests : OpenSearchTestCase() {
-
+    @Test
     fun `test exec query-level monitor response`() {
         val req = ExecuteMonitorResponse(randomQueryLevelMonitorRunResult())
         Assert.assertNotNull(req)
@@ -27,6 +28,7 @@ class ExecuteMonitorResponseTests : OpenSearchTestCase() {
         assertNotNull(newReq.monitorRunResult.inputResults)
     }
 
+    @Test
     fun `test exec bucket-level monitor response`() {
         val req = ExecuteMonitorResponse(randomBucketLevelMonitorRunResult())
         Assert.assertNotNull(req)

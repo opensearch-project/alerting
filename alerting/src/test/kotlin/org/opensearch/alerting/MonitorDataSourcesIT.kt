@@ -91,15 +91,15 @@ import java.util.concurrent.TimeUnit
 import java.util.stream.Collectors
 
 class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
-
     fun `test execute monitor with dryrun`() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -116,14 +116,16 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 0)
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
-            .get()
+        getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 0)
         try {
@@ -141,11 +143,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customAlertsIndex = "custom_alerts_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(alertsIndex = customAlertsIndex)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources = DataSources(alertsIndex = customAlertsIndex),
+            )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -163,26 +166,29 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val alerts = searchAlerts(id, customAlertsIndex)
         assertEquals("Alert saved for test monitor", 1, alerts.size)
         val table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
-            .get()
+        getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         val alertId = getAlertsResponse.alerts.get(0).id
-        val acknowledgeAlertResponse = client().execute(
-            AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_TYPE,
-            AcknowledgeAlertRequest(id, listOf(alertId), WriteRequest.RefreshPolicy.IMMEDIATE)
-        ).get()
+        val acknowledgeAlertResponse =
+            client()
+                .execute(
+                    AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_TYPE,
+                    AcknowledgeAlertRequest(id, listOf(alertId), WriteRequest.RefreshPolicy.IMMEDIATE),
+                ).get()
         Assert.assertEquals(acknowledgeAlertResponse.acknowledged.size, 1)
     }
 
     fun `test mappings parsing`() {
-
         val index1 = "index_123"
         val index2 = "index_456"
         val index3 = "index_789"
@@ -197,82 +203,109 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         createIndex(index3, Settings.EMPTY)
         createIndex(index4, Settings.EMPTY)
 
-        val m1 = """{
-                "properties": {
-                  "properties": {
-                    "type": "keyword"
-                  }
-                }
-        }
-        """.trimIndent()
-        client().admin().indices().putMapping(PutMappingRequest(index1).source(m1, XContentType.JSON)).get()
-
-        val m2 = """{
-                "properties": {
-                  "type": {
+        val m1 =
+            """
+            {
                     "properties": {
-                      "properties": { "type": "keyword" }
+                      "properties": {
+                        "type": "keyword"
+                      }
                     }
-                  }
-                }
-        }
-        """.trimIndent()
-        client().admin().indices().putMapping(PutMappingRequest(index2).source(m2, XContentType.JSON)).get()
+            }
+            """.trimIndent()
+        client()
+            .admin()
+            .indices()
+            .putMapping(PutMappingRequest(index1).source(m1, XContentType.JSON))
+            .get()
 
-        val m3 = """{
-                "properties": {
-                  "type": {
+        val m2 =
+            """
+            {
                     "properties": {
-                      "something": {
-                        "properties" : {
+                      "type": {
+                        "properties": {
                           "properties": { "type": "keyword" }
                         }
                       }
                     }
-                  }
-                }
-        }
-        """.trimIndent()
-        client().admin().indices().putMapping(PutMappingRequest(index3).source(m3, XContentType.JSON)).get()
+            }
+            """.trimIndent()
+        client()
+            .admin()
+            .indices()
+            .putMapping(PutMappingRequest(index2).source(m2, XContentType.JSON))
+            .get()
 
-        val m4 = """{
-                "properties": {
-                  "type": {
+        val m3 =
+            """
+            {
                     "properties": {
-                      "something": {
-                        "properties" : {
-                          "properties": { 
-                            "properties": {
-                              "lastone": { "type": "keyword" }
+                      "type": {
+                        "properties": {
+                          "something": {
+                            "properties" : {
+                              "properties": { "type": "keyword" }
                             }
                           }
                         }
                       }
                     }
-                  }
-                }
-        }
-        """.trimIndent()
-        client().admin().indices().putMapping(PutMappingRequest(index4).source(m4, XContentType.JSON)).get()
+            }
+            """.trimIndent()
+        client()
+            .admin()
+            .indices()
+            .putMapping(PutMappingRequest(index3).source(m3, XContentType.JSON))
+            .get()
 
-        val docLevelInput = DocLevelMonitorInput(
-            "description",
-            listOf(index1, index2, index3, index4),
-            listOf(q1, q2, q3, q4)
-        )
+        val m4 =
+            """
+            {
+                    "properties": {
+                      "type": {
+                        "properties": {
+                          "something": {
+                            "properties" : {
+                              "properties": { 
+                                "properties": {
+                                  "lastone": { "type": "keyword" }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+            }
+            """.trimIndent()
+        client()
+            .admin()
+            .indices()
+            .putMapping(PutMappingRequest(index4).source(m4, XContentType.JSON))
+            .get()
+
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index1, index2, index3, index4),
+                listOf(q1, q2, q3, q4),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)
 
         val testDoc1 = """{
@@ -300,9 +333,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         val findings = searchFindings(id, customFindingsIndex)
@@ -312,21 +346,26 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     fun `test execute monitor without triggers`() {
         val docQuery = DocLevelQuery(query = "eventType:\"login\"", name = "3", fields = listOf())
 
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery),
+            )
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)
         assertFalse(monitorResponse?.id.isNullOrEmpty())
 
@@ -343,9 +382,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
         searchAlerts(id)
         var table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.isEmpty())
         var findings = searchFindings(id, customFindingsIndex)
@@ -356,9 +396,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         searchAlerts(id)
         table = Table("asc", "id", null, 1, 0, "")
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.isEmpty())
 
@@ -370,66 +411,75 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test all fields fetched and submitted to percolate query when one of the queries doesn't have queryFieldNames`() {
         // doesn't have query field names so even if other queries pass the wrong fields to query, findings will get generated on matching docs
-        val docQuery1 = DocLevelQuery(
-            query = "source.ip.v6.v1:12345",
-            name = "3",
-            fields = listOf()
-        )
-        val docQuery2 = DocLevelQuery(
-            query = "source.ip.v6.v2:16645",
-            name = "4",
-            fields = listOf(),
-            queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
-        )
-        val docQuery3 = DocLevelQuery(
-            query = "source.ip.v4.v0:120",
-            name = "5",
-            fields = listOf(),
-            queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
-        )
+        val docQuery1 =
+            DocLevelQuery(
+                query = "source.ip.v6.v1:12345",
+                name = "3",
+                fields = listOf(),
+            )
+        val docQuery2 =
+            DocLevelQuery(
+                query = "source.ip.v6.v2:16645",
+                name = "4",
+                fields = listOf(),
+                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
+            )
+        val docQuery3 =
+            DocLevelQuery(
+                query = "source.ip.v4.v0:120",
+                name = "5",
+                fields = listOf(),
+                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
+            )
         val docQuery4 =
             DocLevelQuery(
                 query = "alias.some.fff:\"us-west-2\"",
                 name = "6",
                 fields = listOf(),
-                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
+                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
             )
-        val docQuery5 = DocLevelQuery(
-            query = "message:\"This is an error from IAD region\"",
-            name = "7",
-            queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
-            fields = listOf()
-        )
+        val docQuery5 =
+            DocLevelQuery(
+                query = "message:\"This is an error from IAD region\"",
+                name = "7",
+                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
+                fields = listOf(),
+            )
         val docQuery6 =
             DocLevelQuery(
                 query = "type.subtype:\"some subtype\"",
                 name = "8",
                 fields = listOf(),
-                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
+                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
             )
         val docQuery7 =
             DocLevelQuery(
                 query = "supertype.type:\"some type\"",
                 name = "9",
                 fields = listOf(),
-                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
+                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
             )
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery1, docQuery2, docQuery3, docQuery4, docQuery5, docQuery6, docQuery7)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery1, docQuery2, docQuery3, docQuery4, docQuery5, docQuery6, docQuery7),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         // Trying to test here few different "nesting" situations and "wierd" characters
@@ -446,7 +496,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         }"""
         indexDoc(index, "1", testDoc)
         client().admin().indices().putMapping(
-            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field")
+            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field"),
         )
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
@@ -456,9 +506,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         val findings = searchFindings(id, customFindingsIndex)
@@ -469,67 +520,76 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test percolate query failure when queryFieldNames has alias`() {
         // doesn't have query field names so even if other queries pass the wrong fields to query, findings will get generated on matching docs
-        val docQuery1 = DocLevelQuery(
-            query = "source.ip.v6.v1:12345",
-            name = "3",
-            fields = listOf(),
-            queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
-        )
-        val docQuery2 = DocLevelQuery(
-            query = "source.ip.v6.v2:16645",
-            name = "4",
-            fields = listOf(),
-            queryFieldNames = listOf("source.ip.v6.v2")
-        )
-        val docQuery3 = DocLevelQuery(
-            query = "source.ip.v4.v0:120",
-            name = "5",
-            fields = listOf(),
-            queryFieldNames = listOf("source.ip.v6.v4")
-        )
+        val docQuery1 =
+            DocLevelQuery(
+                query = "source.ip.v6.v1:12345",
+                name = "3",
+                fields = listOf(),
+                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
+            )
+        val docQuery2 =
+            DocLevelQuery(
+                query = "source.ip.v6.v2:16645",
+                name = "4",
+                fields = listOf(),
+                queryFieldNames = listOf("source.ip.v6.v2"),
+            )
+        val docQuery3 =
+            DocLevelQuery(
+                query = "source.ip.v4.v0:120",
+                name = "5",
+                fields = listOf(),
+                queryFieldNames = listOf("source.ip.v6.v4"),
+            )
         val docQuery4 =
             DocLevelQuery(
                 query = "alias.some.fff:\"us-west-2\"",
                 name = "6",
                 fields = listOf(),
-                queryFieldNames = listOf("alias.some.fff")
+                queryFieldNames = listOf("alias.some.fff"),
             )
-        val docQuery5 = DocLevelQuery(
-            query = "message:\"This is an error from IAD region\"",
-            name = "7",
-            queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
-            fields = listOf()
-        )
+        val docQuery5 =
+            DocLevelQuery(
+                query = "message:\"This is an error from IAD region\"",
+                name = "7",
+                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
+                fields = listOf(),
+            )
         val docQuery6 =
             DocLevelQuery(
                 query = "type.subtype:\"some subtype\"",
                 name = "8",
                 fields = listOf(),
-                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
+                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
             )
         val docQuery7 =
             DocLevelQuery(
                 query = "supertype.type:\"some type\"",
                 name = "9",
                 fields = listOf(),
-                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
+                queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1"),
             )
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery1, docQuery2, docQuery3, docQuery4, docQuery5, docQuery6, docQuery7)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery1, docQuery2, docQuery3, docQuery4, docQuery5, docQuery6, docQuery7),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         // Trying to test here few different "nesting" situations and "wierd" characters
@@ -546,7 +606,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         }"""
         indexDoc(index, "1", testDoc)
         client().admin().indices().putMapping(
-            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field")
+            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field"),
         )
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
@@ -556,12 +616,18 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
-        Assert.assertTrue(getAlertsResponse.alerts[0].state.toString().equals(Alert.State.ERROR.toString()))
+        Assert.assertTrue(
+            getAlertsResponse.alerts[0]
+                .state
+                .toString()
+                .equals(Alert.State.ERROR.toString()),
+        )
         val findings = searchFindings(id, customFindingsIndex)
         assertEquals("Findings saved for test monitor", 0, findings.size)
     }
@@ -577,24 +643,27 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val q8 = DocLevelQuery(query = "type:\"some type\"", name = "10", fields = listOf())
         val q9 = DocLevelQuery(query = "properties:123", name = "11", fields = listOf())
 
-        val docLevelInput = DocLevelMonitorInput(
-            "description",
-            listOf(index),
-            listOf(q1, q2, q3, q4, q5, q6, q7, q8, q9)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(q1, q2, q3, q4, q5, q6, q7, q8, q9),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)
         // Trying to test here few different "nesting" situations and "wierd" characters
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
@@ -613,13 +682,18 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         }"""
         indexDoc(index, "1", testDoc)
         client().admin().indices().putMapping(
-            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field")
+            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field"),
         )
-        val mappings = "{\"properties\":{\"type\":{\"type\":\"text\",\"fields\":{\"keyword\":{\"type\":\"keyword\"," +
-            "\"ignore_above\":256}}},\"query\":{\"type\":\"text\"}}}"
-        val mappingsResp = client().admin().indices().putMapping(
-            PutMappingRequest(index).source(mappings, XContentType.JSON)
-        ).get()
+        val mappings =
+            "{\"properties\":{\"type\":{\"type\":\"text\",\"fields\":{\"keyword\":{\"type\":\"keyword\"," +
+                "\"ignore_above\":256}}},\"query\":{\"type\":\"text\"}}}"
+        val mappingsResp =
+            client()
+                .admin()
+                .indices()
+                .putMapping(
+                    PutMappingRequest(index).source(mappings, XContentType.JSON),
+                ).get()
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
         val id = monitorResponse.id
@@ -628,9 +702,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         val findings = searchFindings(id, customFindingsIndex)
@@ -642,22 +717,27 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     fun `test execute monitor with non-flattened json doc as source`() {
         val docQuery1 = DocLevelQuery(query = "source.device.port:12345 OR source.device.hwd.id:12345", name = "3", fields = listOf())
 
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery1)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery1),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)
 
         val mappings = """{
@@ -681,7 +761,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             }
         }"""
 
-        client().admin().indices().putMapping(PutMappingRequest(index).source(mappings, XContentType.JSON)).get()
+        client()
+            .admin()
+            .indices()
+            .putMapping(PutMappingRequest(index).source(mappings, XContentType.JSON))
+            .get()
         val getFieldCapabilitiesResp = client().fieldCaps(FieldCapabilitiesRequest().indices(index).fields("*")).get()
         assertTrue(getFieldCapabilitiesResp.getField("source").containsKey("object"))
         assertTrue(getFieldCapabilitiesResp.getField("source.device").containsKey("object"))
@@ -740,9 +824,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         val findings = searchFindings(id, customFindingsIndex)
@@ -758,22 +843,27 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery5 = DocLevelQuery(query = "message:\"This is an error from IAD region\"", name = "7", fields = listOf())
         val docQuery6 = DocLevelQuery(query = "type.subtype:\"some subtype\"", name = "8", fields = listOf())
         val docQuery7 = DocLevelQuery(query = "supertype.type:\"some type\"", name = "9", fields = listOf())
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery1, docQuery2, docQuery3, docQuery4, docQuery5, docQuery6, docQuery7)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery1, docQuery2, docQuery3, docQuery4, docQuery5, docQuery6, docQuery7),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         // Trying to test here few different "nesting" situations and "wierd" characters
@@ -790,7 +880,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         }"""
         indexDoc(index, "1", testDoc)
         client().admin().indices().putMapping(
-            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field")
+            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field"),
         )
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
@@ -800,9 +890,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         val findings = searchFindings(id, customFindingsIndex)
@@ -813,14 +904,18 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test monitor error alert created and updated with new error`() {
         val docQuery = DocLevelQuery(query = "source:12345", name = "1", fields = listOf())
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
 
         val testDoc = """{
             "message" : "This is an error from IAD region"
@@ -833,26 +928,39 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val id = monitorResponse.id
 
         // Close index to force error alert
-        client().admin().indices().close(CloseIndexRequest(index)).get()
+        client()
+            .admin()
+            .indices()
+            .close(CloseIndexRequest(index))
+            .get()
 
         var executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
         searchAlerts(id)
         var table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         Assert.assertTrue(
             getAlertsResponse.alerts[0].errorMessage ==
-                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; "
+                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; ",
         )
         // Reopen index
-        client().admin().indices().open(OpenIndexRequest(index)).get()
+        client()
+            .admin()
+            .indices()
+            .open(OpenIndexRequest(index))
+            .get()
         // Close queryIndex
-        client().admin().indices().close(CloseIndexRequest(DOC_LEVEL_QUERIES_INDEX + INDEX_PATTERN_SUFFIX)).get()
+        client()
+            .admin()
+            .indices()
+            .close(CloseIndexRequest(DOC_LEVEL_QUERIES_INDEX + INDEX_PATTERN_SUFFIX))
+            .get()
 
         indexDoc(index, "1", testDoc)
 
@@ -861,14 +969,15 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
         searchAlerts(id)
         table = Table("asc", "id", null, 10, 0, "")
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         Assert.assertTrue(
             getAlertsResponse.alerts[0].errorHistory[0].message ==
-                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; "
+                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; ",
         )
         Assert.assertEquals(1, getAlertsResponse.alerts[0].errorHistory.size)
         Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage!!.contains("Failed to run percolate search"))
@@ -876,14 +985,18 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test monitor error alert created trigger run errored 2 times same error`() {
         val docQuery = DocLevelQuery(query = "source:12345", name = "1", fields = listOf())
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery),
+            )
         val trigger = randomDocumentLevelTrigger(condition = Script("invalid script code"))
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
 
         val monitorResponse = createMonitor(monitor)
         assertFalse(monitorResponse?.id.isNullOrEmpty())
@@ -896,9 +1009,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
         var table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage!!.contains("Trigger errors"))
@@ -910,9 +1024,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
         table = Table("asc", "id", null, 10, 0, "")
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         Assert.assertEquals(0, getAlertsResponse.alerts[0].errorHistory.size)
@@ -925,19 +1040,24 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertHistoryIndex = "custom-alert-history-index"
         val customAlertHistoryIndexPattern = "<custom_alert_history_index-{now/d}-1>"
         val docQuery = DocLevelQuery(query = "source:12345", name = "1", fields = listOf())
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery)
-        )
-        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                alertsIndex = customAlertIndex,
-                alertsHistoryIndex = customAlertHistoryIndex,
-                alertsHistoryIndexPattern = customAlertHistoryIndexPattern
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery),
             )
-        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        alertsIndex = customAlertIndex,
+                        alertsHistoryIndex = customAlertHistoryIndex,
+                        alertsHistoryIndexPattern = customAlertHistoryIndexPattern,
+                    ),
+            )
 
         val monitorResponse = createMonitor(monitor)
         assertFalse(monitorResponse?.id.isNullOrEmpty())
@@ -946,47 +1066,58 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val id = monitorResponse.id
 
         // Close index to force error alert
-        client().admin().indices().close(CloseIndexRequest(index)).get()
+        client()
+            .admin()
+            .indices()
+            .close(CloseIndexRequest(index))
+            .get()
 
         var executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 0)
         searchAlerts(id)
         var table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertIndex))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertIndex))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(1, getAlertsResponse.alerts.size)
         Assert.assertTrue(
             getAlertsResponse.alerts[0].errorMessage ==
-                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; "
+                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; ",
         )
         Assert.assertNull(getAlertsResponse.alerts[0].endTime)
 
         // Open index to have monitor run successfully
-        client().admin().indices().open(OpenIndexRequest(index)).get()
+        client()
+            .admin()
+            .indices()
+            .open(OpenIndexRequest(index))
+            .get()
         // Execute monitor again and expect successful run
         executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         // Verify that alert is moved to history index
         table = Table("asc", "id", null, 10, 0, "")
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertIndex))
-            .get()
+        getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertIndex))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(0, getAlertsResponse.alerts.size)
 
         table = Table("asc", "id", null, 10, 0, "")
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertHistoryIndex))
-            .get()
+        getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, customAlertHistoryIndex))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(1, getAlertsResponse.alerts.size)
         Assert.assertTrue(
             getAlertsResponse.alerts[0].errorMessage ==
-                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; "
+                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; ",
         )
         Assert.assertNotNull(getAlertsResponse.alerts[0].endTime)
     }
@@ -996,19 +1127,24 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertHistoryIndex = "custom-alert-history-index"
         val customAlertHistoryIndexPattern = "<custom_alert_history_index-{now/d}-1>"
         val docQuery = DocLevelQuery(query = "source:12345", name = "1", fields = listOf())
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery)
-        )
-        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                alertsIndex = customAlertIndex,
-                alertsHistoryIndex = customAlertHistoryIndex,
-                alertsHistoryIndexPattern = customAlertHistoryIndexPattern
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery),
             )
-        )
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        alertsIndex = customAlertIndex,
+                        alertsHistoryIndex = customAlertHistoryIndex,
+                        alertsHistoryIndexPattern = customAlertHistoryIndexPattern,
+                    ),
+            )
 
         val monitorResponse = createMonitor(monitor)
         assertFalse(monitorResponse?.id.isNullOrEmpty())
@@ -1017,7 +1153,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val monitorId = monitorResponse.id
 
         // Close index to force error alert
-        client().admin().indices().close(CloseIndexRequest(index)).get()
+        client()
+            .admin()
+            .indices()
+            .close(CloseIndexRequest(index))
+            .get()
 
         var executeMonitorResponse = executeMonitor(monitor, monitorId, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
@@ -1025,55 +1165,65 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // Create 10 old alerts to simulate having "old error alerts"(2.6)
         for (i in 1..10) {
             val startTimestamp = Instant.now().minusSeconds(3600 * 24 * i.toLong()).toEpochMilli()
-            val oldErrorAlertAsString = """
+            val oldErrorAlertAsString =
+                """
                 {"id":"$i","version":-1,"monitor_id":"$monitorId",
                 "schema_version":4,"monitor_version":1,"monitor_name":"geCNcHKTlp","monitor_user":{"name":"","backend_roles":[],
                 "roles":[],"custom_attribute_names":[],"user_requested_tenant":null},"trigger_id":"_nnk_YcB5pHgSZwYwO2r",
                 "trigger_name":"NoOp trigger","finding_ids":[],"related_doc_ids":[],"state":"ERROR","error_message":"some monitor error",
                 "alert_history":[],"severity":"","action_execution_results":[],
                 "start_time":$startTimestamp,"last_notification_time":$startTimestamp,"end_time":null,"acknowledged_time":null}
-            """.trimIndent()
+                """.trimIndent()
 
-            client().index(
-                IndexRequest(customAlertIndex)
-                    .id("$i")
-                    .routing(monitorId)
-                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-                    .source(oldErrorAlertAsString, XContentType.JSON)
-            ).get()
+            client()
+                .index(
+                    IndexRequest(customAlertIndex)
+                        .id("$i")
+                        .routing(monitorId)
+                        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                        .source(oldErrorAlertAsString, XContentType.JSON),
+                ).get()
         }
         var table = Table("asc", "id", null, 1000, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertIndex))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertIndex))
+                .get()
 
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(1 + 10, getAlertsResponse.alerts.size)
-        val newErrorAlert = getAlertsResponse.alerts.firstOrNull {
-            it.errorMessage ==
-                "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; "
-        }
+        val newErrorAlert =
+            getAlertsResponse.alerts.firstOrNull {
+                it.errorMessage ==
+                    "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; "
+            }
         Assert.assertNotNull(newErrorAlert)
         Assert.assertNull(newErrorAlert!!.endTime)
 
         // Open index to have monitor run successfully
-        client().admin().indices().open(OpenIndexRequest(index)).get()
+        client()
+            .admin()
+            .indices()
+            .open(OpenIndexRequest(index))
+            .get()
         // Execute monitor again and expect successful run
         executeMonitorResponse = executeMonitor(monitor, monitorId, false)
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         // Verify that alert is moved to history index
         table = Table("asc", "id", null, 1000, 0, "")
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertIndex))
-            .get()
+        getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertIndex))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(0, getAlertsResponse.alerts.size)
 
         table = Table("asc", "id", null, 1000, 0, "")
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertHistoryIndex))
-            .get()
+        getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, customAlertHistoryIndex))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertEquals(11, getAlertsResponse.alerts.size)
         getAlertsResponse.alerts.forEach { alert -> assertNotNull(alert.endTime) }
@@ -1086,15 +1236,17 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)
 
         // We are verifying here that index with nested mappings and nested aliases
@@ -1108,11 +1260,14 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         m["rule"] = Map.of("type", "nested", "properties", m1)
         val properties = Map.of<String, Any>("properties", m)
 
-        client().admin().indices().putMapping(
-            PutMappingRequest(
-                index
-            ).source(properties)
-        ).get()
+        client()
+            .admin()
+            .indices()
+            .putMapping(
+                PutMappingRequest(
+                    index,
+                ).source(properties),
+            ).get()
 
         // Put alias for nested fields
         val mm: MutableMap<String, Any> = HashMap()
@@ -1120,11 +1275,14 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         mm1["title_alias"] = Map.of("type", "alias", "path", "rule.title")
         mm["rule"] = Map.of("type", "nested", "properties", mm1)
         val properties1 = Map.of<String, Any>("properties", mm)
-        client().admin().indices().putMapping(
-            PutMappingRequest(
-                index
-            ).source(properties1)
-        ).get()
+        client()
+            .admin()
+            .indices()
+            .putMapping(
+                PutMappingRequest(
+                    index,
+                ).source(properties1),
+            ).get()
 
         val testDoc = """{
             "rule": {"title": "some_title"},
@@ -1133,7 +1291,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         indexDoc(index, "2", testDoc)
 
         client().admin().indices().putMapping(
-            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field")
+            PutMappingRequest(index).source("alias.some.fff", "type=alias,path=test_field.some_other_field"),
         )
         assertFalse(monitorResponse?.id.isNullOrEmpty())
         monitor = monitorResponse!!.monitor
@@ -1143,9 +1301,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
         val table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         val findings = searchFindings(id, customFindingsIndex)
@@ -1165,9 +1324,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             "message": "msg 1 2 3 4"
         }"""
         indexDoc(index, "2", testDoc)
-        client().admin().indices()
+        client()
+            .admin()
+            .indices()
             .create(
-                CreateIndexRequest(customQueryIndex + "-000001").alias(Alias(customQueryIndex))
+                CreateIndexRequest(customQueryIndex + "-000001")
+                    .alias(Alias(customQueryIndex))
                     .mapping(
                         """
                         {
@@ -1186,25 +1348,37 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                             }
                           }
                         }
-                        """.trimIndent()
-                    )
+                        """.trimIndent(),
+                    ),
             ).get()
 
-        client().admin().indices().close(CloseIndexRequest(customQueryIndex + "-000001")).get()
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                queryIndexMappingsByType = mapOf(Pair("text", mapOf(Pair("analyzer", analyzer)))),
-            ),
-            owner = "alerting"
-        )
+        client()
+            .admin()
+            .indices()
+            .close(CloseIndexRequest(customQueryIndex + "-000001"))
+            .get()
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        queryIndexMappingsByType = mapOf(Pair("text", mapOf(Pair("analyzer", analyzer)))),
+                    ),
+                owner = "alerting",
+            )
         try {
             createMonitor(monitor)
             fail("monitor creation should fail due to incorrect analyzer name in test setup")
         } catch (e: Exception) {
-            Assert.assertEquals(client().search(SearchRequest(SCHEDULED_JOBS_INDEX)).get().hits.hits.size, 0)
+            Assert.assertEquals(
+                client()
+                    .search(SearchRequest(SCHEDULED_JOBS_INDEX))
+                    .get()
+                    .hits.hits.size,
+                0,
+            )
         }
     }
 
@@ -1214,14 +1388,16 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customQueryIndex = "custom_alerts_index"
         val analyzer = "whitespace"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                queryIndexMappingsByType = mapOf(Pair("text", mapOf(Pair("analyzer", analyzer)))),
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        queryIndexMappingsByType = mapOf(Pair("text", mapOf(Pair("analyzer", analyzer)))),
+                    ),
             )
-        )
         var executeMonitorResponse = executeMonitor(monitor, null)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -1243,9 +1419,13 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         Assert.assertEquals(
-            (executeMonitorResponse.monitorRunResult.triggerResults.iterator().next().value as DocumentLevelTriggerRunResult)
-                .triggeredDocs.size,
-            1
+            (
+                executeMonitorResponse.monitorRunResult.triggerResults
+                    .iterator()
+                    .next()
+                    .value as DocumentLevelTriggerRunResult
+            ).triggeredDocs.size,
+            1,
         )
     }
 
@@ -1255,14 +1435,16 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customQueryIndex = "custom_alerts_index"
         val analyzer = "whitespace"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                queryIndexMappingsByType = mapOf(Pair("text", mapOf(Pair("analyzer", analyzer)))),
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        queryIndexMappingsByType = mapOf(Pair("text", mapOf(Pair("analyzer", analyzer)))),
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -1278,7 +1460,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(id)
-        val mapping = client().admin().indices().getMappings(GetMappingsRequest().indices(customQueryIndex)).get()
+        val mapping =
+            client()
+                .admin()
+                .indices()
+                .getMappings(GetMappingsRequest().indices(customQueryIndex))
+                .get()
         Assert.assertTrue(mapping.toString().contains("\"analyzer\":\"$analyzer\""))
     }
 
@@ -1288,14 +1475,16 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customQueryIndex = "custom_query_index"
         val analyzer = "whitespace"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                queryIndexMappingsByType = mapOf(Pair("text", mapOf(Pair("analyzer", analyzer)))),
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        queryIndexMappingsByType = mapOf(Pair("text", mapOf(Pair("analyzer", analyzer)))),
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -1311,13 +1500,25 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertEquals(executeMonitorResponse!!.monitorRunResult.monitorName, monitor.name)
         Assert.assertEquals(executeMonitorResponse.monitorRunResult.triggerResults.size, 1)
         searchAlerts(monitorId)
-        val clusterStateResponse = client().admin().cluster().state(ClusterStateRequest().indices(customQueryIndex).metadata(true)).get()
-        val mapping = client().admin().indices().getMappings(GetMappingsRequest().indices(customQueryIndex)).get()
+        val clusterStateResponse =
+            client()
+                .admin()
+                .cluster()
+                .state(ClusterStateRequest().indices(customQueryIndex).metadata(true))
+                .get()
+        val mapping =
+            client()
+                .admin()
+                .indices()
+                .getMappings(GetMappingsRequest().indices(customQueryIndex))
+                .get()
         Assert.assertTrue(mapping.toString().contains("\"analyzer\":\"$analyzer\"") == true)
         // Verify queries exist
-        var searchResponse = client().search(
-            SearchRequest(customQueryIndex).source(SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
-        ).get()
+        var searchResponse =
+            client()
+                .search(
+                    SearchRequest(customQueryIndex).source(SearchSourceBuilder().query(QueryBuilders.matchAllQuery())),
+                ).get()
         assertNotEquals(0, searchResponse.hits.hits.size)
 
         deleteMonitor(monitorId)
@@ -1331,11 +1532,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "<custom_findings_index-{now/d}-1>"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(findingsIndex = customFindingsIndex, findingsIndexPattern = customFindingsIndexPattern)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources = DataSources(findingsIndex = customFindingsIndex, findingsIndexPattern = customFindingsIndexPattern),
+            )
         val monitorResponse = createMonitor(monitor)
         client().admin().indices().refresh(RefreshRequest("*"))
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
@@ -1370,7 +1572,6 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute monitor with multiple indices in input success`() {
-
         val testSourceIndex1 = "test_source_index1"
         val testSourceIndex2 = "test_source_index2"
 
@@ -1382,11 +1583,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "<custom_findings_index-{now/d}-1>"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(findingsIndex = customFindingsIndex, findingsIndexPattern = customFindingsIndexPattern)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources = DataSources(findingsIndex = customFindingsIndex, findingsIndexPattern = customFindingsIndexPattern),
+            )
         val monitorResponse = createMonitor(monitor)
         client().admin().indices().refresh(RefreshRequest("*"))
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
@@ -1439,11 +1641,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "<custom_findings_index-{now/d}-1>"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(findingsIndex = customFindingsIndex, findingsIndexPattern = customFindingsIndexPattern)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources = DataSources(findingsIndex = customFindingsIndex, findingsIndexPattern = customFindingsIndexPattern),
+            )
         val monitorResponse = createMonitor(monitor)
         client().admin().indices().refresh(RefreshRequest("*"))
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
@@ -1457,7 +1660,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         indexDoc(testSourceIndex2, "1", testDoc)
 
-        client().admin().indices().delete(DeleteIndexRequest(testSourceIndex1)).get()
+        client()
+            .admin()
+            .indices()
+            .delete(DeleteIndexRequest(testSourceIndex1))
+            .get()
 
         val id = monitorResponse.id
         var executeMonitorResponse = executeMonitor(monitor, id, false)
@@ -1496,11 +1703,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "<custom_findings_index-{now/d}-1>"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(findingsIndex = customFindingsIndex, findingsIndexPattern = customFindingsIndexPattern)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources = DataSources(findingsIndex = customFindingsIndex, findingsIndexPattern = customFindingsIndexPattern),
+            )
         val monitorResponse = createMonitor(monitor)
         client().admin().indices().refresh(RefreshRequest("*"))
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
@@ -1514,7 +1722,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         indexDoc(testSourceIndex1, "1", testDoc)
 
-        client().admin().indices().delete(DeleteIndexRequest(testSourceIndex2)).get()
+        client()
+            .admin()
+            .indices()
+            .delete(DeleteIndexRequest(testSourceIndex2))
+            .get()
 
         val id = monitorResponse.id
         var executeMonitorResponse = executeMonitor(monitor, id, false)
@@ -1542,67 +1754,71 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute pre-existing monitor and update`() {
-        val request = CreateIndexRequest(SCHEDULED_JOBS_INDEX).mapping(ScheduledJobIndices.scheduledJobMappings())
-            .settings(Settings.builder().put("index.hidden", true).build())
+        val request =
+            CreateIndexRequest(SCHEDULED_JOBS_INDEX)
+                .mapping(ScheduledJobIndices.scheduledJobMappings())
+                .settings(Settings.builder().put("index.hidden", true).build())
         client().admin().indices().create(request)
-        val monitorStringWithoutName = """
-        {
-        "monitor": {
-        "type": "monitor",
-        "schema_version": 0,
-        "name": "UayEuXpZtb",
-        "monitor_type": "doc_level_monitor",
-        "user": {
-        "name": "",
-        "backend_roles": [],
-        "roles": [],
-        "custom_attribute_names": [],
-        "user_requested_tenant": null
-        },
-        "enabled": true,
-        "enabled_time": 1662753436791,
-        "schedule": {
-        "period": {
-        "interval": 5,
-        "unit": "MINUTES"
-        }
-        },
-        "inputs": [{
-        "doc_level_input": {
-        "description": "description",
-        "indices": [
-        "$index"
-        ],
-        "queries": [{
-        "id": "63efdcce-b5a1-49f4-a25f-6b5f9496a755",
-        "name": "3",
-        "query": "test_field:\"us-west-2\"",
-        "tags": []
-        }]
-        }
-        }],
-        "triggers": [{
-        "document_level_trigger": {
-        "id": "OGnTI4MBv6qt0ATc9Phk",
-        "name": "mrbHRMevYI",
-        "severity": "1",
-        "condition": {
-        "script": {
-        "source": "return true",
-        "lang": "painless"
-        }
-        },
-        "actions": []
-        }
-        }],
-        "last_update_time": 1662753436791
-        }
-        }
-        """.trimIndent()
+        val monitorStringWithoutName =
+            """
+            {
+            "monitor": {
+            "type": "monitor",
+            "schema_version": 0,
+            "name": "UayEuXpZtb",
+            "monitor_type": "doc_level_monitor",
+            "user": {
+            "name": "",
+            "backend_roles": [],
+            "roles": [],
+            "custom_attribute_names": [],
+            "user_requested_tenant": null
+            },
+            "enabled": true,
+            "enabled_time": 1662753436791,
+            "schedule": {
+            "period": {
+            "interval": 5,
+            "unit": "MINUTES"
+            }
+            },
+            "inputs": [{
+            "doc_level_input": {
+            "description": "description",
+            "indices": [
+            "$index"
+            ],
+            "queries": [{
+            "id": "63efdcce-b5a1-49f4-a25f-6b5f9496a755",
+            "name": "3",
+            "query": "test_field:\"us-west-2\"",
+            "tags": []
+            }]
+            }
+            }],
+            "triggers": [{
+            "document_level_trigger": {
+            "id": "OGnTI4MBv6qt0ATc9Phk",
+            "name": "mrbHRMevYI",
+            "severity": "1",
+            "condition": {
+            "script": {
+            "source": "return true",
+            "lang": "painless"
+            }
+            },
+            "actions": []
+            }
+            }],
+            "last_update_time": 1662753436791
+            }
+            }
+            """.trimIndent()
         val monitorId = "abc"
         indexDoc(SCHEDULED_JOBS_INDEX, monitorId, monitorStringWithoutName)
 
-        val monitorMetadata = """
+        val monitorMetadata =
+            """
             {
                     "metadata": {
                         "monitor_id": "$monitorId",
@@ -1619,7 +1835,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                         }
                     }
                 }
-        """.trimIndent()
+            """.trimIndent()
         indexDoc(SCHEDULED_JOBS_INDEX, "$monitorId-metadata", monitorMetadata)
         val getMonitorResponse = getMonitorResponse(monitorId)
         Assert.assertNotNull(getMonitorResponse)
@@ -1644,18 +1860,20 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertsIndex = "custom_alerts_index"
         val customQueryIndex = "custom_query_index"
         val customFindingsIndex = "custom_findings_index"
-        val updateMonitorResponse = updateMonitor(
-            monitor.copy(
-                id = monitorId,
-                owner = "security_analytics_plugin",
-                dataSources = DataSources(
-                    alertsIndex = customAlertsIndex,
-                    queryIndex = customQueryIndex,
-                    findingsIndex = customFindingsIndex
-                )
-            ),
-            monitorId
-        )
+        val updateMonitorResponse =
+            updateMonitor(
+                monitor.copy(
+                    id = monitorId,
+                    owner = "security_analytics_plugin",
+                    dataSources =
+                        DataSources(
+                            alertsIndex = customAlertsIndex,
+                            queryIndex = customQueryIndex,
+                            findingsIndex = customFindingsIndex,
+                        ),
+                ),
+                monitorId,
+            )
         Assert.assertNotNull(updateMonitorResponse)
         Assert.assertEquals(updateMonitorResponse!!.monitor.owner, "security_analytics_plugin")
         indexDoc(index, "2", testDoc)
@@ -1668,77 +1886,85 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertsIndexAlerts = searchAlerts(monitorId, customAlertsIndex)
         assertEquals("Alert saved for test monitor", 1, customAlertsIndexAlerts.size)
         val table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, null))
-            .get()
+        getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", monitorId, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
         var searchMonitorResponse =
-            client().execute(AlertingActions.SEARCH_MONITORS_ACTION_TYPE, SearchMonitorRequest(searchRequest))
+            client()
+                .execute(AlertingActions.SEARCH_MONITORS_ACTION_TYPE, SearchMonitorRequest(searchRequest))
                 .get()
         Assert.assertEquals(searchMonitorResponse.hits.hits.size, 0)
         searchRequest.source().query(MatchQueryBuilder("monitor.owner", "security_analytics_plugin"))
         searchMonitorResponse =
-            client().execute(AlertingActions.SEARCH_MONITORS_ACTION_TYPE, SearchMonitorRequest(searchRequest))
+            client()
+                .execute(AlertingActions.SEARCH_MONITORS_ACTION_TYPE, SearchMonitorRequest(searchRequest))
                 .get()
         Assert.assertEquals(searchMonitorResponse.hits.hits.size, 1)
     }
 
     fun `test execute pre-existing monitor without triggers`() {
-        val request = CreateIndexRequest(SCHEDULED_JOBS_INDEX).mapping(ScheduledJobIndices.scheduledJobMappings())
-            .settings(Settings.builder().put("index.hidden", true).build())
+        val request =
+            CreateIndexRequest(SCHEDULED_JOBS_INDEX)
+                .mapping(ScheduledJobIndices.scheduledJobMappings())
+                .settings(Settings.builder().put("index.hidden", true).build())
         client().admin().indices().create(request)
-        val monitorStringWithoutName = """
-        {
-        "monitor": {
-        "type": "monitor",
-        "schema_version": 0,
-        "name": "UayEuXpZtb",
-        "monitor_type": "doc_level_monitor",
-        "user": {
-        "name": "",
-        "backend_roles": [],
-        "roles": [],
-        "custom_attribute_names": [],
-        "user_requested_tenant": null
-        },
-        "enabled": true,
-        "enabled_time": 1662753436791,
-        "schedule": {
-        "period": {
-        "interval": 5,
-        "unit": "MINUTES"
-        }
-        },
-        "inputs": [{
-        "doc_level_input": {
-        "description": "description",
-        "indices": [
-        "$index"
-        ],
-        "queries": [{
-        "id": "63efdcce-b5a1-49f4-a25f-6b5f9496a755",
-        "name": "3",
-        "query": "test_field:\"us-west-2\"",
-        "tags": []
-        }]
-        }
-        }],
-        "triggers": [],
-        "last_update_time": 1662753436791
-        }
-        }
-        """.trimIndent()
+        val monitorStringWithoutName =
+            """
+            {
+            "monitor": {
+            "type": "monitor",
+            "schema_version": 0,
+            "name": "UayEuXpZtb",
+            "monitor_type": "doc_level_monitor",
+            "user": {
+            "name": "",
+            "backend_roles": [],
+            "roles": [],
+            "custom_attribute_names": [],
+            "user_requested_tenant": null
+            },
+            "enabled": true,
+            "enabled_time": 1662753436791,
+            "schedule": {
+            "period": {
+            "interval": 5,
+            "unit": "MINUTES"
+            }
+            },
+            "inputs": [{
+            "doc_level_input": {
+            "description": "description",
+            "indices": [
+            "$index"
+            ],
+            "queries": [{
+            "id": "63efdcce-b5a1-49f4-a25f-6b5f9496a755",
+            "name": "3",
+            "query": "test_field:\"us-west-2\"",
+            "tags": []
+            }]
+            }
+            }],
+            "triggers": [],
+            "last_update_time": 1662753436791
+            }
+            }
+            """.trimIndent()
         val monitorId = "abc"
         indexDoc(SCHEDULED_JOBS_INDEX, monitorId, monitorStringWithoutName)
 
-        val monitorMetadata = """
+        val monitorMetadata =
+            """
             {
                     "metadata": {
                         "monitor_id": "$monitorId",
@@ -1755,7 +1981,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                         }
                     }
                 }
-        """.trimIndent()
+            """.trimIndent()
         indexDoc(SCHEDULED_JOBS_INDEX, "$monitorId-metadata", monitorMetadata)
         val getMonitorResponse = getMonitorResponse(monitorId)
         Assert.assertNotNull(getMonitorResponse)
@@ -1787,11 +2013,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(findingsIndex = customFindingsIndex)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources = DataSources(findingsIndex = customFindingsIndex),
+            )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -1828,11 +2055,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(findingsIndex = customFindingsIndex)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources = DataSources(findingsIndex = customFindingsIndex),
+            )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -1856,7 +2084,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(
             "Findings mismatch between manually searched and fetched via GetFindingsAction",
             findings.get(0).id,
-            findingsFromAPI.get(0).id
+            findingsFromAPI.get(0).id,
         )
     }
 
@@ -1865,11 +2093,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(findingsIndex = customFindingsIndex)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources = DataSources(findingsIndex = customFindingsIndex),
+            )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -1895,7 +2124,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetMonitor Action error ",
-                    it.contains("Monitor not found")
+                    it.contains("Monitor not found"),
                 )
             }
         }
@@ -1906,12 +2135,13 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customAlertsIndex = "custom_alerts_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(alertsIndex = customAlertsIndex),
-            owner = "owner"
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources = DataSources(alertsIndex = customAlertsIndex),
+                owner = "owner",
+            )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -1930,14 +2160,16 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val alerts = searchAlerts(id, customAlertsIndex)
         assertEquals("Alert saved for test monitor", 1, alerts.size)
         val table = Table("asc", "id", null, 1, 0, "")
-        var getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex))
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", null, customAlertsIndex))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
-        getAlertsResponse = client()
-            .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
-            .get()
+        getAlertsResponse =
+            client()
+                .execute(AlertingActions.GET_ALERTS_ACTION_TYPE, GetAlertsRequest(table, "ALL", "ALL", id, null))
+                .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
     }
@@ -1947,11 +2179,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(findingsIndex = customFindingsIndex)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources = DataSources(findingsIndex = customFindingsIndex),
+            )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -1977,7 +2210,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetMonitor Action error ",
-                    it.contains("no such index")
+                    it.contains("no such index"),
                 )
             }
         }
@@ -1991,15 +2224,17 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertsIndex = "custom_alerts_index"
         val customAlertsHistoryIndex = "custom_alerts_history_index"
         val customAlertsHistoryIndexPattern = "<custom_alerts_history_index-{now/d}-1>"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger1, trigger2),
-            dataSources = DataSources(
-                alertsIndex = customAlertsIndex,
-                alertsHistoryIndex = customAlertsHistoryIndex,
-                alertsHistoryIndexPattern = customAlertsHistoryIndexPattern
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger1, trigger2),
+                dataSources =
+                    DataSources(
+                        alertsIndex = customAlertsIndex,
+                        alertsHistoryIndex = customAlertsHistoryIndex,
+                        alertsHistoryIndexPattern = customAlertsHistoryIndexPattern,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -2039,15 +2274,17 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertsIndex = "custom_alerts_index"
         val customAlertsHistoryIndex = "custom_alerts_history_index"
         val customAlertsHistoryIndexPattern = "<custom_alerts_history_index-{now/d}-1>"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger1, trigger2),
-            dataSources = DataSources(
-                alertsIndex = customAlertsIndex,
-                alertsHistoryIndex = customAlertsHistoryIndex,
-                alertsHistoryIndexPattern = customAlertsHistoryIndexPattern
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger1, trigger2),
+                dataSources =
+                    DataSources(
+                        alertsIndex = customAlertsIndex,
+                        alertsHistoryIndex = customAlertsHistoryIndex,
+                        alertsHistoryIndexPattern = customAlertsHistoryIndexPattern,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -2105,10 +2342,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -2121,10 +2359,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         val id = monitorResponse.id
 
-        var monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-        )
+        var monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         val monitorResponse1 = createMonitor(monitor1)
         monitor1 = monitorResponse1!!.monitor
         val id1 = monitorResponse1.id
@@ -2136,57 +2375,61 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val alerts1 = searchAlerts(id)
         assertEquals("Alert saved for test monitor", 1, alerts1.size)
         val table = Table("asc", "id", null, 1000, 0, "")
-        var getAlertsResponse = client()
-            .execute(
-                AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", null, null)
-            )
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(
+                    AlertingActions.GET_ALERTS_ACTION_TYPE,
+                    GetAlertsRequest(table, "ALL", "ALL", null, null),
+                ).get()
 
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 2)
 
-        var alertsResponseForRequestWithoutCustomIndex = client()
-            .execute(
-                AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", null, null, monitorIds = listOf(id, id1, "1", "2"))
-            )
-            .get()
+        var alertsResponseForRequestWithoutCustomIndex =
+            client()
+                .execute(
+                    AlertingActions.GET_ALERTS_ACTION_TYPE,
+                    GetAlertsRequest(table, "ALL", "ALL", null, null, monitorIds = listOf(id, id1, "1", "2")),
+                ).get()
         Assert.assertTrue(alertsResponseForRequestWithoutCustomIndex != null)
         Assert.assertTrue(alertsResponseForRequestWithoutCustomIndex.alerts.size == 2)
-        val alertIds = getAlertsResponse.alerts.stream().map { alert -> alert.id }.collect(Collectors.toList())
-        var getAlertsByAlertIds = client()
-            .execute(
-                AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", null, null, alertIds = alertIds)
-            )
-            .get()
+        val alertIds =
+            getAlertsResponse.alerts
+                .stream()
+                .map { alert -> alert.id }
+                .collect(Collectors.toList())
+        var getAlertsByAlertIds =
+            client()
+                .execute(
+                    AlertingActions.GET_ALERTS_ACTION_TYPE,
+                    GetAlertsRequest(table, "ALL", "ALL", null, null, alertIds = alertIds),
+                ).get()
         Assert.assertTrue(getAlertsByAlertIds != null)
         Assert.assertTrue(getAlertsByAlertIds.alerts.size == 2)
 
-        var getAlertsByWrongAlertIds = client()
-            .execute(
-                AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", null, null, alertIds = listOf("1", "2"))
-            )
-            .get()
+        var getAlertsByWrongAlertIds =
+            client()
+                .execute(
+                    AlertingActions.GET_ALERTS_ACTION_TYPE,
+                    GetAlertsRequest(table, "ALL", "ALL", null, null, alertIds = listOf("1", "2")),
+                ).get()
 
         Assert.assertTrue(getAlertsByWrongAlertIds != null)
         Assert.assertEquals(getAlertsByWrongAlertIds.alerts.size, 0)
     }
 
     fun `test queryIndex rollover and delete monitor success`() {
-
         val testSourceIndex = "test_source_index"
         createIndex(testSourceIndex, Settings.builder().put("index.mapping.total_fields.limit", "10000").build())
 
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         // This doc should create close to 1000 (limit) fields in index mapping. It's easier to add mappings like this then via api
         val docPayload: StringBuilder = StringBuilder(100000)
         docPayload.append("{")
@@ -2225,7 +2468,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // Both monitors used same queryIndex alias. Since source index has close to limit amount of fields in mappings,
         // we expect that creation of second monitor would trigger rollover of queryIndex
         var getIndexResponse: GetIndexResponse =
-            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+            client()
+                .admin()
+                .indices()
+                .getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*"))
+                .get()
         assertEquals(2, getIndexResponse.indices.size)
         assertEquals(DOC_LEVEL_QUERIES_INDEX + "-000001", getIndexResponse.indices[0])
         assertEquals(DOC_LEVEL_QUERIES_INDEX + "-000002", getIndexResponse.indices[1])
@@ -2248,36 +2495,48 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(alerts != null)
         Assert.assertTrue(alerts.size == 2)
         // Delete monitor #1
-        client().execute(
-            AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorResponse.id, WriteRequest.RefreshPolicy.IMMEDIATE)
-        ).get()
+        client()
+            .execute(
+                AlertingActions.DELETE_MONITOR_ACTION_TYPE,
+                DeleteMonitorRequest(monitorResponse.id, WriteRequest.RefreshPolicy.IMMEDIATE),
+            ).get()
         // Expect first concrete queryIndex to be deleted since that one was only used by this monitor
         getIndexResponse =
-            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+            client()
+                .admin()
+                .indices()
+                .getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*"))
+                .get()
         assertEquals(1, getIndexResponse.indices.size)
         assertEquals(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "-000002", getIndexResponse.indices[0])
         // Delete monitor #2
-        client().execute(
-            AlertingActions.DELETE_MONITOR_ACTION_TYPE, DeleteMonitorRequest(monitorResponse2.id, WriteRequest.RefreshPolicy.IMMEDIATE)
-        ).get()
+        client()
+            .execute(
+                AlertingActions.DELETE_MONITOR_ACTION_TYPE,
+                DeleteMonitorRequest(monitorResponse2.id, WriteRequest.RefreshPolicy.IMMEDIATE),
+            ).get()
         // Expect second concrete queryIndex to be deleted since that one was only used by this monitor
         getIndexResponse =
-            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+            client()
+                .admin()
+                .indices()
+                .getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*"))
+                .get()
         assertEquals(0, getIndexResponse.indices.size)
     }
 
     fun `test queryIndex rollover failure source_index field count over limit`() {
-
         val testSourceIndex = "test_source_index"
         createIndex(testSourceIndex, Settings.EMPTY)
 
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         // This doc should create 999 fields in mapping, only 1 field less then limit
         val docPayload: StringBuilder = StringBuilder(100000)
         docPayload.append("{")
@@ -2302,10 +2561,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         // Create doc with 11 fields
         val docPayload: StringBuilder = StringBuilder(1000)
         docPayload.append("{")
@@ -2344,7 +2604,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // Both monitors used same queryIndex. Since source index has well below limit amount of fields in mappings,
         // we expect only 1 backing queryIndex
         val getIndexResponse: GetIndexResponse =
-            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+            client()
+                .admin()
+                .indices()
+                .getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*"))
+                .get()
         assertEquals(1, getIndexResponse.indices.size)
         // Now we'll verify that execution of both monitors work
         indexDoc(testSourceIndex, "3", testDoc)
@@ -2380,12 +2644,13 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex1), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(),
-            owner = "alerting"
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources = DataSources(),
+                owner = "alerting",
+            )
         // This doc should create close to 10000 (limit) fields in index mapping. It's easier to add mappings like this then via api
         val docPayload: StringBuilder = StringBuilder(100000)
         docPayload.append("{")
@@ -2402,23 +2667,33 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         monitor = monitorResponse!!.monitor
 
         // Update monitor and change input
-        val updatedMonitor = monitor.copy(
-            inputs = listOf(
-                DocLevelMonitorInput("description", listOf(testSourceIndex2), listOf(docQuery))
+        val updatedMonitor =
+            monitor.copy(
+                inputs =
+                    listOf(
+                        DocLevelMonitorInput("description", listOf(testSourceIndex2), listOf(docQuery)),
+                    ),
             )
-        )
         updateMonitor(updatedMonitor, updatedMonitor.id)
         assertFalse(monitorResponse?.id.isNullOrEmpty())
 
         // Expect queryIndex to rollover after setting new source_index with close to limit amount of fields in mappings
         var getIndexResponse: GetIndexResponse =
-            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+            client()
+                .admin()
+                .indices()
+                .getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*"))
+                .get()
         assertEquals(2, getIndexResponse.indices.size)
 
         deleteMonitor(updatedMonitor.id)
         waitUntil {
             getIndexResponse =
-                client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+                client()
+                    .admin()
+                    .indices()
+                    .getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*"))
+                    .get()
             return@waitUntil getIndexResponse.indices.isEmpty()
         }
         assertEquals(0, getIndexResponse.indices.size)
@@ -2430,10 +2705,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         // This doc should create 12000 fields in index mapping. It's easier to add mappings like this then via api
         val docPayload: StringBuilder = StringBuilder(100000)
         docPayload.append("{")
@@ -2450,17 +2726,27 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         // Expect queryIndex to rollover after setting new source_index with close to limit amount of fields in mappings
         var getIndexResponse: GetIndexResponse =
-            client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+            client()
+                .admin()
+                .indices()
+                .getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*"))
+                .get()
         assertEquals(1, getIndexResponse.indices.size)
-        val field_max_limit = getIndexResponse
-            .getSetting(DOC_LEVEL_QUERIES_INDEX + "-000001", MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.key).toInt()
+        val fieldMaxLimit =
+            getIndexResponse
+                .getSetting(DOC_LEVEL_QUERIES_INDEX + "-000001", MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.key)
+                .toInt()
 
-        assertEquals(10000 + DocLevelMonitorQueries.QUERY_INDEX_BASE_FIELDS_COUNT, field_max_limit)
+        assertEquals(10000 + DocLevelMonitorQueries.QUERY_INDEX_BASE_FIELDS_COUNT, fieldMaxLimit)
 
         deleteMonitor(monitorResponse.id)
         waitUntil {
             getIndexResponse =
-                client().admin().indices().getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*")).get()
+                client()
+                    .admin()
+                    .indices()
+                    .getIndex(GetIndexRequest().indices(ScheduledJob.DOC_LEVEL_QUERIES_INDEX + "*"))
+                    .get()
             return@waitUntil getIndexResponse.indices.isEmpty()
         }
         assertEquals(0, getIndexResponse.indices.size)
@@ -2476,10 +2762,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(testSourceIndex), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         // This doc should create 999 fields in mapping, only 1 field less then limit
         val docPayload = "{\"test_field\" : \"us-west-2\" }"
         // Create monitor
@@ -2503,50 +2790,58 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     // TODO - revisit single node integ tests setup to figure out why we cannot have multiple test classes implementing it
 
     fun `test execute workflow with custom alerts and finding index when bucket monitor is used in chained finding of doc monitor`() {
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field_1").field("test_field_1")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field_1").field("test_field_1"),
+            )
         val customAlertsHistoryIndex = "custom_alerts_history_index"
         val customAlertsHistoryIndexPattern = "<custom_alerts_history_index-{now/d}-1>"
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
         // Bucket level monitor will reduce the size of matched doc ids on those that belong
         // to a bucket that contains more than 1 document after term grouping
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 1
-        """.trimIndent()
+            """.trimIndent()
 
         var trigger = randomBucketLevelTrigger()
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null,
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
         val bucketCustomAlertsIndex = "custom_alerts_index"
         val bucketCustomFindingsIndex = "custom_findings_index"
         val bucketCustomFindingsIndexPattern = "custom_findings_index-1"
 
-        val bucketLevelMonitorResponse = createMonitor(
-            randomBucketLevelMonitor(
-                inputs = listOf(input),
-                enabled = false,
-                triggers = listOf(trigger),
-                dataSources = DataSources(
-                    findingsEnabled = true,
-                    alertsIndex = bucketCustomAlertsIndex,
-                    findingsIndex = bucketCustomFindingsIndex,
-                    findingsIndexPattern = bucketCustomFindingsIndexPattern
-                )
-            )
-        )!!
+        val bucketLevelMonitorResponse =
+            createMonitor(
+                randomBucketLevelMonitor(
+                    inputs = listOf(input),
+                    enabled = false,
+                    triggers = listOf(trigger),
+                    dataSources =
+                        DataSources(
+                            findingsEnabled = true,
+                            alertsIndex = bucketCustomAlertsIndex,
+                            findingsIndex = bucketCustomFindingsIndex,
+                            findingsIndexPattern = bucketCustomFindingsIndexPattern,
+                        ),
+                ),
+            )!!
 
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1", fields = listOf())
         val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_1\"", name = "2", fields = listOf())
@@ -2556,23 +2851,26 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docCustomAlertsIndex = "custom_alerts_index"
         val docCustomFindingsIndex = "custom_findings_index"
         val docCustomFindingsIndexPattern = "custom_findings_index-1"
-        var docLevelMonitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(docTrigger),
-            dataSources = DataSources(
-                alertsIndex = docCustomAlertsIndex,
-                findingsIndex = docCustomFindingsIndex,
-                findingsIndexPattern = docCustomFindingsIndexPattern
+        var docLevelMonitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(docTrigger),
+                dataSources =
+                    DataSources(
+                        alertsIndex = docCustomAlertsIndex,
+                        findingsIndex = docCustomFindingsIndex,
+                        findingsIndexPattern = docCustomFindingsIndexPattern,
+                    ),
             )
-        )
 
         val docLevelMonitorResponse = createMonitor(docLevelMonitor)!!
         // 1. bucketMonitor (chainedFinding = null) 2. docMonitor (chainedFinding = bucketMonitor)
-        var workflow = randomWorkflow(
-            monitorIds = listOf(bucketLevelMonitorResponse.id, docLevelMonitorResponse.id),
-            enabled = false,
-            auditDelegateMonitorAlerts = false
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(bucketLevelMonitorResponse.id, docLevelMonitorResponse.id),
+                enabled = false,
+                auditDelegateMonitorAlerts = false,
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
@@ -2585,8 +2883,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 "test_value_1", // adding duplicate to verify aggregation
                 "test_value_2",
                 "test_value_2",
-                "test_value_3"
-            )
+                "test_value_3",
+            ),
         )
 
         val workflowId = workflowResponse.id
@@ -2600,8 +2898,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 val searchResult = monitorRunResults.inputResults.results.first()
 
                 @Suppress("UNCHECKED_CAST")
-                val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")
-                    ?.get("buckets") as List<kotlin.collections.Map<String, Any>>
+                val buckets =
+                    searchResult
+                        .stringMap("aggregations")
+                        ?.stringMap("composite_agg")
+                        ?.get("buckets") as List<kotlin.collections.Map<String, Any>>
                 assertEquals("Incorrect search result", 3, buckets.size)
 
                 val getAlertsResponse = assertAlerts(bucketLevelMonitorResponse.id, bucketCustomAlertsIndex, 2, workflowId)
@@ -2628,99 +2929,116 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1", fields = listOf())
         val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "2", fields = listOf())
 
-        var docLevelMonitor = randomDocumentLevelMonitor(
-            inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery1, docQuery2))),
-            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN)),
-            dataSources = DataSources(
-                alertsIndex = "custom_alerts_index",
-                findingsIndex = "custom_findings_index",
-                findingsIndexPattern = "custom_findings_index-1"
+        var docLevelMonitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery1, docQuery2))),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN)),
+                dataSources =
+                    DataSources(
+                        alertsIndex = "custom_alerts_index",
+                        findingsIndex = "custom_findings_index",
+                        findingsIndexPattern = "custom_findings_index-1",
+                    ),
             )
-        )
 
         val docLevelMonitorResponse = createMonitor(docLevelMonitor)!!
 
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field_1").field("test_field_1")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field_1").field("test_field_1"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
         // Bucket level monitor will reduce the size of matched doc ids on those that belong to a bucket that contains more than 1 document after term grouping
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 1
-        """.trimIndent()
+            """.trimIndent()
 
         var trigger = randomBucketLevelTrigger()
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null,
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
 
-        val bucketLevelMonitorResponse = createMonitor(
-            randomBucketLevelMonitor(
-                inputs = listOf(input),
-                enabled = false,
-                triggers = listOf(trigger),
-                dataSources = DataSources(
-                    findingsEnabled = true,
-                    alertsIndex = "custom_alerts_index",
-                    findingsIndex = "custom_findings_index",
-                    findingsIndexPattern = "custom_findings_index-1"
-                )
-            )
-        )!!
+        val bucketLevelMonitorResponse =
+            createMonitor(
+                randomBucketLevelMonitor(
+                    inputs = listOf(input),
+                    enabled = false,
+                    triggers = listOf(trigger),
+                    dataSources =
+                        DataSources(
+                            findingsEnabled = true,
+                            alertsIndex = "custom_alerts_index",
+                            findingsIndex = "custom_findings_index",
+                            findingsIndexPattern = "custom_findings_index-1",
+                        ),
+                ),
+            )!!
 
-        var docLevelMonitor1 = randomDocumentLevelMonitor(
-            // Match the documents with test_field_1: test_value_3
-            inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))),
-            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN)),
-            dataSources = DataSources(
-                findingsEnabled = true,
-                alertsIndex = "custom_alerts_index_1",
-                findingsIndex = "custom_findings_index_1",
-                findingsIndexPattern = "custom_findings_index_1-1"
+        var docLevelMonitor1 =
+            randomDocumentLevelMonitor(
+                // Match the documents with test_field_1: test_value_3
+                inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN)),
+                dataSources =
+                    DataSources(
+                        findingsEnabled = true,
+                        alertsIndex = "custom_alerts_index_1",
+                        findingsIndex = "custom_findings_index_1",
+                        findingsIndexPattern = "custom_findings_index_1-1",
+                    ),
             )
-        )
 
         val docLevelMonitorResponse1 = createMonitor(docLevelMonitor1)!!
 
-        val queryMonitorInput = SearchInput(
-            indices = listOf(index),
-            query = SearchSourceBuilder().query(
-                QueryBuilders
-                    .rangeQuery("test_strict_date_time")
-                    .gt("{{period_end}}||-10d")
-                    .lte("{{period_end}}")
-                    .format("epoch_millis")
+        val queryMonitorInput =
+            SearchInput(
+                indices = listOf(index),
+                query =
+                    SearchSourceBuilder().query(
+                        QueryBuilders
+                            .rangeQuery("test_strict_date_time")
+                            .gt("{{period_end}}||-10d")
+                            .lte("{{period_end}}")
+                            .format("epoch_millis"),
+                    ),
             )
-        )
-        val queryTriggerScript = """
+        val queryTriggerScript =
+            """
             return ctx.results[0].hits.hits.size() > 0
-        """.trimIndent()
+            """.trimIndent()
 
         val queryLevelTrigger = randomQueryLevelTrigger(condition = Script(queryTriggerScript))
         val queryMonitorResponse =
             createMonitor(randomQueryLevelMonitor(inputs = listOf(queryMonitorInput), triggers = listOf(queryLevelTrigger)))!!
 
         // 1. docMonitor (chainedFinding = null) 2. bucketMonitor (chainedFinding = docMonitor) 3. docMonitor (chainedFinding = bucketMonitor) 4. queryMonitor (chainedFinding = docMonitor 3)
-        var workflow = randomWorkflow(
-            monitorIds = listOf(
-                docLevelMonitorResponse.id,
-                bucketLevelMonitorResponse.id,
-                docLevelMonitorResponse1.id,
-                queryMonitorResponse.id
-            ),
-            auditDelegateMonitorAlerts = false
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds =
+                    listOf(
+                        docLevelMonitorResponse.id,
+                        bucketLevelMonitorResponse.id,
+                        docLevelMonitorResponse1.id,
+                        queryMonitorResponse.id,
+                    ),
+                auditDelegateMonitorAlerts = false,
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
@@ -2734,8 +3052,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 "test_value_2",
                 "test_value_2",
                 "test_value_3",
-                "test_value_3"
-            )
+                "test_value_3",
+            ),
         )
 
         val workflowId = workflowResponse.id
@@ -2765,9 +3083,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                         docLevelMonitorResponse.monitor.dataSources.findingsIndex,
                         4,
                         4,
-                        listOf("3", "4", "5", "6")
+                        listOf("3", "4", "5", "6"),
                     )
                 }
+
                 // Verify second bucket level monitor execution, alerts and findings
                 bucketLevelMonitorResponse.monitor.name -> {
                     val searchResult = monitorRunResults.inputResults.results.first()
@@ -2775,7 +3094,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                     @Suppress("UNCHECKED_CAST")
                     val buckets =
                         searchResult
-                            .stringMap("aggregations")?.stringMap("composite_agg")
+                            .stringMap("aggregations")
+                            ?.stringMap("composite_agg")
                             ?.get("buckets") as List<kotlin.collections.Map<String, Any>>
                     assertEquals("Incorrect search result", 2, buckets.size)
 
@@ -2784,7 +3104,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                             bucketLevelMonitorResponse.id,
                             bucketLevelMonitorResponse.monitor.dataSources.alertsIndex,
                             2,
-                            workflowId
+                            workflowId,
                         )
                     assertAcknowledges(getAlertsResponse.alerts, bucketLevelMonitorResponse.id, 2)
                     assertFindings(
@@ -2792,9 +3112,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                         bucketLevelMonitorResponse.monitor.dataSources.findingsIndex,
                         1,
                         4,
-                        listOf("3", "4", "5", "6")
+                        listOf("3", "4", "5", "6"),
                     )
                 }
+
                 // Verify third doc level monitor execution, alerts and findings
                 docLevelMonitorResponse1.monitor.name -> {
                     assertEquals(1, monitorRunResults.inputResults.results.size)
@@ -2814,9 +3135,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                         docLevelMonitorResponse1.monitor.dataSources.findingsIndex,
                         2,
                         2,
-                        listOf("5", "6")
+                        listOf("5", "6"),
                     )
                 }
+
                 // Verify fourth query level monitor execution
                 queryMonitorResponse.monitor.name -> {
                     assertEquals(1, monitorRunResults.inputResults.results.size)
@@ -2827,16 +3149,16 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                         (
                             (
                                 monitorRunResults.inputResults.results[0]["hits"] as kotlin.collections.Map<String, Any>
-                                )["total"] as kotlin.collections.Map<String, Any>
-                            )["value"]
+                            )["total"] as kotlin.collections.Map<String, Any>
+                        )["value"]
                     assertEquals(2, totalHits)
                     @Suppress("UNCHECKED_CAST")
                     val docIds =
                         (
                             (
                                 monitorRunResults.inputResults.results[0]["hits"] as kotlin.collections.Map<String, Any>
-                                )["hits"] as List<kotlin.collections.Map<String, String>>
-                            ).map { it["_id"]!! }
+                            )["hits"] as List<kotlin.collections.Map<String, String>>
+                        ).map { it["_id"]!! }
                     assertEquals(listOf("5", "6"), docIds.sorted())
                 }
             }
@@ -2850,15 +3172,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         workflowId: String,
     ): GetAlertsResponse {
         val table = Table("asc", "id", null, alertSize, 0, "")
-        val getAlertsResponse = client()
-            .execute(
-                AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(
-                    table, "ALL", "ALL", monitorId, customAlertsIndex,
-                    workflowIds = listOf(workflowId)
-                )
-            )
-            .get()
+        val getAlertsResponse =
+            client()
+                .execute(
+                    AlertingActions.GET_ALERTS_ACTION_TYPE,
+                    GetAlertsRequest(
+                        table,
+                        "ALL",
+                        "ALL",
+                        monitorId,
+                        customAlertsIndex,
+                        workflowIds = listOf(workflowId),
+                    ),
+                ).get()
         assertTrue(getAlertsResponse != null)
         assertTrue(getAlertsResponse.alerts.size == alertSize)
         return getAlertsResponse
@@ -2871,15 +3197,17 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertsIndex1 = "custom_alerts_index"
         val customFindingsIndex1 = "custom_findings_index"
         val customFindingsIndexPattern1 = "custom_findings_index-1"
-        var monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1),
-            dataSources = DataSources(
-                alertsIndex = customAlertsIndex1,
-                findingsIndex = customFindingsIndex1,
-                findingsIndexPattern = customFindingsIndexPattern1
+        var monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+                dataSources =
+                    DataSources(
+                        alertsIndex = customAlertsIndex1,
+                        findingsIndex = customFindingsIndex1,
+                        findingsIndexPattern = customFindingsIndexPattern1,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor1)!!
 
         val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
@@ -2888,21 +3216,25 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertsIndex2 = "custom_alerts_index_2"
         val customFindingsIndex2 = "custom_findings_index_2"
         val customFindingsIndexPattern2 = "custom_findings_index-2"
-        var monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput2),
-            triggers = listOf(trigger2),
-            dataSources = DataSources(
-                alertsIndex = customAlertsIndex2,
-                findingsIndex = customFindingsIndex2,
-                findingsIndexPattern = customFindingsIndexPattern2
+        var monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput2),
+                triggers = listOf(trigger2),
+                dataSources =
+                    DataSources(
+                        alertsIndex = customAlertsIndex2,
+                        findingsIndex = customFindingsIndex2,
+                        findingsIndexPattern = customFindingsIndexPattern2,
+                    ),
             )
-        )
 
         val monitorResponse2 = createMonitor(monitor2)!!
 
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id, monitorResponse2.id), auditDelegateMonitorAlerts = false
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+                auditDelegateMonitorAlerts = false,
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
@@ -2964,71 +3296,85 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertsIndex1 = "custom_alerts_index"
         val customFindingsIndex1 = "custom_findings_index"
         val customFindingsIndexPattern1 = "custom_findings_index-1"
-        var monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1),
-            enabled = false,
-            dataSources = DataSources(
-                alertsIndex = customAlertsIndex1,
-                findingsIndex = customFindingsIndex1,
-                findingsIndexPattern = customFindingsIndexPattern1
+        var monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+                enabled = false,
+                dataSources =
+                    DataSources(
+                        alertsIndex = customAlertsIndex1,
+                        findingsIndex = customFindingsIndex1,
+                        findingsIndexPattern = customFindingsIndexPattern1,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor1)!!
 
         val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
         val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput2),
-            triggers = listOf(trigger2),
-            enabled = false,
-            dataSources = DataSources(
-                alertsIndex = customAlertsIndex1,
-                findingsIndex = customFindingsIndex1,
-                findingsIndexPattern = customFindingsIndexPattern1
+        var monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput2),
+                triggers = listOf(trigger2),
+                enabled = false,
+                dataSources =
+                    DataSources(
+                        alertsIndex = customAlertsIndex1,
+                        findingsIndex = customFindingsIndex1,
+                        findingsIndexPattern = customFindingsIndexPattern1,
+                    ),
             )
-        )
 
         val monitorResponse2 = createMonitor(monitor2)!!
         val docQuery3 = DocLevelQuery(query = "_id:*", name = "5", fields = listOf())
         val docLevelInput3 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery3))
         val trigger3 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        var monitor3 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput3),
-            triggers = listOf(trigger3),
-            enabled = false,
-            dataSources = DataSources(
-                alertsIndex = customAlertsIndex1,
-                findingsIndex = customFindingsIndex1,
-                findingsIndexPattern = customFindingsIndexPattern1
+        var monitor3 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput3),
+                triggers = listOf(trigger3),
+                enabled = false,
+                dataSources =
+                    DataSources(
+                        alertsIndex = customAlertsIndex1,
+                        findingsIndex = customFindingsIndex1,
+                        findingsIndexPattern = customFindingsIndexPattern1,
+                    ),
             )
-        )
 
         val monitorResponse3 = createMonitor(monitor3)!!
         val d1 = Delegate(1, monitorResponse.id)
         val d2 = Delegate(2, monitorResponse2.id)
-        val d3 = Delegate(
-            3, monitorResponse3.id,
-            ChainedMonitorFindings(null, listOf(monitorResponse.id, monitorResponse2.id))
-        )
-        var workflow = Workflow(
-            id = "",
-            name = "test",
-            enabled = false,
-            schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
-            lastUpdateTime = Instant.now(),
-            enabledTime = null,
-            workflowType = Workflow.WorkflowType.COMPOSITE,
-            user = randomUser(),
-            inputs = listOf(CompositeInput(org.opensearch.commons.alerting.model.Sequence(listOf(d1, d2, d3)))),
-            version = -1L,
-            schemaVersion = 0,
-            triggers = emptyList(),
-            auditDelegateMonitorAlerts = false
-
-        )
+        val d3 =
+            Delegate(
+                3,
+                monitorResponse3.id,
+                ChainedMonitorFindings(null, listOf(monitorResponse.id, monitorResponse2.id)),
+            )
+        var workflow =
+            Workflow(
+                id = "",
+                name = "test",
+                enabled = false,
+                schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+                lastUpdateTime = Instant.now(),
+                enabledTime = null,
+                workflowType = Workflow.WorkflowType.COMPOSITE,
+                user = randomUser(),
+                inputs =
+                    listOf(
+                        CompositeInput(
+                            org.opensearch.commons.alerting.model
+                                .Sequence(listOf(d1, d2, d3)),
+                        ),
+                    ),
+                version = -1L,
+                schemaVersion = 0,
+                triggers = emptyList(),
+                auditDelegateMonitorAlerts = false,
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
@@ -3079,29 +3425,33 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertsIndex = "custom_alerts_index"
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                alertsIndex = customAlertsIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        alertsIndex = customAlertsIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)!!
 
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id),
-            auditDelegateMonitorAlerts = false
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+                auditDelegateMonitorAlerts = false,
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
 
-        var workflow1 = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id),
-            auditDelegateMonitorAlerts = false
-        )
+        var workflow1 =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+                auditDelegateMonitorAlerts = false,
+            )
         val workflowResponse1 = upsertWorkflow(workflow1)!!
         val workflowById1 = searchWorkflow(workflowResponse1.id)
         assertNotNull(workflowById1)
@@ -3142,7 +3492,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(
             "Workflow metadata execution id not correct",
             executeWorkflowResponse.workflowRunResult.executionId,
-            workflowMetadata!!.latestExecutionId
+            workflowMetadata!!.latestExecutionId,
         )
         val monitorMetadataId = getDelegateMonitorMetadataId(workflowMetadata, monitorResponse)
         val monitorMetadata = searchMonitorMetadata(monitorMetadataId)
@@ -3166,7 +3516,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(
             "Workflow metadata execution id not correct",
             executeWorkflowResponse1.workflowRunResult.executionId,
-            workflowMetadata1!!.latestExecutionId
+            workflowMetadata1!!.latestExecutionId,
         )
         val monitorMetadataId1 = getDelegateMonitorMetadataId(workflowMetadata1, monitorResponse)
         val monitorMetadata1 = searchMonitorMetadata(monitorMetadataId1)
@@ -3181,22 +3531,27 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         val monitorResponse = createMonitor(monitor)!!
 
-        val workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id), auditDelegateMonitorAlerts = false
-        )
+        val workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+                auditDelegateMonitorAlerts = false,
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
 
-        val workflow1 = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id), auditDelegateMonitorAlerts = false
-        )
+        val workflow1 =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+                auditDelegateMonitorAlerts = false,
+            )
         val workflowResponse1 = upsertWorkflow(workflow1)!!
         val workflowById1 = searchWorkflow(workflowResponse1.id)
         assertNotNull(workflowById1)
@@ -3236,7 +3591,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(
             "Workflow metadata execution id not correct",
             executeWorkflowResponse.workflowRunResult.executionId,
-            workflowMetadata!!.latestExecutionId
+            workflowMetadata!!.latestExecutionId,
         )
         val monitorMetadataId = getDelegateMonitorMetadataId(workflowMetadata, monitorResponse)
         val monitorMetadata = searchMonitorMetadata(monitorMetadataId)
@@ -3247,14 +3602,16 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customFindingsIndexPattern = "custom_findings_index-1"
         val monitorId = monitorResponse.id
         updateMonitor(
-            monitor = monitor.copy(
-                dataSources = DataSources(
-                    alertsIndex = customAlertsIndex,
-                    findingsIndex = customFindingsIndex,
-                    findingsIndexPattern = customFindingsIndexPattern
-                )
-            ),
-            monitorId
+            monitor =
+                monitor.copy(
+                    dataSources =
+                        DataSources(
+                            alertsIndex = customAlertsIndex,
+                            findingsIndex = customFindingsIndex,
+                            findingsIndexPattern = customFindingsIndexPattern,
+                        ),
+                ),
+            monitorId,
         )
 
         // Execute second workflow
@@ -3277,7 +3634,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(
             "Workflow metadata execution id not correct",
             executeWorkflowResponse1.workflowRunResult.executionId,
-            workflowMetadata1!!.latestExecutionId
+            workflowMetadata1!!.latestExecutionId,
         )
         val monitorMetadataId1 = getDelegateMonitorMetadataId(workflowMetadata1, monitorResponse)
         val monitorMetadata1 = searchMonitorMetadata(monitorMetadataId1)
@@ -3291,25 +3648,28 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1)
-        )
+        var monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+            )
         val monitorResponse = createMonitor(monitor1)!!
 
         val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
         val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput2),
-            triggers = listOf(trigger2),
-        )
+        var monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput2),
+                triggers = listOf(trigger2),
+            )
 
         val monitorResponse2 = createMonitor(monitor2)!!
 
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id, monitorResponse2.id)
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
@@ -3334,7 +3694,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(
             "Workflow metadata execution id not correct",
             executeWorkflowResponse.workflowRunResult.executionId,
-            workflowMetadata!!.latestExecutionId
+            workflowMetadata!!.latestExecutionId,
         )
         val monitorMetadataId = getDelegateMonitorMetadataId(workflowMetadata, monitorResponse)
         val monitorMetadata = searchMonitorMetadata(monitorMetadataId)
@@ -3350,7 +3710,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(
             "Workflow metadata execution id not correct",
             executeWorkflowResponse1.workflowRunResult.executionId,
-            workflowMetadata1!!.latestExecutionId
+            workflowMetadata1!!.latestExecutionId,
         )
         val monitorMetadataId1 = getDelegateMonitorMetadataId(workflowMetadata1, monitorResponse)
         assertTrue(monitorMetadataId == monitorMetadataId1)
@@ -3362,25 +3722,28 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1)
-        )
+        var monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+            )
         val monitorResponse = createMonitor(monitor1)!!
 
         val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
         val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput2),
-            triggers = listOf(trigger2),
-        )
+        var monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput2),
+                triggers = listOf(trigger2),
+            )
 
         val monitorResponse2 = createMonitor(monitor2)!!
 
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id, monitorResponse2.id)
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
@@ -3412,47 +3775,55 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute workflow with custom alerts and finding index with bucket and doc monitor bucket monitor used as chained finding`() {
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field_1").field("test_field_1")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field_1").field("test_field_1"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
         // Bucket level monitor will reduce the size of matched doc ids on those that belong to a bucket that contains more than 1 document after term grouping
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 1
-        """.trimIndent()
+            """.trimIndent()
 
         var trigger = randomBucketLevelTrigger()
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null,
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
         val bucketCustomAlertsIndex = "custom_alerts_index"
         val bucketCustomFindingsIndex = "custom_findings_index"
         val bucketCustomFindingsIndexPattern = "custom_findings_index-1"
 
-        val bucketLevelMonitorResponse = createMonitor(
-            randomBucketLevelMonitor(
-                inputs = listOf(input),
-                enabled = false,
-                triggers = listOf(trigger),
-                dataSources = DataSources(
-                    findingsEnabled = true,
-                    alertsIndex = bucketCustomAlertsIndex,
-                    findingsIndex = bucketCustomFindingsIndex,
-                    findingsIndexPattern = bucketCustomFindingsIndexPattern
-                )
-            )
-        )!!
+        val bucketLevelMonitorResponse =
+            createMonitor(
+                randomBucketLevelMonitor(
+                    inputs = listOf(input),
+                    enabled = false,
+                    triggers = listOf(trigger),
+                    dataSources =
+                        DataSources(
+                            findingsEnabled = true,
+                            alertsIndex = bucketCustomAlertsIndex,
+                            findingsIndex = bucketCustomFindingsIndex,
+                            findingsIndexPattern = bucketCustomFindingsIndexPattern,
+                        ),
+                ),
+            )!!
 
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1", fields = listOf())
         val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_1\"", name = "2", fields = listOf())
@@ -3462,21 +3833,25 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docCustomAlertsIndex = "custom_alerts_index"
         val docCustomFindingsIndex = "custom_findings_index"
         val docCustomFindingsIndexPattern = "custom_findings_index-1"
-        var docLevelMonitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(docTrigger),
-            dataSources = DataSources(
-                alertsIndex = docCustomAlertsIndex,
-                findingsIndex = docCustomFindingsIndex,
-                findingsIndexPattern = docCustomFindingsIndexPattern
+        var docLevelMonitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(docTrigger),
+                dataSources =
+                    DataSources(
+                        alertsIndex = docCustomAlertsIndex,
+                        findingsIndex = docCustomFindingsIndex,
+                        findingsIndexPattern = docCustomFindingsIndexPattern,
+                    ),
             )
-        )
 
         val docLevelMonitorResponse = createMonitor(docLevelMonitor)!!
         // 1. bucketMonitor (chainedFinding = null) 2. docMonitor (chainedFinding = bucketMonitor)
-        var workflow = randomWorkflow(
-            monitorIds = listOf(bucketLevelMonitorResponse.id, docLevelMonitorResponse.id), auditDelegateMonitorAlerts = false
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(bucketLevelMonitorResponse.id, docLevelMonitorResponse.id),
+                auditDelegateMonitorAlerts = false,
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
@@ -3489,8 +3864,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 "test_value_1", // adding duplicate to verify aggregation
                 "test_value_2",
                 "test_value_2",
-                "test_value_3"
-            )
+                "test_value_3",
+            ),
         )
 
         val workflowId = workflowResponse.id
@@ -3504,8 +3879,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 val searchResult = monitorRunResults.inputResults.results.first()
 
                 @Suppress("UNCHECKED_CAST")
-                val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")
-                    ?.get("buckets") as List<kotlin.collections.Map<String, Any>>
+                val buckets =
+                    searchResult
+                        .stringMap("aggregations")
+                        ?.stringMap("composite_agg")
+                        ?.get("buckets") as List<kotlin.collections.Map<String, Any>>
                 assertEquals("Incorrect search result", 3, buckets.size)
 
                 val getAlertsResponse = assertAlerts(bucketLevelMonitorResponse.id, bucketCustomAlertsIndex, alertSize = 2, workflowId)
@@ -3532,298 +3910,78 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertIndex = "custom-alert-index"
         val customAlertHistoryIndex = "custom-alert-history-index"
         val customAlertHistoryIndexPattern = "<custom_alert_history_index-{now/d}-1>"
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field_1").field("test_field_1")
-        )
-        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
-        val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
-        // Bucket level monitor will reduce the size of matched doc ids on those that belong to a bucket that contains more than 1 document after term grouping
-        val triggerScript = """
-            params.docCount > 1
-        """.trimIndent()
-
-        var trigger = randomBucketLevelTrigger()
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null,
-            )
-        )
-
-        val bucketLevelMonitorResponse = createMonitor(
-            randomBucketLevelMonitor(
-                inputs = listOf(input),
-                enabled = false,
-                triggers = listOf(trigger),
-                dataSources = DataSources(
-                    alertsIndex = customAlertIndex,
-                    alertsHistoryIndexPattern = customAlertHistoryIndexPattern,
-                    alertsHistoryIndex = customAlertHistoryIndex
-
-                )
-            )
-        )!!
-
-        val bucketLevelMonitorResponse2 = createMonitor(
-            randomBucketLevelMonitor(
-                inputs = listOf(input),
-                enabled = false,
-                triggers = listOf(trigger),
-                dataSources = DataSources(
-                    alertsIndex = customAlertIndex,
-                    alertsHistoryIndexPattern = customAlertHistoryIndexPattern,
-                    alertsHistoryIndex = customAlertHistoryIndex
-
-                )
-            )
-        )!!
-
-        val andTrigger = randomChainedAlertTrigger(
-            name = "1And2",
-            condition = Script("monitor[id=${bucketLevelMonitorResponse.id}] && monitor[id=${bucketLevelMonitorResponse2.id}]")
-        )
-        // 1. bucketMonitor (chainedFinding = null) 2. docMonitor (chainedFinding = bucketMonitor)
-        var workflow = randomWorkflow(
-            monitorIds = listOf(bucketLevelMonitorResponse.id, bucketLevelMonitorResponse2.id),
-            triggers = listOf(andTrigger)
-        )
-        val workflowResponse = upsertWorkflow(workflow)!!
-        val workflowById = searchWorkflow(workflowResponse.id)
-        assertNotNull(workflowById)
-
-        // Creates 5 documents
-        insertSampleTimeSerializedData(
-            index,
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
             listOf(
-                "test_value_1",
-                "test_value_1", // adding duplicate to verify aggregation
-                "test_value_2",
-                "test_value_2",
-                "test_value_3"
+                TermsValuesSourceBuilder("test_field_1").field("test_field_1"),
             )
-        )
-
-        val workflowId = workflowResponse.id
-        // 1. bucket level monitor should reduce the doc findings to 4 (1, 2, 3, 4)
-        // 2. Doc level monitor will match those 4 documents although it contains rules for matching all 5 documents (docQuery3 matches the fifth)
-        val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        assertNotNull(executeWorkflowResponse)
-
-        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults.isNotEmpty())
-        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults.containsKey(andTrigger.id))
-        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults[andTrigger.id]!!.triggered)
-
-        val auditStateAlerts = getAuditStateAlerts(
-            alertsIndex = customAlertHistoryIndex,
-            monitorId = bucketLevelMonitorResponse.id,
-            executionId = executeWorkflowResponse.workflowRunResult.executionId
-        )
-        Assert.assertEquals(auditStateAlerts.size, 2)
-
-        val auditStateAlerts2 = getAuditStateAlerts(
-            alertsIndex = customAlertHistoryIndex,
-            monitorId = bucketLevelMonitorResponse2.id,
-            executionId = executeWorkflowResponse.workflowRunResult.executionId
-        )
-        Assert.assertEquals(auditStateAlerts2.size, 2)
-    }
-
-    fun `test chained alerts for bucket level monitors generating audit alerts`() {
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field_1").field("test_field_1")
-        )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
         // Bucket level monitor will reduce the size of matched doc ids on those that belong to a bucket that contains more than 1 document after term grouping
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 1
-        """.trimIndent()
+            """.trimIndent()
 
         var trigger = randomBucketLevelTrigger()
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null,
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
 
-        val bucketLevelMonitorResponse = createMonitor(
-            randomBucketLevelMonitor(
-                inputs = listOf(input),
-                enabled = false,
-                triggers = listOf(trigger)
+        val bucketLevelMonitorResponse =
+            createMonitor(
+                randomBucketLevelMonitor(
+                    inputs = listOf(input),
+                    enabled = false,
+                    triggers = listOf(trigger),
+                    dataSources =
+                        DataSources(
+                            alertsIndex = customAlertIndex,
+                            alertsHistoryIndexPattern = customAlertHistoryIndexPattern,
+                            alertsHistoryIndex = customAlertHistoryIndex,
+                        ),
+                ),
+            )!!
+
+        val bucketLevelMonitorResponse2 =
+            createMonitor(
+                randomBucketLevelMonitor(
+                    inputs = listOf(input),
+                    enabled = false,
+                    triggers = listOf(trigger),
+                    dataSources =
+                        DataSources(
+                            alertsIndex = customAlertIndex,
+                            alertsHistoryIndexPattern = customAlertHistoryIndexPattern,
+                            alertsHistoryIndex = customAlertHistoryIndex,
+                        ),
+                ),
+            )!!
+
+        val andTrigger =
+            randomChainedAlertTrigger(
+                name = "1And2",
+                condition = Script("monitor[id=${bucketLevelMonitorResponse.id}] && monitor[id=${bucketLevelMonitorResponse2.id}]"),
             )
-        )!!
-
-        val bucketLevelMonitorResponse2 = createMonitor(
-            randomBucketLevelMonitor(
-                inputs = listOf(input),
-                enabled = false,
-                triggers = listOf(trigger)
-            )
-        )!!
-
-        val andTrigger = randomChainedAlertTrigger(
-            name = "1And2",
-            condition = Script("monitor[id=${bucketLevelMonitorResponse.id}] && monitor[id=${bucketLevelMonitorResponse2.id}]")
-        )
         // 1. bucketMonitor (chainedFinding = null) 2. docMonitor (chainedFinding = bucketMonitor)
-        var workflow = randomWorkflow(
-            monitorIds = listOf(bucketLevelMonitorResponse.id, bucketLevelMonitorResponse2.id),
-            triggers = listOf(andTrigger)
-        )
-        val workflowResponse = upsertWorkflow(workflow)!!
-        val workflowById = searchWorkflow(workflowResponse.id)
-        assertNotNull(workflowById)
-
-        // Creates 5 documents
-        insertSampleTimeSerializedData(
-            index,
-            listOf(
-                "test_value_1",
-                "test_value_1", // adding duplicate to verify aggregation
-                "test_value_2",
-                "test_value_2",
-                "test_value_3"
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(bucketLevelMonitorResponse.id, bucketLevelMonitorResponse2.id),
+                triggers = listOf(andTrigger),
             )
-        )
-
-        val workflowId = workflowResponse.id
-        // 1. bucket level monitor should reduce the doc findings to 4 (1, 2, 3, 4)
-        // 2. Doc level monitor will match those 4 documents although it contains rules for matching all 5 documents (docQuery3 matches the fifth)
-        val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        assertNotNull(executeWorkflowResponse)
-
-        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults.isNotEmpty())
-        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults.containsKey(andTrigger.id))
-        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults[andTrigger.id]!!.triggered)
-
-        val auditStateAlerts = getAuditStateAlerts(
-            alertsIndex = bucketLevelMonitorResponse.monitor.dataSources.alertsHistoryIndex,
-            monitorId = bucketLevelMonitorResponse.id,
-            executionId = executeWorkflowResponse.workflowRunResult.executionId
-        )
-        Assert.assertEquals(auditStateAlerts.size, 2)
-
-        val auditStateAlerts2 = getAuditStateAlerts(
-            alertsIndex = bucketLevelMonitorResponse.monitor.dataSources.alertsHistoryIndex,
-            monitorId = bucketLevelMonitorResponse2.id,
-            executionId = executeWorkflowResponse.workflowRunResult.executionId
-        )
-        Assert.assertEquals(auditStateAlerts2.size, 2)
-    }
-
-    fun `test execute with custom alerts and finding index with bucket and doc monitor when doc monitor  is used in chained finding`() {
-        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1", fields = listOf())
-        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "2", fields = listOf())
-
-        var docLevelMonitor = randomDocumentLevelMonitor(
-            inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery1, docQuery2))),
-            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN)),
-            dataSources = DataSources(
-                alertsIndex = "custom_alerts_index",
-                findingsIndex = "custom_findings_index",
-                findingsIndexPattern = "custom_findings_index-1"
-            )
-        )
-
-        val docLevelMonitorResponse = createMonitor(docLevelMonitor)!!
-
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field_1").field("test_field_1")
-        )
-        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
-        val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
-        // Bucket level monitor will reduce the size of matched doc ids on those that belong to a bucket that contains more than 1 document after term grouping
-        val triggerScript = """
-            params.docCount > 1
-        """.trimIndent()
-
-        var trigger = randomBucketLevelTrigger()
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null,
-            )
-        )
-
-        val bucketLevelMonitorResponse = createMonitor(
-            randomBucketLevelMonitor(
-                inputs = listOf(input),
-                enabled = false,
-                triggers = listOf(trigger),
-                dataSources = DataSources(
-                    findingsEnabled = true,
-                    alertsIndex = "custom_alerts_index",
-                    findingsIndex = "custom_findings_index",
-                    findingsIndexPattern = "custom_findings_index-1"
-                )
-            )
-        )!!
-
-        var docLevelMonitor1 = randomDocumentLevelMonitor(
-            // Match the documents with test_field_1: test_value_3
-            inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))),
-            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN)),
-            dataSources = DataSources(
-                findingsEnabled = true,
-                alertsIndex = "custom_alerts_index_1",
-                findingsIndex = "custom_findings_index_1",
-                findingsIndexPattern = "custom_findings_index_1-1"
-            )
-        )
-
-        val docLevelMonitorResponse1 = createMonitor(docLevelMonitor1)!!
-
-        val queryMonitorInput = SearchInput(
-            indices = listOf(index),
-            query = SearchSourceBuilder().query(
-                QueryBuilders
-                    .rangeQuery("test_strict_date_time")
-                    .gt("{{period_end}}||-10d")
-                    .lte("{{period_end}}")
-                    .format("epoch_millis")
-            )
-        )
-        val queryTriggerScript = """
-            return ctx.results[0].hits.hits.size() > 0
-        """.trimIndent()
-
-        val queryLevelTrigger = randomQueryLevelTrigger(condition = Script(queryTriggerScript))
-        val queryMonitorResponse =
-            createMonitor(randomQueryLevelMonitor(inputs = listOf(queryMonitorInput), triggers = listOf(queryLevelTrigger)))!!
-
-        // 1. docMonitor (chainedFinding = null) 2. bucketMonitor (chainedFinding = docMonitor) 3. docMonitor (chainedFinding = bucketMonitor) 4. queryMonitor (chainedFinding = docMonitor 3)
-        var workflow = randomWorkflow(
-            monitorIds = listOf(
-                docLevelMonitorResponse.id,
-                bucketLevelMonitorResponse.id,
-                docLevelMonitorResponse1.id,
-                queryMonitorResponse.id
-            ),
-            auditDelegateMonitorAlerts = false
-        )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
@@ -3837,8 +3995,269 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 "test_value_2",
                 "test_value_2",
                 "test_value_3",
-                "test_value_3"
+            ),
+        )
+
+        val workflowId = workflowResponse.id
+        // 1. bucket level monitor should reduce the doc findings to 4 (1, 2, 3, 4)
+        // 2. Doc level monitor will match those 4 documents although it contains rules for matching all 5 documents (docQuery3 matches the fifth)
+        val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
+        assertNotNull(executeWorkflowResponse)
+
+        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults.isNotEmpty())
+        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults.containsKey(andTrigger.id))
+        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults[andTrigger.id]!!.triggered)
+
+        val auditStateAlerts =
+            getAuditStateAlerts(
+                alertsIndex = customAlertHistoryIndex,
+                monitorId = bucketLevelMonitorResponse.id,
+                executionId = executeWorkflowResponse.workflowRunResult.executionId,
             )
+        Assert.assertEquals(auditStateAlerts.size, 2)
+
+        val auditStateAlerts2 =
+            getAuditStateAlerts(
+                alertsIndex = customAlertHistoryIndex,
+                monitorId = bucketLevelMonitorResponse2.id,
+                executionId = executeWorkflowResponse.workflowRunResult.executionId,
+            )
+        Assert.assertEquals(auditStateAlerts2.size, 2)
+    }
+
+    fun `test chained alerts for bucket level monitors generating audit alerts`() {
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field_1").field("test_field_1"),
+            )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        // Bucket level monitor will reduce the size of matched doc ids on those that belong to a bucket that contains more than 1 document after term grouping
+        val triggerScript =
+            """
+            params.docCount > 1
+            """.trimIndent()
+
+        var trigger = randomBucketLevelTrigger()
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
+            )
+
+        val bucketLevelMonitorResponse =
+            createMonitor(
+                randomBucketLevelMonitor(
+                    inputs = listOf(input),
+                    enabled = false,
+                    triggers = listOf(trigger),
+                ),
+            )!!
+
+        val bucketLevelMonitorResponse2 =
+            createMonitor(
+                randomBucketLevelMonitor(
+                    inputs = listOf(input),
+                    enabled = false,
+                    triggers = listOf(trigger),
+                ),
+            )!!
+
+        val andTrigger =
+            randomChainedAlertTrigger(
+                name = "1And2",
+                condition = Script("monitor[id=${bucketLevelMonitorResponse.id}] && monitor[id=${bucketLevelMonitorResponse2.id}]"),
+            )
+        // 1. bucketMonitor (chainedFinding = null) 2. docMonitor (chainedFinding = bucketMonitor)
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(bucketLevelMonitorResponse.id, bucketLevelMonitorResponse2.id),
+                triggers = listOf(andTrigger),
+            )
+        val workflowResponse = upsertWorkflow(workflow)!!
+        val workflowById = searchWorkflow(workflowResponse.id)
+        assertNotNull(workflowById)
+
+        // Creates 5 documents
+        insertSampleTimeSerializedData(
+            index,
+            listOf(
+                "test_value_1",
+                "test_value_1", // adding duplicate to verify aggregation
+                "test_value_2",
+                "test_value_2",
+                "test_value_3",
+            ),
+        )
+
+        val workflowId = workflowResponse.id
+        // 1. bucket level monitor should reduce the doc findings to 4 (1, 2, 3, 4)
+        // 2. Doc level monitor will match those 4 documents although it contains rules for matching all 5 documents (docQuery3 matches the fifth)
+        val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
+        assertNotNull(executeWorkflowResponse)
+
+        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults.isNotEmpty())
+        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults.containsKey(andTrigger.id))
+        Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults[andTrigger.id]!!.triggered)
+
+        val auditStateAlerts =
+            getAuditStateAlerts(
+                alertsIndex = bucketLevelMonitorResponse.monitor.dataSources.alertsHistoryIndex,
+                monitorId = bucketLevelMonitorResponse.id,
+                executionId = executeWorkflowResponse.workflowRunResult.executionId,
+            )
+        Assert.assertEquals(auditStateAlerts.size, 2)
+
+        val auditStateAlerts2 =
+            getAuditStateAlerts(
+                alertsIndex = bucketLevelMonitorResponse.monitor.dataSources.alertsHistoryIndex,
+                monitorId = bucketLevelMonitorResponse2.id,
+                executionId = executeWorkflowResponse.workflowRunResult.executionId,
+            )
+        Assert.assertEquals(auditStateAlerts2.size, 2)
+    }
+
+    fun `test execute with custom alerts and finding index with bucket and doc monitor when doc monitor  is used in chained finding`() {
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1", fields = listOf())
+        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "2", fields = listOf())
+
+        var docLevelMonitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery1, docQuery2))),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN)),
+                dataSources =
+                    DataSources(
+                        alertsIndex = "custom_alerts_index",
+                        findingsIndex = "custom_findings_index",
+                        findingsIndexPattern = "custom_findings_index-1",
+                    ),
+            )
+
+        val docLevelMonitorResponse = createMonitor(docLevelMonitor)!!
+
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field_1").field("test_field_1"),
+            )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        // Bucket level monitor will reduce the size of matched doc ids on those that belong to a bucket that contains more than 1 document after term grouping
+        val triggerScript =
+            """
+            params.docCount > 1
+            """.trimIndent()
+
+        var trigger = randomBucketLevelTrigger()
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
+            )
+
+        val bucketLevelMonitorResponse =
+            createMonitor(
+                randomBucketLevelMonitor(
+                    inputs = listOf(input),
+                    enabled = false,
+                    triggers = listOf(trigger),
+                    dataSources =
+                        DataSources(
+                            findingsEnabled = true,
+                            alertsIndex = "custom_alerts_index",
+                            findingsIndex = "custom_findings_index",
+                            findingsIndexPattern = "custom_findings_index-1",
+                        ),
+                ),
+            )!!
+
+        var docLevelMonitor1 =
+            randomDocumentLevelMonitor(
+                // Match the documents with test_field_1: test_value_3
+                inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN)),
+                dataSources =
+                    DataSources(
+                        findingsEnabled = true,
+                        alertsIndex = "custom_alerts_index_1",
+                        findingsIndex = "custom_findings_index_1",
+                        findingsIndexPattern = "custom_findings_index_1-1",
+                    ),
+            )
+
+        val docLevelMonitorResponse1 = createMonitor(docLevelMonitor1)!!
+
+        val queryMonitorInput =
+            SearchInput(
+                indices = listOf(index),
+                query =
+                    SearchSourceBuilder().query(
+                        QueryBuilders
+                            .rangeQuery("test_strict_date_time")
+                            .gt("{{period_end}}||-10d")
+                            .lte("{{period_end}}")
+                            .format("epoch_millis"),
+                    ),
+            )
+        val queryTriggerScript =
+            """
+            return ctx.results[0].hits.hits.size() > 0
+            """.trimIndent()
+
+        val queryLevelTrigger = randomQueryLevelTrigger(condition = Script(queryTriggerScript))
+        val queryMonitorResponse =
+            createMonitor(randomQueryLevelMonitor(inputs = listOf(queryMonitorInput), triggers = listOf(queryLevelTrigger)))!!
+
+        // 1. docMonitor (chainedFinding = null) 2. bucketMonitor (chainedFinding = docMonitor) 3. docMonitor (chainedFinding = bucketMonitor) 4. queryMonitor (chainedFinding = docMonitor 3)
+        var workflow =
+            randomWorkflow(
+                monitorIds =
+                    listOf(
+                        docLevelMonitorResponse.id,
+                        bucketLevelMonitorResponse.id,
+                        docLevelMonitorResponse1.id,
+                        queryMonitorResponse.id,
+                    ),
+                auditDelegateMonitorAlerts = false,
+            )
+        val workflowResponse = upsertWorkflow(workflow)!!
+        val workflowById = searchWorkflow(workflowResponse.id)
+        assertNotNull(workflowById)
+
+        // Creates 5 documents
+        insertSampleTimeSerializedData(
+            index,
+            listOf(
+                "test_value_1",
+                "test_value_1", // adding duplicate to verify aggregation
+                "test_value_2",
+                "test_value_2",
+                "test_value_3",
+                "test_value_3",
+            ),
         )
 
         val workflowId = workflowResponse.id
@@ -3865,7 +4284,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                             docLevelMonitorResponse.id,
                             docLevelMonitorResponse.monitor.dataSources.alertsIndex,
                             alertSize = 4,
-                            workflowId = workflowId
+                            workflowId = workflowId,
                         )
                     assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse.id, 4)
                     assertFindings(
@@ -3873,9 +4292,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                         docLevelMonitorResponse.monitor.dataSources.findingsIndex,
                         4,
                         4,
-                        listOf("3", "4", "5", "6")
+                        listOf("3", "4", "5", "6"),
                     )
                 }
+
                 // Verify second bucket level monitor execution, alerts and findings
                 bucketLevelMonitorResponse.monitor.name -> {
                     val searchResult = monitorRunResults.inputResults.results.first()
@@ -3883,7 +4303,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                     @Suppress("UNCHECKED_CAST")
                     val buckets =
                         searchResult
-                            .stringMap("aggregations")?.stringMap("composite_agg")
+                            .stringMap("aggregations")
+                            ?.stringMap("composite_agg")
                             ?.get("buckets") as List<kotlin.collections.Map<String, Any>>
                     assertEquals("Incorrect search result", 2, buckets.size)
 
@@ -3892,7 +4313,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                             bucketLevelMonitorResponse.id,
                             bucketLevelMonitorResponse.monitor.dataSources.alertsIndex,
                             alertSize = 2,
-                            workflowId
+                            workflowId,
                         )
                     assertAcknowledges(getAlertsResponse.alerts, bucketLevelMonitorResponse.id, 2)
                     assertFindings(
@@ -3900,9 +4321,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                         bucketLevelMonitorResponse.monitor.dataSources.findingsIndex,
                         1,
                         4,
-                        listOf("3", "4", "5", "6")
+                        listOf("3", "4", "5", "6"),
                     )
                 }
+
                 // Verify third doc level monitor execution, alerts and findings
                 docLevelMonitorResponse1.monitor.name -> {
                     assertEquals(1, monitorRunResults.inputResults.results.size)
@@ -3919,7 +4341,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                             docLevelMonitorResponse1.id,
                             docLevelMonitorResponse1.monitor.dataSources.alertsIndex,
                             alertSize = 2,
-                            workflowId
+                            workflowId,
                         )
                     assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse1.id, 2)
                     assertFindings(
@@ -3927,9 +4349,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                         docLevelMonitorResponse1.monitor.dataSources.findingsIndex,
                         2,
                         2,
-                        listOf("5", "6")
+                        listOf("5", "6"),
                     )
                 }
+
                 // Verify fourth query level monitor execution
                 queryMonitorResponse.monitor.name -> {
                     assertEquals(1, monitorRunResults.inputResults.results.size)
@@ -3941,8 +4364,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                             (
                                 monitorRunResults.inputResults.results[0]["hits"]
                                     as kotlin.collections.Map<String, Any>
-                                )["total"] as kotlin.collections.Map<String, Any>
-                            )["value"]
+                            )["total"] as kotlin.collections.Map<String, Any>
+                        )["value"]
                     assertEquals(2, totalHits)
                     @Suppress("UNCHECKED_CAST")
                     val docIds =
@@ -3950,9 +4373,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                             (
                                 monitorRunResults.inputResults.results[0]["hits"]
                                     as kotlin.collections.Map<String, Any>
-                                )["hits"] as List<kotlin.collections.Map<String, String>>
-                            )
-                            .map { it["_id"]!! }
+                            )["hits"] as List<kotlin.collections.Map<String, String>>
+                        ).map { it["_id"]!! }
                     assertEquals(listOf("5", "6"), docIds.sorted())
                 }
             }
@@ -3960,20 +4382,26 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute workflow input error`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
 
         val monitorResponse = createMonitor(monitor)!!
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id), auditDelegateMonitorAlerts = false
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+                auditDelegateMonitorAlerts = false,
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
@@ -3989,21 +4417,26 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test execute workflow wrong workflow id`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
 
         val monitorResponse = createMonitor(monitor)!!
 
-        val workflowRequest = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
-        )
+        val workflowRequest =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+            )
         val workflowResponse = upsertWorkflow(workflowRequest)!!
         val workflowId = workflowResponse.id
         val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
@@ -4048,15 +4481,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val searchRequest = SearchRequest(alertsIndex)
         val boolQueryBuilder = QueryBuilders.boolQuery()
         boolQueryBuilder.must(TermQueryBuilder("monitor_id", monitorId))
-        if (executionId.isNullOrEmpty() == false)
+        if (executionId.isNullOrEmpty() == false) {
             boolQueryBuilder.must(TermQueryBuilder("execution_id", executionId))
+        }
         searchRequest.source().query(boolQueryBuilder)
         val searchResponse = client().search(searchRequest).get()
         return searchResponse.hits.map { hit ->
-            val xcp = XContentHelper.createParser(
-                xContentRegistry(), LoggingDeprecationHandler.INSTANCE,
-                hit.sourceRef, XContentType.JSON
-            )
+            val xcp =
+                XContentHelper.createParser(
+                    xContentRegistry(),
+                    LoggingDeprecationHandler.INSTANCE,
+                    hit.sourceRef,
+                    XContentType.JSON,
+                )
             XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
             val alert = Alert.parse(xcp, hit.id, hit.version)
             alert
@@ -4073,20 +4510,20 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val alerts = searchAlerts(monitorId, alertsIndex!!, executionId = executionId)
         assertEquals("Alert saved for test monitor", alertSize, alerts.size)
         val table = Table("asc", "id", null, alertSize, 0, "")
-        var getAlertsResponse = client()
-            .execute(
-                AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", null, alertsIndex)
-            )
-            .get()
+        var getAlertsResponse =
+            client()
+                .execute(
+                    AlertingActions.GET_ALERTS_ACTION_TYPE,
+                    GetAlertsRequest(table, "ALL", "ALL", null, alertsIndex),
+                ).get()
         assertTrue(getAlertsResponse != null)
         assertTrue(getAlertsResponse.alerts.size == alertSize)
-        getAlertsResponse = client()
-            .execute(
-                AlertingActions.GET_ALERTS_ACTION_TYPE,
-                GetAlertsRequest(table, "ALL", "ALL", monitorId, null, workflowIds = listOf(workflowId))
-            )
-            .get()
+        getAlertsResponse =
+            client()
+                .execute(
+                    AlertingActions.GET_ALERTS_ACTION_TYPE,
+                    GetAlertsRequest(table, "ALL", "ALL", monitorId, null, workflowIds = listOf(workflowId)),
+                ).get()
         assertTrue(getAlertsResponse != null)
         assertTrue(getAlertsResponse.alerts.size == alertSize)
 
@@ -4099,10 +4536,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         alertSize: Int,
     ) {
         val alertIds = alerts.map { it.id }
-        val acknowledgeAlertResponse = client().execute(
-            AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_TYPE,
-            AcknowledgeAlertRequest(monitorId, alertIds, WriteRequest.RefreshPolicy.IMMEDIATE)
-        ).get()
+        val acknowledgeAlertResponse =
+            client()
+                .execute(
+                    AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_TYPE,
+                    AcknowledgeAlertRequest(monitorId, alertIds, WriteRequest.RefreshPolicy.IMMEDIATE),
+                ).get()
 
         assertEquals(alertSize, acknowledgeAlertResponse.acknowledged.size)
     }
@@ -4114,23 +4553,36 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     ) {
         val alertIds = alerts.map { it.id }.toMutableList()
         val acknowledgeAlertResponse = ackChainedAlerts(alertIds, workflowId)
-        assertTrue(acknowledgeAlertResponse.acknowledged.stream().map { it.id }.collect(Collectors.toList()).containsAll(alertIds))
+        assertTrue(
+            acknowledgeAlertResponse.acknowledged
+                .stream()
+                .map { it.id }
+                .collect(Collectors.toList())
+                .containsAll(alertIds),
+        )
         assertEquals(alertSize, acknowledgeAlertResponse.acknowledged.size)
         alertIds.add("dummy")
         val redundantAck = ackChainedAlerts(alertIds, workflowId)
         Assert.assertTrue(redundantAck.acknowledged.isEmpty())
         Assert.assertTrue(redundantAck.missing.contains("dummy"))
         alertIds.remove("dummy")
-        Assert.assertTrue(redundantAck.failed.map { it.id }.toList().containsAll(alertIds))
+        Assert.assertTrue(
+            redundantAck.failed
+                .map { it.id }
+                .toList()
+                .containsAll(alertIds),
+        )
     }
 
-    private fun ackChainedAlerts(alertIds: List<String>, workflowId: String): AcknowledgeAlertResponse {
-
-        return client().execute(
-            AlertingActions.ACKNOWLEDGE_CHAINED_ALERTS_ACTION_TYPE,
-            AcknowledgeChainedAlertRequest(workflowId, alertIds)
-        ).get()
-    }
+    private fun ackChainedAlerts(
+        alertIds: List<String>,
+        workflowId: String,
+    ): AcknowledgeAlertResponse =
+        client()
+            .execute(
+                AlertingActions.ACKNOWLEDGE_CHAINED_ALERTS_ACTION_TYPE,
+                AcknowledgeChainedAlertRequest(workflowId, alertIds),
+            ).get()
 
     private fun assertAuditStateAlerts(
         monitorId: String,
@@ -4138,10 +4590,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     ) {
         alerts.forEach { Assert.assertEquals(it.state, Alert.State.AUDIT) }
         val alertIds = alerts.stream().map { it.id }.collect(Collectors.toList())
-        val ack = client().execute(
-            AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_TYPE,
-            AcknowledgeAlertRequest(monitorId, alertIds, WriteRequest.RefreshPolicy.IMMEDIATE)
-        ).get()
+        val ack =
+            client()
+                .execute(
+                    AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_TYPE,
+                    AcknowledgeAlertRequest(monitorId, alertIds, WriteRequest.RefreshPolicy.IMMEDIATE),
+                ).get()
         Assert.assertTrue(ack.acknowledged.isEmpty())
         Assert.assertTrue(ack.missing.containsAll(alertIds))
         Assert.assertTrue(ack.failed.isEmpty())
@@ -4150,43 +4604,50 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     fun `test execute workflow with bucket-level and doc-level chained monitors`() {
         createTestIndex(TEST_HR_INDEX)
 
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field_1").field("test_field_1")
-        )
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field_1").field("test_field_1"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
-        val input = SearchInput(
-            indices = listOf(TEST_HR_INDEX),
-            query = SearchSourceBuilder().size(0).query(QueryBuilders.matchAllQuery()).aggregation(compositeAgg)
-        )
-        val triggerScript = """
+        val input =
+            SearchInput(
+                indices = listOf(TEST_HR_INDEX),
+                query = SearchSourceBuilder().size(0).query(QueryBuilders.matchAllQuery()).aggregation(compositeAgg),
+            )
+        val triggerScript =
+            """
             params.docCount > 0
-        """.trimIndent()
+            """.trimIndent()
 
         var trigger = randomBucketLevelTrigger()
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null
-            ),
-            actions = listOf()
-        )
-        val bucketMonitor = createMonitor(
-            randomBucketLevelMonitor(
-                inputs = listOf(input),
-                enabled = false,
-                triggers = listOf(trigger)
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
+                actions = listOf(),
             )
-        )
+        val bucketMonitor =
+            createMonitor(
+                randomBucketLevelMonitor(
+                    inputs = listOf(input),
+                    enabled = false,
+                    triggers = listOf(trigger),
+                ),
+            )
         assertNotNull("The bucket monitor was not created", bucketMonitor)
 
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"a\"", name = "3", fields = listOf())
-        var monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(DocLevelMonitorInput("description", listOf(TEST_HR_INDEX), listOf(docQuery1))),
-            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN))
-        )
+        var monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(DocLevelMonitorInput("description", listOf(TEST_HR_INDEX), listOf(docQuery1))),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN)),
+            )
         val docMonitor = createMonitor(monitor1)!!
         assertNotNull("The doc level monitor was not created", docMonitor)
 
@@ -4203,7 +4664,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
               "test_field_1": "a",
               "accessible": true
             }
-            """.trimIndent()
+            """.trimIndent(),
         )
 
         // Add a second doc that is not accessible to the user
@@ -4215,7 +4676,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
               "test_field_1": "b",
               "accessible": false
             }
-            """.trimIndent()
+            """.trimIndent(),
         )
 
         indexDoc(
@@ -4226,7 +4687,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
               "test_field_1": "c",
               "accessible": true
             }
-            """.trimIndent()
+            """.trimIndent(),
         )
 
         val executeResult = executeWorkflow(id = workflowResponse!!.id)
@@ -4243,17 +4704,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val customAlertsIndex = "custom_alerts_index"
         val customAlertsHistoryIndex = "custom_alerts_history_index"
         val customAlertsHistoryIndexPattern = "<custom_alerts_history_index-{now/d}-1>"
-        var monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1),
-            dataSources = DataSources(
-                findingsIndex = customFindingsIndex1,
-                findingsIndexPattern = customFindingsIndexPattern1,
-                alertsIndex = customAlertsIndex,
-                alertsHistoryIndex = customAlertsHistoryIndex,
-                alertsHistoryIndexPattern = customAlertsHistoryIndexPattern
+        var monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+                dataSources =
+                    DataSources(
+                        findingsIndex = customFindingsIndex1,
+                        findingsIndexPattern = customFindingsIndexPattern1,
+                        alertsIndex = customAlertsIndex,
+                        alertsHistoryIndex = customAlertsHistoryIndex,
+                        alertsHistoryIndexPattern = customAlertsHistoryIndexPattern,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor1)!!
 
         val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
@@ -4261,31 +4724,36 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex2 = "custom_findings_index_2"
         val customFindingsIndexPattern2 = "custom_findings_index-2"
-        var monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput2),
-            triggers = listOf(trigger2),
-            dataSources = DataSources(
-                findingsIndex = customFindingsIndex2,
-                findingsIndexPattern = customFindingsIndexPattern2,
-                alertsIndex = customAlertsIndex,
-                alertsHistoryIndex = customAlertsHistoryIndex,
-                alertsHistoryIndexPattern = customAlertsHistoryIndexPattern
+        var monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput2),
+                triggers = listOf(trigger2),
+                dataSources =
+                    DataSources(
+                        findingsIndex = customFindingsIndex2,
+                        findingsIndexPattern = customFindingsIndexPattern2,
+                        alertsIndex = customAlertsIndex,
+                        alertsHistoryIndex = customAlertsHistoryIndex,
+                        alertsHistoryIndexPattern = customAlertsHistoryIndexPattern,
+                    ),
             )
-        )
 
         val monitorResponse2 = createMonitor(monitor2)!!
-        val andTrigger = randomChainedAlertTrigger(
-            name = "1And2",
-            condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]")
-        )
-        val notTrigger = randomChainedAlertTrigger(
-            name = "Not1OrNot2",
-            condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]")
-        )
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
-            triggers = listOf(andTrigger, notTrigger)
-        )
+        val andTrigger =
+            randomChainedAlertTrigger(
+                name = "1And2",
+                condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]"),
+            )
+        val notTrigger =
+            randomChainedAlertTrigger(
+                name = "Not1OrNot2",
+                condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]"),
+            )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+                triggers = listOf(andTrigger, notTrigger),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
@@ -4366,20 +4834,24 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         Assert.assertEquals(
             monitor1.dataSources.alertsHistoryIndex,
-            CompositeWorkflowRunner.getDelegateMonitorAlertIndex(dataSources = monitor1.dataSources, workflow, true)
+            CompositeWorkflowRunner.getDelegateMonitorAlertIndex(dataSources = monitor1.dataSources, workflow, true),
         )
-        val alerts = getAuditStateAlerts(
-            monitorId = monitorResponse.id, executionId = executeWorkflowResponse.workflowRunResult.executionId,
-            alertsIndex = monitor1.dataSources.alertsHistoryIndex,
-        )
+        val alerts =
+            getAuditStateAlerts(
+                monitorId = monitorResponse.id,
+                executionId = executeWorkflowResponse.workflowRunResult.executionId,
+                alertsIndex = monitor1.dataSources.alertsHistoryIndex,
+            )
         assertAuditStateAlerts(monitorResponse.id, alerts)
         assertFindings(monitorResponse.id, customFindingsIndex1, 2, 2, listOf("1", "2"))
         val associatedAlertIds = res.associatedAlerts.map { it.id }.toList()
         associatedAlertIds.containsAll(alerts.map { it.id }.toList())
-        val alerts1 = getAuditStateAlerts(
-            alertsIndex = monitor2.dataSources.alertsHistoryIndex, monitorId = monitorResponse2.id,
-            executionId = executeWorkflowResponse.workflowRunResult.executionId,
-        )
+        val alerts1 =
+            getAuditStateAlerts(
+                alertsIndex = monitor2.dataSources.alertsHistoryIndex,
+                monitorId = monitorResponse2.id,
+                executionId = executeWorkflowResponse.workflowRunResult.executionId,
+            )
         assertAuditStateAlerts(monitorResponse2.id, alerts1)
         assertFindings(monitorResponse2.id, customFindingsIndex2, 1, 1, listOf("2"))
         associatedAlertIds.containsAll(alerts1.map { it.id }.toList())
@@ -4392,14 +4864,16 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex1 = "custom_findings_index"
         val customFindingsIndexPattern1 = "custom_findings_index-1"
-        var monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1),
-            dataSources = DataSources(
-                findingsIndex = customFindingsIndex1,
-                findingsIndexPattern = customFindingsIndexPattern1
+        var monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+                dataSources =
+                    DataSources(
+                        findingsIndex = customFindingsIndex1,
+                        findingsIndexPattern = customFindingsIndexPattern1,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor1)!!
 
         val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
@@ -4407,28 +4881,33 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex2 = "custom_findings_index_2"
         val customFindingsIndexPattern2 = "custom_findings_index-2"
-        var monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput2),
-            triggers = listOf(trigger2),
-            dataSources = DataSources(
-                findingsIndex = customFindingsIndex2,
-                findingsIndexPattern = customFindingsIndexPattern2
+        var monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput2),
+                triggers = listOf(trigger2),
+                dataSources =
+                    DataSources(
+                        findingsIndex = customFindingsIndex2,
+                        findingsIndexPattern = customFindingsIndexPattern2,
+                    ),
             )
-        )
 
         val monitorResponse2 = createMonitor(monitor2)!!
-        val andTrigger = randomChainedAlertTrigger(
-            name = "1And2",
-            condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]")
-        )
-        val notTrigger = randomChainedAlertTrigger(
-            name = "Not1OrNot2",
-            condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]")
-        )
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
-            triggers = listOf(andTrigger, notTrigger)
-        )
+        val andTrigger =
+            randomChainedAlertTrigger(
+                name = "1And2",
+                condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]"),
+            )
+        val notTrigger =
+            randomChainedAlertTrigger(
+                name = "Not1OrNot2",
+                condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]"),
+            )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+                triggers = listOf(andTrigger, notTrigger),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
@@ -4443,27 +4922,30 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         var notTriggerResult = triggerResults[notTrigger.id]
         Assert.assertTrue(notTriggerResult!!.triggered)
         Assert.assertFalse(andTriggerResult!!.triggered)
-        var res = getWorkflowAlerts(
-            workflowId,
-        )
+        var res =
+            getWorkflowAlerts(
+                workflowId,
+            )
         var chainedAlerts = res.alerts
         Assert.assertTrue(chainedAlerts.size == 1)
 
         // verify get alerts api with defaults set in query params returns only chained alerts and not audit alerts
         val table = Table("asc", "id", null, 1, 0, "")
-        val getAlertsDefaultParamsResponse = client().execute(
-            AlertingActions.GET_ALERTS_ACTION_TYPE,
-            GetAlertsRequest(
-                table = table,
-                severityLevel = "ALL",
-                alertState = "ALL",
-                monitorId = null,
-                alertIndex = null,
-                monitorIds = null,
-                workflowIds = null,
-                alertIds = null
-            )
-        ).get()
+        val getAlertsDefaultParamsResponse =
+            client()
+                .execute(
+                    AlertingActions.GET_ALERTS_ACTION_TYPE,
+                    GetAlertsRequest(
+                        table = table,
+                        severityLevel = "ALL",
+                        alertState = "ALL",
+                        monitorId = null,
+                        alertIndex = null,
+                        monitorIds = null,
+                        workflowIds = null,
+                        alertIds = null,
+                    ),
+                ).get()
         Assert.assertEquals(getAlertsDefaultParamsResponse.alerts.size, 1)
         Assert.assertTrue(res.associatedAlerts.isEmpty())
         verifyAcknowledgeChainedAlerts(chainedAlerts, workflowId, 1)
@@ -4508,19 +4990,21 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         notTriggerResult = triggerResults[notTrigger.id]
         Assert.assertFalse(notTriggerResult!!.triggered)
         Assert.assertTrue(andTriggerResult!!.triggered)
-        val getAuditAlertsForMonitor1 = client().execute(
-            AlertingActions.GET_ALERTS_ACTION_TYPE,
-            GetAlertsRequest(
-                table = table,
-                severityLevel = "ALL",
-                alertState = "AUDIT",
-                monitorId = monitorResponse.id,
-                alertIndex = null,
-                monitorIds = null,
-                workflowIds = listOf(workflowId),
-                alertIds = null
-            )
-        ).get()
+        val getAuditAlertsForMonitor1 =
+            client()
+                .execute(
+                    AlertingActions.GET_ALERTS_ACTION_TYPE,
+                    GetAlertsRequest(
+                        table = table,
+                        severityLevel = "ALL",
+                        alertState = "AUDIT",
+                        monitorId = monitorResponse.id,
+                        alertIndex = null,
+                        monitorIds = null,
+                        workflowIds = listOf(workflowId),
+                        alertIds = null,
+                    ),
+                ).get()
         Assert.assertEquals(getAuditAlertsForMonitor1.alerts.size, 1)
         res = getWorkflowAlerts(workflowId)
         chainedAlerts = res.alerts
@@ -4540,21 +5024,25 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
         Assert.assertEquals(
             monitor1.dataSources.alertsHistoryIndex,
-            CompositeWorkflowRunner.getDelegateMonitorAlertIndex(dataSources = monitor1.dataSources, workflow, true)
+            CompositeWorkflowRunner.getDelegateMonitorAlertIndex(dataSources = monitor1.dataSources, workflow, true),
         )
-        val alerts = getAuditStateAlerts(
-            alertsIndex = monitor1.dataSources.alertsHistoryIndex, monitorId = monitorResponse.id,
-            executionId = executeWorkflowResponse.workflowRunResult.executionId
-        )
+        val alerts =
+            getAuditStateAlerts(
+                alertsIndex = monitor1.dataSources.alertsHistoryIndex,
+                monitorId = monitorResponse.id,
+                executionId = executeWorkflowResponse.workflowRunResult.executionId,
+            )
         val associatedAlertIds = res.associatedAlerts.map { it.id }.toList()
         associatedAlertIds.containsAll(alerts.map { it.id }.toList())
         assertAuditStateAlerts(monitorResponse.id, alerts)
         assertFindings(monitorResponse.id, customFindingsIndex1, 2, 2, listOf("1", "2"))
 
-        val alerts1 = getAuditStateAlerts(
-            alertsIndex = monitor2.dataSources.alertsHistoryIndex, monitorId = monitorResponse2.id,
-            executionId = executeWorkflowResponse.workflowRunResult.executionId
-        )
+        val alerts1 =
+            getAuditStateAlerts(
+                alertsIndex = monitor2.dataSources.alertsHistoryIndex,
+                monitorId = monitorResponse2.id,
+                executionId = executeWorkflowResponse.workflowRunResult.executionId,
+            )
         associatedAlertIds.containsAll(alerts1.map { it.id }.toList())
         assertAuditStateAlerts(monitorResponse2.id, alerts1)
         assertFindings(monitorResponse2.id, customFindingsIndex2, 1, 1, listOf("2"))
@@ -4572,39 +5060,47 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test create workflow success`() {
         val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery1)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery1),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        val monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        val monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
 
-        val monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        val monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
 
         val monitorResponse1 = createMonitor(monitor1)!!
         val monitorResponse2 = createMonitor(monitor2)!!
 
-        val workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse1.id, monitorResponse2.id)
-        )
+        val workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse1.id, monitorResponse2.id),
+            )
 
         val workflowResponse = upsertWorkflow(workflow)!!
         assertNotNull("Workflow creation failed", workflowResponse)
@@ -4637,45 +5133,55 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Delegate2 order not correct", 2, delegate2.order)
         assertEquals("Delegate2 id not correct", monitorResponse2.id, delegate2.monitorId)
         assertEquals(
-            "Delegate2 Chained finding not correct", monitorResponse1.id, delegate2.chainedMonitorFindings!!.monitorId
+            "Delegate2 Chained finding not correct",
+            monitorResponse1.id,
+            delegate2.chainedMonitorFindings!!.monitorId,
         )
     }
 
     fun `test update workflow add monitor success`() {
         val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery1)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery1),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        val monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        val monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
 
-        val monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        val monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
 
         val monitorResponse1 = createMonitor(monitor1)!!
         val monitorResponse2 = createMonitor(monitor2)!!
 
-        val workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse1.id, monitorResponse2.id)
-        )
+        val workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse1.id, monitorResponse2.id),
+            )
 
         val workflowResponse = upsertWorkflow(workflow)!!
         assertNotNull("Workflow creation failed", workflowResponse)
@@ -4686,24 +5192,27 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         var workflowById = searchWorkflow(workflowResponse.id)!!
         assertNotNull(workflowById)
 
-        val monitor3 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        val monitor3 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
         val monitorResponse3 = createMonitor(monitor3)!!
 
-        val updatedWorkflowResponse = upsertWorkflow(
-            randomWorkflow(
-                monitorIds = listOf(monitorResponse1.id, monitorResponse2.id, monitorResponse3.id)
-            ),
-            workflowResponse.id,
-            RestRequest.Method.PUT
-        )!!
+        val updatedWorkflowResponse =
+            upsertWorkflow(
+                randomWorkflow(
+                    monitorIds = listOf(monitorResponse1.id, monitorResponse2.id, monitorResponse3.id),
+                ),
+                workflowResponse.id,
+                RestRequest.Method.PUT,
+            )!!
 
         assertNotNull("Workflow creation failed", updatedWorkflowResponse)
         assertNotNull(updatedWorkflowResponse.workflow)
@@ -4734,7 +5243,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Delegate2 order not correct", 2, delegate2.order)
         assertEquals("Delegate2 id not correct", monitorResponse2.id, delegate2.monitorId)
         assertEquals(
-            "Delegate2 Chained finding not correct", monitorResponse1.id, delegate2.chainedMonitorFindings!!.monitorId
+            "Delegate2 Chained finding not correct",
+            monitorResponse1.id,
+            delegate2.chainedMonitorFindings!!.monitorId,
         )
 
         val delegate3 = delegates[2]
@@ -4742,45 +5253,55 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Delegate3 order not correct", 3, delegate3.order)
         assertEquals("Delegate3 id not correct", monitorResponse3.id, delegate3.monitorId)
         assertEquals(
-            "Delegate3 Chained finding not correct", monitorResponse2.id, delegate3.chainedMonitorFindings!!.monitorId
+            "Delegate3 Chained finding not correct",
+            monitorResponse2.id,
+            delegate3.chainedMonitorFindings!!.monitorId,
         )
     }
 
     fun `test update workflow change order of delegate monitors`() {
         val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery1)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery1),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        val monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        val monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
 
-        val monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        val monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
 
         val monitorResponse1 = createMonitor(monitor1)!!
         val monitorResponse2 = createMonitor(monitor2)!!
 
-        val workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse1.id, monitorResponse2.id)
-        )
+        val workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse1.id, monitorResponse2.id),
+            )
 
         val workflowResponse = upsertWorkflow(workflow)!!
         assertNotNull("Workflow creation failed", workflowResponse)
@@ -4791,13 +5312,14 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         var workflowById = searchWorkflow(workflowResponse.id)!!
         assertNotNull(workflowById)
 
-        val updatedWorkflowResponse = upsertWorkflow(
-            randomWorkflow(
-                monitorIds = listOf(monitorResponse2.id, monitorResponse1.id)
-            ),
-            workflowResponse.id,
-            RestRequest.Method.PUT
-        )!!
+        val updatedWorkflowResponse =
+            upsertWorkflow(
+                randomWorkflow(
+                    monitorIds = listOf(monitorResponse2.id, monitorResponse1.id),
+                ),
+                workflowResponse.id,
+                RestRequest.Method.PUT,
+            )!!
 
         assertNotNull("Workflow creation failed", updatedWorkflowResponse)
         assertNotNull(updatedWorkflowResponse.workflow)
@@ -4828,45 +5350,55 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals("Delegate2 order not correct", 2, delegate2.order)
         assertEquals("Delegate2 id not correct", monitorResponse1.id, delegate2.monitorId)
         assertEquals(
-            "Delegate2 Chained finding not correct", monitorResponse2.id, delegate2.chainedMonitorFindings!!.monitorId
+            "Delegate2 Chained finding not correct",
+            monitorResponse2.id,
+            delegate2.chainedMonitorFindings!!.monitorId,
         )
     }
 
     fun `test update workflow remove monitor success`() {
         val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery1)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery1),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        val monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        val monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
 
-        val monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        val monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
 
         val monitorResponse1 = createMonitor(monitor1)!!
         val monitorResponse2 = createMonitor(monitor2)!!
 
-        val workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse1.id, monitorResponse2.id)
-        )
+        val workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse1.id, monitorResponse2.id),
+            )
 
         val workflowResponse = upsertWorkflow(workflow)!!
         assertNotNull("Workflow creation failed", workflowResponse)
@@ -4877,13 +5409,14 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         var workflowById = searchWorkflow(workflowResponse.id)!!
         assertNotNull(workflowById)
 
-        val updatedWorkflowResponse = upsertWorkflow(
-            randomWorkflow(
-                monitorIds = listOf(monitorResponse1.id)
-            ),
-            workflowResponse.id,
-            RestRequest.Method.PUT
-        )!!
+        val updatedWorkflowResponse =
+            upsertWorkflow(
+                randomWorkflow(
+                    monitorIds = listOf(monitorResponse1.id),
+                ),
+                workflowResponse.id,
+                RestRequest.Method.PUT,
+            )!!
 
         assertNotNull("Workflow creation failed", updatedWorkflowResponse)
         assertNotNull(updatedWorkflowResponse.workflow)
@@ -4912,28 +5445,34 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test update workflow doesn't exist failure`() {
         val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery1)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery1),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        val monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        val monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
 
         val monitorResponse1 = createMonitor(monitor1)!!
 
-        val workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse1.id)
-        )
+        val workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse1.id),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         assertNotNull("Workflow creation failed", workflowResponse)
 
@@ -4943,27 +5482,32 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetWorkflow Action error ",
-                    it.contains("Workflow with testId is not found")
+                    it.contains("Workflow with testId is not found"),
                 )
             }
         }
     }
 
     fun `test get workflow`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
 
         val monitorResponse = createMonitor(monitor)!!
 
-        val workflowRequest = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
-        )
+        val workflowRequest =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+            )
 
         val workflowResponse = upsertWorkflow(workflowRequest)!!
         assertNotNull("Workflow creation failed", workflowResponse)
@@ -5001,21 +5545,25 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetWorkflow Action error ",
-                    it.contains("Workflow not found")
+                    it.contains("Workflow not found"),
                 )
             }
         }
     }
 
     fun `test get workflow for invalid id monitor index exists`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         createMonitor(monitor)
         // Get workflow for non existing workflow id
         try {
@@ -5024,28 +5572,33 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetWorkflow Action error ",
-                    it.contains("Workflow not found")
+                    it.contains("Workflow not found"),
                 )
             }
         }
     }
 
     fun `test delete workflow keeping delegate monitor`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
 
         val monitorResponse = createMonitor(monitor)!!
 
-        val workflowRequest = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
-        )
+        val workflowRequest =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+            )
         val workflowResponse = upsertWorkflow(workflowRequest)!!
         val workflowId = workflowResponse.id
         val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
@@ -5064,7 +5617,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetWorkflow Action error ",
-                    it.contains("Workflow not found.")
+                    it.contains("Workflow not found."),
                 )
             }
         }
@@ -5080,28 +5633,33 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Expected 0 hits for searchMonitorMetadata, got non-0 results.",
-                    it.contains("List is empty")
+                    it.contains("List is empty"),
                 )
             }
         }
     }
 
     fun `test delete workflow delegate monitor deleted`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
 
         val monitorResponse = createMonitor(monitor)!!
 
-        val workflowRequest = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
-        )
+        val workflowRequest =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+            )
         val workflowResponse = upsertWorkflow(workflowRequest)!!
         val workflowId = workflowResponse.id
         val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
@@ -5120,7 +5678,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetWorkflow Action error ",
-                    it.contains("Workflow not found.")
+                    it.contains("Workflow not found."),
                 )
             }
         }
@@ -5131,7 +5689,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetMonitor Action error ",
-                    it.contains("Monitor not found")
+                    it.contains("Monitor not found"),
                 )
             }
         }
@@ -5143,7 +5701,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Expected 0 hits for searchMonitorMetadata, got non-0 results.",
-                    it.contains("List is empty")
+                    it.contains("List is empty"),
                 )
             }
         }
@@ -5153,25 +5711,28 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1)
-        )
+        var monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+            )
         val monitorResponse = createMonitor(monitor1)!!
 
         val docQuery2 = DocLevelQuery(query = "source.ip.v6.v2:16645", name = "4", fields = listOf())
         val docLevelInput2 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery2))
         val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput2),
-            triggers = listOf(trigger2),
-        )
+        var monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput2),
+                triggers = listOf(trigger2),
+            )
 
         val monitorResponse2 = createMonitor(monitor2)!!
 
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id, monitorResponse2.id)
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
@@ -5212,7 +5773,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetWorkflow Action error ",
-                    it.contains("Workflow not found.")
+                    it.contains("Workflow not found."),
                 )
             }
         }
@@ -5224,7 +5785,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetMonitor Action error ",
-                    it.contains("List is empty")
+                    it.contains("List is empty"),
                 )
             }
         }
@@ -5236,7 +5797,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetMonitor Action error ",
-                    it.contains("List is empty")
+                    it.contains("List is empty"),
                 )
             }
         }
@@ -5248,28 +5809,33 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetMonitor Action error ",
-                    it.contains("List is empty")
+                    it.contains("List is empty"),
                 )
             }
         }
     }
 
     fun `test delete workflow delegate monitor part of another workflow not deleted`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
 
         val monitorResponse = createMonitor(monitor)!!
 
-        val workflowRequest = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
-        )
+        val workflowRequest =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+            )
         val workflowResponse = upsertWorkflow(workflowRequest)!!
         val workflowId = workflowResponse.id
         val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
@@ -5277,9 +5843,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertNotNull(getWorkflowResponse)
         assertEquals(workflowId, getWorkflowResponse.id)
 
-        val workflowRequest2 = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
-        )
+        val workflowRequest2 =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+            )
         val workflowResponse2 = upsertWorkflow(workflowRequest2)!!
         val workflowId2 = workflowResponse2.id
         val getWorkflowResponse2 = getWorkflowById(id = workflowResponse2.id)
@@ -5293,7 +5860,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning GetWorkflow Action error ",
-                    it.contains("[Not allowed to delete ${monitorResponse.id} monitors")
+                    it.contains("[Not allowed to delete ${monitorResponse.id} monitors"),
                 )
             }
         }
@@ -5302,21 +5869,26 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
     }
 
     fun `test trying to delete monitor that is part of workflow sequence`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
 
         val monitorResponse = createMonitor(monitor)!!
 
-        val workflowRequest = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
-        )
+        val workflowRequest =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+            )
 
         val workflowResponse = upsertWorkflow(workflowRequest)!!
         val workflowId = workflowResponse.id
@@ -5332,7 +5904,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning DeleteMonitor Action error ",
-                    it.contains("Monitor can't be deleted because it is a part of workflow(s)")
+                    it.contains("Monitor can't be deleted because it is a part of workflow(s)"),
                 )
             }
         }
@@ -5346,22 +5918,26 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning DeleteWorkflow Action error ",
-                    it.contains("Workflow not found.")
+                    it.contains("Workflow not found."),
                 )
             }
         }
     }
 
     fun `test delete workflow for invalid id monitor index exists`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         createMonitor(monitor)
         // Try deleting non-existing workflow
         try {
@@ -5370,23 +5946,24 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning DeleteWorkflow Action error ",
-                    it.contains("Workflow not found.")
+                    it.contains("Workflow not found."),
                 )
             }
         }
     }
 
     fun `test create workflow without delegate failure`() {
-        val workflow = randomWorkflow(
-            monitorIds = Collections.emptyList()
-        )
+        val workflow =
+            randomWorkflow(
+                monitorIds = Collections.emptyList(),
+            )
         try {
             upsertWorkflow(workflow)
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Delegates list can not be empty.")
+                    it.contains("Delegates list can not be empty."),
                 )
             }
         }
@@ -5397,162 +5974,188 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         for (i in 0..25) {
             monitorsIds.add(UUID.randomUUID().toString())
         }
-        val workflow = randomWorkflow(
-            monitorIds = monitorsIds
-        )
+        val workflow =
+            randomWorkflow(
+                monitorIds = monitorsIds,
+            )
         try {
             upsertWorkflow(workflow)
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Delegates list can not be larger then 25.")
+                    it.contains("Delegates list can not be larger then 25."),
                 )
             }
         }
     }
 
     fun `test update workflow without delegate failure`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
 
-        val monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-        )
+        val monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
 
         val monitorResponse1 = createMonitor(monitor1)!!
         val monitorResponse2 = createMonitor(monitor2)!!
 
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse1.id, monitorResponse2.id)
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse1.id, monitorResponse2.id),
+            )
 
         val workflowResponse = upsertWorkflow(workflow)!!
         assertNotNull("Workflow creation failed", workflowResponse)
 
-        workflow = randomWorkflow(
-            id = workflowResponse.id,
-            monitorIds = Collections.emptyList()
-        )
+        workflow =
+            randomWorkflow(
+                id = workflowResponse.id,
+                monitorIds = Collections.emptyList(),
+            )
         try {
             upsertWorkflow(workflow)
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Delegates list can not be empty.")
+                    it.contains("Delegates list can not be empty."),
                 )
             }
         }
     }
 
     fun `test create workflow duplicate delegate failure`() {
-        val workflow = randomWorkflow(
-            monitorIds = listOf("1", "1", "2")
-        )
+        val workflow =
+            randomWorkflow(
+                monitorIds = listOf("1", "1", "2"),
+            )
         try {
             upsertWorkflow(workflow)
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Duplicate delegates not allowed")
+                    it.contains("Duplicate delegates not allowed"),
                 )
             }
         }
     }
 
     fun `test update workflow duplicate delegate failure`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
 
         val monitorResponse = createMonitor(monitor)!!
 
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+            )
 
         val workflowResponse = upsertWorkflow(workflow)!!
         assertNotNull("Workflow creation failed", workflowResponse)
 
-        workflow = randomWorkflow(
-            id = workflowResponse.id,
-            monitorIds = listOf("1", "1", "2")
-        )
+        workflow =
+            randomWorkflow(
+                id = workflowResponse.id,
+                monitorIds = listOf("1", "1", "2"),
+            )
         try {
             upsertWorkflow(workflow)
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Duplicate delegates not allowed")
+                    it.contains("Duplicate delegates not allowed"),
                 )
             }
         }
     }
 
     fun `test create workflow delegate monitor doesn't exist failure`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         val monitorResponse = createMonitor(monitor)!!
 
-        val workflow = randomWorkflow(
-            monitorIds = listOf("-1", monitorResponse.id)
-        )
+        val workflow =
+            randomWorkflow(
+                monitorIds = listOf("-1", monitorResponse.id),
+            )
         try {
             upsertWorkflow(workflow)
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("are not valid monitor ids")
+                    it.contains("are not valid monitor ids"),
                 )
             }
         }
     }
 
     fun `test update workflow delegate monitor doesn't exist failure`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         val monitorResponse = createMonitor(monitor)!!
 
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         assertNotNull("Workflow creation failed", workflowResponse)
 
-        workflow = randomWorkflow(
-            id = workflowResponse.id,
-            monitorIds = listOf("-1", monitorResponse.id)
-        )
+        workflow =
+            randomWorkflow(
+                id = workflowResponse.id,
+                monitorIds = listOf("-1", monitorResponse.id),
+            )
 
         try {
             upsertWorkflow(workflow)
@@ -5560,81 +6163,92 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("are not valid monitor ids")
+                    it.contains("are not valid monitor ids"),
                 )
             }
         }
     }
 
     fun `test create workflow sequence order not correct failure`() {
-        val delegates = listOf(
-            Delegate(1, "monitor-1"),
-            Delegate(1, "monitor-2"),
-            Delegate(2, "monitor-3")
-        )
-        val workflow = randomWorkflowWithDelegates(
-            delegates = delegates
-        )
+        val delegates =
+            listOf(
+                Delegate(1, "monitor-1"),
+                Delegate(1, "monitor-2"),
+                Delegate(2, "monitor-3"),
+            )
+        val workflow =
+            randomWorkflowWithDelegates(
+                delegates = delegates,
+            )
         try {
             upsertWorkflow(workflow)
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Sequence ordering of delegate monitor shouldn't contain duplicate order values")
+                    it.contains("Sequence ordering of delegate monitor shouldn't contain duplicate order values"),
                 )
             }
         }
     }
 
     fun `test update workflow sequence order not correct failure`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         val monitorResponse = createMonitor(monitor)!!
 
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         assertNotNull("Workflow creation failed", workflowResponse)
 
-        val delegates = listOf(
-            Delegate(1, "monitor-1"),
-            Delegate(1, "monitor-2"),
-            Delegate(2, "monitor-3")
-        )
-        workflow = randomWorkflowWithDelegates(
-            id = workflowResponse.id,
-            delegates = delegates
-        )
+        val delegates =
+            listOf(
+                Delegate(1, "monitor-1"),
+                Delegate(1, "monitor-2"),
+                Delegate(2, "monitor-3"),
+            )
+        workflow =
+            randomWorkflowWithDelegates(
+                id = workflowResponse.id,
+                delegates = delegates,
+            )
         try {
             upsertWorkflow(workflow)
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Sequence ordering of delegate monitor shouldn't contain duplicate order values")
+                    it.contains("Sequence ordering of delegate monitor shouldn't contain duplicate order values"),
                 )
             }
         }
     }
 
     fun `test create workflow chained findings monitor not in sequence failure`() {
-        val delegates = listOf(
-            Delegate(1, "monitor-1"),
-            Delegate(2, "monitor-2", ChainedMonitorFindings("monitor-1")),
-            Delegate(3, "monitor-3", ChainedMonitorFindings("monitor-x"))
-        )
-        val workflow = randomWorkflowWithDelegates(
-            delegates = delegates
-        )
+        val delegates =
+            listOf(
+                Delegate(1, "monitor-1"),
+                Delegate(2, "monitor-2", ChainedMonitorFindings("monitor-1")),
+                Delegate(3, "monitor-3", ChainedMonitorFindings("monitor-x")),
+            )
+        val workflow =
+            randomWorkflowWithDelegates(
+                delegates = delegates,
+            )
 
         try {
             upsertWorkflow(workflow)
@@ -5642,89 +6256,105 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Chained Findings Monitor monitor-x doesn't exist in sequence")
+                    it.contains("Chained Findings Monitor monitor-x doesn't exist in sequence"),
                 )
             }
         }
     }
 
     fun `test create workflow query monitor chained findings monitor failure`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val docMonitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val docMonitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         val docMonitorResponse = createMonitor(docMonitor)!!
 
         val queryMonitor = randomQueryLevelMonitor()
         val queryMonitorResponse = createMonitor(queryMonitor)!!
 
-        val workflow = randomWorkflow(
-            monitorIds = listOf(queryMonitorResponse.id, docMonitorResponse.id)
-        )
+        val workflow =
+            randomWorkflow(
+                monitorIds = listOf(queryMonitorResponse.id, docMonitorResponse.id),
+            )
         try {
             upsertWorkflow(workflow)
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Query level monitor can't be part of chained findings")
+                    it.contains("Query level monitor can't be part of chained findings"),
                 )
             }
         }
     }
 
     fun `test create workflow delegate and chained finding monitor different indices failure`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val docMonitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val docMonitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         val docMonitorResponse = createMonitor(docMonitor)!!
 
         val index1 = "$index-1"
         createTestIndex(index1)
 
-        val docLevelInput1 = DocLevelMonitorInput(
-            "description", listOf(index1), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput1 =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index1),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
 
-        val docMonitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger)
-        )
+        val docMonitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger),
+            )
         val docMonitorResponse1 = createMonitor(docMonitor1)!!
 
-        val workflow = randomWorkflow(
-            monitorIds = listOf(docMonitorResponse1.id, docMonitorResponse.id)
-        )
+        val workflow =
+            randomWorkflow(
+                monitorIds = listOf(docMonitorResponse1.id, docMonitorResponse.id),
+            )
         try {
             upsertWorkflow(workflow)
         } catch (e: Exception) {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("doesn't query all of chained findings monitor's indices")
+                    it.contains("doesn't query all of chained findings monitor's indices"),
                 )
             }
         }
     }
 
     fun `test create workflow when monitor index not initialized failure`() {
-        val delegates = listOf(
-            Delegate(1, "monitor-1")
-        )
-        val workflow = randomWorkflowWithDelegates(
-            delegates = delegates
-        )
+        val delegates =
+            listOf(
+                Delegate(1, "monitor-1"),
+            )
+        val workflow =
+            randomWorkflowWithDelegates(
+                delegates = delegates,
+            )
 
         try {
             upsertWorkflow(workflow)
@@ -5732,39 +6362,46 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Monitors not found")
+                    it.contains("Monitors not found"),
                 )
             }
         }
     }
 
     fun `test update workflow chained findings monitor not in sequence failure`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         val monitorResponse = createMonitor(monitor)!!
 
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         assertNotNull("Workflow creation failed", workflowResponse)
 
-        val delegates = listOf(
-            Delegate(1, "monitor-1"),
-            Delegate(2, "monitor-2", ChainedMonitorFindings("monitor-1")),
-            Delegate(3, "monitor-3", ChainedMonitorFindings("monitor-x"))
-        )
-        workflow = randomWorkflowWithDelegates(
-            id = workflowResponse.id,
-            delegates = delegates
-        )
+        val delegates =
+            listOf(
+                Delegate(1, "monitor-1"),
+                Delegate(2, "monitor-2", ChainedMonitorFindings("monitor-1")),
+                Delegate(3, "monitor-3", ChainedMonitorFindings("monitor-x")),
+            )
+        workflow =
+            randomWorkflowWithDelegates(
+                id = workflowResponse.id,
+                delegates = delegates,
+            )
 
         try {
             upsertWorkflow(workflow)
@@ -5772,21 +6409,23 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Chained Findings Monitor monitor-x doesn't exist in sequence")
+                    it.contains("Chained Findings Monitor monitor-x doesn't exist in sequence"),
                 )
             }
         }
     }
 
     fun `test create workflow chained findings order not correct failure`() {
-        val delegates = listOf(
-            Delegate(1, "monitor-1"),
-            Delegate(3, "monitor-2", ChainedMonitorFindings("monitor-1")),
-            Delegate(2, "monitor-3", ChainedMonitorFindings("monitor-2"))
-        )
-        val workflow = randomWorkflowWithDelegates(
-            delegates = delegates
-        )
+        val delegates =
+            listOf(
+                Delegate(1, "monitor-1"),
+                Delegate(3, "monitor-2", ChainedMonitorFindings("monitor-1")),
+                Delegate(2, "monitor-3", ChainedMonitorFindings("monitor-2")),
+            )
+        val workflow =
+            randomWorkflowWithDelegates(
+                delegates = delegates,
+            )
 
         try {
             upsertWorkflow(workflow)
@@ -5794,38 +6433,45 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Chained Findings Monitor monitor-2 should be executed before monitor monitor-3")
+                    it.contains("Chained Findings Monitor monitor-2 should be executed before monitor monitor-3"),
                 )
             }
         }
     }
 
     fun `test update workflow chained findings order not correct failure`() {
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf()))
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
 
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger)
-        )
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+            )
         val monitorResponse = createMonitor(monitor)!!
 
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         assertNotNull("Workflow creation failed", workflowResponse)
 
-        val delegates = listOf(
-            Delegate(1, "monitor-1"),
-            Delegate(3, "monitor-2", ChainedMonitorFindings("monitor-1")),
-            Delegate(2, "monitor-3", ChainedMonitorFindings("monitor-2"))
-        )
-        workflow = randomWorkflowWithDelegates(
-            delegates = delegates
-        )
+        val delegates =
+            listOf(
+                Delegate(1, "monitor-1"),
+                Delegate(3, "monitor-2", ChainedMonitorFindings("monitor-1")),
+                Delegate(2, "monitor-3", ChainedMonitorFindings("monitor-2")),
+            )
+        workflow =
+            randomWorkflowWithDelegates(
+                delegates = delegates,
+            )
 
         try {
             upsertWorkflow(workflow)
@@ -5833,7 +6479,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             e.message?.let {
                 assertTrue(
                     "Exception not returning IndexWorkflow Action error ",
-                    it.contains("Chained Findings Monitor monitor-2 should be executed before monitor monitor-3")
+                    it.contains("Chained Findings Monitor monitor-2 should be executed before monitor monitor-3"),
                 )
             }
         }
@@ -5841,49 +6487,60 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
 
     fun `test create workflow with chained alert triggers`() {
         val docQuery1 = DocLevelQuery(query = "source.ip.v6.v1:12345", name = "3", fields = listOf())
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery1)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery1),
+            )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        val monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        val monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
 
-        val monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        val monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
 
         val monitorResponse1 = createMonitor(monitor1)!!
         val monitorResponse2 = createMonitor(monitor2)!!
 
-        val chainedAlertTrigger1 = randomChainedAlertTrigger(
-            condition = Script("monitor[id=${monitorResponse1.id}] && monitor[id=${monitorResponse2.id}")
-        )
-        val chainedAlertTrigger2 = randomChainedAlertTrigger(
-            condition = Script("monitor[id=${monitorResponse1.id}] || monitor[id=${monitorResponse2.id}]")
-        )
-        val workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse1.id, monitorResponse2.id),
-            triggers = listOf(
-                chainedAlertTrigger1,
-                chainedAlertTrigger2
+        val chainedAlertTrigger1 =
+            randomChainedAlertTrigger(
+                condition = Script("monitor[id=${monitorResponse1.id}] && monitor[id=${monitorResponse2.id}"),
             )
-        )
+        val chainedAlertTrigger2 =
+            randomChainedAlertTrigger(
+                condition = Script("monitor[id=${monitorResponse1.id}] || monitor[id=${monitorResponse2.id}]"),
+            )
+        val workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse1.id, monitorResponse2.id),
+                triggers =
+                    listOf(
+                        chainedAlertTrigger1,
+                        chainedAlertTrigger2,
+                    ),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)!!
 
@@ -5895,12 +6552,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(
             "Workflow input not correct",
             (workflowById.triggers.get(0) as ChainedAlertTrigger).condition.idOrCode,
-            chainedAlertTrigger1.condition.idOrCode
+            chainedAlertTrigger1.condition.idOrCode,
         )
         assertEquals(
             "Workflow input not correct",
             (workflowById.triggers.get(1) as ChainedAlertTrigger).condition.idOrCode,
-            chainedAlertTrigger2.condition.idOrCode
+            chainedAlertTrigger2.condition.idOrCode,
         )
     }
 
@@ -5908,29 +6565,34 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1)
-        )
-        var monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1)
-        )
+        var monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+            )
+        var monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+            )
         val monitorResponse = createMonitor(monitor1)!!
         val monitorResponse2 = createMonitor(monitor2)!!
 
-        val andTrigger = randomChainedAlertTrigger(
-            name = "1And2",
-            condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]")
-        )
-        val notTrigger = randomChainedAlertTrigger(
-            name = "Not1OrNot2",
-            condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]")
-        )
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
-            triggers = listOf(andTrigger)
-        )
+        val andTrigger =
+            randomChainedAlertTrigger(
+                name = "1And2",
+                condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]"),
+            )
+        val notTrigger =
+            randomChainedAlertTrigger(
+                name = "Not1OrNot2",
+                condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]"),
+            )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+                triggers = listOf(andTrigger),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
@@ -5943,16 +6605,18 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         indexDoc(index, "1", testDoc1)
         val workflowId = workflowById!!.id
         var executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        var res = getWorkflowAlerts(
-            workflowId,
-        )
+        var res =
+            getWorkflowAlerts(
+                workflowId,
+            )
         var chainedAlerts = res.alerts
         Assert.assertTrue(chainedAlerts.size == 1)
-        val updatedWorkflowResponse = upsertWorkflow(
-            workflowById.copy(triggers = listOf(notTrigger)),
-            workflowResponse.id,
-            RestRequest.Method.PUT
-        )!!
+        val updatedWorkflowResponse =
+            upsertWorkflow(
+                workflowById.copy(triggers = listOf(notTrigger)),
+                workflowResponse.id,
+                RestRequest.Method.PUT,
+            )!!
         val updatedWorkflow = searchWorkflow(workflowResponse.id)
         Assert.assertTrue(updatedWorkflow!!.triggers.size == 1)
         Assert.assertTrue(updatedWorkflow.triggers[0].id == notTrigger.id)
@@ -5964,17 +6628,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val searchRequest = SearchRequest(AlertIndices.ALERT_HISTORY_ALL)
         val sr = client().search(searchRequest).get()
         Assert.assertTrue(sr.hits.hits.size == 3)
-        val alerts = sr.hits.map { hit ->
-            val xcp = XContentHelper.createParser(
-                xContentRegistry(),
-                LoggingDeprecationHandler.INSTANCE,
-                hit.sourceRef,
-                XContentType.JSON
-            )
-            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-            val alert = Alert.parse(xcp, hit.id, hit.version)
-            alert
-        }
+        val alerts =
+            sr.hits.map { hit ->
+                val xcp =
+                    XContentHelper.createParser(
+                        xContentRegistry(),
+                        LoggingDeprecationHandler.INSTANCE,
+                        hit.sourceRef,
+                        XContentType.JSON,
+                    )
+                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                val alert = Alert.parse(xcp, hit.id, hit.version)
+                alert
+            }
         Assert.assertTrue(alerts.stream().anyMatch { it.state == Alert.State.DELETED && chainedAlerts[0].id == it.id })
     }
 
@@ -5982,29 +6648,34 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1)
-        )
-        var monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1)
-        )
+        var monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+            )
+        var monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+            )
         val monitorResponse = createMonitor(monitor1)!!
         val monitorResponse2 = createMonitor(monitor2)!!
 
-        val andTrigger = randomChainedAlertTrigger(
-            name = "1And2",
-            condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]")
-        )
-        val notTrigger = randomChainedAlertTrigger(
-            name = "Not1OrNot2",
-            condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]")
-        )
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
-            triggers = listOf(andTrigger)
-        )
+        val andTrigger =
+            randomChainedAlertTrigger(
+                name = "1And2",
+                condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]"),
+            )
+        val notTrigger =
+            randomChainedAlertTrigger(
+                name = "Not1OrNot2",
+                condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]"),
+            )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+                triggers = listOf(andTrigger),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
@@ -6017,9 +6688,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         indexDoc(index, "1", testDoc1)
         val workflowId = workflowById!!.id
         var executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        var res = getWorkflowAlerts(
-            workflowId,
-        )
+        var res =
+            getWorkflowAlerts(
+                workflowId,
+            )
         var chainedAlerts = res.alerts
         Assert.assertTrue(chainedAlerts.size == 1)
         val deleteRes = deleteWorkflow(workflowId, false)
@@ -6032,17 +6704,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val searchRequest = SearchRequest(AlertIndices.ALERT_HISTORY_ALL)
         val sr = client().search(searchRequest).get()
         Assert.assertTrue(sr.hits.hits.size == 3)
-        val alerts = sr.hits.map { hit ->
-            val xcp = XContentHelper.createParser(
-                xContentRegistry(),
-                LoggingDeprecationHandler.INSTANCE,
-                hit.sourceRef,
-                XContentType.JSON
-            )
-            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-            val alert = Alert.parse(xcp, hit.id, hit.version)
-            alert
-        }
+        val alerts =
+            sr.hits.map { hit ->
+                val xcp =
+                    XContentHelper.createParser(
+                        xContentRegistry(),
+                        LoggingDeprecationHandler.INSTANCE,
+                        hit.sourceRef,
+                        XContentType.JSON,
+                    )
+                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                val alert = Alert.parse(xcp, hit.id, hit.version)
+                alert
+            }
         Assert.assertTrue(alerts.stream().anyMatch { it.state == Alert.State.DELETED && chainedAlerts[0].id == it.id })
     }
 
@@ -6050,25 +6724,29 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1)
-        )
-        var monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1)
-        )
+        var monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+            )
+        var monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+            )
         val monitorResponse = createMonitor(monitor1)!!
         val monitorResponse2 = createMonitor(monitor2)!!
 
-        val andTrigger = randomChainedAlertTrigger(
-            name = "1And2",
-            condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]")
-        )
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
-            triggers = listOf(andTrigger)
-        )
+        val andTrigger =
+            randomChainedAlertTrigger(
+                name = "1And2",
+                condition = Script("monitor[id=${monitorResponse.id}] && monitor[id=${monitorResponse2.id}]"),
+            )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+                triggers = listOf(andTrigger),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         val workflowId = workflowById!!.id
@@ -6090,35 +6768,51 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             fail("Bulk request to index to test index has failed")
         }
         var executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
-        var res = getWorkflowAlerts(
-            workflowId = workflowId
-        )
+        var res =
+            getWorkflowAlerts(
+                workflowId = workflowId,
+            )
         Assert.assertTrue(executeWorkflowResponse.workflowRunResult.triggerResults[andTrigger.id]!!.triggered)
         var chainedAlerts = res.alerts
         Assert.assertTrue(chainedAlerts.size == 1)
         Assert.assertEquals(res.associatedAlerts.size, 10)
-        var res100to200 = getWorkflowAlerts(
-            workflowId = workflowId,
-            alertIds = listOf(res.alerts[0].id),
-            table = Table("asc", "monitor_id", null, 100, 100, null)
-        )
+        var res100to200 =
+            getWorkflowAlerts(
+                workflowId = workflowId,
+                alertIds = listOf(res.alerts[0].id),
+                table = Table("asc", "monitor_id", null, 100, 100, null),
+            )
         Assert.assertEquals(res100to200.associatedAlerts.size, 100)
-        var res200to300 = getWorkflowAlerts(
-            workflowId = workflowId,
-            alertIds = listOf(res.alerts[0].id),
-            table = Table("asc", "monitor_id", null, 100, 201, null)
-        )
+        var res200to300 =
+            getWorkflowAlerts(
+                workflowId = workflowId,
+                alertIds = listOf(res.alerts[0].id),
+                table = Table("asc", "monitor_id", null, 100, 201, null),
+            )
         Assert.assertEquals(res200to300.associatedAlerts.size, 100)
-        var res0to99 = getWorkflowAlerts(
-            workflowId = workflowId,
-            alertIds = listOf(res.alerts[0].id),
-            table = Table("asc", "monitor_id", null, 100, 0, null)
-        )
+        var res0to99 =
+            getWorkflowAlerts(
+                workflowId = workflowId,
+                alertIds = listOf(res.alerts[0].id),
+                table = Table("asc", "monitor_id", null, 100, 0, null),
+            )
         Assert.assertEquals(res0to99.associatedAlerts.size, 100)
 
-        val ids100to200 = res100to200.associatedAlerts.stream().map { it.id }.collect(Collectors.toSet())
-        val idsSet0to99 = res0to99.associatedAlerts.stream().map { it.id }.collect(Collectors.toSet())
-        val idsSet200to300 = res200to300.associatedAlerts.stream().map { it.id }.collect(Collectors.toSet())
+        val ids100to200 =
+            res100to200.associatedAlerts
+                .stream()
+                .map { it.id }
+                .collect(Collectors.toSet())
+        val idsSet0to99 =
+            res0to99.associatedAlerts
+                .stream()
+                .map { it.id }
+                .collect(Collectors.toSet())
+        val idsSet200to300 =
+            res200to300.associatedAlerts
+                .stream()
+                .map { it.id }
+                .collect(Collectors.toSet())
 
         Assert.assertTrue(idsSet0to99.all { it !in ids100to200 })
         Assert.assertTrue(idsSet0to99.all { it !in idsSet200to300 })
@@ -6129,24 +6823,28 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput1 = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1))
         val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor1 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1)
-        )
-        var monitor2 = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput1),
-            triggers = listOf(trigger1)
-        )
+        var monitor1 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+            )
+        var monitor2 =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput1),
+                triggers = listOf(trigger1),
+            )
         val monitorResponse = createMonitor(monitor1)!!
         val monitorResponse2 = createMonitor(monitor2)!!
-        val notTrigger = randomChainedAlertTrigger(
-            name = "Not1OrNot2",
-            condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]")
-        )
-        var workflow = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
-            triggers = listOf(notTrigger)
-        )
+        val notTrigger =
+            randomChainedAlertTrigger(
+                name = "Not1OrNot2",
+                condition = Script("!monitor[id=${monitorResponse.id}] || !monitor[id=${monitorResponse2.id}]"),
+            )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id, monitorResponse2.id),
+                triggers = listOf(notTrigger),
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         val workflowId = workflowById!!.id
@@ -6166,7 +6864,14 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(udpdatedActiveAlerts.alerts[0].lastNotificationTime!! > workflowAlerts.alerts[0].lastNotificationTime!!)
 
         /** Acknowledge ACTIVE alert*/
-        val ackChainedAlerts = ackChainedAlerts(udpdatedActiveAlerts.alerts.stream().map { it.id }.collect(Collectors.toList()), workflowId)
+        val ackChainedAlerts =
+            ackChainedAlerts(
+                udpdatedActiveAlerts.alerts
+                    .stream()
+                    .map { it.id }
+                    .collect(Collectors.toList()),
+                workflowId,
+            )
         Assert.assertTrue(ackChainedAlerts.acknowledged.size == 1)
         Assert.assertTrue(ackChainedAlerts.missing.size == 0)
         Assert.assertTrue(ackChainedAlerts.failed.size == 0)
@@ -6212,11 +6917,12 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(queryIndex = ".opensearch-alerting-custom-queries")
-        )
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources = DataSources(queryIndex = ".opensearch-alerting-custom-queries"),
+            )
         val monitorResponse = createMonitor(monitor)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
@@ -6235,15 +6941,15 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             "1",
             response!!.getSetting(
                 ".opensearch-alerting-custom-queries-000001",
-                IndexMetadata.SETTING_NUMBER_OF_SHARDS
-            )
+                IndexMetadata.SETTING_NUMBER_OF_SHARDS,
+            ),
         )
         assertEquals(
             "0",
             response.getSetting(
                 ".opensearch-alerting-custom-queries-000001",
-                IndexMetadata.SETTING_NUMBER_OF_REPLICAS
-            )
+                IndexMetadata.SETTING_NUMBER_OF_REPLICAS,
+            ),
         )
 
         executeMonitor(monitor, id, false)
@@ -6253,61 +6959,69 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             "1",
             response!!.getSetting(
                 ".opensearch-alerting-custom-queries-000001",
-                IndexMetadata.SETTING_NUMBER_OF_SHARDS
-            )
+                IndexMetadata.SETTING_NUMBER_OF_SHARDS,
+            ),
         )
         assertEquals(
             "0",
             response.getSetting(
                 ".opensearch-alerting-custom-queries-000001",
-                IndexMetadata.SETTING_NUMBER_OF_REPLICAS
-            )
+                IndexMetadata.SETTING_NUMBER_OF_REPLICAS,
+            ),
         )
     }
 
     fun `test execute workflow when bucket monitor is used in chained finding of ignored doc monitor`() {
-        val query = QueryBuilders.rangeQuery("test_strict_date_time")
-            .gt("{{period_end}}||-10d")
-            .lte("{{period_end}}")
-            .format("epoch_millis")
-        val compositeSources = listOf(
-            TermsValuesSourceBuilder("test_field_1").field("test_field_1")
-        )
+        val query =
+            QueryBuilders
+                .rangeQuery("test_strict_date_time")
+                .gt("{{period_end}}||-10d")
+                .lte("{{period_end}}")
+                .format("epoch_millis")
+        val compositeSources =
+            listOf(
+                TermsValuesSourceBuilder("test_field_1").field("test_field_1"),
+            )
         val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
         val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
         // Bucket level monitor will reduce the size of matched doc ids on those that belong
         // to a bucket that contains more than 1 document after term grouping
-        val triggerScript = """
+        val triggerScript =
+            """
             params.docCount > 1
-        """.trimIndent()
+            """.trimIndent()
 
         var trigger = randomBucketLevelTrigger()
-        trigger = trigger.copy(
-            bucketSelector = BucketSelectorExtAggregationBuilder(
-                name = trigger.id,
-                bucketsPathsMap = mapOf("docCount" to "_count"),
-                script = Script(triggerScript),
-                parentBucketPath = "composite_agg",
-                filter = null,
+        trigger =
+            trigger.copy(
+                bucketSelector =
+                    BucketSelectorExtAggregationBuilder(
+                        name = trigger.id,
+                        bucketsPathsMap = mapOf("docCount" to "_count"),
+                        script = Script(triggerScript),
+                        parentBucketPath = "composite_agg",
+                        filter = null,
+                    ),
             )
-        )
         val bucketCustomAlertsIndex = "custom_alerts_index"
         val bucketCustomFindingsIndex = "custom_findings_index"
         val bucketCustomFindingsIndexPattern = "custom_findings_index-1"
 
-        val bucketLevelMonitorResponse = createMonitor(
-            randomBucketLevelMonitor(
-                inputs = listOf(input),
-                enabled = false,
-                triggers = listOf(trigger),
-                dataSources = DataSources(
-                    findingsEnabled = true,
-                    alertsIndex = bucketCustomAlertsIndex,
-                    findingsIndex = bucketCustomFindingsIndex,
-                    findingsIndexPattern = bucketCustomFindingsIndexPattern
-                )
-            )
-        )!!
+        val bucketLevelMonitorResponse =
+            createMonitor(
+                randomBucketLevelMonitor(
+                    inputs = listOf(input),
+                    enabled = false,
+                    triggers = listOf(trigger),
+                    dataSources =
+                        DataSources(
+                            findingsEnabled = true,
+                            alertsIndex = bucketCustomAlertsIndex,
+                            findingsIndex = bucketCustomFindingsIndex,
+                            findingsIndexPattern = bucketCustomFindingsIndexPattern,
+                        ),
+                ),
+            )!!
 
         val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1", fields = listOf())
         val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_1\"", name = "2", fields = listOf())
@@ -6317,24 +7031,27 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val docCustomAlertsIndex = "custom_alerts_index"
         val docCustomFindingsIndex = "custom_findings_index"
         val docCustomFindingsIndexPattern = "custom_findings_index-1"
-        var docLevelMonitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(docTrigger),
-            dataSources = DataSources(
-                alertsIndex = docCustomAlertsIndex,
-                findingsIndex = docCustomFindingsIndex,
-                findingsIndexPattern = docCustomFindingsIndexPattern
-            ),
-            ignoreFindingsAndAlerts = true
-        )
+        var docLevelMonitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(docTrigger),
+                dataSources =
+                    DataSources(
+                        alertsIndex = docCustomAlertsIndex,
+                        findingsIndex = docCustomFindingsIndex,
+                        findingsIndexPattern = docCustomFindingsIndexPattern,
+                    ),
+                ignoreFindingsAndAlerts = true,
+            )
 
         val docLevelMonitorResponse = createMonitor(docLevelMonitor)!!
         // 1. bucketMonitor (chainedFinding = null) 2. docMonitor (chainedFinding = bucketMonitor)
-        var workflow = randomWorkflow(
-            monitorIds = listOf(bucketLevelMonitorResponse.id, docLevelMonitorResponse.id),
-            enabled = false,
-            auditDelegateMonitorAlerts = false
-        )
+        var workflow =
+            randomWorkflow(
+                monitorIds = listOf(bucketLevelMonitorResponse.id, docLevelMonitorResponse.id),
+                enabled = false,
+                auditDelegateMonitorAlerts = false,
+            )
         val workflowResponse = upsertWorkflow(workflow)!!
         val workflowById = searchWorkflow(workflowResponse.id)
         assertNotNull(workflowById)
@@ -6347,8 +7064,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 "test_value_1", // adding duplicate to verify aggregation
                 "test_value_2",
                 "test_value_2",
-                "test_value_3"
-            )
+                "test_value_3",
+            ),
         )
 
         val workflowId = workflowResponse.id
@@ -6362,8 +7079,11 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 val searchResult = monitorRunResults.inputResults.results.first()
 
                 @Suppress("UNCHECKED_CAST")
-                val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")
-                    ?.get("buckets") as List<kotlin.collections.Map<String, Any>>
+                val buckets =
+                    searchResult
+                        .stringMap("aggregations")
+                        ?.stringMap("composite_agg")
+                        ?.get("buckets") as List<kotlin.collections.Map<String, Any>>
                 assertEquals("Incorrect search result", 3, buckets.size)
 
                 val getAlertsResponse = assertAlerts(bucketLevelMonitorResponse.id, bucketCustomAlertsIndex, 2, workflowId)
@@ -6388,27 +7108,31 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         createIndex(index1, Settings.EMPTY)
         val q1 = DocLevelQuery(query = "properties:\"abcd\"", name = "1", fields = listOf())
 
-        val docLevelInput = DocLevelMonitorInput(
-            "description",
-            listOf(index1),
-            listOf(q1)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index1),
+                listOf(q1),
+            )
 
         val customQueryIndex = "custom_alerts_index"
 
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(trigger),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex
+        val monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(trigger),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                    ),
             )
-        )
 
         val monitorResponse = createMonitor(monitor)!!
 
-        val workflowRequest = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id)
-        )
+        val workflowRequest =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+            )
         val workflowResponse = upsertWorkflow(workflowRequest)!!
         val workflowId = workflowResponse.id
         val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
@@ -6438,22 +7162,24 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(2, lastRunContextBeforeDisable?.get("0"))
 
         // Disable workflow
-        val disabledWorkflowRequest = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id),
-            id = workflowId,
-            enabled = false
-        )
+        val disabledWorkflowRequest =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+                id = workflowId,
+                enabled = false,
+            )
         upsertWorkflow(disabledWorkflowRequest, method = RestRequest.Method.PUT, id = workflowId)
 
         // Index doc. Since workflow is disabled, monitor workflow metadata shouldn't be updated
         indexDoc(index1, "4", testDoc1)
 
         // re-enable workflow
-        val enabledWorkflowRequest = randomWorkflow(
-            monitorIds = listOf(monitorResponse.id),
-            id = workflowId,
-            enabled = true
-        )
+        val enabledWorkflowRequest =
+            randomWorkflow(
+                monitorIds = listOf(monitorResponse.id),
+                id = workflowId,
+                enabled = true,
+            )
         upsertWorkflow(enabledWorkflowRequest, method = RestRequest.Method.PUT, id = workflowId)
 
         // Assert no new findings generated after workflow is re-enabled
@@ -6474,21 +7200,26 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // Setup doc level monitor
         val docQuery = DocLevelQuery(query = "eventType:\"login\"", name = "3", fields = listOf())
 
-        val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery)
-        )
+        val docLevelInput =
+            DocLevelMonitorInput(
+                "description",
+                listOf(index),
+                listOf(docQuery),
+            )
         val customFindingsIndex = "custom_findings_index"
         val customFindingsIndexPattern = "custom_findings_index-1"
         val customQueryIndex = "custom_alerts_index"
-        var monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(),
-            dataSources = DataSources(
-                queryIndex = customQueryIndex,
-                findingsIndex = customFindingsIndex,
-                findingsIndexPattern = customFindingsIndexPattern
+        var monitor =
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(),
+                dataSources =
+                    DataSources(
+                        queryIndex = customQueryIndex,
+                        findingsIndex = customFindingsIndex,
+                        findingsIndexPattern = customFindingsIndexPattern,
+                    ),
             )
-        )
         val monitorResponse = createMonitor(monitor)
         assertFalse(monitorResponse?.id.isNullOrEmpty())
 
@@ -6513,17 +7244,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(0, lastRunContextBeforeDisable?.get("0"))
 
         // Disable monitor
-        var updateMonitorResponse = updateMonitor(
-            monitor.copy(
-                id = monitorResponse.id,
-                dataSources = DataSources(
-                    queryIndex = customQueryIndex,
+        var updateMonitorResponse =
+            updateMonitor(
+                monitor.copy(
+                    id = monitorResponse.id,
+                    dataSources =
+                        DataSources(
+                            queryIndex = customQueryIndex,
+                        ),
+                    enabled = false,
+                    enabledTime = null,
                 ),
-                enabled = false,
-                enabledTime = null
-            ),
-            monitorResponse.id
-        )
+                monitorResponse.id,
+            )
         Assert.assertNotNull(updateMonitorResponse)
 
         // Index doc. Since monitor is disabled, monitor workflow metadata shouldn't be updated
@@ -6539,17 +7272,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(1, findings.size)
 
         // re-enable monitor
-        updateMonitorResponse = updateMonitor(
-            monitor.copy(
-                id = monitorResponse.id,
-                dataSources = DataSources(
-                    queryIndex = customQueryIndex,
+        updateMonitorResponse =
+            updateMonitor(
+                monitor.copy(
+                    id = monitorResponse.id,
+                    dataSources =
+                        DataSources(
+                            queryIndex = customQueryIndex,
+                        ),
+                    enabled = true,
+                    enabledTime = Instant.now().truncatedTo(ChronoUnit.MILLIS),
                 ),
-                enabled = true,
-                enabledTime = Instant.now().truncatedTo(ChronoUnit.MILLIS)
-            ),
-            monitorResponse.id
-        )
+                monitorResponse.id,
+            )
         Assert.assertNotNull(updateMonitorResponse)
         executeMonitorResponse = executeMonitor(monitor, id, false)
         Assert.assertNotNull(executeMonitorResponse)

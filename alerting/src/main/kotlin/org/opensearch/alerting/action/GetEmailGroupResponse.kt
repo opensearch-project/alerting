@@ -19,7 +19,9 @@ import org.opensearch.core.xcontent.ToXContentObject
 import org.opensearch.core.xcontent.XContentBuilder
 import java.io.IOException
 
-class GetEmailGroupResponse : ActionResponse, ToXContentObject {
+class GetEmailGroupResponse :
+    ActionResponse,
+    ToXContentObject {
     var id: String
     var version: Long
     var seqNo: Long
@@ -33,7 +35,7 @@ class GetEmailGroupResponse : ActionResponse, ToXContentObject {
         seqNo: Long,
         primaryTerm: Long,
         status: RestStatus,
-        emailGroup: EmailGroup?
+        emailGroup: EmailGroup?,
     ) : super() {
         this.id = id
         this.version = version
@@ -52,7 +54,9 @@ class GetEmailGroupResponse : ActionResponse, ToXContentObject {
         sin.readEnum(RestStatus::class.java), // RestStatus
         if (sin.readBoolean()) {
             EmailGroup.readFrom(sin) // emailGroup
-        } else null
+        } else {
+            null
+        },
     )
 
     @Throws(IOException::class)
@@ -71,14 +75,19 @@ class GetEmailGroupResponse : ActionResponse, ToXContentObject {
     }
 
     @Throws(IOException::class)
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
-        builder.startObject()
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
+        builder
+            .startObject()
             .field(_ID, id)
             .field(_VERSION, version)
             .field(_SEQ_NO, seqNo)
             .field(_PRIMARY_TERM, primaryTerm)
-        if (emailGroup != null)
+        if (emailGroup != null) {
             builder.field("email_group", emailGroup)
+        }
 
         return builder.endObject()
     }

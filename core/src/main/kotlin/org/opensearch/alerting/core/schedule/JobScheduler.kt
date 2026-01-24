@@ -22,7 +22,10 @@ import java.util.stream.Collectors
  *
  * JobScheduler is unaware of the ScheduledJob version and it is up to callers to ensure that the older version of ScheduledJob to be descheduled and schedule the new version.
  */
-class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: JobRunner) {
+class JobScheduler(
+    private val threadPool: ThreadPool,
+    private val jobRunner: JobRunner,
+) {
     private val logger = LogManager.getLogger(JobScheduler::class.java)
 
     /**
@@ -41,11 +44,10 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
      *
      * @return List of jobs that could not be scheduled
      */
-    fun schedule(vararg jobsToSchedule: ScheduledJob): List<ScheduledJob> {
-        return jobsToSchedule.filter {
+    fun schedule(vararg jobsToSchedule: ScheduledJob): List<ScheduledJob> =
+        jobsToSchedule.filter {
             !this.schedule(it)
         }
-    }
 
     /**
      * Schedules a single [scheduledJob]
@@ -74,9 +76,10 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
             return false
         }
 
-        val scheduledJobInfo = scheduledJobIdToInfo.getOrPut(scheduledJob.id) {
-            ScheduledJobInfo(scheduledJob.id, scheduledJob)
-        }
+        val scheduledJobInfo =
+            scheduledJobIdToInfo.getOrPut(scheduledJob.id) {
+                ScheduledJobInfo(scheduledJob.id, scheduledJob)
+            }
         if (scheduledJobInfo.scheduledCancellable != null) {
             // This means that the given ScheduledJob already has schedule running. We should not schedule any more.
             return true
@@ -93,15 +96,15 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
      *
      * @return List of job ids failed to deschedule.
      */
-    fun deschedule(ids: Collection<String>): List<String> {
-        return ids.filter {
-            !this.deschedule(it)
-        }.also {
-            if (it.isNotEmpty()) {
-                logger.error("Unable to deschedule jobs $it")
+    fun deschedule(ids: Collection<String>): List<String> =
+        ids
+            .filter {
+                !this.deschedule(it)
+            }.also {
+                if (it.isNotEmpty()) {
+                    logger.error("Unable to deschedule jobs $it")
+                }
             }
-        }
-    }
 
     /**
      * Mark the scheduledJob as descheduled and try to cancel any future schedule for given scheduledJob id.
@@ -144,18 +147,21 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
     /**
      * @return list of jobIds that are scheduled.
      */
-    fun scheduledJobs(): Set<String> {
-        return scheduledJobIdToInfo.keys
-    }
+    fun scheduledJobs(): Set<String> = scheduledJobIdToInfo.keys
 
-    private fun reschedule(scheduleJob: ScheduledJob, scheduledJobInfo: ScheduledJobInfo): Boolean {
+    private fun reschedule(
+        scheduleJob: ScheduledJob,
+        scheduledJobInfo: ScheduledJobInfo,
+    ): Boolean {
         if (scheduleJob.enabledTime == null) {
             logger.info("${scheduleJob.name} there is no enabled time. This job should never have been scheduled.")
             return false
         }
-        scheduledJobInfo.expectedNextExecutionTime = scheduleJob.schedule.getExpectedNextExecutionTime(
-            scheduleJob.enabledTime!!, scheduledJobInfo.expectedNextExecutionTime
-        )
+        scheduledJobInfo.expectedNextExecutionTime =
+            scheduleJob.schedule.getExpectedNextExecutionTime(
+                scheduleJob.enabledTime!!,
+                scheduledJobInfo.expectedNextExecutionTime,
+            )
 
         // Validate if there is next execution that needs to happen.
         // e.g cron job that is expected to run in 30th of Feb (which doesn't exist). "0/5 * 30 2 *"
@@ -167,21 +173,22 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
         val duration = Duration.between(Instant.now(), scheduledJobInfo.expectedNextExecutionTime)
 
         // Create anonymous runnable.
-        val runnable = Runnable {
-            // Check again if the scheduled job is marked descheduled.
-            if (scheduledJobInfo.descheduled) {
-                return@Runnable // skip running job if job is marked descheduled.
+        val runnable =
+            Runnable {
+                // Check again if the scheduled job is marked descheduled.
+                if (scheduledJobInfo.descheduled) {
+                    return@Runnable // skip running job if job is marked descheduled.
+                }
+
+                // Order of operations inside here matter, we specifically call getPeriodEndingAt before reschedule because
+                // reschedule will update expectedNextExecutionTime to the next one which would throw off the startTime/endTime
+                val (startTime, endTime) = scheduleJob.schedule.getPeriodEndingAt(scheduledJobInfo.expectedNextExecutionTime)
+                scheduledJobInfo.actualPreviousExecutionTime = Instant.now()
+
+                this.reschedule(scheduleJob, scheduledJobInfo)
+
+                jobRunner.runJob(scheduleJob, startTime, endTime)
             }
-
-            // Order of operations inside here matter, we specifically call getPeriodEndingAt before reschedule because
-            // reschedule will update expectedNextExecutionTime to the next one which would throw off the startTime/endTime
-            val (startTime, endTime) = scheduleJob.schedule.getPeriodEndingAt(scheduledJobInfo.expectedNextExecutionTime)
-            scheduledJobInfo.actualPreviousExecutionTime = Instant.now()
-
-            this.reschedule(scheduleJob, scheduledJobInfo)
-
-            jobRunner.runJob(scheduleJob, startTime, endTime)
-        }
 
         // Check descheduled flag as close as possible before we actually schedule a job.
         // This way we will can minimize race conditions.
@@ -200,24 +207,26 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
     fun getJobSchedulerMetric(showAlertingV2ScheduledJobs: Boolean?): List<JobSchedulerMetrics> {
         val scheduledJobEntries = scheduledJobIdToInfo.entries
 
-        val filteredScheduledJobEntries = if (showAlertingV2ScheduledJobs == null) {
-            // if no alerting version was specified, do not filter
-            scheduledJobEntries
-        } else if (showAlertingV2ScheduledJobs) {
-            scheduledJobEntries.filter { it.value.scheduledJob.type == monitorV2Type }
-        } else {
-            scheduledJobEntries.filter { it.value.scheduledJob.type != monitorV2Type }
-        }
+        val filteredScheduledJobEntries =
+            if (showAlertingV2ScheduledJobs == null) {
+                // if no alerting version was specified, do not filter
+                scheduledJobEntries
+            } else if (showAlertingV2ScheduledJobs) {
+                scheduledJobEntries.filter { it.value.scheduledJob.type == monitorV2Type }
+            } else {
+                scheduledJobEntries.filter { it.value.scheduledJob.type != monitorV2Type }
+            }
 
-        return filteredScheduledJobEntries.stream()
+        return filteredScheduledJobEntries
+            .stream()
             .map { entry ->
                 JobSchedulerMetrics(
                     entry.value.scheduledJobId,
                     entry.value.actualPreviousExecutionTime?.toEpochMilli(),
-                    entry.value.scheduledJob.schedule.runningOnTime(entry.value.actualPreviousExecutionTime)
+                    entry.value.scheduledJob.schedule
+                        .runningOnTime(entry.value.actualPreviousExecutionTime),
                 )
-            }
-            .collect(Collectors.toList())
+            }.collect(Collectors.toList())
     }
 
     fun postIndex(job: ScheduledJob) {
@@ -240,6 +249,6 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
         var descheduled: Boolean = false,
         var actualPreviousExecutionTime: Instant? = null,
         var expectedNextExecutionTime: Instant? = null,
-        var scheduledCancellable: Scheduler.ScheduledCancellable? = null
+        var scheduledCancellable: Scheduler.ScheduledCancellable? = null,
     )
 }

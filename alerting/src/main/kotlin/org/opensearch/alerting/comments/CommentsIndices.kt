@@ -46,9 +46,8 @@ class CommentsIndices(
     settings: Settings,
     private val client: Client,
     private val threadPool: ThreadPool,
-    private val clusterService: ClusterService
+    private val clusterService: ClusterService,
 ) : ClusterStateListener {
-
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.COMMENTS_HISTORY_MAX_DOCS) { commentsHistoryMaxDocs = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.COMMENTS_HISTORY_INDEX_MAX_AGE) {
@@ -77,8 +76,7 @@ class CommentsIndices(
         const val ALL_COMMENTS_INDEX_PATTERN = ".opensearch-alerting-comments*"
 
         @JvmStatic
-        fun commentsMapping() =
-            CommentsIndices::class.java.getResource("alerting_comments.json").readText()
+        fun commentsMapping() = CommentsIndices::class.java.getResource("alerting_comments.json").readText()
 
         private val logger = LogManager.getLogger(AlertIndices::class.java)
     }
@@ -112,13 +110,14 @@ class CommentsIndices(
             // try to rollover immediately as we might be restarting the cluster
             rolloverCommentsHistoryIndex()
             // schedule the next rollover for approx MAX_AGE later
-            scheduledCommentsRollover = threadPool
-                .scheduleWithFixedDelay({ rolloverAndDeleteCommentsHistoryIndices() }, commentsHistoryRolloverPeriod, executorName())
+            scheduledCommentsRollover =
+                threadPool
+                    .scheduleWithFixedDelay({ rolloverAndDeleteCommentsHistoryIndices() }, commentsHistoryRolloverPeriod, executorName())
         } catch (e: Exception) {
             // This should be run on cluster startup
             logger.error(
                 "Error creating comments indices. Comments can't be recorded until clustermanager node is restarted.",
-                e
+                e,
             )
         }
     }
@@ -127,9 +126,7 @@ class CommentsIndices(
         scheduledCommentsRollover?.cancel()
     }
 
-    private fun executorName(): String {
-        return ThreadPool.Names.MANAGEMENT
-    }
+    private fun executorName(): String = ThreadPool.Names.MANAGEMENT
 
     override fun clusterChanged(event: ClusterChangedEvent) {
         // Instead of using a LocalNodeClusterManagerListener to track clustermanager changes, this service will
@@ -151,23 +148,24 @@ class CommentsIndices(
     private fun rescheduleCommentsRollover() {
         if (clusterService.state().nodes.isLocalNodeElectedClusterManager) {
             scheduledCommentsRollover?.cancel()
-            scheduledCommentsRollover = threadPool
-                .scheduleWithFixedDelay({ rolloverAndDeleteCommentsHistoryIndices() }, commentsHistoryRolloverPeriod, executorName())
+            scheduledCommentsRollover =
+                threadPool
+                    .scheduleWithFixedDelay({ rolloverAndDeleteCommentsHistoryIndices() }, commentsHistoryRolloverPeriod, executorName())
         }
     }
 
-    fun isCommentsHistoryInitialized(): Boolean {
-        return clusterService.state().metadata.hasAlias(COMMENTS_HISTORY_WRITE_INDEX)
-    }
+    fun isCommentsHistoryInitialized(): Boolean = clusterService.state().metadata.hasAlias(COMMENTS_HISTORY_WRITE_INDEX)
 
     suspend fun createOrUpdateInitialCommentsHistoryIndex() {
         if (!isCommentsHistoryInitialized()) {
             commentsHistoryIndexInitialized = createIndex(COMMENTS_HISTORY_INDEX_PATTERN, commentsMapping(), COMMENTS_HISTORY_WRITE_INDEX)
-            if (commentsHistoryIndexInitialized)
-                IndexUtils.lastUpdatedCommentsHistoryIndex = IndexUtils.getIndexNameWithAlias(
-                    clusterService.state(),
-                    COMMENTS_HISTORY_WRITE_INDEX
-                )
+            if (commentsHistoryIndexInitialized) {
+                IndexUtils.lastUpdatedCommentsHistoryIndex =
+                    IndexUtils.getIndexNameWithAlias(
+                        clusterService.state(),
+                        COMMENTS_HISTORY_WRITE_INDEX,
+                    )
+            }
         } else {
             updateIndexMapping(COMMENTS_HISTORY_WRITE_INDEX, commentsMapping(), true)
         }
@@ -187,12 +185,12 @@ class CommentsIndices(
             commentsMapping(),
             commentsHistoryMaxDocs,
             commentsHistoryMaxAge,
-            COMMENTS_HISTORY_WRITE_INDEX
+            COMMENTS_HISTORY_WRITE_INDEX,
         )
     }
 
-    // TODO: Everything below is boilerplate util functions straight from AlertIndices.kt
     /*
+    TODO: Everything below is boilerplate util functions straight from AlertIndices.kt
     Depending on whether comments system indices will be component-specific or
     component-agnostic, may need to either merge CommentsIndices.kt into AlertIndices.kt,
     or factor these out into IndexUtils.kt for both AlertIndices.kt and CommentsIndices.kt
@@ -213,7 +211,7 @@ class CommentsIndices(
         indexMetadata: IndexMetadata,
         retentionPeriodMillis: Long,
         writeIndex: String,
-        historyEnabled: Boolean
+        historyEnabled: Boolean,
     ): String? {
         val creationTime = indexMetadata.creationDate
         if ((Instant.now().toEpochMilli() - creationTime) > retentionPeriodMillis) {
@@ -243,16 +241,17 @@ class CommentsIndices(
                         if (!deleteIndicesResponse.isAcknowledged) {
                             logger.error(
                                 "Could not delete one or more comments history indices: $indicesToDelete." +
-                                    "Retrying one by one."
+                                    "Retrying one by one.",
                             )
                             deleteOldHistoryIndex(indicesToDelete)
                         }
                     }
+
                     override fun onFailure(e: Exception) {
                         logger.error("Delete for comments History Indices $indicesToDelete Failed. Retrying one By one.")
                         deleteOldHistoryIndex(indicesToDelete)
                     }
-                }
+                },
             )
         }
     }
@@ -270,27 +269,34 @@ class CommentsIndices(
                             }
                         }
                     }
+
                     override fun onFailure(e: Exception) {
                         logger.debug("Exception ${e.message} while deleting the index $index")
                     }
-                }
+                },
             )
         }
     }
 
-    private suspend fun createIndex(index: String, schemaMapping: String, alias: String? = null): Boolean {
+    private suspend fun createIndex(
+        index: String,
+        schemaMapping: String,
+        alias: String? = null,
+    ): Boolean {
         // This should be a fast check of local cluster state. Should be exceedingly rare that the local cluster
         // state does not contain the index and multiple nodes concurrently try to create the index.
         // If it does happen that error is handled we catch the ResourceAlreadyExistsException
-        val existsResponse: IndicesExistsResponse = client.admin().indices().suspendUntil {
-            exists(IndicesExistsRequest(index).local(true), it)
-        }
+        val existsResponse: IndicesExistsResponse =
+            client.admin().indices().suspendUntil {
+                exists(IndicesExistsRequest(index).local(true), it)
+            }
         if (existsResponse.isExists) return true
 
         logger.debug("index: [$index] schema mappings: [$schemaMapping]")
-        val request = CreateIndexRequest(index)
-            .mapping(schemaMapping)
-            .settings(Settings.builder().put("index.hidden", true).build())
+        val request =
+            CreateIndexRequest(index)
+                .mapping(schemaMapping)
+                .settings(Settings.builder().put("index.hidden", true).build())
 
         if (alias != null) request.alias(Alias(alias))
         return try {
@@ -305,20 +311,24 @@ class CommentsIndices(
         }
     }
 
-    private suspend fun updateIndexMapping(index: String, mapping: String, alias: Boolean = false) {
+    private suspend fun updateIndexMapping(
+        index: String,
+        mapping: String,
+        alias: Boolean = false,
+    ) {
         val clusterState = clusterService.state()
         var targetIndex = index
         if (alias) {
             targetIndex = IndexUtils.getIndexNameWithAlias(clusterState, index)
         }
 
-        if (targetIndex == IndexUtils.lastUpdatedCommentsHistoryIndex
-        ) {
+        if (targetIndex == IndexUtils.lastUpdatedCommentsHistoryIndex) {
             return
         }
 
-        val putMappingRequest: PutMappingRequest = PutMappingRequest(targetIndex)
-            .source(mapping, XContentType.JSON)
+        val putMappingRequest: PutMappingRequest =
+            PutMappingRequest(targetIndex)
+                .source(mapping, XContentType.JSON)
         val updateResponse: AcknowledgedResponse = client.admin().indices().suspendUntil { putMapping(putMappingRequest, it) }
         if (updateResponse.isAcknowledged) {
             logger.info("Index mapping of $targetIndex is updated")
@@ -328,7 +338,10 @@ class CommentsIndices(
         }
     }
 
-    private fun setIndexUpdateFlag(index: String, targetIndex: String) {
+    private fun setIndexUpdateFlag(
+        index: String,
+        targetIndex: String,
+    ) {
         when (index) {
             COMMENTS_HISTORY_WRITE_INDEX -> IndexUtils.lastUpdatedCommentsHistoryIndex = targetIndex
         }
@@ -341,7 +354,7 @@ class CommentsIndices(
         map: String,
         docsCondition: Long,
         ageCondition: TimeValue,
-        writeIndex: String
+        writeIndex: String,
     ) {
         logger.info("in rolloverIndex, initialize: $initialized")
         if (!initialized) {
@@ -351,7 +364,8 @@ class CommentsIndices(
         logger.info("sending rollover request")
         // We have to pass null for newIndexName in order to get Elastic to increment the index count.
         val request = RolloverRequest(index, null)
-        request.createIndexRequest.index(pattern)
+        request.createIndexRequest
+            .index(pattern)
             .mapping(map)
             .settings(Settings.builder().put("index.hidden", true).build())
         request.addMaxIndexDocsCondition(docsCondition)
@@ -367,25 +381,32 @@ class CommentsIndices(
                         lastRolloverTime = TimeValue.timeValueMillis(threadPool.absoluteTimeInMillis())
                     }
                 }
+
                 override fun onFailure(e: Exception) {
                     logger.error("$writeIndex not roll over failed.")
                 }
-            }
+            },
         )
     }
 
-    private fun deleteOldIndices(tag: String, indices: String) {
-        val clusterStateRequest = ClusterStateRequest()
-            .clear()
-            .indices(indices)
-            .metadata(true)
-            .local(true)
-            .indicesOptions(IndicesOptions.strictExpand())
+    private fun deleteOldIndices(
+        tag: String,
+        indices: String,
+    ) {
+        val clusterStateRequest =
+            ClusterStateRequest()
+                .clear()
+                .indices(indices)
+                .metadata(true)
+                .local(true)
+                .indicesOptions(IndicesOptions.strictExpand())
         client.admin().cluster().state(
             clusterStateRequest,
             object : ActionListener<ClusterStateResponse> {
                 override fun onResponse(clusterStateResponse: ClusterStateResponse) {
-                    if (clusterStateResponse.state.metadata.indices.isNotEmpty()) {
+                    if (clusterStateResponse.state.metadata.indices
+                            .isNotEmpty()
+                    ) {
                         val indicesToDelete = getIndicesToDelete(clusterStateResponse)
                         logger.info("Deleting old $tag indices viz $indicesToDelete")
                         deleteAllOldHistoryIndices(indicesToDelete)
@@ -393,10 +414,11 @@ class CommentsIndices(
                         logger.info("No Old $tag Indices to delete")
                     }
                 }
+
                 override fun onFailure(e: Exception) {
                     logger.error("Error fetching cluster state")
                 }
-            }
+            },
         )
     }
 }

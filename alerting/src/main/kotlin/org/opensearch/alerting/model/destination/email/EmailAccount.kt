@@ -32,9 +32,9 @@ data class EmailAccount(
     val port: Int,
     val method: MethodType,
     val username: SecureString? = null,
-    val password: SecureString? = null
-) : Writeable, ToXContent {
-
+    val password: SecureString? = null,
+) : Writeable,
+    ToXContent {
     init {
         // Excluding dashes (-) from valid names for EmailAccount since the name is used
         // to namespace the associated OpenSearch keystore settings and dashes do not work for those settings.
@@ -46,10 +46,14 @@ data class EmailAccount(
         require(isValidEmail(email)) { "Invalid email" }
     }
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
         builder.startObject()
         if (params.paramAsBoolean("with_type", false)) builder.startObject(EMAIL_ACCOUNT_TYPE)
-        builder.field(SCHEMA_VERSION, schemaVersion)
+        builder
+            .field(SCHEMA_VERSION, schemaVersion)
             .field(NAME_FIELD, name)
             .field(EMAIL_FIELD, email)
             .field(HOST_FIELD, host)
@@ -59,9 +63,7 @@ data class EmailAccount(
         return builder.endObject()
     }
 
-    fun toXContent(builder: XContentBuilder): XContentBuilder {
-        return toXContent(builder, ToXContent.EMPTY_PARAMS)
-    }
+    fun toXContent(builder: XContentBuilder): XContentBuilder = toXContent(builder, ToXContent.EMPTY_PARAMS)
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
@@ -77,13 +79,17 @@ data class EmailAccount(
         out.writeOptionalSecureString(password)
     }
 
-    enum class MethodType(val value: String) {
+    enum class MethodType(
+        val value: String,
+    ) {
         NONE("none"),
         SSL("ssl"),
-        TLS("starttls");
+        TLS("starttls"),
+        ;
 
         companion object {
             private val values = values()
+
             // Created this method since MethodType value does not necessarily match enum name
             fun getByValue(value: String) = values.firstOrNull { it.value == value }
         }
@@ -102,7 +108,11 @@ data class EmailAccount(
 
         @JvmStatic
         @Throws(IOException::class)
-        fun parse(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): EmailAccount {
+        fun parse(
+            xcp: XContentParser,
+            id: String = NO_ID,
+            version: Long = NO_VERSION,
+        ): EmailAccount {
             var schemaVersion = NO_SCHEMA_VERSION
             lateinit var name: String
             lateinit var email: String
@@ -116,11 +126,26 @@ data class EmailAccount(
                 xcp.nextToken()
 
                 when (fieldName) {
-                    SCHEMA_VERSION -> schemaVersion = xcp.intValue()
-                    NAME_FIELD -> name = xcp.text()
-                    EMAIL_FIELD -> email = xcp.text()
-                    HOST_FIELD -> host = xcp.text()
-                    PORT_FIELD -> port = xcp.intValue()
+                    SCHEMA_VERSION -> {
+                        schemaVersion = xcp.intValue()
+                    }
+
+                    NAME_FIELD -> {
+                        name = xcp.text()
+                    }
+
+                    EMAIL_FIELD -> {
+                        email = xcp.text()
+                    }
+
+                    HOST_FIELD -> {
+                        host = xcp.text()
+                    }
+
+                    PORT_FIELD -> {
+                        port = xcp.intValue()
+                    }
+
                     METHOD_FIELD -> {
                         method = xcp.text()
                         val allowedMethods = MethodType.values().map { it.value }
@@ -139,13 +164,17 @@ data class EmailAccount(
                 email,
                 host,
                 port,
-                requireNotNull(MethodType.getByValue(method)) { "Method type was null" }
+                requireNotNull(MethodType.getByValue(method)) { "Method type was null" },
             )
         }
 
         @JvmStatic
         @Throws(IOException::class)
-        fun parseWithType(xcp: XContentParser, id: String = NO_ID, version: Long = NO_VERSION): EmailAccount {
+        fun parseWithType(
+            xcp: XContentParser,
+            id: String = NO_ID,
+            version: Long = NO_VERSION,
+        ): EmailAccount {
             ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
             ensureExpectedToken(Token.FIELD_NAME, xcp.nextToken(), xcp)
             ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
@@ -156,8 +185,8 @@ data class EmailAccount(
 
         @JvmStatic
         @Throws(IOException::class)
-        fun readFrom(sin: StreamInput): EmailAccount {
-            return EmailAccount(
+        fun readFrom(sin: StreamInput): EmailAccount =
+            EmailAccount(
                 sin.readString(), // id
                 sin.readLong(), // version
                 sin.readInt(), // schemaVersion
@@ -167,8 +196,7 @@ data class EmailAccount(
                 sin.readInt(), // port
                 sin.readEnum(MethodType::class.java), // method
                 sin.readOptionalSecureString(), // username
-                sin.readOptionalSecureString() // password
+                sin.readOptionalSecureString(), // password
             )
-        }
     }
 }

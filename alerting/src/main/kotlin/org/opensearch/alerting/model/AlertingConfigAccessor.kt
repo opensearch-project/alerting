@@ -25,8 +25,11 @@ import org.opensearch.transport.client.Client
  */
 class AlertingConfigAccessor {
     companion object {
-
-        suspend fun getEmailAccountInfo(client: Client, xContentRegistry: NamedXContentRegistry, emailAccountId: String): EmailAccount {
+        suspend fun getEmailAccountInfo(
+            client: Client,
+            xContentRegistry: NamedXContentRegistry,
+            emailAccountId: String,
+        ): EmailAccount {
             val source = getAlertingConfigDocumentSource(client, "Email account", emailAccountId)
             return withContext(Dispatchers.IO) {
                 val xcp = XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, source, XContentType.JSON)
@@ -35,7 +38,11 @@ class AlertingConfigAccessor {
             }
         }
 
-        suspend fun getEmailGroupInfo(client: Client, xContentRegistry: NamedXContentRegistry, emailGroupId: String): EmailGroup {
+        suspend fun getEmailGroupInfo(
+            client: Client,
+            xContentRegistry: NamedXContentRegistry,
+            emailGroupId: String,
+        ): EmailGroup {
             val source = getAlertingConfigDocumentSource(client, "Email group", emailGroupId)
             return withContext(Dispatchers.IO) {
                 val xcp = XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, source, XContentType.JSON)
@@ -47,7 +54,7 @@ class AlertingConfigAccessor {
         private suspend fun getAlertingConfigDocumentSource(
             client: Client,
             type: String,
-            docId: String
+            docId: String,
         ): BytesReference {
             val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, docId).routing(docId)
             val getResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }

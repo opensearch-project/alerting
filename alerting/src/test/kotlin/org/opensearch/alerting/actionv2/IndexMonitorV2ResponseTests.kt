@@ -10,16 +10,19 @@ import org.opensearch.alerting.randomPPLMonitor
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.core.common.io.stream.StreamInput
 import org.opensearch.test.OpenSearchTestCase
+import kotlin.test.Test
 
 class IndexMonitorV2ResponseTests : OpenSearchTestCase() {
+    @Test
     fun `test index monitor v2 response as stream`() {
-        val req = IndexMonitorV2Response(
-            id = "abc",
-            version = 2L,
-            seqNo = 1L,
-            primaryTerm = 1L,
-            monitorV2 = randomPPLMonitor() as MonitorV2
-        )
+        val req =
+            IndexMonitorV2Response(
+                id = "abc",
+                version = 2L,
+                seqNo = 1L,
+                primaryTerm = 1L,
+                monitorV2 = randomPPLMonitor() as MonitorV2,
+            )
         assertNotNull(req)
 
         val out = BytesStreamOutput()

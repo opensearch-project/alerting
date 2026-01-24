@@ -35,81 +35,92 @@ import org.opensearch.transport.client.Client
 
 private val log = LogManager.getLogger(TransportGetEmailGroupAction::class.java)
 
-class TransportGetEmailGroupAction @Inject constructor(
-    transportService: TransportService,
-    val client: Client,
-    actionFilters: ActionFilters,
-    val clusterService: ClusterService,
-    settings: Settings,
-    val xContentRegistry: NamedXContentRegistry
-) : HandledTransportAction<GetEmailGroupRequest, GetEmailGroupResponse>(
-    GetEmailGroupAction.NAME, transportService, actionFilters, ::GetEmailGroupRequest
-) {
+class TransportGetEmailGroupAction
+    @Inject
+    constructor(
+        transportService: TransportService,
+        val client: Client,
+        actionFilters: ActionFilters,
+        val clusterService: ClusterService,
+        settings: Settings,
+        val xContentRegistry: NamedXContentRegistry,
+    ) : HandledTransportAction<GetEmailGroupRequest, GetEmailGroupResponse>(
+            GetEmailGroupAction.NAME,
+            transportService,
+            actionFilters,
+            ::GetEmailGroupRequest,
+        ) {
+        @Volatile private var allowList = ALLOW_LIST.get(settings)
 
-    @Volatile private var allowList = ALLOW_LIST.get(settings)
+        init {
+            clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
+        }
 
-    init {
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
-    }
-
-    override fun doExecute(
-        task: Task,
-        getEmailGroupRequest: GetEmailGroupRequest,
-        actionListener: ActionListener<GetEmailGroupResponse>
-    ) {
-
-        if (!allowList.contains(DestinationType.EMAIL.value)) {
-            actionListener.onFailure(
-                AlertingException.wrap(
-                    OpenSearchStatusException(
-                        "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
-                        RestStatus.FORBIDDEN
-                    )
+        override fun doExecute(
+            task: Task,
+            getEmailGroupRequest: GetEmailGroupRequest,
+            actionListener: ActionListener<GetEmailGroupResponse>,
+        ) {
+            if (!allowList.contains(DestinationType.EMAIL.value)) {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException(
+                            "This API is blocked since Destination type [${DestinationType.EMAIL}] is not allowed",
+                            RestStatus.FORBIDDEN,
+                        ),
+                    ),
                 )
-            )
-            return
-        }
+                return
+            }
 
-        val getRequest = GetRequest(SCHEDULED_JOBS_INDEX, getEmailGroupRequest.emailGroupID)
-            .version(getEmailGroupRequest.version)
-            .fetchSourceContext(getEmailGroupRequest.srcContext)
-        client.threadPool().threadContext.stashContext().use {
-            client.get(
-                getRequest,
-                object : ActionListener<GetResponse> {
-                    override fun onResponse(response: GetResponse) {
-                        if (!response.isExists) {
-                            actionListener.onFailure(
-                                AlertingException.wrap(
-                                    OpenSearchStatusException("Email Group not found.", RestStatus.NOT_FOUND)
+            val getRequest =
+                GetRequest(SCHEDULED_JOBS_INDEX, getEmailGroupRequest.emailGroupID)
+                    .version(getEmailGroupRequest.version)
+                    .fetchSourceContext(getEmailGroupRequest.srcContext)
+            client.threadPool().threadContext.stashContext().use {
+                client.get(
+                    getRequest,
+                    object : ActionListener<GetResponse> {
+                        override fun onResponse(response: GetResponse) {
+                            if (!response.isExists) {
+                                actionListener.onFailure(
+                                    AlertingException.wrap(
+                                        OpenSearchStatusException("Email Group not found.", RestStatus.NOT_FOUND),
+                                    ),
                                 )
-                            )
-                            return
-                        }
-
-                        var emailGroup: EmailGroup? = null
-                        if (!response.isSourceEmpty) {
-                            XContentHelper.createParser(
-                                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                                response.sourceAsBytesRef, XContentType.JSON
-                            ).use { xcp ->
-                                emailGroup = EmailGroup.parseWithType(xcp, response.id, response.version)
+                                return
                             }
+
+                            var emailGroup: EmailGroup? = null
+                            if (!response.isSourceEmpty) {
+                                XContentHelper
+                                    .createParser(
+                                        xContentRegistry,
+                                        LoggingDeprecationHandler.INSTANCE,
+                                        response.sourceAsBytesRef,
+                                        XContentType.JSON,
+                                    ).use { xcp ->
+                                        emailGroup = EmailGroup.parseWithType(xcp, response.id, response.version)
+                                    }
+                            }
+
+                            actionListener.onResponse(
+                                GetEmailGroupResponse(
+                                    response.id,
+                                    response.version,
+                                    response.seqNo,
+                                    response.primaryTerm,
+                                    RestStatus.OK,
+                                    emailGroup,
+                                ),
+                            )
                         }
 
-                        actionListener.onResponse(
-                            GetEmailGroupResponse(
-                                response.id, response.version, response.seqNo, response.primaryTerm,
-                                RestStatus.OK, emailGroup
-                            )
-                        )
-                    }
-
-                    override fun onFailure(e: Exception) {
-                        actionListener.onFailure(e)
-                    }
-                }
-            )
+                        override fun onFailure(e: Exception) {
+                            actionListener.onFailure(e)
+                        }
+                    },
+                )
+            }
         }
     }
-}

@@ -21,7 +21,9 @@ fun context(request: RestRequest): FetchSourceContext? {
     val userAgent = if (request.header("User-Agent") == null) "" else request.header("User-Agent")
     return if (!userAgent.contains(AlertingPlugin.OPEN_SEARCH_DASHBOARDS_USER_AGENT)) {
         FetchSourceContext(true, Strings.EMPTY_ARRAY, AlertingPlugin.UI_METADATA_EXCLUDE)
-    } else null
+    } else {
+        null
+    }
 }
 
 const val IF_SEQ_NO = "if_seq_no"

@@ -7,5 +7,6 @@ package org.opensearch.alerting.chainedAlertCondition.resolvers
 
 interface ChainedAlertTriggerResolver {
     fun getMonitorIds(parsedTriggerCondition: ChainedAlertRPNResolver): Set<String>
+
     fun evaluate(alertGeneratingMonitors: Set<String>): Boolean
 }

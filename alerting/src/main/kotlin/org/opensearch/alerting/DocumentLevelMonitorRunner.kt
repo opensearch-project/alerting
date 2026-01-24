@@ -60,7 +60,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         dryrun: Boolean,
         workflowRunContext: WorkflowRunContext?,
         executionId: String,
-        transportService: TransportService
+        transportService: TransportService,
     ): MonitorRunResult<DocumentLevelTriggerRunResult> {
         logger.debug("Document-level-monitor is running ...")
         val startTime = System.currentTimeMillis()
@@ -92,29 +92,35 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             monitorResult = monitorResult.copy(error = AlertingException.wrap(e))
         }
 
-        var (monitorMetadata, _) = MonitorMetadataService.getOrCreateMetadata(
-            monitor = monitor,
-            createWithRunContext = false,
-            skipIndex = isTempMonitor,
-            workflowRunContext?.workflowMetadataId
-        )
+        var (monitorMetadata, _) =
+            MonitorMetadataService.getOrCreateMetadata(
+                monitor = monitor,
+                createWithRunContext = false,
+                skipIndex = isTempMonitor,
+                workflowRunContext?.workflowMetadataId,
+            )
 
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
 
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
 
-        val lastRunContext = if (monitorMetadata.lastRunContext.isNullOrEmpty()) mutableMapOf()
-        else monitorMetadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
+        val lastRunContext =
+            if (monitorMetadata.lastRunContext.isNullOrEmpty()) {
+                mutableMapOf()
+            } else {
+                monitorMetadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
+            }
 
         val updatedLastRunContext = lastRunContext.toMutableMap()
 
         try {
             // Resolve all passed indices to concrete indices
-            val allConcreteIndices = IndexUtils.resolveAllIndices(
-                docLevelMonitorInput.indices,
-                monitorCtx.clusterService!!,
-                monitorCtx.indexNameExpressionResolver!!
-            )
+            val allConcreteIndices =
+                IndexUtils.resolveAllIndices(
+                    docLevelMonitorInput.indices,
+                    monitorCtx.clusterService!!,
+                    monitorCtx.indexNameExpressionResolver!!,
+                )
             if (allConcreteIndices.isEmpty()) {
                 logger.error("indices not found-${docLevelMonitorInput.indices.joinToString(",")}")
                 throw IndexNotFoundException(docLevelMonitorInput.indices.joinToString(","))
@@ -125,7 +131,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 monitor = monitor,
                 monitorId = monitor.id,
                 monitorMetadata,
-                indexTimeout = monitorCtx.indexTimeout!!
+                indexTimeout = monitorCtx.indexTimeout!!,
             )
 
             // cleanup old indices that are not monitored anymore from the same monitor
@@ -138,21 +144,23 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
 
             // Map of document ids per index when monitor is workflow delegate and has chained findings
             val matchingDocIdsPerIndex = workflowRunContext?.matchingDocIdsPerIndex
-            val findingIdsForMatchingDocIds = if (workflowRunContext?.findingIds != null) {
-                workflowRunContext.findingIds
-            } else {
-                listOf()
-            }
+            val findingIdsForMatchingDocIds =
+                if (workflowRunContext?.findingIds != null) {
+                    workflowRunContext.findingIds
+                } else {
+                    listOf()
+                }
 
             val concreteIndicesSeenSoFar = mutableListOf<String>()
             val updatedIndexNames = mutableListOf<String>()
             val docLevelMonitorFanOutResponses: MutableList<DocLevelMonitorFanOutResponse> = mutableListOf()
             docLevelMonitorInput.indices.forEach { indexName ->
-                var concreteIndices = IndexUtils.resolveAllIndices(
-                    listOf(indexName),
-                    monitorCtx.clusterService!!,
-                    monitorCtx.indexNameExpressionResolver!!
-                )
+                var concreteIndices =
+                    IndexUtils.resolveAllIndices(
+                        listOf(indexName),
+                        monitorCtx.clusterService!!,
+                        monitorCtx.indexNameExpressionResolver!!,
+                    )
                 var lastWriteIndex: String? = null
                 if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                     IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
@@ -161,45 +169,54 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     if (lastWriteIndex != null) {
                         val lastWriteIndexCreationDate =
                             IndexUtils.getCreationDateForIndex(lastWriteIndex, monitorCtx.clusterService!!.state())
-                        concreteIndices = IndexUtils.getNewestIndicesByCreationDate(
-                            concreteIndices,
-                            monitorCtx.clusterService!!.state(),
-                            lastWriteIndexCreationDate
-                        )
+                        concreteIndices =
+                            IndexUtils.getNewestIndicesByCreationDate(
+                                concreteIndices,
+                                monitorCtx.clusterService!!.state(),
+                                lastWriteIndexCreationDate,
+                            )
                     }
                 }
                 concreteIndicesSeenSoFar.addAll(concreteIndices)
                 val updatedIndexName = indexName.replace("*", "_")
                 updatedIndexNames.add(updatedIndexName)
-                val conflictingFields = monitorCtx.docLevelMonitorQueries!!.getAllConflictingFields(
-                    monitorCtx.clusterService!!.state(),
-                    concreteIndices
-                )
+                val conflictingFields =
+                    monitorCtx.docLevelMonitorQueries!!.getAllConflictingFields(
+                        monitorCtx.clusterService!!.state(),
+                        concreteIndices,
+                    )
 
                 concreteIndices.forEach { concreteIndexName ->
                     // Prepare lastRunContext for each index
-                    val indexLastRunContext = lastRunContext.getOrPut(concreteIndexName) {
-                        val isIndexCreatedRecently = createdRecently(
-                            monitor,
-                            periodStart,
-                            periodEnd,
-                            monitorCtx.clusterService!!.state().metadata.index(concreteIndexName)
-                        )
-                        MonitorMetadataService.createRunContextForIndex(concreteIndexName, isIndexCreatedRecently)
-                    }
+                    val indexLastRunContext =
+                        lastRunContext.getOrPut(concreteIndexName) {
+                            val isIndexCreatedRecently =
+                                createdRecently(
+                                    monitor,
+                                    periodStart,
+                                    periodEnd,
+                                    monitorCtx.clusterService!!
+                                        .state()
+                                        .metadata
+                                        .index(concreteIndexName),
+                                )
+                            MonitorMetadataService.createRunContextForIndex(concreteIndexName, isIndexCreatedRecently)
+                        }
                     val shardCount: Int = getShardsCount(monitorCtx.clusterService!!, concreteIndexName)
                     // Prepare updatedLastRunContext for each index
-                    val indexUpdatedRunContext = initializeNewLastRunContext(
-                        indexLastRunContext.toMutableMap(),
-                        concreteIndexName,
-                        shardCount
-                    ) as MutableMap<String, Any>
+                    val indexUpdatedRunContext =
+                        initializeNewLastRunContext(
+                            indexLastRunContext.toMutableMap(),
+                            concreteIndexName,
+                            shardCount,
+                        ) as MutableMap<String, Any>
                     if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                         IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
                     ) {
-                        if (concreteIndexName == IndexUtils.getWriteIndex(
+                        if (concreteIndexName ==
+                            IndexUtils.getWriteIndex(
                                 indexName,
-                                monitorCtx.clusterService!!.state()
+                                monitorCtx.clusterService!!.state(),
                             )
                         ) {
                             updatedLastRunContext.remove(lastWriteIndex)
@@ -216,29 +233,33 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         // update lastRunContext if its a temp monitor as we only want to view the last bit of data then
                         // TODO: If dryrun, we should make it so we limit the search as this could still potentially give us lots of data
                         if (isTempMonitor) {
-                            indexLastRunContext[shard] = if (indexLastRunContext.containsKey(shard)) {
-                                if (indexLastRunContext[shard] is Long) {
-                                    max(-1L, indexUpdatedRunContext[shard] as Long - 10L)
-                                } else if (indexLastRunContext[shard] is Int) {
-                                    max(-1L, (indexUpdatedRunContext[shard] as Int).toLong() - 10L)
-                                } else -1L
-                            } else {
-                                -1L
-                            }
+                            indexLastRunContext[shard] =
+                                if (indexLastRunContext.containsKey(shard)) {
+                                    if (indexLastRunContext[shard] is Long) {
+                                        max(-1L, indexUpdatedRunContext[shard] as Long - 10L)
+                                    } else if (indexLastRunContext[shard] is Int) {
+                                        max(-1L, (indexUpdatedRunContext[shard] as Int).toLong() - 10L)
+                                    } else {
+                                        -1L
+                                    }
+                                } else {
+                                    -1L
+                                }
                         }
                     }
-                    val indexExecutionContext = IndexExecutionContext(
-                        queries,
-                        indexLastRunContext,
-                        indexUpdatedRunContext,
-                        updatedIndexName,
-                        concreteIndexName,
-                        updatedIndexNames,
-                        concreteIndices,
-                        conflictingFields.toList(),
-                        matchingDocIdsPerIndex?.get(concreteIndexName),
-                        findingIdsForMatchingDocIds
-                    )
+                    val indexExecutionContext =
+                        IndexExecutionContext(
+                            queries,
+                            indexLastRunContext,
+                            indexUpdatedRunContext,
+                            updatedIndexName,
+                            concreteIndexName,
+                            updatedIndexNames,
+                            concreteIndices,
+                            conflictingFields.toList(),
+                            matchingDocIdsPerIndex?.get(concreteIndexName),
+                            findingIdsForMatchingDocIds,
+                        )
 
                     val shards = mutableSetOf<String>()
                     shards.addAll(indexUpdatedRunContext.keys)
@@ -252,156 +273,169 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                      **/
                     val clusterService = monitorCtx.clusterService!!
                     val localNode = clusterService.localNode()
-                    val nodeMap: Map<String, DiscoveryNode> = if (docLevelMonitorInput?.fanoutEnabled == true) {
-                        getNodes(monitorCtx)
-                    } else {
-                        logger.info("Fan-out is disabled for chained findings monitor ${monitor.id}")
-                        mapOf(localNode.id to localNode)
-                    }
-
-                    val nodeShardAssignments = distributeShards(
-                        monitorCtx.totalNodesFanOut,
-                        nodeMap.keys.toList(),
-                        shards.toList(),
-                        monitorCtx.clusterService!!.state().metadata.index(concreteIndexName).index
-                    )
-
-                    val responses: Collection<DocLevelMonitorFanOutResponse> = suspendCoroutine { cont ->
-                        val listener = GroupedActionListener(
-                            object : ActionListener<Collection<DocLevelMonitorFanOutResponse>> {
-                                override fun onResponse(response: Collection<DocLevelMonitorFanOutResponse>) {
-                                    cont.resume(response)
-                                }
-
-                                override fun onFailure(e: Exception) {
-                                    if (e.cause is Exception)
-                                        cont.resumeWithException(e.cause as Exception)
-                                    else
-                                        cont.resumeWithException(e)
-                                }
-                            },
-                            nodeShardAssignments.size
-                        )
-                        val responseReader = Writeable.Reader {
-                            DocLevelMonitorFanOutResponse(it)
+                    val nodeMap: Map<String, DiscoveryNode> =
+                        if (docLevelMonitorInput?.fanoutEnabled == true) {
+                            getNodes(monitorCtx)
+                        } else {
+                            logger.info("Fan-out is disabled for chained findings monitor ${monitor.id}")
+                            mapOf(localNode.id to localNode)
                         }
-                        for (node in nodeMap) {
-                            if (nodeShardAssignments.containsKey(node.key)) {
-                                val docLevelMonitorFanOutRequest = DocLevelMonitorFanOutRequest(
-                                    monitor,
-                                    dryrun,
-                                    monitorMetadata,
-                                    executionId,
-                                    indexExecutionContext,
-                                    nodeShardAssignments[node.key]!!.toList(),
-                                    concreteIndicesSeenSoFar,
-                                    workflowRunContext
-                                )
 
-                                transportService.sendRequest(
-                                    node.value,
-                                    DocLevelMonitorFanOutAction.NAME,
-                                    docLevelMonitorFanOutRequest,
-                                    TransportRequestOptions
-                                        .builder()
-                                        .withTimeout(monitorCtx.docLevelMonitorExecutionMaxDuration)
-                                        .build(),
-                                    object : ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(
-                                        listener,
-                                        responseReader
-                                    ) {
-                                        override fun handleException(e: TransportException) {
-                                            if (
-                                                e is ReceiveTimeoutTransportException
-                                            ) {
-                                                logger.warn(
-                                                    "fan_out timed out in node ${localNode.id} for doc level monitor ${monitor.id}," +
-                                                        " attempting to collect partial results from other nodes. ExecutionId: $executionId"
-                                                )
-                                                listener.onResponse(
-                                                    DocLevelMonitorFanOutResponse(
-                                                        localNode.id,
-                                                        executionId,
-                                                        monitor.id,
-                                                        mutableMapOf()
-                                                    )
-                                                )
-                                                return
-                                            }
-                                            val cause = e.unwrapCause()
-                                            if (cause is ConnectTransportException ||
-                                                (
-                                                    e is RemoteTransportException &&
-                                                        (
-                                                            cause is NodeClosedException ||
-                                                                cause is CircuitBreakingException ||
-                                                                cause is ActionNotFoundTransportException
-                                                            )
-                                                    )
-                                            ) {
-                                                val localNode = monitorCtx.clusterService!!.localNode()
-                                                // retry in local node
-                                                transportService.sendRequest(
-                                                    localNode,
-                                                    DocLevelMonitorFanOutAction.NAME,
-                                                    docLevelMonitorFanOutRequest,
-                                                    TransportRequestOptions
-                                                        .builder()
-                                                        .withTimeout(monitorCtx.docLevelMonitorExecutionMaxDuration)
-                                                        .build(),
-                                                    object :
-                                                        ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(
-                                                            listener,
-                                                            responseReader
-                                                        ) {
-                                                        override fun handleException(e: TransportException) {
-                                                            logger.error("Fan out retry failed in node ${localNode.id}", e)
-                                                            listener.onResponse(
-                                                                DocLevelMonitorFanOutResponse(
-                                                                    "",
-                                                                    "",
-                                                                    "",
-                                                                    mutableMapOf(),
-                                                                    exception = if (e.cause is AlertingException) {
-                                                                        e.cause as AlertingException
-                                                                    } else {
-                                                                        AlertingException.wrap(e) as AlertingException
-                                                                    }
-                                                                )
-                                                            )
-                                                        }
+                    val nodeShardAssignments =
+                        distributeShards(
+                            monitorCtx.totalNodesFanOut,
+                            nodeMap.keys.toList(),
+                            shards.toList(),
+                            monitorCtx.clusterService!!
+                                .state()
+                                .metadata
+                                .index(concreteIndexName)
+                                .index,
+                        )
 
-                                                        override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
-                                                            listener.onResponse(response)
-                                                        }
-                                                    }
-                                                )
+                    val responses: Collection<DocLevelMonitorFanOutResponse> =
+                        suspendCoroutine { cont ->
+                            val listener =
+                                GroupedActionListener(
+                                    object : ActionListener<Collection<DocLevelMonitorFanOutResponse>> {
+                                        override fun onResponse(response: Collection<DocLevelMonitorFanOutResponse>) {
+                                            cont.resume(response)
+                                        }
+
+                                        override fun onFailure(e: Exception) {
+                                            if (e.cause is Exception) {
+                                                cont.resumeWithException(e.cause as Exception)
                                             } else {
-                                                logger.error("Fan out failed in node ${node.key}", e)
-                                                listener.onResponse(
-                                                    DocLevelMonitorFanOutResponse(
-                                                        "",
-                                                        "",
-                                                        "",
-                                                        mutableMapOf(),
-                                                        exception = if (e.cause is AlertingException) {
-                                                            e.cause as AlertingException
-                                                        } else {
-                                                            AlertingException.wrap(e) as AlertingException
-                                                        }
-                                                    )
-                                                )
+                                                cont.resumeWithException(e)
                                             }
                                         }
-
-                                        override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
-                                            listener.onResponse(response)
-                                        }
-                                    }
+                                    },
+                                    nodeShardAssignments.size,
                                 )
+                            val responseReader =
+                                Writeable.Reader {
+                                    DocLevelMonitorFanOutResponse(it)
+                                }
+                            for (node in nodeMap) {
+                                if (nodeShardAssignments.containsKey(node.key)) {
+                                    val docLevelMonitorFanOutRequest =
+                                        DocLevelMonitorFanOutRequest(
+                                            monitor,
+                                            dryrun,
+                                            monitorMetadata,
+                                            executionId,
+                                            indexExecutionContext,
+                                            nodeShardAssignments[node.key]!!.toList(),
+                                            concreteIndicesSeenSoFar,
+                                            workflowRunContext,
+                                        )
+
+                                    transportService.sendRequest(
+                                        node.value,
+                                        DocLevelMonitorFanOutAction.NAME,
+                                        docLevelMonitorFanOutRequest,
+                                        TransportRequestOptions
+                                            .builder()
+                                            .withTimeout(monitorCtx.docLevelMonitorExecutionMaxDuration)
+                                            .build(),
+                                        object : ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(
+                                            listener,
+                                            responseReader,
+                                        ) {
+                                            override fun handleException(e: TransportException) {
+                                                if (
+                                                    e is ReceiveTimeoutTransportException
+                                                ) {
+                                                    logger.warn(
+                                                        "fan_out timed out in node ${localNode.id} for doc level monitor ${monitor.id}," +
+                                                            " attempting to collect partial results from other nodes. ExecutionId: $executionId",
+                                                    )
+                                                    listener.onResponse(
+                                                        DocLevelMonitorFanOutResponse(
+                                                            localNode.id,
+                                                            executionId,
+                                                            monitor.id,
+                                                            mutableMapOf(),
+                                                        ),
+                                                    )
+                                                    return
+                                                }
+                                                val cause = e.unwrapCause()
+                                                if (cause is ConnectTransportException ||
+                                                    (
+                                                        e is RemoteTransportException &&
+                                                            (
+                                                                cause is NodeClosedException ||
+                                                                    cause is CircuitBreakingException ||
+                                                                    cause is ActionNotFoundTransportException
+                                                            )
+                                                    )
+                                                ) {
+                                                    val localNode = monitorCtx.clusterService!!.localNode()
+                                                    // retry in local node
+                                                    transportService.sendRequest(
+                                                        localNode,
+                                                        DocLevelMonitorFanOutAction.NAME,
+                                                        docLevelMonitorFanOutRequest,
+                                                        TransportRequestOptions
+                                                            .builder()
+                                                            .withTimeout(monitorCtx.docLevelMonitorExecutionMaxDuration)
+                                                            .build(),
+                                                        object :
+                                                            ActionListenerResponseHandler<DocLevelMonitorFanOutResponse>(
+                                                                listener,
+                                                                responseReader,
+                                                            ) {
+                                                            override fun handleException(e: TransportException) {
+                                                                logger.error("Fan out retry failed in node ${localNode.id}", e)
+                                                                listener.onResponse(
+                                                                    DocLevelMonitorFanOutResponse(
+                                                                        "",
+                                                                        "",
+                                                                        "",
+                                                                        mutableMapOf(),
+                                                                        exception =
+                                                                            if (e.cause is AlertingException) {
+                                                                                e.cause as AlertingException
+                                                                            } else {
+                                                                                AlertingException.wrap(e) as AlertingException
+                                                                            },
+                                                                    ),
+                                                                )
+                                                            }
+
+                                                            override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
+                                                                listener.onResponse(response)
+                                                            }
+                                                        },
+                                                    )
+                                                } else {
+                                                    logger.error("Fan out failed in node ${node.key}", e)
+                                                    listener.onResponse(
+                                                        DocLevelMonitorFanOutResponse(
+                                                            "",
+                                                            "",
+                                                            "",
+                                                            mutableMapOf(),
+                                                            exception =
+                                                                if (e.cause is AlertingException) {
+                                                                    e.cause as AlertingException
+                                                                } else {
+                                                                    AlertingException.wrap(e) as AlertingException
+                                                                },
+                                                        ),
+                                                    )
+                                                }
+                                            }
+
+                                            override fun handleResponse(response: DocLevelMonitorFanOutResponse) {
+                                                listener.onResponse(response)
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
-                    }
                     docLevelMonitorFanOutResponses.addAll(responses)
                 }
             }
@@ -416,7 +450,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             if (!isTempMonitor) {
                 MonitorMetadataService.upsertMetadata(
                     monitorMetadata.copy(lastRunContext = updatedLastRunContext),
-                    true
+                    true,
                 )
             } else {
                 // Clean up any queries created by the dry run monitor
@@ -431,11 +465,12 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage, executionId, workflowRunContext)
             }
             logger.error("Failed running Document-level-monitor ${monitor.name}", e)
-            val alertingException = AlertingException(
-                errorMessage,
-                RestStatus.INTERNAL_SERVER_ERROR,
-                e
-            )
+            val alertingException =
+                AlertingException(
+                    errorMessage,
+                    RestStatus.INTERNAL_SERVER_ERROR,
+                    e,
+                )
             return monitorResult.copy(error = alertingException, inputResults = InputRunResults(emptyList(), alertingException))
         } finally {
             val endTime = System.currentTimeMillis()
@@ -443,7 +478,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             logger.debug(
                 "Monitor {} Time spent on monitor run: {}",
                 monitor.id,
-                totalTimeTakenStat
+                totalTimeTakenStat,
             )
         }
     }
@@ -452,7 +487,6 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         docLevelMonitorFanOutResponses: MutableList<DocLevelMonitorFanOutResponse>,
         updatedLastRunContext: MutableMap<String, MutableMap<String, Any>>,
     ) {
-
         // Prepare updatedLastRunContext for each index
         for (indexName in updatedLastRunContext.keys) {
             for (fanOutResponse in docLevelMonitorFanOutResponses) {
@@ -462,15 +496,14 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
 
                     if (fanOutResponse.lastRunContexts.contains("index") && fanOutResponse.lastRunContexts["index"] == indexName) {
                         fanOutResponse.lastRunContexts.keys.forEach {
-
-                            val seq_no = fanOutResponse.lastRunContexts[it].toString().toLongOrNull()
+                            val seqNo = fanOutResponse.lastRunContexts[it].toString().toLongOrNull()
                             if (
                                 it != "shards_count" &&
                                 it != "index" &&
-                                seq_no != null &&
-                                seq_no >= 0
+                                seqNo != null &&
+                                seqNo >= 0
                             ) {
-                                indexLastRunContext[it] = seq_no
+                                indexLastRunContext[it] = seqNo
                             }
                         }
                     }
@@ -480,7 +513,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
     }
 
     private fun checkAndThrowExceptionIfAllFanOutsFailed(
-        docLevelMonitorFanOutResponses: MutableList<DocLevelMonitorFanOutResponse>
+        docLevelMonitorFanOutResponses: MutableList<DocLevelMonitorFanOutResponse>,
     ): AlertingException? {
         val exceptions = mutableListOf<AlertingException>()
         for (res in docLevelMonitorFanOutResponses) {
@@ -505,16 +538,18 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     if (documentLevelTriggerRunResult != null) {
                         if (false == triggerResults.contains(triggerId)) {
                             triggerResults[triggerId] = documentLevelTriggerRunResult
-                            triggerErrorMap[triggerId] = if (documentLevelTriggerRunResult.error != null) {
-                                val error = if (documentLevelTriggerRunResult.error is AlertingException) {
-                                    documentLevelTriggerRunResult.error as AlertingException
+                            triggerErrorMap[triggerId] =
+                                if (documentLevelTriggerRunResult.error != null) {
+                                    val error =
+                                        if (documentLevelTriggerRunResult.error is AlertingException) {
+                                            documentLevelTriggerRunResult.error as AlertingException
+                                        } else {
+                                            AlertingException.wrap(documentLevelTriggerRunResult.error!!) as AlertingException
+                                        }
+                                    mutableListOf(error)
                                 } else {
-                                    AlertingException.wrap(documentLevelTriggerRunResult.error!!) as AlertingException
+                                    mutableListOf()
                                 }
-                                mutableListOf(error)
-                            } else {
-                                mutableListOf()
-                            }
                         } else {
                             val currVal = triggerResults[triggerId]
                             val newTriggeredDocs = mutableListOf<String>()
@@ -523,10 +558,11 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                             val newActionResults = mutableMapOf<String, MutableMap<String, ActionRunResult>>()
                             newActionResults.putAll(currVal.actionResultsMap)
                             newActionResults.putAll(documentLevelTriggerRunResult.actionResultsMap)
-                            triggerResults[triggerId] = currVal.copy(
-                                triggeredDocs = newTriggeredDocs,
-                                actionResultsMap = newActionResults
-                            )
+                            triggerResults[triggerId] =
+                                currVal.copy(
+                                    triggeredDocs = newTriggeredDocs,
+                                    actionResultsMap = newActionResults,
+                                )
 
                             if (documentLevelTriggerRunResult.error != null) {
                                 triggerErrorMap[triggerId]!!.add(documentLevelTriggerRunResult.error as AlertingException)
@@ -588,19 +624,23 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         monitor: Monitor,
         periodStart: Instant,
         periodEnd: Instant,
-        indexMetadata: IndexMetadata
+        indexMetadata: IndexMetadata,
     ): Boolean {
         val lastExecutionTime = if (periodStart == periodEnd) monitor.lastUpdateTime else periodStart
         val indexCreationDate = indexMetadata.settings.get("index.creation_date")?.toLong() ?: 0L
         return indexCreationDate > lastExecutionTime.toEpochMilli()
     }
 
-    private fun getShardsCount(clusterService: ClusterService, index: String): Int {
+    private fun getShardsCount(
+        clusterService: ClusterService,
+        index: String,
+    ): Int {
         val allShards: List<ShardRouting> = clusterService!!.state().routingTable().allShards(index)
         return allShards.filter { it.primary() }.size
     }
 
-    private fun getNodes(monitorCtx: MonitorRunnerExecutionContext): Map<String, DiscoveryNode> {
-        return monitorCtx.clusterService!!.state().nodes.dataNodes.filter { it.value.version >= Version.CURRENT }
-    }
+    private fun getNodes(monitorCtx: MonitorRunnerExecutionContext): Map<String, DiscoveryNode> =
+        monitorCtx.clusterService!!.state().nodes.dataNodes.filter {
+            it.value.version >= Version.CURRENT
+        }
 }

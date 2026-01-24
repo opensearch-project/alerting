@@ -21,7 +21,6 @@ import org.opensearch.transport.TransportService
 import java.time.Instant
 
 abstract class MonitorRunner {
-
     abstract suspend fun runMonitor(
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
@@ -30,7 +29,7 @@ abstract class MonitorRunner {
         dryRun: Boolean,
         workflowRunContext: WorkflowRunContext? = null,
         executionId: String,
-        transportService: TransportService
+        transportService: TransportService,
     ): MonitorRunResult<*>
 
     suspend fun runAction(
@@ -38,16 +37,19 @@ abstract class MonitorRunner {
         ctx: TriggerExecutionContext,
         monitorCtx: MonitorRunnerExecutionContext,
         monitor: Monitor,
-        dryrun: Boolean
+        dryrun: Boolean,
     ): ActionRunResult {
         return try {
             if (ctx is QueryLevelTriggerExecutionContext && !MonitorRunnerService.isActionActionable(action, ctx.alert?.alert)) {
                 return ActionRunResult(action.id, action.name, mapOf(), true, null, null)
             }
             val actionOutput = mutableMapOf<String, String>()
-            actionOutput[Action.SUBJECT] = if (action.subjectTemplate != null)
-                MonitorRunnerService.compileTemplate(action.subjectTemplate!!, ctx)
-            else ""
+            actionOutput[Action.SUBJECT] =
+                if (action.subjectTemplate != null) {
+                    MonitorRunnerService.compileTemplate(action.subjectTemplate!!, ctx)
+                } else {
+                    ""
+                }
             actionOutput[Action.MESSAGE] = MonitorRunnerService.compileTemplate(action.messageTemplate, ctx)
             if (Strings.isNullOrEmpty(actionOutput[Action.MESSAGE])) {
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
@@ -61,15 +63,16 @@ abstract class MonitorRunner {
                             monitorCtx.settings!!,
                             monitorCtx.threadPool!!.threadContext,
                             monitor.user?.roles,
-                            monitor.user
-                        )
+                            monitor.user,
+                        ),
                     ) {
-                        actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                            action,
-                            monitorCtx,
-                            actionOutput[Action.SUBJECT],
-                            actionOutput[Action.MESSAGE]!!
-                        )
+                        actionOutput[Action.MESSAGE_ID] =
+                            getConfigAndSendNotification(
+                                action,
+                                monitorCtx,
+                                actionOutput[Action.SUBJECT],
+                                actionOutput[Action.MESSAGE]!!,
+                            )
                     }
                 }
             }

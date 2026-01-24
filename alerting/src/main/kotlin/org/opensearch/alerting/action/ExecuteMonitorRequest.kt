@@ -25,7 +25,7 @@ class ExecuteMonitorRequest : ActionRequest {
         requestEnd: TimeValue,
         monitorId: String?,
         monitor: Monitor?,
-        requestStart: TimeValue? = null
+        requestStart: TimeValue? = null,
     ) : super() {
         this.dryrun = dryrun
         this.requestEnd = requestEnd
@@ -41,13 +41,13 @@ class ExecuteMonitorRequest : ActionRequest {
         sin.readOptionalString(), // monitorId
         if (sin.readBoolean()) {
             Monitor.readFrom(sin) // monitor
-        } else null,
-        sin.readOptionalTimeValue()
+        } else {
+            null
+        },
+        sin.readOptionalTimeValue(),
     )
 
-    override fun validate(): ActionRequestValidationException? {
-        return null
-    }
+    override fun validate(): ActionRequestValidationException? = null
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {

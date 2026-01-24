@@ -26,19 +26,21 @@ data class PPLSQLMonitorRunResult(
     override val monitorName: String,
     override val error: Exception?,
     override val triggerResults: Map<String, PPLSQLTriggerRunResult>,
-    val pplQueryResults: Map<String, Map<String, Any?>> // key: trigger id, value: query results
+    val pplQueryResults: Map<String, Map<String, Any?>>, // key: trigger id, value: query results
 ) : MonitorV2RunResult<PPLSQLTriggerRunResult> {
-
     @Throws(IOException::class)
     @Suppress("UNCHECKED_CAST")
     constructor(sin: StreamInput) : this(
         sin.readString(), // monitorName
         sin.readException(), // error
         sin.readMap(STRING_READER, runResultReader()) as Map<String, PPLSQLTriggerRunResult>, // triggerResults
-        sin.readMap() as Map<String, Map<String, Any?>> // pplQueryResults
+        sin.readMap() as Map<String, Map<String, Any?>>, // pplQueryResults
     )
 
-    override fun toXContent(builder: XContentBuilder, params: ToXContent.Params): XContentBuilder {
+    override fun toXContent(
+        builder: XContentBuilder,
+        params: ToXContent.Params,
+    ): XContentBuilder {
         builder.startObject()
         builder.field(MONITOR_V2_NAME_FIELD, monitorName)
         builder.field(ERROR_FIELD, error?.message)
@@ -59,16 +61,14 @@ data class PPLSQLMonitorRunResult(
     companion object {
         const val PPL_QUERY_RESULTS_FIELD = "ppl_query_results"
 
-        private fun runResultReader(): Writeable.Reader<PPLSQLTriggerRunResult> {
-            return Writeable.Reader<PPLSQLTriggerRunResult> {
+        private fun runResultReader(): Writeable.Reader<PPLSQLTriggerRunResult> =
+            Writeable.Reader<PPLSQLTriggerRunResult> {
                 PPLSQLTriggerRunResult.readFrom(it)
             }
-        }
 
-        private fun runResultWriter(): Writeable.Writer<PPLSQLTriggerRunResult> {
-            return Writeable.Writer<PPLSQLTriggerRunResult> { streamOutput: StreamOutput, runResult: PPLSQLTriggerRunResult ->
+        private fun runResultWriter(): Writeable.Writer<PPLSQLTriggerRunResult> =
+            Writeable.Writer<PPLSQLTriggerRunResult> { streamOutput: StreamOutput, runResult: PPLSQLTriggerRunResult ->
                 runResult.writeTo(streamOutput)
             }
-        }
     }
 }

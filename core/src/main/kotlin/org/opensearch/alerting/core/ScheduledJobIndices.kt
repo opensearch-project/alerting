@@ -20,14 +20,18 @@ import org.opensearch.transport.client.AdminClient
  * [initScheduledJobIndex] is called before indexing a new scheduled job. It verifies that the index exists before
  * allowing the index to go through. This is to ensure the correct mappings exist for [ScheduledJob].
  */
-class ScheduledJobIndices(private val client: AdminClient, private val clusterService: ClusterService) {
-
+class ScheduledJobIndices(
+    private val client: AdminClient,
+    private val clusterService: ClusterService,
+) {
     companion object {
         @JvmStatic
-        fun scheduledJobMappings(): String {
-            return ScheduledJobIndices::class.java.classLoader.getResource("mappings/scheduled-jobs.json").readText()
-        }
+        fun scheduledJobMappings(): String =
+            ScheduledJobIndices::class.java.classLoader
+                .getResource("mappings/scheduled-jobs.json")
+                .readText()
     }
+
     /**
      * Initialize the indices required for scheduled jobs.
      * First check if the index exists, and if not create the index with the provided callback listeners.
@@ -36,9 +40,10 @@ class ScheduledJobIndices(private val client: AdminClient, private val clusterSe
      */
     fun initScheduledJobIndex(actionListener: ActionListener<CreateIndexResponse>) {
         if (!scheduledJobIndexExists()) {
-            var indexRequest = CreateIndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                .mapping(scheduledJobMappings())
-                .settings(Settings.builder().put("index.hidden", true).build())
+            var indexRequest =
+                CreateIndexRequest(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                    .mapping(scheduledJobMappings())
+                    .settings(Settings.builder().put("index.hidden", true).build())
             client.indices().create(indexRequest, actionListener)
         }
     }

@@ -6,6 +6,5 @@
 package org.opensearch.alerting.spi
 
 interface RemoteMonitorRunnerExtension {
-
     fun getMonitorTypesToMonitorRunners(): Map<String, RemoteMonitorRunner>
 }
