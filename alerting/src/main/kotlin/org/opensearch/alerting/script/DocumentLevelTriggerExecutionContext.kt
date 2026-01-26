@@ -6,6 +6,7 @@
 package org.opensearch.alerting.script
 
 import org.opensearch.alerting.model.AlertContext
+import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import java.time.Instant
@@ -19,16 +20,26 @@ data class DocumentLevelTriggerExecutionContext(
     val alerts: List<AlertContext> = listOf(),
     val triggeredDocs: List<String>,
     val relatedFindings: List<String>,
-    override val error: Exception? = null
-) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error) {
+    override val error: Exception? = null,
+    override val clusterSettings: ClusterSettings
+) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error, clusterSettings) {
 
     constructor(
         monitor: Monitor,
         trigger: DocumentLevelTrigger,
-        alerts: List<AlertContext> = listOf()
+        alerts: List<AlertContext> = listOf(),
+        clusterSettings: ClusterSettings
     ) : this(
-        monitor, trigger, emptyList(), Instant.now(), Instant.now(),
-        alerts, emptyList(), emptyList(), null
+        monitor,
+        trigger,
+        emptyList(),
+        Instant.now(),
+        Instant.now(),
+        alerts,
+        emptyList(),
+        emptyList(),
+        null,
+        clusterSettings
     )
 
     /**
