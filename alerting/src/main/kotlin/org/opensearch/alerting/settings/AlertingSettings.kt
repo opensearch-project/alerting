@@ -483,5 +483,11 @@ class AlertingSettings {
             "plugins.alerting.tenant.resource_id_header.",
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        val FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY = Setting.simpleString(
+            "plugins.alerting.filter_by_backend_roles_access_strategy",
+            "intersect",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }
