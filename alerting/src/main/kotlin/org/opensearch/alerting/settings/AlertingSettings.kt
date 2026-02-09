@@ -345,13 +345,6 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val ALERTING_V2_MAX_MONITORS = Setting.intSetting(
-            "plugins.alerting.v2.monitor.max_monitors",
-            1000,
-            1,
-            Setting.Property.NodeScope, Setting.Property.Dynamic
-        )
-
         val ALERTING_V2_MAX_THROTTLE_DURATION = Setting.longSetting(
             "plugins.alerting.v2.monitor.max_throttle_duration",
             7200L, // 5 days, 7200 minutes
@@ -362,13 +355,6 @@ class AlertingSettings {
         val ALERTING_V2_MAX_EXPIRE_DURATION = Setting.longSetting(
             "plugins.alerting.v2.monitor.max_expire_duration",
             43200L, // 30 days, 43200 minutes
-            2L,
-            Setting.Property.NodeScope, Setting.Property.Dynamic
-        )
-
-        val ALERTING_V2_MAX_LOOK_BACK_WINDOW = Setting.longSetting(
-            "plugins.alerting.v2.monitor.max_look_back_window",
-            10080L, // 7 days, 10080 minutes
             2L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )

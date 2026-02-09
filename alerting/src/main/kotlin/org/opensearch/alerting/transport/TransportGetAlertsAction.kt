@@ -14,6 +14,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.alertsv2.AlertV2Indices.Companion.ALERT_V2_INDEX
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use
@@ -27,6 +28,8 @@ import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetAlertsRequest
 import org.opensearch.commons.alerting.action.GetAlertsResponse
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Alert.Companion.MONITOR_NAME_FIELD
+import org.opensearch.commons.alerting.model.Alert.Companion.TRIGGER_NAME_FIELD
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
@@ -136,8 +139,8 @@ class TransportGetAlertsAction @Inject constructor(
                     QueryBuilders
                         .queryStringQuery(tableProp.searchString)
                         .defaultOperator(Operator.AND)
-                        .field("monitor_name")
-                        .field("trigger_name")
+                        .field(MONITOR_NAME_FIELD)
+                        .field(TRIGGER_NAME_FIELD)
                 )
         }
         val searchSourceBuilder = SearchSourceBuilder()
@@ -218,11 +221,7 @@ class TransportGetAlertsAction @Inject constructor(
                 xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                 getResponse.sourceAsBytesRef, XContentType.JSON
             )
-            val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
-            validateMonitorV1(scheduledJob)?.let {
-                throw it
-            }
-            return scheduledJob as Monitor
+            return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
         } catch (t: Exception) {
             log.error("Failure in fetching monitor ${getAlertsRequest.monitorId} to resolve alert index in get alerts action", t)
             return null

@@ -5,23 +5,20 @@
 
 package org.opensearch.alerting.alertsv2
 
-import org.junit.Before
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.TEST_INDEX_MAPPINGS
 import org.opensearch.alerting.TEST_INDEX_NAME
-import org.opensearch.alerting.core.settings.AlertingV2Settings
 import org.opensearch.alerting.makeRequest
-import org.opensearch.alerting.modelv2.PPLSQLMonitor
-import org.opensearch.alerting.modelv2.PPLSQLTrigger
-import org.opensearch.alerting.modelv2.PPLSQLTrigger.ConditionType
-import org.opensearch.alerting.modelv2.PPLSQLTrigger.NumResultsCondition
-import org.opensearch.alerting.modelv2.PPLSQLTrigger.TriggerMode
 import org.opensearch.alerting.randomPPLMonitor
 import org.opensearch.alerting.randomPPLTrigger
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.IntervalSchedule
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.ConditionType
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.NumResultsCondition
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.TriggerMode
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.test.OpenSearchTestCase
@@ -36,11 +33,6 @@ import java.util.concurrent.TimeUnit
  * --tests "org.opensearch.alerting.alertsv2.AlertV2IndicesIT"
  */
 class AlertV2IndicesIT : AlertingRestTestCase() {
-    @Before
-    fun enableAlertingV2() {
-        client().updateSettings(AlertingV2Settings.ALERTING_V2_ENABLED.key, "true")
-    }
-
     fun `test create alert v2 index`() {
         generateAlertV2s()
 
@@ -54,8 +46,8 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         assertIndexDoesNotExist(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX)
 
         putAlertV2Mappings(
-            AlertV2Indices.alertV2Mapping().trimStart('{').trimEnd('}')
-                .replace("\"schema_version\": 1", "\"schema_version\": 0")
+            AlertV2Indices.alertMapping().trimStart('{').trimEnd('}')
+                .replace("\"schema_version\": 6", "\"schema_version\": 0")
         )
         assertIndexExists(AlertV2Indices.ALERT_V2_INDEX)
         assertIndexExists(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX)
@@ -68,8 +60,8 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         assertIndexExists(AlertV2Indices.ALERT_V2_INDEX)
         assertIndexExists(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX)
         verifyIndexSchemaVersion(ScheduledJob.SCHEDULED_JOBS_INDEX, 9)
-        verifyIndexSchemaVersion(AlertV2Indices.ALERT_V2_INDEX, 1)
-        verifyIndexSchemaVersion(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX, 1)
+        verifyIndexSchemaVersion(AlertV2Indices.ALERT_V2_INDEX, 6)
+        verifyIndexSchemaVersion(AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX, 6)
     }
 
     fun `test alert v2 index gets recreated automatically if deleted`() {
@@ -109,13 +101,13 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         // Disable alert history
         client().updateSettings(AlertingSettings.ALERT_V2_HISTORY_ENABLED.key, "false")
 
-        val pplMonitorId = generateAlertV2s(
+        val pplMonitor = generateAlertV2s(
             randomPPLMonitor(
                 schedule = IntervalSchedule(interval = 30, unit = MINUTES),
                 query = "source = $TEST_INDEX_NAME | head 3",
                 triggers = listOf(
                     randomPPLTrigger(
-                        mode = PPLSQLTrigger.TriggerMode.RESULT_SET,
+                        mode = TriggerMode.RESULT_SET,
                         conditionType = ConditionType.NUMBER_OF_RESULTS,
                         numResultsCondition = NumResultsCondition.GREATER_THAN,
                         numResultsValue = 0L,
@@ -125,7 +117,7 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
             )
         )
 
-        val alerts1 = searchAlertV2s(pplMonitorId)
+        val alerts1 = searchAlerts(pplMonitor, AlertV2Indices.ALERT_V2_INDEX)
         assertEquals("1 alert should be present", 1, alerts1.size)
 
         // wait for alert to expire.
@@ -136,20 +128,20 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
         }, 2, TimeUnit.MINUTES)
 
         // Since history is disabled, the alert should be hard deleted by now
-        val alerts2 = searchAlertV2s(pplMonitorId, AlertV2Indices.ALL_ALERT_V2_INDEX_PATTERN)
+        val alerts2 = searchAlerts(pplMonitor, AlertV2Indices.ALL_ALERT_V2_INDEX_PATTERN)
         assertTrue("There should be no alerts, but alerts were found", alerts2.isEmpty())
     }
 
     fun `test short retention period`() {
         resetHistorySettings()
 
-        val pplMonitorId = generateAlertV2s(
+        val pplMonitor = generateAlertV2s(
             randomPPLMonitor(
                 schedule = IntervalSchedule(interval = 30, unit = MINUTES),
                 query = "source = $TEST_INDEX_NAME | head 3",
                 triggers = listOf(
                     randomPPLTrigger(
-                        mode = PPLSQLTrigger.TriggerMode.RESULT_SET,
+                        mode = TriggerMode.RESULT_SET,
                         conditionType = ConditionType.NUMBER_OF_RESULTS,
                         numResultsCondition = NumResultsCondition.GREATER_THAN,
                         numResultsValue = 0L,
@@ -159,7 +151,7 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
             )
         )
 
-        val alerts1 = searchAlertV2s(pplMonitorId)
+        val alerts1 = searchAlerts(pplMonitor, AlertV2Indices.ALERT_V2_INDEX)
         assertEquals("1 alert should be present", 1, alerts1.size)
 
         // history index should be created but empty
@@ -172,7 +164,7 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
             return@waitUntil false
         }, 2, TimeUnit.MINUTES)
 
-        assertTrue(searchAlertV2s(pplMonitorId).isEmpty())
+        assertTrue(searchAlerts(pplMonitor, AlertV2Indices.ALERT_V2_INDEX).isEmpty())
         assertEquals(1, getAlertV2HistoryDocCount())
 
         // update rollover check and max docs as well as decreasing the retention period
@@ -215,24 +207,24 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
             )
         )
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        val getAlertsResponsePreExpire = getAlertV2s()
+        val getAlertsResponsePreExpire = getAlerts()
         val alertsGeneratedPreExpire = numAlerts(getAlertsResponsePreExpire) > 0
 
         assert(triggered) { "Monitor should have triggered but it didn't" }
         assert(alertsGeneratedPreExpire) { "Alerts should have been generated but they weren't" }
 
         // delete the monitor
-        deleteMonitorV2(pplMonitor.id)
+        deleteMonitor(pplMonitor)
 
         // sleep so postDelete can expire the generated alert
         OpenSearchTestCase.waitUntil({
             return@waitUntil false
         }, 5, TimeUnit.SECONDS)
 
-        val getAlertsResponsePostExpire = getAlertV2s()
+        val getAlertsResponsePostExpire = getAlerts()
         val alertsGeneratedPostExpire = numAlerts(getAlertsResponsePostExpire) > 0
         assert(!alertsGeneratedPostExpire)
 
@@ -265,10 +257,10 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
 
         val pplMonitor = createRandomPPLMonitor(initialPplMonitorConfig)
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        val getAlertsResponsePreExpire = getAlertV2s()
+        val getAlertsResponsePreExpire = getAlerts()
         val alertsGeneratedPreExpire = numAlerts(getAlertsResponsePreExpire) > 0
 
         assert(triggered) { "Monitor should have triggered but it didn't" }
@@ -276,14 +268,14 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
 
         // update the monitor to any new config,
         // and more importantly, updated triggers
-        updateMonitorV2(randomPPLMonitor().makeCopy(pplMonitor.id, pplMonitor.version))
+        updateMonitor(randomPPLMonitor().copy(id = pplMonitor.id, version = pplMonitor.version))
 
         // sleep so postIndex can expire the generated alert
         OpenSearchTestCase.waitUntil({
             return@waitUntil false
         }, 5, TimeUnit.SECONDS)
 
-        val getAlertsResponsePostExpire = getAlertV2s()
+        val getAlertsResponsePostExpire = getAlerts()
         val alertsGeneratedPostExpire = numAlerts(getAlertsResponsePostExpire) > 0
         assert(!alertsGeneratedPostExpire)
 
@@ -316,24 +308,24 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
             )
         )
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        val getAlertsResponsePreExpire = getAlertV2s()
+        val getAlertsResponsePreExpire = getAlerts()
         val alertsGeneratedPreExpire = numAlerts(getAlertsResponsePreExpire) > 0
 
         assert(triggered) { "Monitor should have triggered but it didn't" }
         assert(alertsGeneratedPreExpire) { "Alerts should have been generated but they weren't" }
 
         // delete the monitor
-        deleteMonitorV2(pplMonitor.id)
+        deleteMonitor(pplMonitor)
 
         // sleep so postDelete can expire the generated alert
         OpenSearchTestCase.waitUntil({
             return@waitUntil false
         }, 5, TimeUnit.SECONDS)
 
-        val getAlertsResponsePostExpire = getAlertV2s()
+        val getAlertsResponsePostExpire = getAlerts()
         val alertsGeneratedPostExpire = numAlerts(getAlertsResponsePostExpire) > 0
         assert(!alertsGeneratedPostExpire)
 
@@ -368,24 +360,24 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
 
         val pplMonitor = createRandomPPLMonitor(initialPplMonitorConfig)
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        val getAlertsResponsePreExpire = getAlertV2s()
+        val getAlertsResponsePreExpire = getAlerts()
         val alertsGeneratedPreExpire = numAlerts(getAlertsResponsePreExpire) > 0
 
         assert(triggered) { "Monitor should have triggered but it didn't" }
         assert(alertsGeneratedPreExpire) { "Alerts should have been generated but they weren't" }
 
         // update the monitor to any new config
-        updateMonitorV2(randomPPLMonitor().makeCopy(pplMonitor.id, pplMonitor.version))
+        updateMonitor(randomPPLMonitor().copy(id = pplMonitor.id, version = pplMonitor.version))
 
         // sleep so postIndex can expire the generated alert
         OpenSearchTestCase.waitUntil({
             return@waitUntil false
         }, 5, TimeUnit.SECONDS)
 
-        val getAlertsResponsePostExpire = getAlertV2s()
+        val getAlertsResponsePostExpire = getAlerts()
         val alertsGeneratedPostExpire = numAlerts(getAlertsResponsePostExpire) > 0
         assert(!alertsGeneratedPostExpire)
 
@@ -420,7 +412,7 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
 
     // generates alerts by creating then executing a monitor
     private fun generateAlertV2s(
-        pplMonitorConfig: PPLSQLMonitor = randomPPLMonitor(
+        pplMonitorConfig: Monitor = randomPPLMonitor(
             query = "source = $TEST_INDEX_NAME | head 3",
             triggers = listOf(
                 randomPPLTrigger(
@@ -430,7 +422,7 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
                 )
             )
         )
-    ): String {
+    ): Monitor {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(1, MINUTES, "abc", 5)
         indexDocFromSomeTimeAgo(2, MINUTES, "def", 10)
@@ -438,13 +430,13 @@ class AlertV2IndicesIT : AlertingRestTestCase() {
 
         val pplMonitor = createRandomPPLMonitor(pplMonitorConfig)
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
 
         // ensure execute call succeeded
         val xcp = createParser(XContentType.JSON.xContent(), executeResponse.entity.content)
         val output = xcp.map()
         assertNull("Error running monitor v2", output["error"])
 
-        return pplMonitor.id
+        return pplMonitor
     }
 }

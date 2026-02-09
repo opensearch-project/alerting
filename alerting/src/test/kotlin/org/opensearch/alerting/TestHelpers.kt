@@ -12,14 +12,6 @@ import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
 import org.opensearch.alerting.model.destination.email.EmailGroup
-import org.opensearch.alerting.modelv2.AlertV2
-import org.opensearch.alerting.modelv2.PPLSQLMonitor
-import org.opensearch.alerting.modelv2.PPLSQLMonitor.QueryLanguage
-import org.opensearch.alerting.modelv2.PPLSQLTrigger
-import org.opensearch.alerting.modelv2.PPLSQLTrigger.ConditionType
-import org.opensearch.alerting.modelv2.PPLSQLTrigger.NumResultsCondition
-import org.opensearch.alerting.modelv2.PPLSQLTrigger.TriggerMode
-import org.opensearch.alerting.modelv2.TriggerV2.Severity
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Request
 import org.opensearch.client.RequestOptions
@@ -55,6 +47,13 @@ import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
+import org.opensearch.commons.alerting.model.PPLSQLInput
+import org.opensearch.commons.alerting.model.PPLSQLInput.QueryLanguage
+import org.opensearch.commons.alerting.model.PPLSQLTrigger
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.ConditionType
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.NumResultsCondition
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.Severity
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.TriggerMode
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Schedule
@@ -243,6 +242,36 @@ fun randomDocumentLevelMonitor(
     )
 }
 
+fun randomPPLMonitor(
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    enabled: Boolean = randomBoolean(),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    triggers: List<PPLSQLTrigger> = List(randomIntBetween(1, 5)) { randomPPLTrigger() },
+    user: User? = randomUser(),
+    queryLanguage: QueryLanguage = QueryLanguage.PPL,
+    query: String = "source = $TEST_INDEX_NAME | head 10"
+): Monitor {
+    return Monitor(
+        name = name,
+        enabled = enabled,
+        schedule = schedule,
+        lastUpdateTime = lastUpdateTime,
+        enabledTime = enabledTime,
+        monitorType = Monitor.MonitorType.PPL_MONITOR.value,
+        inputs = listOf(
+            PPLSQLInput(
+                query = query,
+                queryLanguage = queryLanguage
+            )
+        ),
+        triggers = triggers,
+        user = user,
+        uiMetadata = mapOf()
+    )
+}
+
 fun randomWorkflow(
     id: String = Workflow.NO_ID,
     monitorIds: List<String>,
@@ -308,36 +337,6 @@ fun randomWorkflowWithDelegates(
     )
 }
 
-fun randomPPLMonitor(
-    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    enabled: Boolean = randomBoolean(),
-    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
-    lookBackWindow: Long? = randomLongBetween(10, 100),
-    timestampField: String? = lookBackWindow?.let { TIMESTAMP_FIELD },
-    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
-    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
-    description: String? = if (randomBoolean()) "some description" else null,
-    triggers: List<PPLSQLTrigger> = List(randomIntBetween(1, 5)) { randomPPLTrigger() },
-    user: User? = randomUser(),
-    queryLanguage: QueryLanguage = QueryLanguage.PPL,
-    query: String = "source = $TEST_INDEX_NAME | head 10"
-): PPLSQLMonitor {
-    return PPLSQLMonitor(
-        name = name,
-        enabled = enabled,
-        schedule = schedule,
-        lookBackWindow = lookBackWindow,
-        timestampField = timestampField,
-        lastUpdateTime = lastUpdateTime,
-        enabledTime = enabledTime,
-        description = description,
-        triggers = triggers,
-        user = user,
-        queryLanguage = queryLanguage,
-        query = query
-    )
-}
-
 fun randomQueryLevelTrigger(
     id: String = UUIDs.base64UUID(),
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -397,7 +396,7 @@ fun randomDocumentLevelTrigger(
 // random PPLTrigger defaults to a number_of_results trigger, because a custom condition
 // would require knowledge of the PPL Monitor's query
 // it is on the caller to be explicit and pass in valid arguments that would create either
-// a valid PPL Monitor or one that intentionally throws an error.
+// a valid PPL Monitor or one that intentionally throws an error during testing.
 // e.g. to create a valid PPL Monitor, if conditionType is CUSTOM,
 // numResultsCondition and numResultsValue must be null, while
 // customCondition must not be null.
@@ -417,7 +416,7 @@ fun randomPPLTrigger(
     return PPLSQLTrigger(
         id = id,
         name = name,
-        severity = severity,
+        severity = severity.value,
         throttleDuration = throttleDuration,
         expireDuration = expireDuration,
         lastTriggeredTime = null,
@@ -552,42 +551,6 @@ fun randomAlert(monitor: Monitor = randomQueryLevelMonitor()): Alert {
     return Alert(
         monitor, trigger, Instant.now().truncatedTo(ChronoUnit.MILLIS), null,
         actionExecutionResults = actionExecutionResults
-    )
-}
-
-fun randomAlertV2(
-    id: String = UUIDs.base64UUID(),
-    version: Long = randomLongBetween(1, 10),
-    schemaVersion: Int = randomIntBetween(1, 10),
-    monitorId: String = UUIDs.base64UUID(),
-    monitorName: String = UUIDs.base64UUID(),
-    monitorVersion: Long = randomLongBetween(1, 10),
-    monitorUser: User? = randomUser(),
-    triggerId: String = UUIDs.base64UUID(),
-    triggerName: String = UUIDs.base64UUID(),
-    query: String = "source = $TEST_INDEX_NAME | head 10",
-    queryResults: Map<String, Any> = mapOf(),
-    triggeredTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
-    errorMessage: String? = "sample error message",
-    severity: Severity = Severity.entries.random(),
-    executionId: String? = UUIDs.base64UUID()
-): AlertV2 {
-    return AlertV2(
-        id = id,
-        version = version,
-        schemaVersion = schemaVersion,
-        monitorId = monitorId,
-        monitorName = monitorName,
-        monitorVersion = monitorVersion,
-        monitorUser = monitorUser,
-        triggerId = triggerId,
-        triggerName = triggerName,
-        query = query,
-        queryResults = queryResults,
-        triggeredTime = triggeredTime,
-        errorMessage = errorMessage,
-        severity = severity,
-        executionId = executionId,
     )
 }
 
@@ -930,7 +893,7 @@ fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
     return this[key] as Map<String, Map<String, Any>>
 }
 
-fun assertPplMonitorsEqual(pplMonitor1: PPLSQLMonitor, pplMonitor2: PPLSQLMonitor) {
+fun assertPplMonitorsEqual(pplMonitor1: Monitor, pplMonitor2: Monitor) {
     // note: Get and Search Monitor responses do not include User information by
     // design, so that check is skipped
 
@@ -940,17 +903,22 @@ fun assertPplMonitorsEqual(pplMonitor1: PPLSQLMonitor, pplMonitor2: PPLSQLMonito
 
     assertEquals("Monitor enabled fields not equal", pplMonitor1.enabled, pplMonitor2.enabled)
     assertEquals("Monitor schedules not equal", pplMonitor1.schedule, pplMonitor2.schedule)
-    assertEquals("Monitor lookback windows not equal", pplMonitor1.lookBackWindow, pplMonitor2.lookBackWindow)
-    assertEquals("Monitor timestamp fields not equal", pplMonitor1.timestampField, pplMonitor2.timestampField)
-    assertEquals("Monitor last updated times are not equal", pplMonitor1.lastUpdateTime, pplMonitor2.lastUpdateTime)
-    assertEquals("Monitor query languages not equal", pplMonitor1.queryLanguage, pplMonitor2.queryLanguage)
-    assertEquals("Monitor queries not equal", pplMonitor1.query, pplMonitor2.query)
+    assertEquals(
+        "Monitor query languages not equal",
+        (pplMonitor1.inputs[0] as PPLSQLInput).queryLanguage,
+        (pplMonitor2.inputs[0] as PPLSQLInput).queryLanguage
+    )
+    assertEquals(
+        "Monitor queries not equal",
+        (pplMonitor1.inputs[0] as PPLSQLInput).query,
+        (pplMonitor2.inputs[0] as PPLSQLInput).query
+    )
     assertEquals("Number of triggers in monitor not equal", pplMonitor1.triggers.size, pplMonitor2.triggers.size)
 
     val sortedTriggers1 = pplMonitor1.triggers.sortedBy { it.id }
     val sortedTriggers2 = pplMonitor2.triggers.sortedBy { it.id }
     for (i in sortedTriggers1.indices) {
-        assertPplTriggersEqual(sortedTriggers1[i], sortedTriggers2[i])
+        assertPplTriggersEqual(sortedTriggers1[i] as PPLSQLTrigger, sortedTriggers2[i] as PPLSQLTrigger)
     }
 }
 
@@ -1007,83 +975,5 @@ fun assertPplTriggersEqual(pplTrigger1: PPLSQLTrigger, pplTrigger2: PPLSQLTrigge
         "Monitor trigger $id custom conditions not equal",
         pplTrigger1.customCondition,
         pplTrigger2.customCondition
-    )
-}
-
-fun assertAlertV2sEqual(alert1: AlertV2, alert2: AlertV2) {
-    assertEquals(
-        "AlertV2 IDs are not equal",
-        alert1.id,
-        alert2.id
-    )
-    assertEquals(
-        "AlertV2 versions are not equal",
-        alert1.version,
-        alert2.version
-    )
-    assertEquals(
-        "AlertV2 schema versions are not equal",
-        alert1.schemaVersion,
-        alert2.schemaVersion
-    )
-    assertEquals(
-        "AlertV2 monitor IDs are not equal",
-        alert1.monitorId,
-        alert2.monitorId
-    )
-    assertEquals(
-        "AlertV2 monitor names are not equal",
-        alert1.monitorName,
-        alert2.monitorName
-    )
-    assertEquals(
-        "AlertV2 monitor versions are not equal",
-        alert1.monitorVersion,
-        alert2.monitorVersion
-    )
-    assertEquals(
-        "AlertV2 monitor users are not equal",
-        alert1.monitorUser.toString(),
-        alert2.monitorUser.toString()
-    )
-    assertEquals(
-        "AlertV2 trigger IDs are not equal",
-        alert1.triggerId,
-        alert2.triggerId
-    )
-    assertEquals(
-        "AlertV2 trigger names are not equal",
-        alert1.triggerName,
-        alert2.triggerName
-    )
-    assertEquals(
-        "AlertV2 queries are not equal",
-        alert1.query,
-        alert2.query
-    )
-    assertEquals(
-        "AlertV2 query results are not equal",
-        alert1.queryResults,
-        alert2.queryResults
-    )
-    assertEquals(
-        "AlertV2 triggered times are not equal",
-        alert1.triggeredTime,
-        alert2.triggeredTime
-    )
-    assertEquals(
-        "AlertV2 error messages are not equal",
-        alert1.errorMessage,
-        alert2.errorMessage
-    )
-    assertEquals(
-        "AlertV2 severities are not equal",
-        alert1.severity,
-        alert2.severity
-    )
-    assertEquals(
-        "AlertV2 execution IDs are not equal",
-        alert1.executionId,
-        alert2.executionId
     )
 }

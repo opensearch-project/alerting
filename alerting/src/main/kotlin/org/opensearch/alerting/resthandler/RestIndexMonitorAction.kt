@@ -18,6 +18,7 @@ import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.PPLSQLTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
@@ -30,7 +31,6 @@ import org.opensearch.core.xcontent.XContentParser.Token
 import org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.BaseRestHandler
-import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.BytesRestResponse
 import org.opensearch.rest.RestChannel
 import org.opensearch.rest.RestHandler.ReplacedRoute
@@ -43,7 +43,7 @@ import org.opensearch.rest.action.RestResponseListener
 import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
 import java.time.Instant
-import java.util.*
+import java.util.Locale
 
 private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)
 
@@ -92,6 +92,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
 
         val monitor: Monitor
         val rbacRoles: List<String>?
+
         try {
             monitor = Monitor.parse(xcp, id).copy(lastUpdateTime = Instant.now())
 
@@ -132,6 +133,14 @@ class RestIndexMonitorAction : BaseRestHandler() {
                         triggers.forEach {
                             if (it !is DocumentLevelTrigger) {
                                 throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for document level monitor")
+                            }
+                        }
+                    }
+
+                    Monitor.MonitorType.PPL_MONITOR -> {
+                        triggers.forEach {
+                            if (it !is PPLSQLTrigger) {
+                                throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for PPL monitor")
                             }
                         }
                     }

@@ -14,12 +14,6 @@ import org.opensearch.alerting.action.GetEmailGroupAction
 import org.opensearch.alerting.action.GetRemoteIndexesAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
-import org.opensearch.alerting.actionv2.DeleteMonitorV2Action
-import org.opensearch.alerting.actionv2.ExecuteMonitorV2Action
-import org.opensearch.alerting.actionv2.GetAlertsV2Action
-import org.opensearch.alerting.actionv2.GetMonitorV2Action
-import org.opensearch.alerting.actionv2.IndexMonitorV2Action
-import org.opensearch.alerting.actionv2.SearchMonitorV2Action
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.alertsv2.AlertV2Indices
@@ -34,10 +28,8 @@ import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportActio
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
 import org.opensearch.alerting.core.schedule.JobScheduler
-import org.opensearch.alerting.core.settings.AlertingV2Settings
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
-import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.remote.monitors.RemoteMonitorRegistry
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
 import org.opensearch.alerting.resthandler.RestAcknowledgeChainedAlertAction
@@ -62,12 +54,6 @@ import org.opensearch.alerting.resthandler.RestSearchAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
-import org.opensearch.alerting.resthandlerv2.RestDeleteMonitorV2Action
-import org.opensearch.alerting.resthandlerv2.RestExecuteMonitorV2Action
-import org.opensearch.alerting.resthandlerv2.RestGetAlertsV2Action
-import org.opensearch.alerting.resthandlerv2.RestGetMonitorV2Action
-import org.opensearch.alerting.resthandlerv2.RestIndexMonitorV2Action
-import org.opensearch.alerting.resthandlerv2.RestSearchMonitorV2Action
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
@@ -105,12 +91,6 @@ import org.opensearch.alerting.transport.TransportSearchAlertingCommentAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
-import org.opensearch.alerting.transportv2.TransportDeleteMonitorV2Action
-import org.opensearch.alerting.transportv2.TransportExecuteMonitorV2Action
-import org.opensearch.alerting.transportv2.TransportGetAlertsV2Action
-import org.opensearch.alerting.transportv2.TransportGetMonitorV2Action
-import org.opensearch.alerting.transportv2.TransportIndexMonitorV2Action
-import org.opensearch.alerting.transportv2.TransportSearchMonitorV2Action
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
@@ -131,6 +111,8 @@ import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.PPLSQLInput
+import org.opensearch.commons.alerting.model.PPLSQLTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
@@ -193,7 +175,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val UI_METADATA_EXCLUDE = arrayOf("monitor.${Monitor.UI_METADATA_FIELD}")
         @JvmField val TENANT_ID_HEADER = "x-tenant-id"
         @JvmField val MONITOR_BASE_URI = "/_plugins/_alerting/monitors"
-        @JvmField val MONITOR_V2_BASE_URI = "/_plugins/_alerting/v2/monitors"
         @JvmField val WORKFLOW_BASE_URI = "/_plugins/_alerting/workflows"
         @JvmField val REMOTE_BASE_URI = "/_plugins/_alerting/remote"
         @JvmField val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
@@ -206,7 +187,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val FINDING_BASE_URI = "/_plugins/_alerting/findings"
         @JvmField val COMMENTS_BASE_URI = "/_plugins/_alerting/comments"
 
-        @JvmField val ALERTING_JOB_TYPES = listOf("monitor", "workflow", "monitor_v2")
+        @JvmField val ALERTING_JOB_TYPES = listOf("monitor", "workflow")
     }
 
     lateinit var runner: MonitorRunnerService
@@ -258,14 +239,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestIndexAlertingCommentAction(),
             RestSearchAlertingCommentAction(),
             RestDeleteAlertingCommentAction(),
-
-            // Alerting V2
-            RestIndexMonitorV2Action(),
-            RestExecuteMonitorV2Action(),
-            RestDeleteMonitorV2Action(),
-            RestGetMonitorV2Action(),
-            RestSearchMonitorV2Action(settings, clusterService),
-            RestGetAlertsV2Action()
         )
     }
 
@@ -299,29 +272,22 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(ExecuteWorkflowAction.INSTANCE, TransportExecuteWorkflowAction::class.java),
             ActionPlugin.ActionHandler(GetRemoteIndexesAction.INSTANCE, TransportGetRemoteIndexesAction::class.java),
             ActionPlugin.ActionHandler(DocLevelMonitorFanOutAction.INSTANCE, TransportDocLevelMonitorFanOutAction::class.java),
-
-            // Alerting V2
-            ActionPlugin.ActionHandler(IndexMonitorV2Action.INSTANCE, TransportIndexMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(GetMonitorV2Action.INSTANCE, TransportGetMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(SearchMonitorV2Action.INSTANCE, TransportSearchMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(DeleteMonitorV2Action.INSTANCE, TransportDeleteMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(ExecuteMonitorV2Action.INSTANCE, TransportExecuteMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(GetAlertsV2Action.INSTANCE, TransportGetAlertsV2Action::class.java)
         )
     }
 
     override fun getNamedXContent(): List<NamedXContentRegistry.Entry> {
         return listOf(
             Monitor.XCONTENT_REGISTRY,
-            MonitorV2.XCONTENT_REGISTRY,
             SearchInput.XCONTENT_REGISTRY,
             DocLevelMonitorInput.XCONTENT_REGISTRY,
+            PPLSQLInput.XCONTENT_REGISTRY,
             QueryLevelTrigger.XCONTENT_REGISTRY,
             BucketLevelTrigger.XCONTENT_REGISTRY,
             ClusterMetricsInput.XCONTENT_REGISTRY,
             DocumentLevelTrigger.XCONTENT_REGISTRY,
             ChainedAlertTrigger.XCONTENT_REGISTRY,
             RemoteMonitorTrigger.XCONTENT_REGISTRY,
+            PPLSQLTrigger.XCONTENT_REGISTRY,
             Workflow.XCONTENT_REGISTRY
         )
     }
@@ -524,17 +490,14 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.ALERT_V2_HISTORY_MAX_DOCS,
             AlertingSettings.ALERT_V2_HISTORY_RETENTION_PERIOD,
             AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION,
-            AlertingSettings.ALERTING_V2_MAX_MONITORS,
             AlertingSettings.ALERTING_V2_MAX_THROTTLE_DURATION,
             AlertingSettings.ALERTING_V2_MAX_EXPIRE_DURATION,
-            AlertingSettings.ALERTING_V2_MAX_LOOK_BACK_WINDOW,
             AlertingSettings.ALERTING_V2_MAX_QUERY_LENGTH,
             AlertingSettings.ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS,
             AlertingSettings.ALERT_V2_QUERY_RESULTS_MAX_SIZE,
             AlertingSettings.ALERT_V2_PER_RESULT_TRIGGER_MAX_ALERTS,
             AlertingSettings.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH,
             AlertingSettings.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH,
-            AlertingV2Settings.ALERTING_V2_ENABLED,
         )
     }
 

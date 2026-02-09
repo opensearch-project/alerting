@@ -98,7 +98,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     }
 
     protected fun executeMonitor(monitor: Monitor, id: String?, dryRun: Boolean = true): ExecuteMonitorResponse? {
-        val request = ExecuteMonitorRequest(dryRun, TimeValue(Instant.now().toEpochMilli()), id, monitor)
+        val request = ExecuteMonitorRequest(dryRun, false, TimeValue(Instant.now().toEpochMilli()), id, monitor)
         return client().execute(ExecuteMonitorAction.INSTANCE, request).get()
     }
 
@@ -491,7 +491,7 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     }
 
     protected fun executeWorkflow(workflow: Workflow? = null, id: String? = null, dryRun: Boolean = true): ExecuteWorkflowResponse? {
-        val request = ExecuteWorkflowRequest(dryRun, TimeValue(Instant.now().toEpochMilli()), id, workflow)
+        val request = ExecuteWorkflowRequest(dryRun, false, TimeValue(Instant.now().toEpochMilli()), id, workflow)
         return client().execute(ExecuteWorkflowAction.INSTANCE, request).get()
     }
 

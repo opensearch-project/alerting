@@ -34,6 +34,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
+        manual: Boolean,
         workflowRunContext: WorkflowRunContext?,
         executionId: String,
         transportService: TransportService
@@ -47,6 +48,11 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
         var monitorResult = MonitorRunResult<QueryLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
         val currentAlerts = try {
+            // create stateless alert indices as well to prevent get alerts from returning error because
+            // stateless alerts indices couldn't be found
+            monitorCtx.alertV2Indices!!.createOrUpdateAlertV2Index()
+            monitorCtx.alertV2Indices!!.createOrUpdateInitialAlertV2HistoryIndex()
+
             monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
             monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
             monitorCtx.alertService!!.loadCurrentAlertsForQueryLevelMonitor(monitor, workflowRunContext)

@@ -64,7 +64,7 @@ class IndexUtils {
             alertIndexSchemaVersion = getSchemaVersion(AlertIndices.alertMapping())
             findingIndexSchemaVersion = getSchemaVersion(AlertIndices.findingMapping())
             alertingCommentIndexSchemaVersion = getSchemaVersion(CommentsIndices.commentsMapping())
-            alertV2IndexSchemaVersion = getSchemaVersion(AlertV2Indices.alertV2Mapping())
+            alertV2IndexSchemaVersion = getSchemaVersion(AlertV2Indices.alertMapping())
         }
 
         @JvmStatic
@@ -89,7 +89,7 @@ class IndexUtils {
 
         @JvmStatic
         fun alertV2IndexUpdated() {
-            commentsIndexUpdated = true
+            alertV2IndexUpdated = true
         }
 
         @JvmStatic

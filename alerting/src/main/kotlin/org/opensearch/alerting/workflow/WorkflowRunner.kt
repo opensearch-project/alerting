@@ -5,12 +5,12 @@
 
 package org.opensearch.alerting.workflow
 
-import org.opensearch.alerting.AlertingV2Utils.getConfigAndSendNotification
 import org.opensearch.alerting.MonitorRunnerExecutionContext
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.ChainedAlertTriggerExecutionContext
+import org.opensearch.alerting.util.getConfigAndSendNotification
 import org.opensearch.alerting.util.use
 import org.opensearch.commons.alerting.model.ActionRunResult
 import org.opensearch.commons.alerting.model.Workflow
@@ -29,6 +29,7 @@ abstract class WorkflowRunner {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
+        manual: Boolean,
         transportService: TransportService
     ): WorkflowRunResult
 

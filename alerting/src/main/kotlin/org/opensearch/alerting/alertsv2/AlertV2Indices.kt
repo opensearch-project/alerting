@@ -24,6 +24,7 @@ import org.opensearch.action.admin.indices.rollover.RolloverRequest
 import org.opensearch.action.admin.indices.rollover.RolloverResponse
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
+import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_V2_HISTORY_ENABLED
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_V2_HISTORY_INDEX_MAX_AGE
@@ -94,8 +95,8 @@ class AlertV2Indices(
         const val ALL_ALERT_V2_INDEX_PATTERN = ".opensearch-alerting-v2-alert*"
 
         @JvmStatic
-        fun alertV2Mapping() =
-            AlertV2Indices::class.java.getResource("alert_v2_mapping.json").readText()
+        fun alertMapping() =
+            AlertIndices::class.java.getResource("alert_mapping.json").readText()
     }
 
     @Volatile private var alertV2HistoryEnabled = ALERT_V2_HISTORY_ENABLED.get(settings)
@@ -170,24 +171,24 @@ class AlertV2Indices(
 
     suspend fun createOrUpdateAlertV2Index() {
         if (!alertV2IndexInitialized) {
-            alertV2IndexInitialized = createIndex(ALERT_V2_INDEX, alertV2Mapping())
+            alertV2IndexInitialized = createIndex(ALERT_V2_INDEX, alertMapping())
             if (alertV2IndexInitialized) IndexUtils.alertIndexUpdated()
         } else {
-            if (!IndexUtils.alertIndexUpdated) updateIndexMapping(ALERT_V2_INDEX, alertV2Mapping())
+            if (!IndexUtils.alertIndexUpdated) updateIndexMapping(ALERT_V2_INDEX, alertMapping())
         }
         alertV2IndexInitialized
     }
 
     suspend fun createOrUpdateInitialAlertV2HistoryIndex() {
         if (!alertV2HistoryIndexInitialized) {
-            alertV2HistoryIndexInitialized = createIndex(ALERT_V2_HISTORY_INDEX_PATTERN, alertV2Mapping(), ALERT_V2_HISTORY_WRITE_INDEX)
+            alertV2HistoryIndexInitialized = createIndex(ALERT_V2_HISTORY_INDEX_PATTERN, alertMapping(), ALERT_V2_HISTORY_WRITE_INDEX)
             if (alertV2HistoryIndexInitialized)
                 IndexUtils.lastUpdatedAlertV2HistoryIndex = IndexUtils.getIndexNameWithAlias(
                     clusterService.state(),
                     ALERT_V2_HISTORY_WRITE_INDEX
                 )
         } else {
-            updateIndexMapping(ALERT_V2_HISTORY_WRITE_INDEX, alertV2Mapping(), true)
+            updateIndexMapping(ALERT_V2_HISTORY_WRITE_INDEX, alertMapping(), true)
         }
         alertV2HistoryIndexInitialized
     }
@@ -299,7 +300,7 @@ class AlertV2Indices(
             alertV2HistoryIndexInitialized,
             ALERT_V2_HISTORY_WRITE_INDEX,
             ALERT_V2_HISTORY_INDEX_PATTERN,
-            alertV2Mapping(),
+            alertMapping(),
             alertV2HistoryMaxDocs,
             alertV2HistoryMaxAge,
             ALERT_V2_HISTORY_WRITE_INDEX

@@ -11,7 +11,6 @@ import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetAlertsRequest
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.rest.BaseRestHandler
-import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
 import org.opensearch.rest.RestRequest
@@ -54,7 +53,7 @@ class RestGetAlertsAction : BaseRestHandler() {
         val size = request.paramAsInt("size", 20)
         val startIndex = request.paramAsInt("startIndex", 0)
         val searchString = request.param("searchString", "")
-        val severityLevel = request.param("severityLevel", "ALL")
+        val severityLevel = request.param("severityLevel", "ALL") // TODO: stateless and stateful operate on diff sevs
         val alertState = request.param("alertState", "ALL")
         val monitorId: String? = request.param("monitorId")
         val workflowId: String? = request.param("workflowIds")
@@ -78,5 +77,10 @@ class RestGetAlertsAction : BaseRestHandler() {
                 channel ->
             client.execute(AlertingActions.GET_ALERTS_ACTION_TYPE, getAlertsRequest, RestToXContentListener(channel))
         }
+    }
+
+    companion object {
+        const val STATEFUL = "stateful"
+        const val STATELESS = "stateless"
     }
 }

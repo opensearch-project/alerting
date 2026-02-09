@@ -5,11 +5,11 @@
 
 package org.opensearch.alerting
 
-import org.opensearch.alerting.AlertingV2Utils.getConfigAndSendNotification
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
+import org.opensearch.alerting.util.getConfigAndSendNotification
 import org.opensearch.alerting.util.use
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.alerting.model.ActionRunResult
@@ -29,6 +29,7 @@ abstract class MonitorRunner {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
+        manual: Boolean,
         workflowRunContext: WorkflowRunContext? = null,
         executionId: String,
         transportService: TransportService

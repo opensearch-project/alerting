@@ -5,23 +5,30 @@
 
 package org.opensearch.alerting.script
 
-import org.json.JSONObject
-import org.opensearch.alerting.modelv2.PPLSQLMonitor
-import org.opensearch.alerting.modelv2.PPLSQLMonitorRunResult.Companion.PPL_QUERY_RESULTS_FIELD
-import org.opensearch.alerting.modelv2.PPLSQLTrigger
-import org.opensearch.alerting.modelv2.PPLSQLTrigger.Companion.PPL_SQL_TRIGGER_FIELD
+import org.opensearch.common.settings.ClusterSettings
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.PPLSQLTrigger
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.Companion.PPL_SQL_TRIGGER_FIELD
+import java.time.Instant
 
 data class PPLTriggerExecutionContext(
-    override val monitorV2: PPLSQLMonitor,
+    override val monitor: Monitor,
     override val error: Exception? = null,
+    override val results: List<Map<String, Any>>,
+    override val periodStart: Instant,
+    override val periodEnd: Instant,
+    override val clusterSettings: ClusterSettings,
     val pplTrigger: PPLSQLTrigger,
-    var pplQueryResults: JSONObject // can be a full set of PPL query results, or an individual result row
-) : TriggerV2ExecutionContext(monitorV2, error) {
+) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error, clusterSettings) {
 
     override fun asTemplateArg(): Map<String, Any?> {
         val templateArg = super.asTemplateArg().toMutableMap()
         templateArg[PPL_SQL_TRIGGER_FIELD] = pplTrigger.asTemplateArg()
-        templateArg[PPL_QUERY_RESULTS_FIELD] = pplQueryResults.toMap()
+        templateArg[PPL_QUERY_RESULTS_FIELD] = results[0] // PPL/SQL Monitors only ever return one set of results
         return templateArg.toMap()
+    }
+
+    companion object {
+        const val PPL_QUERY_RESULTS_FIELD = "ppl_query_results"
     }
 }

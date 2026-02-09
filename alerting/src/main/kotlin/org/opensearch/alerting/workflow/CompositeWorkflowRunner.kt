@@ -56,6 +56,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
+        manual: Boolean,
         transportService: TransportService
     ): WorkflowRunResult {
         val workflowExecutionStartTime = Instant.now()
@@ -145,6 +146,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                         periodStart,
                         periodEnd,
                         dryRun,
+                        manual,
                         workflowRunContext,
                         executionId,
                         transportService
@@ -176,6 +178,11 @@ object CompositeWorkflowRunner : WorkflowRunner() {
             triggerResults = triggerResults
         )
         val currentAlerts = try {
+            // create stateless alert indices as well to prevent get alerts from returning error because
+            // stateless alerts indices couldn't be found
+            monitorCtx.alertV2Indices!!.createOrUpdateAlertV2Index()
+            monitorCtx.alertV2Indices!!.createOrUpdateInitialAlertV2HistoryIndex()
+
             monitorCtx.alertIndices!!.createOrUpdateAlertIndex(dataSources!!)
             monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(dataSources)
             monitorCtx.alertService!!.loadCurrentAlertsForWorkflow(workflow, dataSources)
@@ -249,6 +256,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
+        manual: Boolean,
         workflowRunContext: WorkflowRunContext,
         executionId: String,
         transportService: TransportService
@@ -261,6 +269,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 periodStart,
                 periodEnd,
                 dryRun,
+                manual,
                 workflowRunContext,
                 executionId,
                 transportService
@@ -272,6 +281,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 periodStart,
                 periodEnd,
                 dryRun,
+                manual,
                 workflowRunContext,
                 executionId,
                 transportService
@@ -283,6 +293,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 periodStart,
                 periodEnd,
                 dryRun,
+                manual,
                 workflowRunContext,
                 executionId,
                 transportService

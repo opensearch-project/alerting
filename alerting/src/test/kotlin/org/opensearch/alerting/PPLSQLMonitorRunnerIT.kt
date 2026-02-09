@@ -5,15 +5,13 @@
 
 package org.opensearch.alerting
 
-import org.junit.Before
-import org.opensearch.alerting.core.settings.AlertingV2Settings
-import org.opensearch.alerting.modelv2.PPLSQLTrigger.ConditionType
-import org.opensearch.alerting.modelv2.PPLSQLTrigger.NumResultsCondition
-import org.opensearch.alerting.modelv2.PPLSQLTrigger.TriggerMode
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.IntervalSchedule
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.ConditionType
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.NumResultsCondition
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.TriggerMode
 import org.opensearch.test.OpenSearchTestCase
 import java.time.temporal.ChronoUnit.MINUTES
 import java.util.concurrent.TimeUnit
@@ -27,11 +25,6 @@ import java.util.concurrent.TimeUnit
  * --tests "org.opensearch.alerting.PPLMonitorRunnerIT"
  */
 class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
-    @Before
-    fun enableAlertingV2() {
-        client().updateSettings(AlertingV2Settings.ALERTING_V2_ENABLED.key, "true")
-    }
-
     fun `test monitor execution timeout generates error alert`() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
@@ -40,7 +33,6 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             randomPPLMonitor(
                 enabled = true,
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
                 triggers = listOf(
                     randomPPLTrigger(
                         throttleDuration = null,
@@ -59,12 +51,13 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
         // set the monitor execution timebox to 1 nanosecond to guarantee a timeout
         client().updateSettings(AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION.key, TimeValue.timeValueNanos(1L))
 
-        val executeMonitorResponse = executeMonitorV2(pplMonitor.id)
+        val executeMonitorResponse = executeMonitor(pplMonitor.id)
 
-        val getAlertsResponse = getAlertV2s()
+        val getAlertsResponse = getAlerts()
         val alertsGenerated = numAlerts(getAlertsResponse) > 0
         val containsErrorAlert = containsErrorAlert(getAlertsResponse)
-        val executeResponseContainsError = (entityAsMap(executeMonitorResponse)["error"] as String?) != null
+        val executeResponseContainsError =
+            (entityAsMap(executeMonitorResponse).stringMap("input_results")?.get("error") as String).isNotEmpty()
 
         assert(alertsGenerated) { "Alerts should have been generated but they weren't" }
         assert(containsErrorAlert) { "Error alert should have been generated for timeout but wasn't" }
@@ -79,7 +72,6 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             randomPPLMonitor(
                 enabled = true,
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
                 triggers = listOf(
                     randomPPLTrigger(
                         throttleDuration = null,
@@ -97,16 +89,16 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
 
         val versionBefore = pplMonitor.version
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        val getAlertsResponse = getAlertV2s()
+        val getAlertsResponse = getAlerts()
         val alertsGenerated = numAlerts(getAlertsResponse) > 0
 
         assert(triggered) { "Monitor should have triggered but it didn't" }
         assert(alertsGenerated) { "Alerts should have been generated but they weren't" }
 
-        val pplMonitorAfter = getMonitorV2(pplMonitor.id)
+        val pplMonitorAfter = getMonitor(pplMonitor.id)
         val versionAfter = pplMonitorAfter.version
 
         assert(versionBefore == versionAfter) { "Monitor version changed after monitor execution" }
@@ -122,7 +114,6 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             randomPPLMonitor(
                 enabled = true,
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
                 triggers = listOf(
                     randomPPLTrigger(
                         throttleDuration = null,
@@ -138,10 +129,10 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             )
         )
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        val getAlertsResponse = getAlertV2s()
+        val getAlertsResponse = getAlerts()
         val alertsGenerated = numAlerts(getAlertsResponse)
 
         assert(triggered) { "Monitor should have triggered but it didn't" }
@@ -167,7 +158,6 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             randomPPLMonitor(
                 enabled = true,
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
                 triggers = listOf(
                     randomPPLTrigger(
                         throttleDuration = null,
@@ -183,10 +173,10 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             )
         )
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        val getAlertsResponse = getAlertV2s()
+        val getAlertsResponse = getAlerts()
         val alertsGenerated = numAlerts(getAlertsResponse) > 0
 
         assert(triggered) { "Monitor should have triggered but it didn't" }
@@ -209,7 +199,6 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             randomPPLMonitor(
                 enabled = true,
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
                 triggers = listOf(
                     randomPPLTrigger(
                         throttleDuration = null,
@@ -225,10 +214,10 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             )
         )
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        val getAlertsResponse = getAlertV2s()
+        val getAlertsResponse = getAlerts()
         val alertsGenerated = numAlerts(getAlertsResponse)
 
         // when the indexed docs above are aggregated by field abc, we have:
@@ -243,76 +232,6 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             "A number of alerts matching the number of docs ingested (2) should have been generated",
             2, alertsGenerated
         )
-    }
-
-    fun `test running ppl monitor with lookback window and doc within lookback window`() {
-        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
-        indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
-
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = 5,
-                timestampField = TIMESTAMP_FIELD,
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        expireDuration = 5,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
-                ),
-                query = "source = $TEST_INDEX_NAME | head 10"
-            )
-        )
-
-        val executeResponse = executeMonitorV2(pplMonitor.id)
-        val triggered = isTriggered(pplMonitor, executeResponse)
-
-        val getAlertsResponse = getAlertV2s()
-        val alertsGenerated = numAlerts(getAlertsResponse) > 0
-
-        assert(triggered) { "Monitor should have triggered but it didn't" }
-        assert(alertsGenerated) { "Alerts should have been generated but they weren't" }
-    }
-
-    fun `test running ppl monitor with lookback window and doc beyond lookback window`() {
-        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
-        indexDocFromSomeTimeAgo(10, MINUTES, "abc", 5)
-
-        val pplMonitor = createRandomPPLMonitor(
-            randomPPLMonitor(
-                enabled = true,
-                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = 5,
-                timestampField = TIMESTAMP_FIELD,
-                triggers = listOf(
-                    randomPPLTrigger(
-                        throttleDuration = null,
-                        expireDuration = 5,
-                        mode = TriggerMode.RESULT_SET,
-                        conditionType = ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = NumResultsCondition.GREATER_THAN,
-                        numResultsValue = 0L,
-                        customCondition = null
-                    )
-                ),
-                query = "source = $TEST_INDEX_NAME | head 10"
-            )
-        )
-
-        val executeResponse = executeMonitorV2(pplMonitor.id)
-        val triggered = isTriggered(pplMonitor, executeResponse)
-
-        val getAlertsResponse = getAlertV2s()
-        val alertsGenerated = numAlerts(getAlertsResponse) > 0
-
-        assert(!triggered) { "Monitor should not have triggered but it did" }
-        assert(!alertsGenerated) { "Alerts should not have been generated but they were" }
     }
 
     fun `test execute api generated alert gets expired`() {
@@ -338,10 +257,10 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             )
         )
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        val getAlertsResponsePreExpire = getAlertV2s()
+        val getAlertsResponsePreExpire = getAlerts()
         val alertsGeneratedPreExpire = numAlerts(getAlertsResponsePreExpire) > 0
 
         assert(triggered) { "Monitor should have triggered but it didn't" }
@@ -352,7 +271,7 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             return@waitUntil false
         }, 2, TimeUnit.MINUTES)
 
-        val getAlertsResponsePostExpire = getAlertV2s()
+        val getAlertsResponsePostExpire = getAlerts()
         val alertsGeneratedPostExpire = numAlerts(getAlertsResponsePostExpire) > 0
         assert(!alertsGeneratedPostExpire)
     }
@@ -387,7 +306,7 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             return@waitUntil false
         }, 2, TimeUnit.MINUTES)
 
-        val getAlertsResponsePreExpire = getAlertV2s()
+        val getAlertsResponsePreExpire = getAlerts()
         val alertsGeneratedPreExpire = numAlerts(getAlertsResponsePreExpire) > 0
 
         assert(alertsGeneratedPreExpire) { "Alerts should have been generated but they weren't" }
@@ -397,7 +316,7 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             return@waitUntil false
         }, 2, TimeUnit.MINUTES)
 
-        val getAlertsResponsePostExpire = getAlertV2s()
+        val getAlertsResponsePostExpire = getAlerts()
         logger.info("num alerts: ${numAlerts(getAlertsResponsePostExpire)}")
         val alertsGeneratedPostExpire = numAlerts(getAlertsResponsePostExpire) > 0
         assert(!alertsGeneratedPostExpire)
@@ -426,10 +345,10 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             )
         )
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        val getAlertsResponsePreThrottle = getAlertV2s()
+        val getAlertsResponsePreThrottle = getAlerts()
         val numAlertsPreThrottle = numAlerts(getAlertsResponsePreThrottle)
 
         assert(triggered) { "Monitor should have triggered but it didn't" }
@@ -441,7 +360,7 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             return@waitUntil false
         }, 2, TimeUnit.MINUTES)
 
-        val getAlertsResponsePostThrottled = getAlertV2s()
+        val getAlertsResponsePostThrottled = getAlerts()
         val numAlertsPostThrottled = numAlerts(getAlertsResponsePostThrottled)
         assertEquals("A new alert was generated when it should have been throttled", 1, numAlertsPostThrottled)
     }
@@ -469,10 +388,10 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             )
         )
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
 
-        val getAlertsResponse = getAlertV2s()
+        val getAlertsResponse = getAlerts()
         val numAlerts = numAlerts(getAlertsResponse)
 
         assert(triggered) { "Monitor should have triggered but it didn't" }
@@ -484,10 +403,10 @@ class PPLSQLMonitorRunnerIT : AlertingRestTestCase() {
             return@waitUntil false
         }, 10, TimeUnit.SECONDS)
 
-        val executeAgainResponse = executeMonitorV2(pplMonitor.id)
+        val executeAgainResponse = executeMonitor(pplMonitor.id)
         val triggeredAgain = isTriggered(pplMonitor, executeAgainResponse)
 
-        val getAlertsAgainResponse = getAlertV2s()
+        val getAlertsAgainResponse = getAlerts()
         val numAlertsAgain = numAlerts(getAlertsAgainResponse)
 
         assert(triggeredAgain) { "Monitor should have triggered again but it didn't" }

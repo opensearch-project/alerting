@@ -18,15 +18,6 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.MonitorRunnerExecutionContext
 import org.opensearch.alerting.alertsv2.AlertV2Indices.Companion.ALERT_V2_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.alertsv2.AlertV2Indices.Companion.ALERT_V2_INDEX
-import org.opensearch.alerting.modelv2.AlertV2
-import org.opensearch.alerting.modelv2.AlertV2.Companion.TRIGGERED_TIME_FIELD
-import org.opensearch.alerting.modelv2.AlertV2.Companion.TRIGGER_V2_ID_FIELD
-import org.opensearch.alerting.modelv2.MonitorV2
-import org.opensearch.alerting.modelv2.MonitorV2.Companion.MONITOR_V2_TYPE
-import org.opensearch.alerting.modelv2.MonitorV2.Companion.TRIGGERS_FIELD
-import org.opensearch.alerting.modelv2.PPLSQLMonitor.Companion.PPL_SQL_MONITOR_TYPE
-import org.opensearch.alerting.modelv2.TriggerV2.Companion.EXPIRE_FIELD
-import org.opensearch.alerting.modelv2.TriggerV2.Companion.ID_FIELD
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_V2_HISTORY_ENABLED
 import org.opensearch.alerting.util.MAX_SEARCH_SIZE
@@ -39,12 +30,25 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Alert.Companion.MONITOR_ID_FIELD
+import org.opensearch.commons.alerting.model.Alert.Companion.START_TIME_FIELD
+import org.opensearch.commons.alerting.model.Alert.Companion.TRIGGER_ID_FIELD
+import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.Monitor.Companion.MONITOR_TYPE
+import org.opensearch.commons.alerting.model.Monitor.Companion.MONITOR_TYPE_FIELD
+import org.opensearch.commons.alerting.model.Monitor.Companion.TRIGGERS_FIELD
+import org.opensearch.commons.alerting.model.Monitor.MonitorType
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.Companion.EXPIRE_FIELD
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.Companion.PPL_SQL_TRIGGER_FIELD
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.commons.alerting.model.Trigger.Companion.ID_FIELD
 import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentParser
+import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.VersionType
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -62,6 +66,12 @@ private val logger = LogManager.getLogger(AlertV2Mover::class.java)
  * either moving them to v2 alerts history index (if alert v2 history enabled) or
  * permanently deleting them (if alert v2 history disabled). It also contains the
  * logic for moving alerts in response to a monitor update or deletion.
+ *
+ * Lifecycle:
+ *  * 1. AlertV2 is generated when a TriggerV2's condition is met. The TriggerV2 fires and forgets the AlertV2.
+ *  * 2. AlertV2 is stored in the alerts index. AlertV2s are stateless. (e.g. they are never ACTIVE or COMPLETED)
+ *  * 3. AlertV2 is soft deleted after its expire duration (determined by its trigger), and archived in an alert history index
+ *  * 4. Based on the alert v2 history retention period, the AlertV2 is permanently deleted
  *
  * @opensearch.experimental
  */
@@ -148,16 +158,16 @@ class AlertV2Mover(
         }
     }
 
-    private suspend fun searchForExpiredAlerts(): List<AlertV2> {
+    private suspend fun searchForExpiredAlerts(): List<Alert> {
         logger.debug("beginning search for expired alerts")
         /* first collect all triggers and their expire durations */
         // when searching the alerting-config index, only trigger IDs and their expire durations are needed
         val monitorV2sSearchQuery = SearchSourceBuilder.searchSource()
-            .query(QueryBuilders.existsQuery(MONITOR_V2_TYPE))
+            .query(QueryBuilders.termQuery("$MONITOR_TYPE.$MONITOR_TYPE_FIELD", MonitorType.PPL_MONITOR.value))
             .fetchSource(
                 arrayOf(
-                    "$MONITOR_V2_TYPE.$PPL_SQL_MONITOR_TYPE.$TRIGGERS_FIELD.$ID_FIELD",
-                    "$MONITOR_V2_TYPE.$PPL_SQL_MONITOR_TYPE.$TRIGGERS_FIELD.$EXPIRE_FIELD"
+                    "$MONITOR_TYPE.$TRIGGERS_FIELD.$PPL_SQL_TRIGGER_FIELD.$ID_FIELD",
+                    "$MONITOR_TYPE.$TRIGGERS_FIELD.$PPL_SQL_TRIGGER_FIELD.$EXPIRE_FIELD"
                 ),
                 null
             )
@@ -166,21 +176,22 @@ class AlertV2Mover(
         val monitorV2sRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
             .source(monitorV2sSearchQuery)
         val searchMonitorV2sResponse: SearchResponse = client.suspendUntil { search(monitorV2sRequest, it) }
+        logger.debug("search monitor response num hits: ${searchMonitorV2sResponse.hits.totalHits.value}")
 
         logger.debug("searching triggers for their expire durations")
         // construct a map that stores each trigger's expiration time
         // TODO: create XContent parser specifically for responses to the above search to avoid casting
         val triggerToExpireDuration = mutableMapOf<String, Long>()
         searchMonitorV2sResponse.hits.forEach { hit ->
-            val monitorV2Obj = hit.sourceAsMap[MONITOR_V2_TYPE] as Map<String, Any>
-            val pplMonitorObj = monitorV2Obj[PPL_SQL_MONITOR_TYPE] as Map<String, Any>
-            val triggers = pplMonitorObj[TRIGGERS_FIELD] as List<Map<String, Any>>
-            for (trigger in triggers) {
-                val triggerId = trigger[ID_FIELD] as String
-                val expireDuration = (trigger[EXPIRE_FIELD] as Int).toLong()
-                logger.debug("triggerId: $triggerId")
+            val monitorObj = hit.sourceAsMap[MONITOR_TYPE] as Map<String, Any>
+            val triggers = monitorObj[TRIGGERS_FIELD] as List<Map<String, Any>>
+            triggers.forEach { trigger ->
+                val pplSqlTrigger = trigger[PPL_SQL_TRIGGER_FIELD] as Map<String, Any>
+                val pplSqlTriggerId = pplSqlTrigger[ID_FIELD] as String
+                val expireDuration = (pplSqlTrigger[EXPIRE_FIELD] as Int).toLong()
+                logger.debug("triggerId: $pplSqlTriggerId")
                 logger.debug("triggerExpires: $expireDuration")
-                triggerToExpireDuration[triggerId] = expireDuration
+                triggerToExpireDuration[pplSqlTriggerId] = expireDuration
             }
         }
 
@@ -202,8 +213,8 @@ class AlertV2Mover(
 
             expiredAlertsBoolQuery.should(
                 QueryBuilders.boolQuery()
-                    .must(QueryBuilders.termQuery(TRIGGER_V2_ID_FIELD, triggerId))
-                    .must(QueryBuilders.rangeQuery(TRIGGERED_TIME_FIELD).lte(maxValidTime))
+                    .must(QueryBuilders.termQuery(TRIGGER_ID_FIELD, triggerId))
+                    .must(QueryBuilders.rangeQuery(START_TIME_FIELD).lte(maxValidTime))
             )
         }
 
@@ -216,7 +227,7 @@ class AlertV2Mover(
         // now nonexistent trigger was somehow found
         expiredAlertsBoolQuery.should(
             QueryBuilders.boolQuery()
-                .mustNot(QueryBuilders.termsQuery(TRIGGER_V2_ID_FIELD, triggerToExpireDuration.keys.toList()))
+                .mustNot(QueryBuilders.termsQuery(TRIGGER_ID_FIELD, triggerToExpireDuration.keys.toList()))
         )
 
         // Explicitly specify that at least one should clause must match
@@ -233,10 +244,10 @@ class AlertV2Mover(
 
         // parse the search results into full alert docs, as they will need to be
         // indexed into alert history indices
-        val expiredAlertV2s = mutableListOf<AlertV2>()
+        val expiredAlertV2s = mutableListOf<Alert>()
         expiredAlertsResponse.hits.forEach { hit ->
             expiredAlertV2s.add(
-                AlertV2.parse(alertV2ContentParser(hit.sourceRef), hit.id, hit.version)
+                Alert.parse(alertContentParser(hit.sourceRef), hit.id, hit.version)
             )
         }
 
@@ -245,7 +256,7 @@ class AlertV2Mover(
         return expiredAlertV2s
     }
 
-    private suspend fun deleteExpiredAlerts(expiredAlerts: List<AlertV2>): BulkResponse? {
+    private suspend fun deleteExpiredAlerts(expiredAlerts: List<Alert>): BulkResponse? {
         logger.debug("beginning to hard delete expired alerts permanently")
         // If no expired alerts are found, simply return
         if (expiredAlerts.isEmpty()) {
@@ -265,7 +276,7 @@ class AlertV2Mover(
         return deleteResponse
     }
 
-    private suspend fun copyExpiredAlerts(expiredAlerts: List<AlertV2>): BulkResponse? {
+    private suspend fun copyExpiredAlerts(expiredAlerts: List<Alert>): BulkResponse? {
         logger.debug("beginning to copy expired alerts to history write index")
         // If no expired alerts are found, simply return
         if (expiredAlerts.isEmpty()) {
@@ -287,7 +298,7 @@ class AlertV2Mover(
         return copyResponse
     }
 
-    private suspend fun deleteExpiredAlertsThatWereCopied(copyResponse: BulkResponse?, expiredAlerts: List<AlertV2>): BulkResponse? {
+    private suspend fun deleteExpiredAlertsThatWereCopied(copyResponse: BulkResponse?, expiredAlerts: List<Alert>): BulkResponse? {
         logger.debug("beginning to delete expired alerts that were copied to history write index")
         // if there were no expired alerts to copy, skip deleting anything
         if (copyResponse == null) {
@@ -296,7 +307,7 @@ class AlertV2Mover(
 
         // pre-index the alerts so retrieving their
         // monitor IDs for routing is easier
-        val alertsById: Map<String, AlertV2> = expiredAlerts.associateBy { it.id }
+        val alertsById: Map<String, Alert> = expiredAlerts.associateBy { it.id }
 
         val deleteRequests = copyResponse.items.filterNot { it.isFailed }.map {
             DeleteRequest(ALERT_V2_INDEX, it.id)
@@ -324,30 +335,32 @@ class AlertV2Mover(
         }
     }
 
-    private fun alertV2ContentParser(bytesReference: BytesReference): XContentParser {
-        return XContentHelper.createParser(
-            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-            bytesReference, XContentType.JSON
-        )
-    }
-
     private fun areAlertV2IndicesPresent(): Boolean {
         return alertV2IndexInitialized && alertV2HistoryIndexInitialized
     }
 
     companion object {
+        private fun alertContentParser(bytesReference: BytesReference): XContentParser {
+            val xcp = XContentHelper.createParser(
+                NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
+                bytesReference, XContentType.JSON
+            )
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            return xcp
+        }
+
         // this method is used by MonitorRunnerService's postIndex and postDelete
         // functions to move (in the case of alert v2 history enabled) or delete
         // (in the case of alert v2 history disabled) the alerts generated by
         // a monitor in response to the event that the monitor gets updated
         // or deleted
-        suspend fun moveAlertV2s(monitorV2Id: String, monitorV2: MonitorV2?, monitorCtx: MonitorRunnerExecutionContext) {
+        suspend fun moveAlertV2s(monitorV2Id: String, monitorV2: Monitor?, monitorCtx: MonitorRunnerExecutionContext) {
             logger.debug("beginning to move alerts for postIndex or postDelete of monitor: $monitorV2Id")
             val client = monitorCtx.client!!
 
             // first collect all alerts that came from this updated or deleted monitor
             val boolQuery = QueryBuilders.boolQuery()
-                .filter(QueryBuilders.termQuery(AlertV2.MONITOR_V2_ID_FIELD, monitorV2Id))
+                .filter(QueryBuilders.termQuery(MONITOR_ID_FIELD, monitorV2Id))
 
             /*
              this monitorV2 != null case happens when this function is called by postIndex. if the monitor is updated,
@@ -365,7 +378,7 @@ class AlertV2Mover(
              meaning this logic will pick up those updated triggers and correctly move/delete the alerts
             */
             if (monitorV2 != null) {
-                boolQuery.mustNot(QueryBuilders.termsQuery(TRIGGER_V2_ID_FIELD, monitorV2.triggers.map { it.id }))
+                boolQuery.mustNot(QueryBuilders.termsQuery(TRIGGER_ID_FIELD, monitorV2.triggers.map { it.id }))
             }
 
             val alertsSearchQuery = SearchSourceBuilder.searchSource()
@@ -379,14 +392,11 @@ class AlertV2Mover(
             // If no alerts are found, simply return
             if (searchAlertsResponse.hits.totalHits?.value == 0L) return
 
-            val activeAlerts = mutableListOf<AlertV2>()
+            val activeAlerts = mutableListOf<Alert>()
             searchAlertsResponse.hits.forEach { hit ->
                 activeAlerts.add(
-                    AlertV2.parse(
-                        XContentHelper.createParser(
-                            NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                            hit.sourceRef, XContentType.JSON
-                        ),
+                    Alert.parse(
+                        alertContentParser(hit.sourceRef),
                         hit.id,
                         hit.version
                     )
@@ -395,7 +405,7 @@ class AlertV2Mover(
 
             // pre-index the alerts so retrieving their
             // monitor IDs for routing is easier
-            val alertsById: Map<String, AlertV2> = activeAlerts.associateBy { it.id }
+            val alertsById: Map<String, Alert> = activeAlerts.associateBy { it.id }
 
             val alertV2HistoryEnabled = monitorCtx.clusterService!!.clusterSettings.get(ALERT_V2_HISTORY_ENABLED)
 
@@ -405,15 +415,10 @@ class AlertV2Mover(
             if (alertV2HistoryEnabled) {
                 logger.debug("alert v2 history enabled, copying alerts to history write index")
                 val indexRequests = searchAlertsResponse.hits.map { hit ->
-                    val xcp = XContentHelper.createParser(
-                        NamedXContentRegistry.EMPTY, LoggingDeprecationHandler.INSTANCE,
-                        hit.sourceRef, XContentType.JSON
-                    )
-
                     IndexRequest(ALERT_V2_HISTORY_WRITE_INDEX)
                         .routing(monitorV2Id)
                         .source(
-                            AlertV2.parse(xcp, hit.id, hit.version)
+                            Alert.parse(alertContentParser(hit.sourceRef), hit.id, hit.version)
                                 .toXContentWithUser(XContentFactory.jsonBuilder())
                         )
                         .version(hit.version)

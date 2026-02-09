@@ -4,7 +4,7 @@
     "required": true
   },
   "_meta" : {
-    "schema_version": 5
+    "schema_version": 6
   },
   "properties": {
     "schema_version": {
@@ -175,6 +175,28 @@
       "fields" : {
         "keyword" : {
           "type" : "keyword"
+        }
+      }
+    },
+    "ppl_query": {
+      "type": "text"
+    },
+    "ppl_query_results":  {
+      "type": "nested",
+      "properties": {
+        "schema": {
+          "type": "nested",
+          "dynamic": true
+        },
+        "datarows": {
+          "type": "object",
+          "enabled": false
+        },
+        "total": {
+          "type": "integer"
+        },
+        "size": {
+          "type": "integer"
         }
       }
     }

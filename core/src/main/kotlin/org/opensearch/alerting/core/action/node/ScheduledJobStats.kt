@@ -7,8 +7,8 @@ package org.opensearch.alerting.core.action.node
 
 import org.opensearch.action.support.nodes.BaseNodeResponse
 import org.opensearch.alerting.core.JobSweeperMetrics
-import org.opensearch.alerting.core.resthandler.StatsRequestUtils.JOBS_INFO
-import org.opensearch.alerting.core.resthandler.StatsRequestUtils.JOB_SCHEDULING_METRICS
+import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler.Companion.JOBS_INFO
+import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler.Companion.JOB_SCHEDULING_METRICS
 import org.opensearch.alerting.core.schedule.JobSchedulerMetrics
 import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.core.common.io.stream.StreamInput

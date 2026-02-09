@@ -14,18 +14,13 @@ import org.junit.Before
 import org.junit.BeforeClass
 import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
 import org.opensearch.alerting.ALL_ACCESS_ROLE
-import org.opensearch.alerting.AlertingPlugin.Companion.MONITOR_V2_BASE_URI
+import org.opensearch.alerting.AlertingPlugin.Companion.MONITOR_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.PPL_FULL_ACCESS_ROLE
 import org.opensearch.alerting.ROLE_TO_PERMISSION_MAPPING
 import org.opensearch.alerting.TEST_INDEX_MAPPINGS
 import org.opensearch.alerting.TEST_INDEX_NAME
-import org.opensearch.alerting.core.settings.AlertingV2Settings
 import org.opensearch.alerting.makeRequest
-import org.opensearch.alerting.modelv2.PPLSQLMonitor
-import org.opensearch.alerting.modelv2.PPLSQLTrigger.ConditionType
-import org.opensearch.alerting.modelv2.PPLSQLTrigger.NumResultsCondition
-import org.opensearch.alerting.modelv2.PPLSQLTrigger.TriggerMode
 import org.opensearch.alerting.randomPPLMonitor
 import org.opensearch.alerting.randomPPLTrigger
 import org.opensearch.client.ResponseException
@@ -33,6 +28,9 @@ import org.opensearch.client.RestClient
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.IntervalSchedule
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.ConditionType
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.NumResultsCondition
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.TriggerMode
 import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.query.QueryBuilders
@@ -61,7 +59,6 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
 
     @Before
     fun create() {
-        client().updateSettings(AlertingV2Settings.ALERTING_V2_ENABLED.key, "true")
         if (userClient == null) {
             createUser(user, arrayOf())
             userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
@@ -93,16 +90,16 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         )
 
         try {
-            createMonitorV2WithClient(
+            createPPLIndexThenMonitorWithClient(
                 userClient!!,
-                monitorV2 = pplMonitorConfig
+                monitor = pplMonitorConfig
             )
             fail("Expected create monitor to fail as user does not have permissions to call alerting APIs")
         } catch (e: ResponseException) {
             assertEquals("Unexpected error status", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
         }
 
-        ensureNumMonitorV2s(0)
+        ensureNumMonitors(0)
     }
 
     fun `test create monitor that queries index user doesn't have access to fails`() {
@@ -125,16 +122,16 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         )
 
         try {
-            createMonitorV2WithClient(
+            createPPLIndexThenMonitorWithClient(
                 userClient!!,
-                monitorV2 = pplMonitorConfig
+                monitor = pplMonitorConfig
             )
             fail("Expected create monitor to fail as user does not have permissions to index that monitor queries")
         } catch (e: ResponseException) {
             assertEquals("Unexpected error status", RestStatus.BAD_REQUEST.status, e.response.statusLine.statusCode)
         }
 
-        ensureNumMonitorV2s(0)
+        ensureNumMonitors(0)
     }
 
     fun `test update monitor that queries index user doesn't have access to fails`() {
@@ -157,7 +154,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         )
 
         // this function automatically creates index TEST_INDEX_NAME, then a monitor that queries it
-        val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf(backendRole))
+        val pplMonitor = createPPLIndexThenMonitorWithClient(userClient!!, pplMonitorConfig, listOf(backendRole))
 
         /*
         user: String,
@@ -184,7 +181,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             .build()
 
         // update some field that isn't the PPL query and the index it's querying
-        val newMonitor = pplMonitorConfig.makeCopy(name = "some_random_name")
+        val newMonitor = pplMonitorConfig.copy(name = "some_random_name")
 
         try {
             // noIndicesUser, who only has access to index unrelated_index, should be blocked
@@ -192,7 +189,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             // has no access to TEST_INDEX_NAME
             noIndicesUserClient!!.makeRequest(
                 "PUT",
-                "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
+                "$MONITOR_BASE_URI/${pplMonitor.id}",
                 newMonitor.toHttpEntity(),
                 BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
             )
@@ -220,9 +217,9 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             false
         )
 
-        createMonitorV2WithClient(userClient!!, monitorV2 = pplMonitorConfig, listOf("backend_role_a"))
+        createPPLIndexThenMonitorWithClient(userClient!!, monitor = pplMonitorConfig, listOf("backend_role_a"))
 
-        ensureNumMonitorV2s(1)
+        ensureNumMonitors(1)
     }
 
     fun `test RBAC create monitor with backend roles user has no access to fails`() {
@@ -241,9 +238,9 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         )
 
         try {
-            createMonitorV2WithClient(
+            createPPLIndexThenMonitorWithClient(
                 userClient!!,
-                monitorV2 = pplMonitorConfig,
+                monitor = pplMonitorConfig,
                 listOf("backend_role_a", "backend_role_b", "backend_role_c")
             )
             fail("Expected create monitor to fail as user does not have backend_role_c backend role")
@@ -251,7 +248,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             assertEquals("Unexpected error status", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
         }
 
-        ensureNumMonitorV2s(0)
+        ensureNumMonitors(0)
     }
 
     fun `test RBAC update monitorV2 as user with correct backend roles succeeds`() {
@@ -268,7 +265,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
+        val pplMonitor = createPPLIndexThenMonitorWithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
 
         // getUser should have access to the monitor above created by user
         val updateUser = "updateUser"
@@ -288,7 +285,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         val newMonitor = randomPPLMonitor()
         val updateMonitorResponse = getUserClient!!.makeRequest(
             "PUT",
-            "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
+            "$MONITOR_BASE_URI/${pplMonitor.id}",
             newMonitor.toHttpEntity(),
             BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
         )
@@ -312,7 +309,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
+        val pplMonitor = createPPLIndexThenMonitorWithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
 
         // updateUser should have access to the monitor above created by user
         val updateUser = "updateUser"
@@ -334,7 +331,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         try {
             getUserClient!!.makeRequest(
                 "PUT",
-                "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
+                "$MONITOR_BASE_URI/${pplMonitor.id}",
                 newMonitor.toHttpEntity(),
                 BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
             )
@@ -361,7 +358,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
+        val pplMonitor = createPPLIndexThenMonitorWithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
 
         // getUser should have access to the monitor above created by user
         val getUser = "getUser"
@@ -380,7 +377,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
 
         val getMonitorResponse = getUserClient!!.makeRequest(
             "GET",
-            "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
+            "$MONITOR_BASE_URI/${pplMonitor.id}",
             null,
             BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
         )
@@ -404,7 +401,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
+        val pplMonitor = createPPLIndexThenMonitorWithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
 
         // getUser should not have access to the monitor above created by user
         val getUser = "getUser"
@@ -424,7 +421,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         try {
             getUserClient!!.makeRequest(
                 "GET",
-                "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
+                "$MONITOR_BASE_URI/${pplMonitor.id}",
                 null,
                 BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
             )
@@ -450,7 +447,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             false
         )
 
-        createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
+        createPPLIndexThenMonitorWithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
 
         // getUser should have access to the monitor above created by user
         val searchUser = "searchUser"
@@ -470,7 +467,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
         val searchMonitorResponse = searchUserClient!!.makeRequest(
             "POST",
-            "$MONITOR_V2_BASE_URI/_search",
+            "$MONITOR_BASE_URI/_search",
             StringEntity(search, ContentType.APPLICATION_JSON),
             BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
         )
@@ -501,7 +498,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             false
         )
 
-        createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
+        createPPLIndexThenMonitorWithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
 
         // getUser should have access to the monitor above created by user
         val searchUser = "searchUser"
@@ -521,7 +518,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
         val searchMonitorResponse = searchUserClient!!.makeRequest(
             "POST",
-            "$MONITOR_V2_BASE_URI/_search",
+            "$MONITOR_BASE_URI/_search",
             StringEntity(search, ContentType.APPLICATION_JSON),
             BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
         )
@@ -551,7 +548,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
+        val pplMonitor = createPPLIndexThenMonitorWithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
 
         // getUser should have access to the monitor above created by user
         val executeUser = "executeUser"
@@ -570,7 +567,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
 
         val getMonitorResponse = getUserClient!!.makeRequest(
             "POST",
-            "$MONITOR_V2_BASE_URI/${pplMonitor.id}/_execute",
+            "$MONITOR_BASE_URI/${pplMonitor.id}/_execute",
             null,
             BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
         )
@@ -594,7 +591,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
+        val pplMonitor = createPPLIndexThenMonitorWithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
 
         // getUser should not have access to the monitor above created by user
         val executeUser = "executeUser"
@@ -614,7 +611,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         try {
             getUserClient!!.makeRequest(
                 "POST",
-                "$MONITOR_V2_BASE_URI/${pplMonitor.id}/_execute",
+                "$MONITOR_BASE_URI/${pplMonitor.id}/_execute",
                 null,
                 BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
             )
@@ -639,7 +636,6 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             randomPPLMonitor(
                 enabled = true,
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
                 triggers = listOf(
                     randomPPLTrigger(
                         throttleDuration = null,
@@ -662,13 +658,13 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val pplMonitor = createMonitorV2WithClient(
+        val pplMonitor = createPPLIndexThenMonitorWithClient(
             userClient!!,
             pplMonitorConfig,
             null
-        ) as PPLSQLMonitor
+        )
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
         assertTrue(triggered)
 
@@ -692,7 +688,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
 
         val getAlertsResponse = getAlertsUserClient!!.makeRequest(
             "GET",
-            "$MONITOR_V2_BASE_URI/alerts",
+            "$MONITOR_BASE_URI/alerts",
             null,
             BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
         )
@@ -718,7 +714,6 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             randomPPLMonitor(
                 enabled = true,
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
-                lookBackWindow = null,
                 triggers = listOf(
                     randomPPLTrigger(
                         throttleDuration = null,
@@ -741,13 +736,13 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val pplMonitor = createMonitorV2WithClient(
+        val pplMonitor = createPPLIndexThenMonitorWithClient(
             userClient!!,
             pplMonitorConfig,
             null
-        ) as PPLSQLMonitor
+        )
 
-        val executeResponse = executeMonitorV2(pplMonitor.id)
+        val executeResponse = executeMonitor(pplMonitor.id)
         val triggered = isTriggered(pplMonitor, executeResponse)
         assertTrue(triggered)
 
@@ -767,7 +762,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
 
         val getAlertsResponse = getAlertsUserClient!!.makeRequest(
             "GET",
-            "$MONITOR_V2_BASE_URI/alerts",
+            "$MONITOR_BASE_URI/alerts",
             null,
             BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
         )
@@ -794,7 +789,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
+        val pplMonitor = createPPLIndexThenMonitorWithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
 
         // getUser should have access to the monitor above created by user
         val deleteUser = "deleteUser"
@@ -813,13 +808,13 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
 
         val getMonitorResponse = deleteUserClient!!.makeRequest(
             "DELETE",
-            "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
+            "$MONITOR_BASE_URI/${pplMonitor.id}",
             null,
             BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
         )
         assertEquals("Get monitorV2 failed", RestStatus.OK, getMonitorResponse.restStatus())
 
-        ensureNumMonitorV2s(0)
+        ensureNumMonitors(0)
 
         // cleanup
         deleteUserClient.close()
@@ -839,7 +834,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             false
         )
 
-        val pplMonitor = createMonitorV2WithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
+        val pplMonitor = createPPLIndexThenMonitorWithClient(userClient!!, pplMonitorConfig, listOf("backend_role_a", "backend_role_b"))
 
         // getUser should not have access to the monitor above created by user
         val deleteUser = "deleteUser"
@@ -859,7 +854,7 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
         try {
             deleteUserClient!!.makeRequest(
                 "DELETE",
-                "$MONITOR_V2_BASE_URI/${pplMonitor.id}",
+                "$MONITOR_BASE_URI/${pplMonitor.id}",
                 null,
                 BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
             )
@@ -870,6 +865,6 @@ class SecureMonitorV2RestApiIT : AlertingRestTestCase() {
             deleteUserClient?.close()
         }
 
-        ensureNumMonitorV2s(1)
+        ensureNumMonitors(1)
     }
 }
