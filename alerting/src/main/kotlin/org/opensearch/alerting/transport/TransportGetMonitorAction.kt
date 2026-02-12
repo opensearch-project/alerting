@@ -18,7 +18,6 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
@@ -114,14 +113,7 @@ class TransportGetMonitorAction @Inject constructor(
                                 response.sourceAsBytesRef,
                                 XContentType.JSON
                             ).use { xcp ->
-                                val scheduledJob = ScheduledJob.parse(xcp, response.id, response.version)
-
-                                validateMonitorV1(scheduledJob)?.let {
-                                    actionListener.onFailure(AlertingException.wrap(it))
-                                    return
-                                }
-
-                                monitor = scheduledJob as Monitor
+                                monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
 
                                 // security is enabled and filterby is enabled
                                 if (!checkUserPermissionsWithResource(
