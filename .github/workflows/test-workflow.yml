@@ -71,7 +71,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: alerting-plugin-${{ matrix.os }}
+          name: alerting-plugin-${{ matrix.os }}-jdk${{ matrix.java }}
           path: alerting-artifacts
           overwrite: true
 
@@ -120,6 +120,6 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: alerting-plugin-${{ matrix.os }}
+          name: alerting-plugin-${{ matrix.os }}-jdk${{ matrix.java }}
           path: alerting-artifacts
           overwrite: true
