@@ -49,11 +49,6 @@ import java.time.Instant
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 private val logger = LogManager.getLogger(AlertV2Indices::class.java)
 
-/**
- * This class handles the rollover and management of v2 alerts history indices
- *
- * @opensearch.experimental
- */
 class AlertV2Indices(
     settings: Settings,
     private val client: Client,

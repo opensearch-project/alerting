@@ -22,14 +22,6 @@ import java.io.IOException
 
 private val log: Logger = LogManager.getLogger(RestDeleteMonitorV2Action::class.java)
 
-/**
- * This class consists of the REST handler to delete V2 monitors.
- * When a monitor is deleted, all alerts are moved to the alert history index if alerting v2 history is enabled,
- * or permanently deleted if alerting v2 history is disabled.
- * If this process fails the monitor is not deleted.
- *
- * @opensearch.experimental
- */
 class RestDeleteMonitorV2Action : BaseRestHandler() {
 
     override fun getName(): String {
@@ -40,14 +32,14 @@ class RestDeleteMonitorV2Action : BaseRestHandler() {
         return mutableListOf(
             Route(
                 DELETE,
-                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitor_id}"
+                "${AlertingPlugin.MONITOR_V2_BASE_URI}/{monitorV2Id}"
             )
         )
     }
 
     @Throws(IOException::class)
     override fun prepareRequest(request: RestRequest, client: NodeClient): RestChannelConsumer {
-        val monitorV2Id = request.param("monitor_id")
+        val monitorV2Id = request.param("monitorV2Id")
         log.info("${request.method()} ${AlertingPlugin.MONITOR_V2_BASE_URI}/$monitorV2Id")
 
         val refreshPolicy = RefreshPolicy.parse(request.param(REFRESH, RefreshPolicy.IMMEDIATE.value))
