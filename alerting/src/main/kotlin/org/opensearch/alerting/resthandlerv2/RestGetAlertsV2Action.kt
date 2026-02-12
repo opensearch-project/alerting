@@ -18,9 +18,7 @@ import org.opensearch.rest.action.RestToXContentListener
 import org.opensearch.transport.client.node.NodeClient
 
 /**
- * This class consists of the REST handler to retrieve V2 alerts.
- *
- * @opensearch.experimental
+ * This class consists of the REST handler to retrieve alerts .
  */
 class RestGetAlertsV2Action : BaseRestHandler() {
 

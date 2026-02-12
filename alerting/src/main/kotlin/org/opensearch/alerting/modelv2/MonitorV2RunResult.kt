@@ -10,18 +10,12 @@ import org.opensearch.core.common.io.stream.StreamOutput
 import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.core.xcontent.ToXContent
 
-/**
- * Monitor V2 run result interface. All classes that store the results
- * of a monitor v2 run must implement this interface
- *
- * @opensearch.experimental
- */
-interface MonitorV2RunResult<TriggerV2Result : TriggerV2RunResult> : Writeable, ToXContent {
+interface MonitorV2RunResult<out TriggerV2Result : TriggerV2RunResult> : Writeable, ToXContent {
     val monitorName: String
     val error: Exception?
     val triggerResults: Map<String, TriggerV2Result>
 
-    enum class MonitorV2RunResultType {
+    enum class MonitorV2RunResultType() {
         PPL_SQL_MONITOR_RUN_RESULT;
     }
 
@@ -29,7 +23,7 @@ interface MonitorV2RunResult<TriggerV2Result : TriggerV2RunResult> : Writeable, 
         const val ERROR_FIELD = "error"
         const val TRIGGER_RESULTS_FIELD = "trigger_results"
 
-        fun readFrom(sin: StreamInput): MonitorV2RunResult<*> {
+        fun readFrom(sin: StreamInput): MonitorV2RunResult<TriggerV2RunResult> {
             val monitorRunResultType = sin.readEnum(MonitorV2RunResultType::class.java)
             return when (monitorRunResultType) {
                 MonitorV2RunResultType.PPL_SQL_MONITOR_RUN_RESULT -> PPLSQLMonitorRunResult(sin)
@@ -37,7 +31,7 @@ interface MonitorV2RunResult<TriggerV2Result : TriggerV2RunResult> : Writeable, 
             }
         }
 
-        fun writeTo(out: StreamOutput, monitorV2RunResult: MonitorV2RunResult<*>) {
+        fun writeTo(out: StreamOutput, monitorV2RunResult: MonitorV2RunResult<TriggerV2RunResult>) {
             when (monitorV2RunResult) {
                 is PPLSQLMonitorRunResult -> {
                     out.writeEnum(MonitorV2RunResultType.PPL_SQL_MONITOR_RUN_RESULT)
