@@ -7,13 +7,11 @@ package org.opensearch.alerting.resthandler
 
 import org.apache.hc.core5.http.ContentType
 import org.apache.hc.core5.http.io.entity.StringEntity
-import org.junit.Before
 import org.opensearch.alerting.AlertingPlugin.Companion.MONITOR_V2_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.TEST_INDEX_MAPPINGS
 import org.opensearch.alerting.TEST_INDEX_NAME
 import org.opensearch.alerting.assertPplMonitorsEqual
-import org.opensearch.alerting.core.settings.AlertingV2Settings
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.modelv2.PPLSQLMonitor
@@ -55,10 +53,6 @@ import java.time.temporal.ChronoUnit.MINUTES
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
 class MonitorV2RestApiIT : AlertingRestTestCase() {
-    @Before
-    fun enableAlertingV2() {
-        client().updateSettings(AlertingV2Settings.ALERTING_V2_ENABLED.key, "true")
-    }
 
     /* Simple Case Tests */
     fun `test create ppl monitor`() {

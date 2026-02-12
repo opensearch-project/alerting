@@ -20,7 +20,6 @@ import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.MONITOR_V2_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
-import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
@@ -28,7 +27,6 @@ import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.Slack
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailGroup
-import org.opensearch.alerting.modelv2.AlertV2
 import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.modelv2.PPLSQLMonitor
 import org.opensearch.alerting.settings.AlertingSettings
@@ -176,7 +174,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     ): MonitorV2 {
         // every random ppl monitor's query searches index TEST_INDEX_NAME
         // by default, so create that first before creating the monitor
-        if (!indexExists(TEST_INDEX_NAME)) {
+        val indexExistsResponse = client().makeRequest("HEAD", TEST_INDEX_NAME)
+        if (indexExistsResponse.restStatus() == RestStatus.NOT_FOUND) {
             createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         }
 
@@ -758,9 +757,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         if (refresh) refreshIndex(indices)
 
         val request = """
-            { "version" : true,
-              "query": { "match_all": {} }
-            }
+                { "version" : true,
+                  "query": { "match_all": {} }
+                }
         """.trimIndent()
         val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
         assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
@@ -805,9 +804,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         if (refresh) refreshIndex(indices)
 
         val request = """
-            { "version" : true,
-              "query": { "match_all": {} }
-            }
+                { "version" : true,
+                  "query": { "match_all": {} }
+                }
         """.trimIndent()
         val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
         assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
@@ -830,9 +829,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         // If this is a test monitor (it doesn't have an ID) and no alerts will be saved for it.
         val searchParams = if (monitor.id != Monitor.NO_ID) mapOf("routing" to monitor.id) else mapOf()
         val request = """
-            { "version" : true,
-              "query" : { "term" : { "${Alert.MONITOR_ID_FIELD}" : "${monitor.id}" } }
-            }
+                { "version" : true,
+                  "query" : { "term" : { "${Alert.MONITOR_ID_FIELD}" : "${monitor.id}" } }
+                }
         """.trimIndent()
         val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", searchParams, StringEntity(request, APPLICATION_JSON))
         assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
@@ -841,35 +840,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return searchResponse.hits.hits.map {
             val xcp = createParser(jsonXContent, it.sourceRef).also { it.nextToken() }
             Alert.parse(xcp, it.id, it.version)
-        }
-    }
-
-    protected fun searchAlertV2s(
-        monitorV2Id: String,
-        indices: String = AlertV2Indices.ALERT_V2_INDEX,
-        refresh: Boolean = true
-    ): List<AlertV2> {
-        try {
-            if (refresh) refreshIndex(indices)
-        } catch (e: Exception) {
-            logger.warn("Could not refresh index $indices because: ${e.message}")
-            return emptyList()
-        }
-
-        // If this is a test monitor (it doesn't have an ID) and no alerts will be saved for it.
-        val searchParams = if (monitorV2Id != MonitorV2.NO_ID) mapOf("routing" to monitorV2Id) else mapOf()
-        val request = """
-            { "version" : true,
-              "query" : { "term" : { "${AlertV2.MONITOR_V2_ID_FIELD}" : "$monitorV2Id" } }
-            }
-        """.trimIndent()
-        val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", searchParams, StringEntity(request, APPLICATION_JSON))
-        assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
-
-        val searchResponse = SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
-        return searchResponse.hits.hits.map {
-            val xcp = createParser(jsonXContent, it.sourceRef)
-            AlertV2.parse(xcp, it.id, it.version)
         }
     }
 
@@ -928,7 +898,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun getAlertV2s(): Response {
         val response = client().makeRequest(
             "GET",
-            "$MONITOR_V2_BASE_URI/alerts",
+            "$MONITOR_V2_BASE_URI/alerts?",
             null,
             BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
         )
@@ -1037,9 +1007,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     protected fun searchMonitors(): SearchResponse {
         var baseEndpoint = "${AlertingPlugin.MONITOR_BASE_URI}/_search?"
         val request = """
-            { "version" : true,
-              "query": { "match_all": {} }
-            }
+                { "version" : true,
+                  "query": { "match_all": {} }
+                }
         """.trimIndent()
         val httpResponse = adminClient().makeRequest("POST", baseEndpoint, StringEntity(request, APPLICATION_JSON))
         assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
@@ -1372,9 +1342,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(twoMinsAgo)
             val testDoc = """
                 {
-                    "test_strict_date_time": "$testTime",
-                    "test_field": "$value",
-                    "number": "$i"
+                  "test_strict_date_time": "$testTime",
+                  "test_field": "$value",
+                   "number": "$i"
                 }
             """.trimIndent()
             // Indexing documents with deterministic doc id to allow for easy selected deletion during testing
@@ -1388,9 +1358,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(time)
             val testDoc = """
                 {
-                    "test_strict_date_time": "$testTime",
-                    "test_field": "$value",
-                    "number": "$i"
+                  "test_strict_date_time": "$testTime",
+                  "test_field": "$value",
+                   "number": "$i"
                 }
             """.trimIndent()
             // Indexing documents with deterministic doc id to allow for easy selected deletion during testing
@@ -1407,9 +1377,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(time)
             val testDoc = """
                 {
-                    "test_strict_date_time": "$testTime",
-                    "test_field": "$value",
-                    "number": "$i"
+                  "test_strict_date_time": "$testTime",
+                  "test_field": "$value",
+                   "number": "$i"
                 }
             """.trimIndent()
             // Indexing documents with deterministic doc id to allow for easy selected deletion during testing
@@ -1437,14 +1407,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val settings = Settings.builder().put("index.hidden", true).build()
 //        createIndex(AlertIndices.FINDING_HISTORY_WRITE_INDEX, settings, mappingHack)
         createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.FINDING_HISTORY_WRITE_INDEX}\" : {}")
-    }
-
-    fun putAlertV2Mappings(mapping: String? = null) {
-        val mappingHack = if (mapping != null) mapping else AlertV2Indices.alertV2Mapping().trimStart('{').trimEnd('}')
-        val encodedHistoryIndex = URLEncoder.encode(AlertV2Indices.ALERT_V2_HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
-        val settings = Settings.builder().put("index.hidden", true).build()
-        createIndex(AlertV2Indices.ALERT_V2_INDEX, settings, mappingHack)
-        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX}\" : {}")
     }
 
     fun scheduledJobMappings(): String {
@@ -1701,13 +1663,11 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val customAttributesString = customAttributes.entries.joinToString(prefix = "{", separator = ", ", postfix = "}") {
             "\"${it.key}\": \"${it.value}\""
         }
-        var entity = """
-            {
-                "password": "$password",
-                "backend_roles": [$broles],
-                "attributes": $customAttributesString
-            }
-        """.trimIndent()
+        var entity = " {\n" +
+            "\"password\": \"$password\",\n" +
+            "\"backend_roles\": [$broles],\n" +
+            "\"attributes\": $customAttributesString\n" +
+            "} "
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -1715,52 +1675,60 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     fun patchUserBackendRoles(name: String, backendRoles: Array<String>) {
         val request = Request("PATCH", "/_plugins/_security/api/internalusers/$name")
         val broles = backendRoles.joinToString { "\"$it\"" }
-        var entity = """
-            [{
-                "op": "replace",
-                "path": "/backend_roles",
-                "value": [$broles]
-            }]
-        """.trimIndent()
+        var entity = " [{\n" +
+            "\"op\": \"replace\",\n" +
+            "\"path\": \"/backend_roles\",\n" +
+            "\"value\": [$broles]\n" +
+            "}]"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
 
     fun createIndexRole(name: String, index: String) {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
-        var entity = """
-            {
-                "cluster_permissions": [],
-                "index_permissions": [{
-                    "index_patterns": ["$index"],
-                    "dls": "",
-                    "fls": [],
-                    "masked_fields": [],
-                    "allowed_actions": ["crud"]
-                }],
-                "tenant_permissions": []
-            }
-        """.trimIndent()
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
 
     fun createCustomIndexRole(name: String, index: String, clusterPermissions: String?) {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
-        val clusterPerms = if (clusterPermissions.isNullOrEmpty()) "[]" else "[\"$clusterPermissions\"]"
-        var entity = """
-            {
-                "cluster_permissions": $clusterPerms,
-                "index_permissions": [{
-                    "index_patterns": ["$index"],
-                    "dls": "",
-                    "fls": [],
-                    "masked_fields": [],
-                    "allowed_actions": ["crud"]
-                }],
-                "tenant_permissions": []
-            }
-        """.trimIndent()
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "\"$clusterPermissions\"\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -1773,39 +1741,50 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 Collectors.joining(",")
             )
 
-        var entity = """
-            {
-                "cluster_permissions": [$clusterPermissionsStr],
-                "index_permissions": [{
-                    "index_patterns": ["$index"],
-                    "dls": "",
-                    "fls": [],
-                    "masked_fields": [],
-                    "allowed_actions": ["crud"]
-                }],
-                "tenant_permissions": []
-            }
-        """.trimIndent()
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "$clusterPermissionsStr\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
 
     fun createIndexRoleWithDocLevelSecurity(name: String, index: String, dlsQuery: String, clusterPermissions: String? = "") {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
-        val clusterPerms = if (clusterPermissions.isNullOrEmpty()) "[]" else "[\"$clusterPermissions\"]"
-        var entity = """
-            {
-                "cluster_permissions": $clusterPerms,
-                "index_permissions": [{
-                    "index_patterns": ["$index"],
-                    "dls": "$dlsQuery",
-                    "fls": [],
-                    "masked_fields": [],
-                    "allowed_actions": ["crud"]
-                }],
-                "tenant_permissions": []
-            }
-        """.trimIndent()
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "\"$clusterPermissions\"\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"$dlsQuery\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -1817,19 +1796,25 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             )
 
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
-        var entity = """
-            {
-                "cluster_permissions": [$clusterPermissionsStr],
-                "index_permissions": [{
-                    "index_patterns": ["$index"],
-                    "dls": "$dlsQuery",
-                    "fls": [],
-                    "masked_fields": [],
-                    "allowed_actions": ["crud"]
-                }],
-                "tenant_permissions": []
-            }
-        """.trimIndent()
+        var entity = "{\n" +
+            "\"cluster_permissions\": [\n" +
+            "$clusterPermissionsStr\n" +
+            "],\n" +
+            "\"index_permissions\": [\n" +
+            "{\n" +
+            "\"index_patterns\": [\n" +
+            "\"$index\"\n" +
+            "],\n" +
+            "\"dls\": \"$dlsQuery\",\n" +
+            "\"fls\": [],\n" +
+            "\"masked_fields\": [],\n" +
+            "\"allowed_actions\": [\n" +
+            "\"crud\"\n" +
+            "]\n" +
+            "}\n" +
+            "],\n" +
+            "\"tenant_permissions\": []\n" +
+            "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -1837,13 +1822,11 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     fun createUserRolesMapping(role: String, users: Array<String>) {
         val request = Request("PUT", "/_plugins/_security/api/rolesmapping/$role")
         val usersStr = users.joinToString { it -> "\"$it\"" }
-        var entity = """
-            {
-                "backend_roles": [],
-                "hosts": [],
-                "users": [$usersStr]
-            }
-        """.trimIndent()
+        var entity = "{                                  \n" +
+            "  \"backend_roles\" : [  ],\n" +
+            "  \"hosts\" : [  ],\n" +
+            "  \"users\" : [$usersStr]\n" +
+            "}"
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -1854,13 +1837,11 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
         val op = if (addUser) "add" else "remove"
 
-        val entity = """
-            [{
-                "op": "$op",
-                "path": "/users",
-                "value": [$usersStr]
-            }]
-        """.trimIndent()
+        val entity = "[{\n" +
+            "  \"op\" : \"$op\",\n" +
+            "  \"path\" : \"/users\",\n" +
+            "  \"value\" : [$usersStr]\n" +
+            "}]"
 
         request.setJsonEntity(entity)
         client().performRequest(request)
@@ -2216,7 +2197,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
         val searchResponse = client().makeRequest(
             "POST", "$MONITOR_V2_BASE_URI/_search",
-            StringEntity(search, APPLICATION_JSON)
+            StringEntity(search, ContentType.APPLICATION_JSON)
         )
 
         assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
@@ -2237,22 +2218,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     // takes in a get alerts API response and returns the current number of active alerts
     protected fun numAlerts(getAlertsResponse: Response): Int {
         logger.info("get alerts response: ${entityAsMap(getAlertsResponse)}")
-        return entityAsMap(getAlertsResponse)["total_alerts_v2"] as Int
-    }
-
-    protected fun getAlertV2HistoryDocCount(): Long {
-        val request = """
-            {
-                "query": {
-                    "match_all": {}
-                }
-            }
-        """.trimIndent()
-        val response = adminClient().makeRequest(
-            "POST", "${AlertV2Indices.ALERT_V2_HISTORY_ALL}/_search", emptyMap(),
-            StringEntity(request, APPLICATION_JSON)
-        )
-        assertEquals("Request to get alert v2 history failed", RestStatus.OK, response.restStatus())
-        return SearchResponse.fromXContent(createParser(jsonXContent, response.entity.content)).hits.totalHits!!.value
+        return entityAsMap(getAlertsResponse)["totalAlertV2s"] as Int
     }
 }
