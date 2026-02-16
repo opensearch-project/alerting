@@ -14,16 +14,8 @@ import org.opensearch.alerting.action.GetEmailGroupAction
 import org.opensearch.alerting.action.GetRemoteIndexesAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
-import org.opensearch.alerting.actionv2.DeleteMonitorV2Action
-import org.opensearch.alerting.actionv2.GetAlertsV2Action
-import org.opensearch.alerting.actionv2.GetMonitorV2Action
-import org.opensearch.alerting.actionv2.IndexMonitorV2Action
-import org.opensearch.alerting.actionv2.SearchMonitorV2Action
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
-import org.opensearch.alerting.alertsv2.AlertV2Indices
-import org.opensearch.alerting.alertsv2.AlertV2Indices.Companion.ALL_ALERT_V2_INDEX_PATTERN
-import org.opensearch.alerting.alertsv2.AlertV2Mover
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.comments.CommentsIndices.Companion.ALL_COMMENTS_INDEX_PATTERN
 import org.opensearch.alerting.core.JobSweeper
@@ -33,10 +25,8 @@ import org.opensearch.alerting.core.action.node.ScheduledJobsStatsTransportActio
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
 import org.opensearch.alerting.core.schedule.JobScheduler
-import org.opensearch.alerting.core.settings.AlertingV2Settings
 import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
-import org.opensearch.alerting.modelv2.MonitorV2
 import org.opensearch.alerting.remote.monitors.RemoteMonitorRegistry
 import org.opensearch.alerting.resthandler.RestAcknowledgeAlertAction
 import org.opensearch.alerting.resthandler.RestAcknowledgeChainedAlertAction
@@ -61,11 +51,6 @@ import org.opensearch.alerting.resthandler.RestSearchAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
-import org.opensearch.alerting.resthandlerv2.RestDeleteMonitorV2Action
-import org.opensearch.alerting.resthandlerv2.RestGetAlertsV2Action
-import org.opensearch.alerting.resthandlerv2.RestGetMonitorV2Action
-import org.opensearch.alerting.resthandlerv2.RestIndexMonitorV2Action
-import org.opensearch.alerting.resthandlerv2.RestSearchMonitorV2Action
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
@@ -98,11 +83,6 @@ import org.opensearch.alerting.transport.TransportSearchAlertingCommentAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
-import org.opensearch.alerting.transportv2.TransportDeleteMonitorV2Action
-import org.opensearch.alerting.transportv2.TransportGetAlertsV2Action
-import org.opensearch.alerting.transportv2.TransportGetMonitorV2Action
-import org.opensearch.alerting.transportv2.TransportIndexMonitorV2Action
-import org.opensearch.alerting.transportv2.TransportSearchMonitorV2Action
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
@@ -177,7 +157,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val OPEN_SEARCH_DASHBOARDS_USER_AGENT = "OpenSearch-Dashboards"
         @JvmField val UI_METADATA_EXCLUDE = arrayOf("monitor.${Monitor.UI_METADATA_FIELD}")
         @JvmField val MONITOR_BASE_URI = "/_plugins/_alerting/monitors"
-        @JvmField val MONITOR_V2_BASE_URI = "/_plugins/_alerting/v2/monitors"
         @JvmField val WORKFLOW_BASE_URI = "/_plugins/_alerting/workflows"
         @JvmField val REMOTE_BASE_URI = "/_plugins/_alerting/remote"
         @JvmField val DESTINATION_BASE_URI = "/_plugins/_alerting/destinations"
@@ -190,7 +169,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         @JvmField val FINDING_BASE_URI = "/_plugins/_alerting/findings"
         @JvmField val COMMENTS_BASE_URI = "/_plugins/_alerting/comments"
 
-        @JvmField val ALERTING_JOB_TYPES = listOf("monitor", "workflow", "monitor_v2")
+        @JvmField val ALERTING_JOB_TYPES = listOf("monitor", "workflow")
     }
 
     lateinit var runner: MonitorRunnerService
@@ -201,10 +180,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var docLevelMonitorQueries: DocLevelMonitorQueries
     lateinit var threadPool: ThreadPool
     lateinit var alertIndices: AlertIndices
-    lateinit var alertV2Indices: AlertV2Indices
     lateinit var clusterService: ClusterService
     lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
-    lateinit var alertV2Mover: AlertV2Mover
     var monitorTypeToMonitorRunners: MutableMap<String, RemoteMonitorRegistry> = mutableMapOf()
 
     override fun getRestHandlers(
@@ -217,7 +194,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         nodesInCluster: Supplier<DiscoveryNodes>
     ): List<RestHandler> {
         return listOf(
-            // Alerting V1
             RestGetMonitorAction(),
             RestDeleteMonitorAction(),
             RestIndexMonitorAction(),
@@ -242,19 +218,11 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestIndexAlertingCommentAction(),
             RestSearchAlertingCommentAction(),
             RestDeleteAlertingCommentAction(),
-
-            // Alerting V2
-            RestIndexMonitorV2Action(),
-            RestDeleteMonitorV2Action(),
-            RestGetMonitorV2Action(),
-            RestSearchMonitorV2Action(settings, clusterService),
-            RestGetAlertsV2Action(),
         )
     }
 
     override fun getActions(): List<ActionPlugin.ActionHandler<out ActionRequest, out ActionResponse>> {
         return listOf(
-            // Alerting V1
             ActionPlugin.ActionHandler(ScheduledJobsStatsAction.INSTANCE, ScheduledJobsStatsTransportAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.INDEX_MONITOR_ACTION_TYPE, TransportIndexMonitorAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_MONITOR_ACTION_TYPE, TransportGetMonitorAction::class.java),
@@ -281,21 +249,13 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(AlertingActions.DELETE_COMMENT_ACTION_TYPE, TransportDeleteAlertingCommentAction::class.java),
             ActionPlugin.ActionHandler(ExecuteWorkflowAction.INSTANCE, TransportExecuteWorkflowAction::class.java),
             ActionPlugin.ActionHandler(GetRemoteIndexesAction.INSTANCE, TransportGetRemoteIndexesAction::class.java),
-            ActionPlugin.ActionHandler(DocLevelMonitorFanOutAction.INSTANCE, TransportDocLevelMonitorFanOutAction::class.java),
-
-            // Alerting V2
-            ActionPlugin.ActionHandler(IndexMonitorV2Action.INSTANCE, TransportIndexMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(GetMonitorV2Action.INSTANCE, TransportGetMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(SearchMonitorV2Action.INSTANCE, TransportSearchMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(DeleteMonitorV2Action.INSTANCE, TransportDeleteMonitorV2Action::class.java),
-            ActionPlugin.ActionHandler(GetAlertsV2Action.INSTANCE, TransportGetAlertsV2Action::class.java)
+            ActionPlugin.ActionHandler(DocLevelMonitorFanOutAction.INSTANCE, TransportDocLevelMonitorFanOutAction::class.java)
         )
     }
 
     override fun getNamedXContent(): List<NamedXContentRegistry.Entry> {
         return listOf(
             Monitor.XCONTENT_REGISTRY,
-            MonitorV2.XCONTENT_REGISTRY,
             SearchInput.XCONTENT_REGISTRY,
             DocLevelMonitorInput.XCONTENT_REGISTRY,
             QueryLevelTrigger.XCONTENT_REGISTRY,
@@ -325,7 +285,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         val settings = environment.settings()
         val lockService = LockService(client, clusterService)
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
-        alertV2Indices = AlertV2Indices(settings, client, threadPool, clusterService)
         val alertService = AlertService(client, xContentRegistry, alertIndices)
         val triggerService = TriggerService(scriptService)
         runner = MonitorRunnerService
@@ -337,7 +296,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerSettings(settings)
             .registerThreadPool(threadPool)
             .registerAlertIndices(alertIndices)
-            .registerAlertV2Indices(alertV2Indices)
             .registerInputService(
                 InputService(
                     client,
@@ -364,7 +322,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
-        alertV2Mover = AlertV2Mover(environment.settings(), client, threadPool, clusterService, xContentRegistry)
         this.threadPool = threadPool
         this.clusterService = clusterService
 
@@ -392,7 +349,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             commentsIndices,
             docLevelMonitorQueries,
             destinationMigrationCoordinator,
-            alertV2Mover,
             lockService,
             alertService,
             triggerService
@@ -475,23 +431,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.COMMENTS_HISTORY_RETENTION_PERIOD,
             AlertingSettings.COMMENTS_MAX_CONTENT_SIZE,
             AlertingSettings.MAX_COMMENTS_PER_ALERT,
-            AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION,
-            AlertingSettings.ALERT_V2_HISTORY_ENABLED,
-            AlertingSettings.ALERT_V2_HISTORY_ROLLOVER_PERIOD,
-            AlertingSettings.ALERT_V2_HISTORY_INDEX_MAX_AGE,
-            AlertingSettings.ALERT_V2_HISTORY_MAX_DOCS,
-            AlertingSettings.ALERT_V2_HISTORY_RETENTION_PERIOD,
-            AlertingSettings.ALERTING_V2_MAX_MONITORS,
-            AlertingSettings.ALERTING_V2_MAX_THROTTLE_DURATION,
-            AlertingSettings.ALERTING_V2_MAX_EXPIRE_DURATION,
-            AlertingSettings.ALERTING_V2_MAX_LOOK_BACK_WINDOW,
-            AlertingSettings.ALERTING_V2_MAX_QUERY_LENGTH,
-            AlertingSettings.ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS,
-            AlertingSettings.ALERT_V2_QUERY_RESULTS_MAX_SIZE,
-            AlertingSettings.ALERT_V2_PER_RESULT_TRIGGER_MAX_ALERTS,
-            AlertingSettings.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH,
-            AlertingSettings.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH,
-            AlertingV2Settings.ALERTING_V2_ENABLED
+            AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION
         )
     }
 
@@ -509,8 +449,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         return listOf(
             SystemIndexDescriptor(ALL_ALERT_INDEX_PATTERN, "Alerting Plugin system index pattern"),
             SystemIndexDescriptor(SCHEDULED_JOBS_INDEX, "Alerting Plugin Configuration index"),
-            SystemIndexDescriptor(ALL_COMMENTS_INDEX_PATTERN, "Alerting Comments system index pattern"),
-            SystemIndexDescriptor(ALL_ALERT_V2_INDEX_PATTERN, "Alerting V2 Alerts index pattern")
+            SystemIndexDescriptor(ALL_COMMENTS_INDEX_PATTERN, "Alerting Comments system index pattern")
         )
     }
 
