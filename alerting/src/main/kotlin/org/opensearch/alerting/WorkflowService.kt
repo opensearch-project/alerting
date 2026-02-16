@@ -11,7 +11,6 @@ import org.opensearch.action.admin.indices.exists.indices.IndicesExistsRequest
 import org.opensearch.action.admin.indices.exists.indices.IndicesExistsResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.client.Client
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -133,12 +132,7 @@ class WorkflowService(
                     xContentRegistry,
                     LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
                 ).use { hitsParser ->
-                    val scheduledJob = ScheduledJob.parse(hitsParser, hit.id, hit.version)
-                    validateMonitorV1(scheduledJob)?.let {
-                        throw OpenSearchException(it)
-                    }
-
-                    val monitor = scheduledJob as Monitor
+                    val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version) as Monitor
                     monitors.add(monitor)
                 }
             }
