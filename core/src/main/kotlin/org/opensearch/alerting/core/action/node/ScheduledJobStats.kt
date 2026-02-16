@@ -7,8 +7,7 @@ package org.opensearch.alerting.core.action.node
 
 import org.opensearch.action.support.nodes.BaseNodeResponse
 import org.opensearch.alerting.core.JobSweeperMetrics
-import org.opensearch.alerting.core.resthandler.StatsRequestUtils.JOBS_INFO
-import org.opensearch.alerting.core.resthandler.StatsRequestUtils.JOB_SCHEDULING_METRICS
+import org.opensearch.alerting.core.resthandler.RestScheduledJobStatsHandler
 import org.opensearch.alerting.core.schedule.JobSchedulerMetrics
 import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.core.common.io.stream.StreamInput
@@ -70,13 +69,13 @@ class ScheduledJobStats : BaseNodeResponse, ToXContentFragment {
         builder.field("schedule_status", status)
         builder.field("roles", node.roles.map { it.roleName().uppercase(Locale.getDefault()) })
         if (jobSweeperMetrics != null) {
-            builder.startObject(JOB_SCHEDULING_METRICS)
+            builder.startObject(RestScheduledJobStatsHandler.JOB_SCHEDULING_METRICS)
             jobSweeperMetrics!!.toXContent(builder, params)
             builder.endObject()
         }
 
         if (jobInfos != null) {
-            builder.startObject(JOBS_INFO)
+            builder.startObject(RestScheduledJobStatsHandler.JOBS_INFO)
             for (job in jobInfos!!) {
                 builder.startObject(job.scheduledJobId)
                 job.toXContent(builder, params)
