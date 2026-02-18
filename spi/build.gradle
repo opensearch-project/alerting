@@ -54,7 +54,7 @@ publishing {
     }
     publications {
         shadow(MavenPublication) {
-            project.shadow.component(it)
+            from components.shadow
             groupId = 'org.opensearch.alerting'
             artifactId = 'alerting-spi'
 
