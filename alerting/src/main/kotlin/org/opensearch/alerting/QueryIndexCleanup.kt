@@ -12,8 +12,6 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
 import org.opensearch.action.admin.indices.exists.indices.IndicesExistsRequest
 import org.opensearch.action.admin.indices.exists.indices.IndicesExistsResponse
-import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.IndicesOptions
@@ -30,6 +28,7 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorMetadata
+import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
@@ -102,13 +101,8 @@ class QueryIndexCleanup(
 
     private fun rescheduleCleanup() {
         if (clusterService.state().nodes.isLocalNodeElectedClusterManager) {
-            scheduledCleanup?.cancel()
-            scheduledCleanup = threadPool.scheduleWithFixedDelay(
-                { cleanupQueryIndices() },
-                queryIndexCleanupPeriod,
-                ThreadPool.Names.MANAGEMENT
-            )
-            logger.info("Query index cleanup rescheduled with period: $queryIndexCleanupPeriod")
+            offClusterManager()
+            onClusterManager()
         }
     }
 
@@ -143,12 +137,10 @@ class QueryIndexCleanup(
     }
 
     private suspend fun fetchAllMonitorMetadata(): List<MonitorMetadata> {
-        val configIndex = ".opendistro-alerting-config"
-
         // Check if index exists first
         val indexExists = try {
             val response: IndicesExistsResponse = client.suspendUntil {
-                admin().indices().exists(IndicesExistsRequest(configIndex), it)
+                admin().indices().exists(IndicesExistsRequest(SCHEDULED_JOBS_INDEX), it)
             }
             response.isExists
         } catch (e: Exception) {
@@ -161,7 +153,7 @@ class QueryIndexCleanup(
             return emptyList()
         }
 
-        val searchRequest = SearchRequest(configIndex)
+        val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
             .source(
                 SearchSourceBuilder()
                     .query(QueryBuilders.existsQuery(METADATA_FIELD))
@@ -174,7 +166,7 @@ class QueryIndexCleanup(
                 search(searchRequest, it)
             }
 
-            logger.info("Metadata query returned ${response.hits.hits.size} documents")
+            logger.info("Metadata query returned ${response.hits.hits.size} of ${response.hits.totalHits} documents")
 
             response.hits.hits.mapNotNull { hit ->
                 try {
@@ -207,13 +199,21 @@ class QueryIndexCleanup(
     private suspend fun buildQueryIndexUsageMap(allMetadata: List<MonitorMetadata>): Map<String, QueryIndexUsage> {
         val queryIndexUsageMap = mutableMapOf<String, QueryIndexUsage>()
 
+        // Batch-fetch all monitors instead of one-by-one
+        val monitorIds = allMetadata.map { it.monitorId }.toSet()
+        val monitors = fetchMonitors(monitorIds)
+
         for (metadata in allMetadata) {
-            val monitorId = extractMonitorId(metadata.id)
-            val monitor = getMonitor(monitorId)
+            val monitorId = metadata.monitorId
+            val monitor = monitors[monitorId]
 
             if (monitor == null) {
                 for ((sourceKey, concreteQueryIndex) in metadata.sourceToQueryIndexMapping) {
-                    val aliasName = extractAliasFromConcreteIndex(concreteQueryIndex)
+                    val aliasName = getAliasForIndex(concreteQueryIndex)
+                    if (aliasName == null) {
+                        logger.debug("Skipping $concreteQueryIndex: not backed by an alias")
+                        continue
+                    }
                     val isWriteIndex = checkIfWriteIndex(aliasName, concreteQueryIndex)
 
                     queryIndexUsageMap.getOrPut(concreteQueryIndex) {
@@ -226,6 +226,13 @@ class QueryIndexCleanup(
             for ((sourceKey, concreteQueryIndex) in metadata.sourceToQueryIndexMapping) {
                 val sourceIndexName = extractSourceIndexName(sourceKey, monitorId)
                 val aliasName = monitor.dataSources.queryIndex
+
+                // Only process query indices that are part of an alias
+                if (!isAlias(aliasName)) {
+                    logger.debug("Skipping $concreteQueryIndex: queryIndex $aliasName is not an alias")
+                    continue
+                }
+
                 val isWriteIndex = checkIfWriteIndex(aliasName, concreteQueryIndex)
 
                 logger.info("Monitor $monitorId: sourceKey=$sourceKey, extracted=$sourceIndexName, queryIndex=$concreteQueryIndex")
@@ -263,10 +270,10 @@ class QueryIndexCleanup(
                 continue
             }
 
-            val sortedIndices = concreteIndices.sortedBy { extractIndexNumber(it.concreteQueryIndex) }
+            val sortedIndices = concreteIndices.sortedBy { getIndexCreationDate(it.concreteQueryIndex) }
 
             // Determine latest index from ALL backing indices in cluster, not just metadata
-            val latestIndexInCluster = allBackingIndices.maxByOrNull { extractIndexNumber(it) }
+            val latestIndexInCluster = allBackingIndices.maxByOrNull { getIndexCreationDate(it) }
 
             // Check if alias still exists
             val aliasExists = clusterService.state().metadata().indicesLookup?.get(aliasName) != null
@@ -323,7 +330,7 @@ class QueryIndexCleanup(
 
     private suspend fun cleanupMetadataMappings(allMetadata: List<MonitorMetadata>, indicesToDelete: List<String>) {
         for (metadata in allMetadata) {
-            val monitorId = extractMonitorId(metadata.id)
+            val monitorId = metadata.monitorId
             val entriesToRemove = mutableListOf<String>()
 
             for ((sourceKey, concreteQueryIndex) in metadata.sourceToQueryIndexMapping) {
@@ -368,33 +375,14 @@ class QueryIndexCleanup(
             deleteIndexRequest,
             object : ActionListener<AcknowledgedResponse> {
                 override fun onResponse(response: AcknowledgedResponse) {
-                    logger.info("Successfully deleted query indices: $indicesToDelete")
+                    logger.info("Successfully deleted query indices: $existingIndices")
                 }
 
                 override fun onFailure(e: Exception) {
-                    logger.error("Batch delete failed for: $indicesToDelete. Retrying individually.", e)
-                    deleteQueryIndicesOneByOne(indicesToDelete)
+                    logger.error("Failed to delete query indices: $existingIndices. Will retry on next cleanup run.", e)
                 }
             }
         )
-    }
-
-    private fun deleteQueryIndicesOneByOne(indicesToDelete: List<String>) {
-        for (index in indicesToDelete) {
-            val deleteRequest = DeleteIndexRequest(index)
-            client.admin().indices().delete(
-                deleteRequest,
-                object : ActionListener<AcknowledgedResponse> {
-                    override fun onResponse(response: AcknowledgedResponse) {
-                        logger.info("Successfully deleted query index: $index")
-                    }
-
-                    override fun onFailure(e: Exception) {
-                        logger.error("Failed to delete query index: $index", e)
-                    }
-                }
-            )
-        }
     }
 
     internal fun extractMonitorId(metadataId: String): String {
@@ -410,12 +398,34 @@ class QueryIndexCleanup(
         return sourceKey.removeSuffix(monitorId)
     }
 
-    internal fun extractAliasFromConcreteIndex(concreteQueryIndex: String): String {
-        return concreteQueryIndex.substringBeforeLast("-")
+    private fun isAlias(name: String): Boolean {
+        return clusterService.state().metadata().hasAlias(name)
     }
 
-    internal fun extractIndexNumber(concreteQueryIndex: String): Int {
-        return concreteQueryIndex.substringAfterLast("-").toIntOrNull() ?: 0
+    /**
+     * Looks up the alias that a concrete index belongs to from cluster state.
+     * Returns null if the index is not part of any alias.
+     */
+    private fun getAliasForIndex(concreteIndex: String): String? {
+        return try {
+            val indexMetadata = clusterService.state().metadata().index(concreteIndex) ?: return null
+            val aliases = indexMetadata.aliases
+            if (aliases.isEmpty()) return null
+            // Return the first alias — query indices typically belong to exactly one alias
+            aliases.keys.iterator().next()
+        } catch (e: Exception) {
+            logger.warn("Failed to look up alias for index: $concreteIndex", e)
+            null
+        }
+    }
+
+    private fun getIndexCreationDate(indexName: String): Long {
+        return try {
+            clusterService.state().metadata().index(indexName)?.settings?.get("index.creation_date")?.toLong() ?: 0L
+        } catch (e: Exception) {
+            logger.warn("Failed to get creation date for index: $indexName", e)
+            0L
+        }
     }
 
     private fun checkIfWriteIndex(aliasName: String, concreteQueryIndex: String): Boolean {
@@ -426,28 +436,47 @@ class QueryIndexCleanup(
         return writeIndexName == concreteQueryIndex
     }
 
-    private suspend fun getMonitor(monitorId: String): Monitor? {
-        val getRequest = GetRequest(".opendistro-alerting-config", monitorId)
-        return try {
-            val response: GetResponse = client.suspendUntil {
-                get(getRequest, it)
-            }
-            if (response.isExists) {
-                val xcp = XContentHelper.createParser(
-                    NamedXContentRegistry.EMPTY,
-                    LoggingDeprecationHandler.INSTANCE,
-                    response.sourceAsBytesRef,
-                    XContentType.JSON
+    private suspend fun fetchMonitors(monitorIds: Set<String>): Map<String, Monitor> {
+        if (monitorIds.isEmpty()) return emptyMap()
+
+        val monitors = mutableMapOf<String, Monitor>()
+        // Batch in chunks to avoid overly large queries
+        for (batch in monitorIds.chunked(SEARCH_QUERY_RESULT_SIZE)) {
+            val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
+                .source(
+                    SearchSourceBuilder()
+                        .query(QueryBuilders.termsQuery("_id", batch))
+                        .size(batch.size)
                 )
-                XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                Monitor.parse(xcp, response.id, response.version)
-            } else null
-        } catch (e: Exception) {
-            logger.warn("Error getting monitor: $monitorId", e)
-            null
+                .indicesOptions(IndicesOptions.lenientExpandOpen())
+
+            try {
+                val response: SearchResponse = client.suspendUntil {
+                    search(searchRequest, it)
+                }
+                for (hit in response.hits.hits) {
+                    try {
+                        val xcp = XContentHelper.createParser(
+                            NamedXContentRegistry.EMPTY,
+                            LoggingDeprecationHandler.INSTANCE,
+                            hit.sourceRef,
+                            XContentType.JSON
+                        )
+                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                        monitors[hit.id] = Monitor.parse(xcp, hit.id, hit.version)
+                    } catch (e: Exception) {
+                        logger.warn("Failed to parse monitor: ${hit.id}", e)
+                    }
+                }
+            } catch (e: Exception) {
+                logger.error("Failed to batch-fetch monitors", e)
+            }
         }
+        logger.info("Fetched ${monitors.size} monitors out of ${monitorIds.size} requested")
+        return monitors
     }
 
+    // Uses locally cached cluster state — not a remote call to the cluster manager
     private fun indexExists(indexName: String): Boolean {
         return try {
             clusterService.state().metadata().hasIndex(indexName)

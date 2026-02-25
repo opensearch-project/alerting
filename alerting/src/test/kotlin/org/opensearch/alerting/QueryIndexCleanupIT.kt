@@ -181,7 +181,7 @@ class QueryIndexCleanupIT : AlertingRestTestCase() {
 
         // Force a rollover by creating a new backing index manually
         val nextIndexNumber = firstBackingIndex.substringAfterLast("-").toInt() + 1
-        val nextIndexName = "$queryIndexAlias-" + String.format("%06d", nextIndexNumber)
+        val nextIndexName = "$queryIndexAlias-" + String.format(java.util.Locale.ROOT, "%06d", nextIndexNumber)
 
         val createIndexRequest = """
             {
