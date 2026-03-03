@@ -74,47 +74,12 @@ jobs:
         if: env.imagePresent == 'true'
         run: |
           cd ..
-          CONTAINER_ID=$(docker run -p 9200:9200 -d -p 9600:9600 -e "OPENSEARCH_INITIAL_ADMIN_PASSWORD=myStrongPassword123!" -e "discovery.type=single-node" opensearch-alerting:test)
-          echo "Started container: $CONTAINER_ID"
-          echo "CONTAINER_ID=$CONTAINER_ID" >> $GITHUB_ENV
-          
-          # Wait and check container status periodically
-          for i in {1..30}; do
-            sleep 10
-            if docker ps | grep -q $CONTAINER_ID; then
-              echo "[$i/30] Container is running..."
-              # Try to connect
-              if curl -s -XGET https://localhost:9200/_cluster/health -u admin:myStrongPassword123! --insecure > /dev/null 2>&1; then
-                echo "OpenSearch is ready!"
-                break
-              fi
-            else
-              echo "Container exited! Logs:"
-              docker logs $CONTAINER_ID
-              exit 1
-            fi
-          done
-          
-          # Final check
-          if ! docker ps | grep -q $CONTAINER_ID; then
-            echo "Container is not running after 5 minutes. Logs:"
-            docker logs $CONTAINER_ID
-            exit 1
-          fi
-          
-          echo "Container status:"
-          docker ps | grep $CONTAINER_ID
+          docker run -p 9200:9200 -d -p 9600:9600 -e "OPENSEARCH_INITIAL_ADMIN_PASSWORD=myStrongPassword123!" -e "discovery.type=single-node" opensearch-alerting:test
+          sleep 300
 
       - name: Run Alerting Test for security enabled test cases
         if: env.imagePresent == 'true'
         run: |
-          echo "Checking OpenSearch status..."
-          curl -XGET https://localhost:9200/_cat/plugins -u admin:myStrongPassword123! --insecure || {
-            echo "Failed to connect to OpenSearch. Container logs:"
-            docker logs $CONTAINER_ID
-            exit 1
-          }
-          
           cluster_running=`curl -XGET https://localhost:9200/_cat/plugins -u admin:myStrongPassword123! --insecure`
           echo $cluster_running
           security=`curl -XGET https://localhost:9200/_cat/plugins -u admin:myStrongPassword123! --insecure |grep opensearch-security|wc -l`
