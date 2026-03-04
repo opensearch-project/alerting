@@ -286,7 +286,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         val settings = environment.settings()
         val lockService = LockService(client, clusterService)
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
-        queryIndexCleanup = QueryIndexCleanup(settings, client, threadPool, clusterService)
+        queryIndexCleanup = QueryIndexCleanup(settings, client, threadPool, clusterService, xContentRegistry)
         val alertService = AlertService(client, xContentRegistry, alertIndices)
         val triggerService = TriggerService(scriptService)
         runner = MonitorRunnerService

@@ -28,6 +28,7 @@ import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorMetadata
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -49,6 +50,7 @@ class QueryIndexCleanup(
     private val client: Client,
     private val threadPool: ThreadPool,
     private val clusterService: ClusterService,
+    private val xContentRegistry: NamedXContentRegistry,
 ) : ClusterStateListener {
 
     private val logger = LogManager.getLogger(javaClass)
@@ -121,8 +123,10 @@ class QueryIndexCleanup(
                 val queryIndexUsageMap = buildQueryIndexUsageMap(allMetadata)
                 val indicesToDelete = determineIndicesToDelete(queryIndexUsageMap)
 
+                // Always clean metadata mappings for dead source indices
+                cleanupMetadataMappings(allMetadata, indicesToDelete)
+
                 if (indicesToDelete.isNotEmpty()) {
-                    cleanupMetadataMappings(allMetadata, indicesToDelete)
                     deleteQueryIndices(indicesToDelete)
                 } else {
                     logger.info("No query indices eligible for deletion")
@@ -153,40 +157,56 @@ class QueryIndexCleanup(
             return emptyList()
         }
 
-        val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
-            .source(
-                SearchSourceBuilder()
+        val allMetadata = mutableListOf<MonitorMetadata>()
+        var searchAfterValues: Array<Any>? = null
+
+        try {
+            do {
+                val searchSourceBuilder = SearchSourceBuilder()
                     .query(QueryBuilders.existsQuery(METADATA_FIELD))
                     .size(SEARCH_QUERY_RESULT_SIZE)
-            )
-            .indicesOptions(IndicesOptions.lenientExpandOpen())
+                    .sort("_id")
 
-        return try {
-            val response: SearchResponse = client.suspendUntil {
-                search(searchRequest, it)
-            }
-
-            logger.info("Metadata query returned ${response.hits.hits.size} of ${response.hits.totalHits} documents")
-
-            response.hits.hits.mapNotNull { hit ->
-                try {
-                    val xcp = XContentHelper.createParser(
-                        NamedXContentRegistry.EMPTY,
-                        LoggingDeprecationHandler.INSTANCE,
-                        hit.sourceRef,
-                        XContentType.JSON
-                    )
-                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                    MonitorMetadata.parse(xcp, hit.id, hit.seqNo, hit.primaryTerm)
-                } catch (e: Exception) {
-                    logger.warn("Failed to parse monitor metadata: ${hit.id}", e)
-                    null
+                if (searchAfterValues != null) {
+                    searchSourceBuilder.searchAfter(searchAfterValues)
                 }
-            }
+
+                val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX)
+                    .source(searchSourceBuilder)
+                    .indicesOptions(IndicesOptions.lenientExpandOpen())
+
+                val response: SearchResponse = client.suspendUntil {
+                    search(searchRequest, it)
+                }
+
+                val hits = response.hits.hits
+                if (allMetadata.isEmpty()) {
+                    logger.info("Metadata query: total ${response.hits.totalHits} documents")
+                }
+
+                for (hit in hits) {
+                    try {
+                        val xcp = XContentHelper.createParser(
+                            NamedXContentRegistry.EMPTY,
+                            LoggingDeprecationHandler.INSTANCE,
+                            hit.sourceRef,
+                            XContentType.JSON
+                        )
+                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                        allMetadata.add(MonitorMetadata.parse(xcp, hit.id, hit.seqNo, hit.primaryTerm))
+                    } catch (e: Exception) {
+                        logger.warn("Failed to parse monitor metadata: ${hit.id}", e)
+                    }
+                }
+
+                searchAfterValues = if (hits.isNotEmpty()) hits.last().sortValues else null
+            } while (searchAfterValues != null)
         } catch (e: Exception) {
             logger.error("Failed to fetch monitor metadata", e)
-            emptyList()
         }
+
+        logger.info("Fetched ${allMetadata.size} monitor metadata documents")
+        return allMetadata
     }
 
     data class QueryIndexUsage(
@@ -457,13 +477,15 @@ class QueryIndexCleanup(
                 for (hit in response.hits.hits) {
                     try {
                         val xcp = XContentHelper.createParser(
-                            NamedXContentRegistry.EMPTY,
+                            xContentRegistry,
                             LoggingDeprecationHandler.INSTANCE,
                             hit.sourceRef,
                             XContentType.JSON
                         )
-                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                        monitors[hit.id] = Monitor.parse(xcp, hit.id, hit.version)
+                        val job = ScheduledJob.parse(xcp, hit.id, hit.version)
+                        if (job is Monitor) {
+                            monitors[hit.id] = job
+                        }
                     } catch (e: Exception) {
                         logger.warn("Failed to parse monitor: ${hit.id}", e)
                     }
