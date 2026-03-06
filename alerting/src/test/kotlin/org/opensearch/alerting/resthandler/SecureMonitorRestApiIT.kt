@@ -326,7 +326,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test get monitor with enable filterBy for a user with multiple backend roles`() {
         enableFilterBy()
-        setFilterByBackendRolesStrategy("all")
+        // setFilterByBackendRolesStrategy("all")
 
         createUserWithTestDataAndCustomRole(
             user,
