@@ -73,6 +73,7 @@ class TransportGetAlertsAction @Inject constructor(
 
     @Volatile
     override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile override var filterByAccessStrategy = AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.get(settings)
 
     init {
         listenFilterBySettingChange(clusterService)

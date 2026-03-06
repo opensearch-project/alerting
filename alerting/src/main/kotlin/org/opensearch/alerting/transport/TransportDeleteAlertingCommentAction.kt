@@ -60,6 +60,7 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
 
     @Volatile private var alertingCommentsEnabled = AlertingSettings.ALERTING_COMMENTS_ENABLED.get(settings)
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile override var filterByAccessStrategy = AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERTING_COMMENTS_ENABLED) {

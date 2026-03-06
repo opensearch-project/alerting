@@ -330,7 +330,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             // refer: `test create monitor with enable filter by`
             return
         }
-        // setFilterByBackendRolesStrategy("all")
+        setFilterByBackendRolesStrategy("all")
 
         val monitor = randomQueryLevelMonitor(enabled = true)
 
@@ -406,6 +406,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             getUser,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
+            // intentionally change order of backend roles from order on monitor to ensure order doesn't matter
             listOf("role2", TEST_HR_BACKEND_ROLE),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
