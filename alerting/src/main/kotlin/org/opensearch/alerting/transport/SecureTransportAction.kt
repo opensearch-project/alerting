@@ -38,13 +38,13 @@ private val log = LogManager.getLogger(SecureTransportAction::class.java)
 interface SecureTransportAction {
 
     var filterByEnabled: Boolean
-    val filterByAccessStrategy: String
+    // var filterByAccessStrategy: String
 
     fun listenFilterBySettingChange(clusterService: ClusterService) {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FILTER_BY_BACKEND_ROLES) { filterByEnabled = it }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY) {
-            filterByAccessStrategy = it
-        }
+        // clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY) {
+        //     filterByAccessStrategy = it
+        // }
     }
 
     fun readUserFromThreadContext(client: Client): User? {
@@ -105,13 +105,14 @@ interface SecureTransportAction {
     }
 
     fun checkUserBackendRolesAccess(userBackendRoles: List<String>, resourceBackendRoles: List<String>): Boolean {
-        if (filter_by_backend_roles_access_strategy == "intersect") {
-            return resourceBackendRoles.intersect(userBackendRoles).isEmpty()
-        } else if (filter_by_backend_roles_access_strategy == "all") {
-            return !resourceBackendRoles.equals(userBackendRoles)
-        }
-        // TODO: this should never be reached
-        return false
+        return !resourceBackendRoles.equals(userBackendRoles)
+        // if (filterByAccessStrategy == "intersect") {
+        //     return resourceBackendRoles.intersect(userBackendRoles).isEmpty()
+        // } else if (filterByAccessStrategy == "all") {
+        //     return !resourceBackendRoles.equals(userBackendRoles)
+        // }
+        // // TODO: this should never be reached
+        // return false
     }
 
     /**
