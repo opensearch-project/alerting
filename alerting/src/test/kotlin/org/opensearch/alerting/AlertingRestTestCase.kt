@@ -1482,7 +1482,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         assertEquals(updateResponse.statusLine.toString(), 200, updateResponse.statusLine.statusCode)
     }
 
-    fun setFilterByBackendRolesStrategy(strategy String) {
+    fun setFilterByBackendRolesStrategy(strategy: String) {
         val updateResponse = client().makeRequest(
             "PUT", "_cluster/settings",
             emptyMap(),
