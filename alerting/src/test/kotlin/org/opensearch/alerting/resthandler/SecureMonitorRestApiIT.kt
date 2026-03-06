@@ -383,7 +383,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             // refer: `test create monitor with enable filter by`
             return
         }
-        // setFilterByBackendRolesStrategy("all")
+        setFilterByBackendRolesStrategy("all")
 
         val monitor = randomQueryLevelMonitor(enabled = true)
 
