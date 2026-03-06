@@ -8,6 +8,7 @@ package org.opensearch.alerting.transport
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.settings.FilterByBackendRolesAccessStrategy
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.alerting.util.AlertingException
@@ -105,12 +106,16 @@ interface SecureTransportAction {
     }
 
     fun checkUserBackendRolesAccess(userBackendRoles: List<String>, resourceBackendRoles: List<String>): Boolean {
-        if (filterByAccessStrategy == "intersect") {
+        if (filterByAccessStrategy == FilterByBackendRolesAccessStrategy.INTERSECT.strategy) {
             return resourceBackendRoles.intersect(userBackendRoles).isEmpty()
-        } else if (filterByAccessStrategy == "all") {
+        } else if (filterByAccessStrategy == FilterByBackendRolesAccessStrategy.ALL.strategy) {
             return !resourceBackendRoles.sorted().equals(userBackendRoles.sorted())
         }
-        // TODO: this should never be reached
+        // Not sure if this is necessary, since there is a validator
+        // on the setting itself
+        throw IllegalArgumentException(
+            "Invalid filter by access strategy: $filterByAccessStrategy"
+        )
         return false
     }
 
