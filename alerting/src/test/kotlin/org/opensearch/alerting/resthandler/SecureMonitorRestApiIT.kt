@@ -43,6 +43,7 @@ import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomTemplateScript
+import org.opensearch.alerting.randomUser
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
@@ -318,6 +319,39 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             fail("Expected 403 Method FORBIDDEN response")
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
+        }
+    }
+
+    fun `test get monitor with enable filterBy for a user with multiple backend roles`() {
+        enableFilterBy()
+        setFilterByBackendRolesStrategy("all")
+
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            listOf(TEST_HR_BACKEND_ROLE, "foobar"),
+            getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
+        )
+
+        val user2 = randomUser(roles = listOf(TEST_HR_ROLE))
+
+        println("user name: ${user2.name}")
+
+        val monitor = randomQueryLevelMonitor(user = user2)
+
+        println("monitor ID: ${monitor.id}")
+
+        try {
+            val getMonitorResponse = userClient?.makeRequest(
+                "GET",
+                "$ALERTING_BASE_URI/${monitor.id}",
+                null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+            )
+            assertEquals("Get monitor failed", RestStatus.OK, getMonitorResponse?.restStatus())
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
