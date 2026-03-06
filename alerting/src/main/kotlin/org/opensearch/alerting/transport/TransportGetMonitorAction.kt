@@ -90,6 +90,9 @@ class TransportGetMonitorAction @Inject constructor(
             return
         }
 
+        log.info("FOOBAR")
+        println("FOOBAR2")
+
         /*
          * Remove security context before you call elasticsearch api's. By this time, permissions required
          * to call this api are validated.
