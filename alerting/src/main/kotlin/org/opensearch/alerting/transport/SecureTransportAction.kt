@@ -105,7 +105,7 @@ interface SecureTransportAction {
     }
 
     fun checkUserBackendRolesAccess(userBackendRoles: List<String>, resourceBackendRoles: List<String>): Boolean {
-        return !resourceBackendRoles.equals(userBackendRoles)
+        return !resourceBackendRoles.sorted().equals(userBackendRoles.sorted())
         // if (filterByAccessStrategy == "intersect") {
         //     return resourceBackendRoles.intersect(userBackendRoles).isEmpty()
         // } else if (filterByAccessStrategy == "all") {
