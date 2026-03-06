@@ -323,7 +323,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test get monitor for backend roles in same order where filterByAccessStrategy is all`() {
+    fun `test get monitor succeeds for same backend roles in same order when filterByAccessStrategy is all`() {
         enableFilterBy()
         if (!isHttps()) {
             // if security is disabled and filter by is enabled, we can't create monitor
@@ -376,7 +376,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test get monitor for backend roles in different order where filterByAccessStrategy is all`() {
+    fun `test get monitor succeeds for same backend roles in different order when filterByAccessStrategy is all`() {
         enableFilterBy()
         if (!isHttps()) {
             // if security is disabled and filter by is enabled, we can't create monitor
