@@ -60,7 +60,7 @@ class RestExecuteMonitorAction : BaseRestHandler() {
 
             if (request.hasParam("monitorID")) {
                 val monitorId = request.param("monitorID")
-                val execMonitorRequest = ExecuteMonitorRequest(dryrun, requestEnd, monitorId, null)
+                val execMonitorRequest = ExecuteMonitorRequest(dryrun, true, requestEnd, monitorId, null)
                 client.execute(ExecuteMonitorAction.INSTANCE, execMonitorRequest, RestToXContentListener(channel))
             } else {
                 val xcp = request.contentParser()
@@ -73,7 +73,7 @@ class RestExecuteMonitorAction : BaseRestHandler() {
                     throw AlertingException.wrap(e)
                 }
 
-                val execMonitorRequest = ExecuteMonitorRequest(dryrun, requestEnd, null, monitor)
+                val execMonitorRequest = ExecuteMonitorRequest(dryrun, true, requestEnd, null, monitor)
                 client.execute(ExecuteMonitorAction.INSTANCE, execMonitorRequest, RestToXContentListener(channel))
             }
         }

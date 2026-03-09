@@ -11,13 +11,13 @@ import org.apache.lucene.search.TotalHits.Relation
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.action.search.SearchResponse.Clusters
 import org.opensearch.action.search.ShardSearchFailure
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.isIndexNotFoundException
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -121,6 +121,7 @@ class TransportSearchMonitorAction @Inject constructor(
         }
     }
 
+    // Used in Get and Search monitor functionalities to return a "no results" response
     fun getEmptySearchResponse(): SearchResponse {
         val internalSearchResponse = InternalSearchResponse(
             SearchHits(emptyArray(), TotalHits(0L, Relation.EQUAL_TO), 0.0f),

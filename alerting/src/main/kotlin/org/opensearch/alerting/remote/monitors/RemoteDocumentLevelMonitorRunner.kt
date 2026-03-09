@@ -41,6 +41,7 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
+        manual: Boolean,
         workflowRunContext: WorkflowRunContext?,
         executionId: String,
         transportService: TransportService

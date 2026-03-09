@@ -728,7 +728,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val alerts = searchAlerts(monitor)
         assertEquals("Alert not saved", 1, alerts.size)
-        assertEquals("Alert status is incorrect", Alert.State.ERROR, alerts[0].state)
+        assertEquals("Alert status is incorrect", Alert.State.ERROR, (alerts[0] as Alert).state)
     }
 
     fun `test execute monitor generates alerts and findings with per alert execution for actions`() {

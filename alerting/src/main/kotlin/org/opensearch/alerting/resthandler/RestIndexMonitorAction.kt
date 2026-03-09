@@ -43,7 +43,7 @@ import org.opensearch.rest.action.RestResponseListener
 import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
 import java.time.Instant
-import java.util.*
+import java.util.Locale
 
 private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)
 
@@ -92,6 +92,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
 
         val monitor: Monitor
         val rbacRoles: List<String>?
+
         try {
             monitor = Monitor.parse(xcp, id).copy(lastUpdateTime = Instant.now())
 

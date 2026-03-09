@@ -47,6 +47,13 @@ import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
+import org.opensearch.commons.alerting.model.PPLSQLInput
+import org.opensearch.commons.alerting.model.PPLSQLInput.QueryLanguage
+import org.opensearch.commons.alerting.model.PPLSQLTrigger
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.ConditionType
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.NumResultsCondition
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.Severity
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.TriggerMode
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Schedule
@@ -79,9 +86,17 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase.randomBoolean
 import org.opensearch.test.OpenSearchTestCase.randomInt
 import org.opensearch.test.OpenSearchTestCase.randomIntBetween
+import org.opensearch.test.OpenSearchTestCase.randomLongBetween
 import org.opensearch.test.rest.OpenSearchRestTestCase
+import org.opensearch.test.rest.OpenSearchRestTestCase.assertEquals
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+
+// constants for PPL Alerting tests
+const val TIMESTAMP_FIELD = "timestamp"
+const val TEST_INDEX_NAME = "index"
+const val TEST_INDEX_MAPPINGS =
+    """"properties":{"timestamp":{"type":"date"},"abc":{"type":"keyword"},"number":{"type":"integer"}}"""
 
 fun randomQueryLevelMonitor(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
@@ -227,6 +242,36 @@ fun randomDocumentLevelMonitor(
     )
 }
 
+fun randomPPLMonitor(
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    enabled: Boolean = randomBoolean(),
+    schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
+    lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+    enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
+    triggers: List<PPLSQLTrigger> = List(randomIntBetween(1, 5)) { randomPPLTrigger() },
+    user: User? = randomUser(),
+    queryLanguage: QueryLanguage = QueryLanguage.PPL,
+    query: String = "source = $TEST_INDEX_NAME | head 10"
+): Monitor {
+    return Monitor(
+        name = name,
+        enabled = enabled,
+        schedule = schedule,
+        lastUpdateTime = lastUpdateTime,
+        enabledTime = enabledTime,
+        monitorType = Monitor.MonitorType.PPL_MONITOR.value,
+        inputs = listOf(
+            PPLSQLInput(
+                query = query,
+                queryLanguage = queryLanguage
+            )
+        ),
+        triggers = triggers,
+        user = user,
+        uiMetadata = mapOf()
+    )
+}
+
 fun randomWorkflow(
     id: String = Workflow.NO_ID,
     monitorIds: List<String>,
@@ -348,6 +393,42 @@ fun randomDocumentLevelTrigger(
     )
 }
 
+// random PPLTrigger defaults to a number_of_results trigger, because a custom condition
+// would require knowledge of the PPL Monitor's query
+// it is on the caller to be explicit and pass in valid arguments that would create either
+// a valid PPL Monitor or one that intentionally throws an error during testing.
+// e.g. to create a valid PPL Monitor, if conditionType is CUSTOM,
+// numResultsCondition and numResultsValue must be null, while
+// customCondition must not be null.
+fun randomPPLTrigger(
+    id: String = UUIDs.base64UUID(),
+    name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
+    severity: Severity = Severity.entries.random(),
+    throttleDuration: Long? = randomLongBetween(1, 100),
+    expireDuration: Long = randomLongBetween(1, 100),
+    actions: List<Action> = mutableListOf(),
+    mode: TriggerMode = TriggerMode.entries.random(),
+    conditionType: ConditionType = ConditionType.NUMBER_OF_RESULTS,
+    numResultsCondition: NumResultsCondition? = NumResultsCondition.entries.random(),
+    numResultsValue: Long? = randomLongBetween(1L, 50L),
+    customCondition: String? = null
+): PPLSQLTrigger {
+    return PPLSQLTrigger(
+        id = id,
+        name = name,
+        severity = severity.value,
+        throttleDuration = throttleDuration,
+        expireDuration = expireDuration,
+        lastTriggeredTime = null,
+        actions = actions,
+        mode = mode,
+        conditionType = conditionType,
+        numResultsCondition = numResultsCondition,
+        numResultsValue = numResultsValue,
+        customCondition = customCondition
+    )
+}
+
 fun randomBucketSelectorExtAggregationBuilder(
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
     bucketsPathsMap: MutableMap<String, String> = mutableMapOf("avg" to "10"),
@@ -424,10 +505,11 @@ fun randomTemplateScript(
 fun randomAction(
     name: String = OpenSearchRestTestCase.randomUnicodeOfLength(10),
     template: Script = randomTemplateScript("Hello World"),
-    destinationId: String = "",
+    subjectTemplate: Script = template,
+    destinationId: String = "abc",
     throttleEnabled: Boolean = false,
     throttle: Throttle = randomThrottle()
-) = Action(name, destinationId, template, template, throttleEnabled, throttle, actionExecutionPolicy = null)
+) = Action(name, destinationId, subjectTemplate, template, throttleEnabled, throttle, actionExecutionPolicy = null)
 
 fun randomActionWithPolicy(
     name: String = OpenSearchRestTestCase.randomUnicodeOfLength(10),
@@ -809,4 +891,89 @@ fun randomAlertContext(
 /** helper that returns a field in a json map whose values are all json objects */
 fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
     return this[key] as Map<String, Map<String, Any>>
+}
+
+fun assertPplMonitorsEqual(pplMonitor1: Monitor, pplMonitor2: Monitor) {
+    // note: Get and Search Monitor responses do not include User information by
+    // design, so that check is skipped
+
+    // note: Update Monitor API intentionally overrides the enabledTime of the new given monitor
+    // with the enabledTime of the existing monitor being updated to ensure execution correctness,
+    // so that check is skipped
+
+    assertEquals("Monitor enabled fields not equal", pplMonitor1.enabled, pplMonitor2.enabled)
+    assertEquals("Monitor schedules not equal", pplMonitor1.schedule, pplMonitor2.schedule)
+    assertEquals(
+        "Monitor query languages not equal",
+        (pplMonitor1.inputs[0] as PPLSQLInput).queryLanguage,
+        (pplMonitor2.inputs[0] as PPLSQLInput).queryLanguage
+    )
+    assertEquals(
+        "Monitor queries not equal",
+        (pplMonitor1.inputs[0] as PPLSQLInput).query,
+        (pplMonitor2.inputs[0] as PPLSQLInput).query
+    )
+    assertEquals("Number of triggers in monitor not equal", pplMonitor1.triggers.size, pplMonitor2.triggers.size)
+
+    val sortedTriggers1 = pplMonitor1.triggers.sortedBy { it.id }
+    val sortedTriggers2 = pplMonitor2.triggers.sortedBy { it.id }
+    for (i in sortedTriggers1.indices) {
+        assertPplTriggersEqual(sortedTriggers1[i] as PPLSQLTrigger, sortedTriggers2[i] as PPLSQLTrigger)
+    }
+}
+
+fun assertPplTriggersEqual(pplTrigger1: PPLSQLTrigger, pplTrigger2: PPLSQLTrigger) {
+    assertEquals(
+        "Monitor trigger IDs not equal",
+        pplTrigger1.id,
+        pplTrigger2.id
+    )
+
+    val id = pplTrigger1.id
+
+    assertEquals(
+        "Monitor trigger $id names not equal",
+        pplTrigger1.name,
+        pplTrigger2.name
+    )
+    assertEquals(
+        "Monitor trigger $id severities not equal",
+        pplTrigger1.severity,
+        pplTrigger2.severity
+    )
+    assertEquals(
+        "Monitor trigger $id throttle durations not equal",
+        pplTrigger1.throttleDuration,
+        pplTrigger2.throttleDuration
+    )
+    assertEquals(
+        "Monitor trigger $id expire durations not equal",
+        pplTrigger1.expireDuration,
+        pplTrigger2.expireDuration
+    )
+    assertEquals(
+        "Monitor trigger $id modes not equal",
+        pplTrigger1.mode,
+        pplTrigger2.mode
+    )
+    assertEquals(
+        "Monitor trigger $id condition types not equal",
+        pplTrigger1.conditionType,
+        pplTrigger2.conditionType
+    )
+    assertEquals(
+        "Monitor trigger $id number_of_results conditions not equal",
+        pplTrigger1.numResultsCondition,
+        pplTrigger2.numResultsCondition
+    )
+    assertEquals(
+        "Monitor trigger $id number_of_results values not equal",
+        pplTrigger1.numResultsValue,
+        pplTrigger2.numResultsValue
+    )
+    assertEquals(
+        "Monitor trigger $id custom conditions not equal",
+        pplTrigger1.customCondition,
+        pplTrigger2.customCondition
+    )
 }

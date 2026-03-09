@@ -17,7 +17,7 @@ class ExecuteMonitorRequestTests : OpenSearchTestCase() {
 
     fun `test execute monitor request with id`() {
 
-        val req = ExecuteMonitorRequest(false, TimeValue.timeValueSeconds(100L), "1234", null)
+        val req = ExecuteMonitorRequest(false, false, TimeValue.timeValueSeconds(100L), "1234", null)
         assertNotNull(req)
 
         val out = BytesStreamOutput()
@@ -32,7 +32,7 @@ class ExecuteMonitorRequestTests : OpenSearchTestCase() {
 
     fun `test execute monitor request with monitor`() {
         val monitor = randomQueryLevelMonitor().copy(inputs = listOf(SearchInput(emptyList(), SearchSourceBuilder())))
-        val req = ExecuteMonitorRequest(false, TimeValue.timeValueSeconds(100L), null, monitor)
+        val req = ExecuteMonitorRequest(false, false, TimeValue.timeValueSeconds(100L), null, monitor)
         assertNotNull(req.monitor)
 
         val out = BytesStreamOutput()

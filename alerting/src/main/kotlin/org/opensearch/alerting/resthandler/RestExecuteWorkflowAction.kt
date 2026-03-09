@@ -41,13 +41,13 @@ class RestExecuteWorkflowAction : BaseRestHandler() {
 
             if (request.hasParam("workflowID")) {
                 val workflowId = request.param("workflowID")
-                val execWorkflowRequest = ExecuteWorkflowRequest(dryrun, requestEnd, workflowId, null)
+                val execWorkflowRequest = ExecuteWorkflowRequest(dryrun, true, requestEnd, workflowId, null)
                 client.execute(ExecuteWorkflowAction.INSTANCE, execWorkflowRequest, RestToXContentListener(channel))
             } else {
                 val xcp = request.contentParser()
                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                 val workflow = Workflow.parse(xcp, Workflow.NO_ID, Workflow.NO_VERSION)
-                val execWorkflowRequest = ExecuteWorkflowRequest(dryrun, requestEnd, null, workflow)
+                val execWorkflowRequest = ExecuteWorkflowRequest(dryrun, true, requestEnd, null, workflow)
                 client.execute(ExecuteWorkflowAction.INSTANCE, execWorkflowRequest, RestToXContentListener(channel))
             }
         }

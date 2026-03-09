@@ -590,7 +590,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
             .get()
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
-        Assert.assertTrue(getAlertsResponse.alerts[0].state.toString().equals(Alert.State.ERROR.toString()))
+        Assert.assertTrue((getAlertsResponse.alerts[0] as Alert).state.toString().equals(Alert.State.ERROR.toString()))
         val findings = searchFindings(id, customFindingsIndex)
         assertEquals("Findings saved for test monitor", 0, findings.size)
     }
@@ -896,10 +896,10 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         Assert.assertTrue(getAlertsResponse != null)
         Assert.assertTrue(getAlertsResponse.alerts.size == 1)
         Assert.assertTrue(
-            getAlertsResponse.alerts[0].errorHistory[0].message ==
+            (getAlertsResponse.alerts[0] as Alert).errorHistory[0].message ==
                 "AlertingException[closed]; nested: Exception[org.opensearch.indices.IndexClosedException: closed]; "
         )
-        Assert.assertEquals(1, getAlertsResponse.alerts[0].errorHistory.size)
+        Assert.assertEquals(1, (getAlertsResponse.alerts[0] as Alert).errorHistory.size)
         Assert.assertTrue(getAlertsResponse.alerts[0].errorMessage!!.contains("Failed to run percolate search"))
     }
 
