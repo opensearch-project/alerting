@@ -88,7 +88,7 @@ class TransportDeleteMonitorAction @Inject constructor(
     ) {
         suspend fun resolveUserAndStart(refreshPolicy: RefreshPolicy) {
             try {
-                val monitor = getMonitor()
+                val monitor = getMonitor() ?: return // null means there was an issue retrieving the Monitor
 
                 val canDelete = user == null || !doFilterForUser(user) ||
                     checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)

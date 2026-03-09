@@ -11,7 +11,6 @@ import org.apache.lucene.search.TotalHits.Relation
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
-import org.opensearch.action.search.SearchResponse.Clusters
 import org.opensearch.action.search.ShardSearchFailure
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction

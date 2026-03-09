@@ -218,7 +218,11 @@ class TransportGetAlertsAction @Inject constructor(
                 xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                 getResponse.sourceAsBytesRef, XContentType.JSON
             )
-            return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+            val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
+            validateMonitorV1(scheduledJob)?.let {
+                throw it
+            }
+            return scheduledJob as Monitor
         } catch (t: Exception) {
             log.error("Failure in fetching monitor ${getAlertsRequest.monitorId} to resolve alert index in get alerts action", t)
             return null

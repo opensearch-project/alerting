@@ -72,7 +72,9 @@ import java.util.concurrent.TimeUnit
 @Suppress("UNCHECKED_CAST")
 class MonitorRestApiIT : AlertingRestTestCase() {
 
-    val USE_TYPED_KEYS = ToXContent.MapParams(mapOf("with_type" to "true"))
+    companion object {
+        val USE_TYPED_KEYS = ToXContent.MapParams(mapOf("with_type" to "true"))
+    }
 
     @Throws(Exception::class)
     fun `test plugin is loaded`() {
@@ -1532,19 +1534,6 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Incorrect number of nodes", numberOfNodes, nodesResponse["total"])
         assertEquals("Failed nodes found during monitor stats call", 0, nodesResponse["failed"])
         assertEquals("More than $numberOfNodes successful node", numberOfNodes, nodesResponse["successful"])
-    }
-
-    private fun isMonitorScheduled(monitorId: String, alertingStatsResponse: Map<String, Any>): Boolean {
-        val nodesInfo = alertingStatsResponse["nodes"] as Map<String, Any>
-        for (nodeId in nodesInfo.keys) {
-            val nodeInfo = nodesInfo[nodeId] as Map<String, Any>
-            val jobsInfo = nodeInfo["jobs_info"] as Map<String, Any>
-            if (jobsInfo.keys.contains(monitorId)) {
-                return true
-            }
-        }
-
-        return false
     }
 
     private fun assertAlertingStatsSweeperEnabled(alertingStatsResponse: Map<String, Any>, expected: Boolean) {
