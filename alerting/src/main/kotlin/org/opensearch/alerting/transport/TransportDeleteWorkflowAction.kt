@@ -344,7 +344,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
             )
         }
 
-        private fun parseWorkflow(getResponse: GetResponse): Workflow {
+        private fun parseWorkflow(getResponse: GetResponse): Workflow? {
             val xcp = XContentHelper.createParser(
                 xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                 getResponse.sourceAsBytesRef, XContentType.JSON

@@ -29,6 +29,7 @@ abstract class MonitorRunner {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
+        manual: Boolean,
         workflowRunContext: WorkflowRunContext? = null,
         executionId: String,
         transportService: TransportService

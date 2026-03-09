@@ -58,6 +58,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
+        manual: Boolean,
         workflowRunContext: WorkflowRunContext?,
         executionId: String,
         transportService: TransportService
@@ -69,6 +70,11 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         monitorCtx.findingsToTriggeredQueries = mutableMapOf()
 
         try {
+            // create stateless alert indices as well to prevent get alerts from returning error because
+            // stateless alerts indices couldn't be found
+            monitorCtx.alertV2Indices!!.createOrUpdateAlertV2Index()
+            monitorCtx.alertV2Indices!!.createOrUpdateInitialAlertV2HistoryIndex()
+
             monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
             monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
             monitorCtx.alertIndices!!.createOrUpdateInitialFindingHistoryIndex(monitor.dataSources)

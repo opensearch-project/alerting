@@ -53,7 +53,7 @@ class RestGetAlertsAction : BaseRestHandler() {
         val size = request.paramAsInt("size", 20)
         val startIndex = request.paramAsInt("startIndex", 0)
         val searchString = request.param("searchString", "")
-        val severityLevel = request.param("severityLevel", "ALL")
+        val severityLevel = request.param("severityLevel", "ALL") // TODO: stateless and stateful operate on diff sevs
         val alertState = request.param("alertState", "ALL")
         val monitorId: String? = request.param("monitorId")
         val workflowId: String? = request.param("workflowIds")
@@ -77,5 +77,10 @@ class RestGetAlertsAction : BaseRestHandler() {
                 channel ->
             client.execute(AlertingActions.GET_ALERTS_ACTION_TYPE, getAlertsRequest, RestToXContentListener(channel))
         }
+    }
+
+    companion object {
+        const val STATEFUL = "stateful"
+        const val STATELESS = "stateless"
     }
 }
