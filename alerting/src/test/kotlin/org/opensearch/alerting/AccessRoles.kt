@@ -9,6 +9,7 @@ import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.commons.alerting.action.AlertingActions
 
 val ALL_ACCESS_ROLE = "all_access"
+val PPL_FULL_ACCESS_ROLE = "ppl_full_access"
 val READALL_AND_MONITOR_ROLE = "readall_and_monitor"
 val ALERTING_FULL_ACCESS_ROLE = "alerting_full_access"
 val ALERTING_ACK_ALERTS_ROLE = "alerting_ack_alerts"
@@ -31,6 +32,7 @@ val ALERTING_GET_ALERTS_ACCESS = "alerting_get_alerts_access"
 val ALERTING_INDEX_WORKFLOW_ACCESS = "alerting_index_workflow_access"
 
 val ROLE_TO_PERMISSION_MAPPING = mapOf(
+    ALL_ACCESS_ROLE to "*",
     ALERTING_NO_ACCESS_ROLE to "",
     ALERTING_GET_EMAIL_ACCOUNT_ACCESS to "cluster:admin/opendistro/alerting/destination/email_account/get",
     ALERTING_SEARCH_EMAIL_ACCOUNT_ACCESS to "cluster:admin/opendistro/alerting/destination/email_account/search",

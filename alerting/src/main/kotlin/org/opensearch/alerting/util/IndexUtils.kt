@@ -6,9 +6,11 @@
 package org.opensearch.alerting.util
 
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
+import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.cluster.ClusterState
@@ -38,6 +40,8 @@ class IndexUtils {
             private set
         var alertingCommentIndexSchemaVersion: Int
             private set
+        var alertV2IndexSchemaVersion: Int
+            private set
 
         var scheduledJobIndexUpdated: Boolean = false
             private set
@@ -47,15 +51,20 @@ class IndexUtils {
             private set
         var commentsIndexUpdated: Boolean = false
             private set
+        var alertV2IndexUpdated: Boolean = false
+            private set
+
         var lastUpdatedAlertHistoryIndex: String? = null
         var lastUpdatedFindingHistoryIndex: String? = null
         var lastUpdatedCommentsHistoryIndex: String? = null
+        var lastUpdatedAlertV2HistoryIndex: String? = null
 
         init {
             scheduledJobIndexSchemaVersion = getSchemaVersion(ScheduledJobIndices.scheduledJobMappings())
             alertIndexSchemaVersion = getSchemaVersion(AlertIndices.alertMapping())
             findingIndexSchemaVersion = getSchemaVersion(AlertIndices.findingMapping())
             alertingCommentIndexSchemaVersion = getSchemaVersion(CommentsIndices.commentsMapping())
+            alertV2IndexSchemaVersion = getSchemaVersion(AlertV2Indices.alertV2Mapping())
         }
 
         @JvmStatic
@@ -75,6 +84,11 @@ class IndexUtils {
 
         @JvmStatic
         fun commentsIndexUpdated() {
+            commentsIndexUpdated = true
+        }
+
+        @JvmStatic
+        fun alertV2IndexUpdated() {
             commentsIndexUpdated = true
         }
 
@@ -204,6 +218,19 @@ class IndexUtils {
         @JvmStatic
         fun getCreationDateForIndex(index: String, clusterState: ClusterState): Long {
             return clusterState.metadata.index(index).creationDate
+        }
+
+        @JvmStatic
+        fun checkShardsFailure(response: IndexResponse): String? {
+            val failureReasons = StringBuilder()
+            if (response.shardInfo.failed > 0) {
+                response.shardInfo.failures.forEach {
+                        entry ->
+                    failureReasons.append(entry.reason())
+                }
+                return failureReasons.toString()
+            }
+            return null
         }
     }
 }
