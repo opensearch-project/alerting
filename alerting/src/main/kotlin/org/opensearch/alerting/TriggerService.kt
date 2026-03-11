@@ -5,12 +5,22 @@
 
 package org.opensearch.alerting
 
+import kotlinx.coroutines.withTimeout
 import org.apache.logging.log4j.LogManager
+import org.json.JSONObject
+import org.opensearch.alerting.PPLUtils.appendCustomCondition
+import org.opensearch.alerting.PPLUtils.appendDataRowsLimit
+import org.opensearch.alerting.PPLUtils.executePplQuery
+import org.opensearch.alerting.PPLUtils.findEvalResultVar
+import org.opensearch.alerting.PPLUtils.findEvalResultVarIdxInSchema
 import org.opensearch.alerting.chainedAlertCondition.parsers.ChainedAlertExpressionParser
+import org.opensearch.alerting.opensearchapi.InjectorContextElement
+import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.ChainedAlertTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerScript
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.triggercondition.parsers.TriggerExpressionParser
 import org.opensearch.alerting.util.CrossClusterMonitorUtils
 import org.opensearch.alerting.util.getBucketKeysHash
@@ -29,6 +39,9 @@ import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.PPLSQLTrigger
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.ConditionType
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.NumResultsCondition
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Workflow
@@ -38,6 +51,8 @@ import org.opensearch.script.ScriptService
 import org.opensearch.search.aggregations.Aggregation
 import org.opensearch.search.aggregations.Aggregations
 import org.opensearch.search.aggregations.support.AggregationPath
+import org.opensearch.transport.TransportService
+import kotlin.time.measureTimedValue
 
 /** Service that handles executing Triggers */
 class TriggerService(val scriptService: ScriptService) {
@@ -234,5 +249,134 @@ class TriggerService(val scriptService: ScriptService) {
         }
 
         return keyValuesList
+    }
+
+    suspend fun runPplSqlTrigger(
+        pplSqlMonitor: Monitor,
+        pplSqlTrigger: PPLSQLTrigger,
+        query: String,
+        pplSqlQueryResults: MutableMap<String, Map<String, Any>>,
+        monitorCtx: MonitorRunnerExecutionContext,
+        transportService: TransportService
+    ): QueryLevelTriggerRunResult {
+        // TODO: change name to trigger max duration
+        val monitorExecutionDuration = monitorCtx
+            .clusterService!!
+            .clusterSettings
+            .get(AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION)
+
+        var triggered: Boolean? = null
+
+        try {
+            withTimeout(monitorExecutionDuration.millis) {
+                logger.debug("checking if custom condition is used and appending to base query")
+                // if trigger uses custom condition, append the custom condition to query, otherwise simply proceed
+                val queryToExecute = if (pplSqlTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
+                    query
+                } else { // custom condition trigger
+                    appendCustomCondition(query, pplSqlTrigger.customCondition!!)
+                }
+
+                // limit the number of PPL query result data rows returned
+                val dataRowsLimit = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS)
+                val limitedQueryToExecute = appendDataRowsLimit(queryToExecute, dataRowsLimit)
+
+                // TODO: after getting ppl query results, see if the number of results
+                // retrieved equals the max allowed number of query results. this implies
+                // query results might have been excluded, in which case a warning message
+                // in the alert and notification must be added that results were excluded
+                // and an alert that should have been generated might not have been
+
+                logger.debug("executing the PPL query of monitor: ${pplSqlMonitor.id}")
+                // execute the PPL query
+                val (queryResponseJson, timeTaken) = measureTimedValue {
+                    withClosableContext(
+                        InjectorContextElement(
+                            pplSqlMonitor.id,
+                            monitorCtx.settings!!,
+                            monitorCtx.threadPool!!.threadContext,
+                            pplSqlMonitor.user?.roles,
+                            pplSqlMonitor.user
+                        )
+                    ) {
+                        executePplQuery(
+                            limitedQueryToExecute,
+                            monitorCtx.clusterService!!.state().nodes.localNode,
+                            transportService
+                        )
+                    }
+                }
+                logger.debug("query results for trigger ${pplSqlTrigger.id}: $queryResponseJson")
+                logger.debug("time taken to execute query against sql/ppl plugin: $timeTaken")
+
+                // store the query results for Execute Monitor API response
+                // unlike the query results stored in alerts and notifications, which must be size capped
+                // (because they will be stored in the OpenSearch cluster or sent as notification) and must be based
+                // on only the query results that met the trigger condition (because alerts should generate
+                // on query results that met trigger condition, not those that didn't), the pplQueryResults
+                // here will be returned as part of the Execute Monitor API response. This will return the original,
+                // untouched set of query results, and whether this causes size exceed errors is deferred
+                // to HTTP's response size limits
+                pplSqlQueryResults[pplSqlTrigger.id] = queryResponseJson.toMap()
+
+                // determine if the trigger condition has been met
+                triggered = if (pplSqlTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
+                    evaluateNumResultsTrigger(
+                        queryResponseJson,
+                        pplSqlTrigger.numResultsCondition!!,
+                        pplSqlTrigger.numResultsValue!!
+                    )
+                } else { // custom condition trigger
+                    evaluateCustomTrigger(queryResponseJson, pplSqlTrigger.customCondition!!)
+                }
+
+                logger.debug("PPLTrigger ${pplSqlTrigger.name} with ID ${pplSqlTrigger.id} triggered: $triggered")
+            }
+
+            return QueryLevelTriggerRunResult(pplSqlTrigger.name, triggered!!, null)
+        } catch (e: Exception) {
+            logger.error(
+                "failed to run PPL Trigger ${pplSqlTrigger.name} (id: ${pplSqlTrigger.id} " +
+                    "from PPL Monitor ${pplSqlMonitor.name} (id: ${pplSqlMonitor.id}",
+                e
+            )
+
+            return QueryLevelTriggerRunResult(pplSqlTrigger.name, true, e)
+        }
+    }
+
+    private fun evaluateNumResultsTrigger(
+        pplQueryResponse: JSONObject,
+        numResultsCondition: NumResultsCondition,
+        numResultsValue: Long
+    ): Boolean {
+        val numResults = pplQueryResponse.getLong("total")
+        return when (numResultsCondition) {
+            NumResultsCondition.GREATER_THAN -> numResults > numResultsValue
+            NumResultsCondition.GREATER_THAN_EQUAL -> numResults >= numResultsValue
+            NumResultsCondition.LESS_THAN -> numResults < numResultsValue
+            NumResultsCondition.LESS_THAN_EQUAL -> numResults <= numResultsValue
+            NumResultsCondition.EQUAL -> numResults == numResultsValue
+            NumResultsCondition.NOT_EQUAL -> numResults != numResultsValue
+        }
+    }
+
+    private fun evaluateCustomTrigger(pplQueryResponse: JSONObject, customCondition: String): Boolean {
+        // find the name of the eval result variable defined in custom condition
+        val evalResultVarName = findEvalResultVar(customCondition)
+
+        // find the index eval statement result variable in the PPL query response schema
+        val evalResultVarIdx = findEvalResultVarIdxInSchema(pplQueryResponse, evalResultVarName)
+
+        val dataRowList = pplQueryResponse.getJSONArray("datarows")
+        for (i in 0 until dataRowList.length()) {
+            val dataRow = dataRowList.getJSONArray(i)
+            val evalResult = dataRow.getBoolean(evalResultVarIdx)
+            if (evalResult) {
+                return true
+            }
+        }
+
+        return false
     }
 }

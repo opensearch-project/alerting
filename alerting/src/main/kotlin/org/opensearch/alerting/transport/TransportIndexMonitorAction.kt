@@ -31,6 +31,7 @@ import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.PPLUtils.appendCustomCondition
+import org.opensearch.alerting.PPLUtils.appendDataRowsLimit
 import org.opensearch.alerting.PPLUtils.executePplQuery
 import org.opensearch.alerting.PPLUtils.findEvalResultVar
 import org.opensearch.alerting.PPLUtils.findEvalResultVarIdxInSchema
@@ -39,9 +40,7 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_EXPIRE_DURATION
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_THROTTLE_DURATION
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTION_THROTTLE_VALUE
@@ -133,8 +132,6 @@ class TransportIndexMonitorAction @Inject constructor(
     @Volatile private var allowList = ALLOW_LIST.get(settings)
 
     // PPL Alerting related settings
-    @Volatile private var maxThrottleDuration = ALERTING_V2_MAX_THROTTLE_DURATION.get(settings)
-    @Volatile private var maxExpireDuration = ALERTING_V2_MAX_EXPIRE_DURATION.get(settings)
     @Volatile private var maxQueryLength = ALERTING_V2_MAX_QUERY_LENGTH.get(settings)
     @Volatile private var maxQueryResults = ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS.get(settings)
     @Volatile private var notificationSubjectMaxLength = NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH.get(settings)
@@ -150,8 +147,6 @@ class TransportIndexMonitorAction @Inject constructor(
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTION_THROTTLE_VALUE) { maxActionThrottle = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
 
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_THROTTLE_DURATION) { maxThrottleDuration = it }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_EXPIRE_DURATION) { maxExpireDuration = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_QUERY_LENGTH) { maxQueryLength = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS) { maxQueryResults = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH) {
@@ -283,7 +278,7 @@ class TransportIndexMonitorAction @Inject constructor(
         )
     }
 
-    fun checkPplSqlQueryAndExecute(
+    private fun checkPplSqlQueryAndExecute(
         actionListener: ActionListener<IndexMonitorResponse>,
         indexMonitorRequest: IndexMonitorRequest,
         user: User?
@@ -316,6 +311,7 @@ class TransportIndexMonitorAction @Inject constructor(
             }
         }
 
+        // initiate the PPL monitor and PPL query validations
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
                 val singleThreadContext = newSingleThreadContext("IndexMonitorV2ActionThread")
@@ -324,6 +320,8 @@ class TransportIndexMonitorAction @Inject constructor(
 
                     val pplSqlMonitor = indexMonitorRequest.monitor
 
+                    // validate the PPL query syntax and that user has permissions to
+                    // the indices being queried
                     val pplQueryValid = validatePplSqlQuery(pplSqlMonitor, validationListener)
                     if (!pplQueryValid) {
                         return@withContext
@@ -350,10 +348,12 @@ class TransportIndexMonitorAction @Inject constructor(
         try {
             val query = (pplSqlMonitor.inputs[0] as PPLSQLInput).query
 
+            val limitedQueryToExecute = appendDataRowsLimit(query, maxQueryResults)
+
             // now run the base query as is.
             // if there are any PPL syntax, index not found, insufficient index permissions, or other errors,
-            // this will throw an exception
-            executePplQuery(query, clusterService.state().nodes.localNode, transportService)
+            // this will throw an exception from the SQL/PPL plugin
+            executePplQuery(limitedQueryToExecute, clusterService.state().nodes.localNode, transportService)
 
             // scan all the triggers with custom conditions, and ensure each query constructed
             // from the base query + custom condition is valid
@@ -367,9 +367,12 @@ class TransportIndexMonitorAction @Inject constructor(
                 val evalResultVar = findEvalResultVar(pplTrigger.customCondition!!)
 
                 val queryWithCustomCondition = appendCustomCondition(query, pplTrigger.customCondition!!)
+                val limitedQueryWithCustomCondition = appendDataRowsLimit(queryWithCustomCondition, maxQueryResults)
 
+                // if the custom condition is invalid, this will throw an exception
+                // from the SQL/PPL plugin
                 val executePplQueryResponse = executePplQuery(
-                    queryWithCustomCondition,
+                    limitedQueryWithCustomCondition,
                     clusterService.state().nodes.localNode,
                     transportService
                 )
@@ -410,30 +413,6 @@ class TransportIndexMonitorAction @Inject constructor(
         // ensure the trigger throttle and expire durations are valid
         pplSqlMonitor.triggers.forEach { trigger ->
             val pplTrigger = trigger as PPLSQLTrigger
-
-            pplTrigger.throttleDuration?.let { throttleDuration ->
-                if (throttleDuration > maxThrottleDuration) {
-                    validationListener.onFailure(
-                        AlertingException.wrap(
-                            IllegalArgumentException(
-                                "Throttle duration must be at most $maxThrottleDuration but was $throttleDuration"
-                            )
-                        )
-                    )
-                    return false
-                }
-            }
-
-            if (pplTrigger.expireDuration > maxExpireDuration) {
-                validationListener.onFailure(
-                    AlertingException.wrap(
-                        IllegalArgumentException(
-                            "Expire duration must be at most $maxExpireDuration but was ${trigger.expireDuration}"
-                        )
-                    )
-                )
-                return false
-            }
 
             if (pplTrigger.conditionType == PPLSQLTrigger.ConditionType.NUMBER_OF_RESULTS &&
                 pplTrigger.numResultsValue!! > maxQueryResults

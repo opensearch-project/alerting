@@ -9,24 +9,34 @@ import org.opensearch.alerting.model.AlertContext
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
+import org.opensearch.commons.alerting.model.PPLSQLTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
+import org.opensearch.commons.alerting.model.Trigger
 import java.time.Instant
 
 data class QueryLevelTriggerExecutionContext(
     override val monitor: Monitor,
-    val trigger: QueryLevelTrigger,
+    val trigger: Trigger,
     override val results: List<Map<String, Any>>,
     override val periodStart: Instant,
     override val periodEnd: Instant,
     val alert: AlertContext? = null,
     override val error: Exception? = null,
-    override val clusterSettings: ClusterSettings
+    override val clusterSettings: ClusterSettings,
+    val pplSqlQueryResult: List<Map<String, Any?>>? = null, // each list element is a result row
 ) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error, clusterSettings) {
+
+    init {
+        require(trigger is QueryLevelTrigger || trigger is PPLSQLTrigger) {
+            "QueryLevelTriggerExecutionContext must only store Triggers for per-query style monitoring, " +
+                "like QueryLevelTrigger or PPLSQLTrigger"
+        }
+    }
 
     constructor(
         monitor: Monitor,
-        trigger: QueryLevelTrigger,
+        trigger: Trigger,
         monitorRunResult: MonitorRunResult<QueryLevelTriggerRunResult>,
         alertContext: AlertContext? = null,
         clusterSettings: ClusterSettings
@@ -38,7 +48,8 @@ data class QueryLevelTriggerExecutionContext(
         monitorRunResult.periodEnd,
         alertContext,
         monitorRunResult.scriptContextError(trigger),
-        clusterSettings
+        clusterSettings,
+        null
     )
 
     /**
@@ -49,6 +60,7 @@ data class QueryLevelTriggerExecutionContext(
         val tempArg = super.asTemplateArg().toMutableMap()
         tempArg["trigger"] = trigger.asTemplateArg()
         tempArg["alert"] = alert?.asTemplateArg() // map "alert" templateArg field to AlertContext wrapper instead of Alert object
+        tempArg["ppl_query_results"] = pplSqlQueryResult
         return tempArg
     }
 }

@@ -52,8 +52,6 @@ import org.opensearch.commons.alerting.model.PPLSQLInput.QueryLanguage
 import org.opensearch.commons.alerting.model.PPLSQLTrigger
 import org.opensearch.commons.alerting.model.PPLSQLTrigger.ConditionType
 import org.opensearch.commons.alerting.model.PPLSQLTrigger.NumResultsCondition
-import org.opensearch.commons.alerting.model.PPLSQLTrigger.Severity
-import org.opensearch.commons.alerting.model.PPLSQLTrigger.TriggerMode
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Schedule
@@ -403,11 +401,8 @@ fun randomDocumentLevelTrigger(
 fun randomPPLTrigger(
     id: String = UUIDs.base64UUID(),
     name: String = OpenSearchRestTestCase.randomAlphaOfLength(10),
-    severity: Severity = Severity.entries.random(),
-    throttleDuration: Long? = randomLongBetween(1, 100),
-    expireDuration: Long = randomLongBetween(1, 100),
+    severity: String = "1",
     actions: List<Action> = mutableListOf(),
-    mode: TriggerMode = TriggerMode.entries.random(),
     conditionType: ConditionType = ConditionType.NUMBER_OF_RESULTS,
     numResultsCondition: NumResultsCondition? = NumResultsCondition.entries.random(),
     numResultsValue: Long? = randomLongBetween(1L, 50L),
@@ -416,12 +411,8 @@ fun randomPPLTrigger(
     return PPLSQLTrigger(
         id = id,
         name = name,
-        severity = severity.value,
-        throttleDuration = throttleDuration,
-        expireDuration = expireDuration,
-        lastTriggeredTime = null,
+        severity = severity,
         actions = actions,
-        mode = mode,
         conditionType = conditionType,
         numResultsCondition = numResultsCondition,
         numResultsValue = numResultsValue,
@@ -940,21 +931,6 @@ fun assertPplTriggersEqual(pplTrigger1: PPLSQLTrigger, pplTrigger2: PPLSQLTrigge
         "Monitor trigger $id severities not equal",
         pplTrigger1.severity,
         pplTrigger2.severity
-    )
-    assertEquals(
-        "Monitor trigger $id throttle durations not equal",
-        pplTrigger1.throttleDuration,
-        pplTrigger2.throttleDuration
-    )
-    assertEquals(
-        "Monitor trigger $id expire durations not equal",
-        pplTrigger1.expireDuration,
-        pplTrigger2.expireDuration
-    )
-    assertEquals(
-        "Monitor trigger $id modes not equal",
-        pplTrigger1.mode,
-        pplTrigger2.mode
     )
     assertEquals(
         "Monitor trigger $id condition types not equal",

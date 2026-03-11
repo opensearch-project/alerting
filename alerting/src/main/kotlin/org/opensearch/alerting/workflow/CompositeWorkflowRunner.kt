@@ -178,11 +178,6 @@ object CompositeWorkflowRunner : WorkflowRunner() {
             triggerResults = triggerResults
         )
         val currentAlerts = try {
-            // create stateless alert indices as well to prevent get alerts from returning error because
-            // stateless alerts indices couldn't be found
-            monitorCtx.alertV2Indices!!.createOrUpdateAlertV2Index()
-            monitorCtx.alertV2Indices!!.createOrUpdateInitialAlertV2HistoryIndex()
-
             monitorCtx.alertIndices!!.createOrUpdateAlertIndex(dataSources!!)
             monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(dataSources)
             monitorCtx.alertService!!.loadCurrentAlertsForWorkflow(workflow, dataSources)

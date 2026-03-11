@@ -35,11 +35,13 @@ import org.opensearch.commons.alerting.model.ClusterMetricsTriggerRunResult
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.NoOpTrigger
+import org.opensearch.commons.alerting.model.PPLSQLInput
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.commons.alerting.model.action.AlertCategory
+import org.opensearch.commons.alerting.util.isPplSqlMonitor
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.rest.RestStatus
@@ -151,7 +153,9 @@ class AlertService(
         result: QueryLevelTriggerRunResult,
         alertError: AlertError?,
         executionId: String,
-        workflorwRunContext: WorkflowRunContext?
+        workflorwRunContext: WorkflowRunContext?,
+        monitorCtx: MonitorRunnerExecutionContext,
+        pplSqlQueryResult: List<Map<String, Any?>>?
     ): Alert? {
         val currentTime = Instant.now()
         val currentAlert = ctx.alert?.alert
@@ -201,6 +205,10 @@ class AlertService(
                 }
             }
 
+        // populate PPL Monitor specific fields
+        val query = if (ctx.monitor.isPplSqlMonitor()) (ctx.monitor.inputs[0] as PPLSQLInput).query else null
+        val queryResults = if (ctx.monitor.isPplSqlMonitor()) pplSqlQueryResult.orEmpty() else emptyList()
+
         // Merge the alert's error message to the current alert's history
         val updatedHistory = currentAlert?.errorHistory.update(alertError)
         return if (alertError == null && !result.triggered) {
@@ -211,7 +219,9 @@ class AlertService(
                 errorHistory = updatedHistory,
                 actionExecutionResults = updatedActionExecutionResults,
                 schemaVersion = IndexUtils.alertIndexSchemaVersion,
-                clusters = triggeredClusters
+                clusters = triggeredClusters,
+                pplQuery = query,
+                pplQueryResults = queryResults
             )
         } else if (alertError == null && currentAlert?.isAcknowledged() == true) {
             null
@@ -224,20 +234,23 @@ class AlertService(
                 errorHistory = updatedHistory,
                 actionExecutionResults = updatedActionExecutionResults,
                 schemaVersion = IndexUtils.alertIndexSchemaVersion,
-                clusters = triggeredClusters
+                clusters = triggeredClusters,
+                pplQuery = query,
+                pplQueryResults = queryResults
             )
         } else {
             val alertState = if (workflorwRunContext?.auditDelegateMonitorAlerts == true) {
                 Alert.State.AUDIT
             } else if (alertError == null) Alert.State.ACTIVE
             else Alert.State.ERROR
+            // TODO: does the trigger field get populated as QueryLevel or PPLSQL Trigger correctly?
             Alert(
                 monitor = ctx.monitor, trigger = ctx.trigger, startTime = currentTime,
                 lastNotificationTime = currentTime, state = alertState, errorMessage = alertError?.message,
                 errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
                 schemaVersion = IndexUtils.alertIndexSchemaVersion, executionId = executionId,
                 workflowId = workflorwRunContext?.workflowId ?: "",
-                clusters = triggeredClusters
+                clusters = triggeredClusters, pplQuery = query, pplQueryResults = queryResults
             )
         }
     }

@@ -183,22 +183,7 @@
     },
     "ppl_query_results":  {
       "type": "nested",
-      "properties": {
-        "schema": {
-          "type": "nested",
-          "dynamic": true
-        },
-        "datarows": {
-          "type": "object",
-          "enabled": false
-        },
-        "total": {
-          "type": "integer"
-        },
-        "size": {
-          "type": "integer"
-        }
-      }
+      "dynamic": true
     }
   }
 }

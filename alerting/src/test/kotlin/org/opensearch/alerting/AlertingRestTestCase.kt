@@ -19,7 +19,6 @@ import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
-import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
@@ -1322,14 +1321,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.FINDING_HISTORY_WRITE_INDEX}\" : {}")
     }
 
-    fun putAlertV2Mappings(mapping: String? = null) {
-        val mappingHack = if (mapping != null) mapping else AlertV2Indices.alertMapping().trimStart('{').trimEnd('}')
-        val encodedHistoryIndex = URLEncoder.encode(AlertV2Indices.ALERT_V2_HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
-        val settings = Settings.builder().put("index.hidden", true).build()
-        createIndex(AlertV2Indices.ALERT_V2_INDEX, settings, mappingHack)
-        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX}\" : {}")
-    }
-
     fun scheduledJobMappings(): String {
         return javaClass.classLoader.getResource("mappings/scheduled-jobs.json").readText()
     }
@@ -2055,11 +2046,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     // this function only works on the TEST_INDEX_NAME index created
     // specifically for this IT suite. It has fields
     // "timestamp" (date), "abc" (string), "number" (integer)
-    protected fun indexDocFromSomeTimeAgo(timeValue: Long, timeUnit: ChronoUnit, abc: String, number: Int) {
+    protected fun indexDocFromSomeTimeAgo(
+        timeValue: Long,
+        timeUnit: ChronoUnit,
+        abc: String,
+        number: Int,
+        id: String = UUID.randomUUID().toString()
+    ) {
         val someTimeAgo = ZonedDateTime.now().minus(timeValue, timeUnit).truncatedTo(MILLIS)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(someTimeAgo) // the timestamp string is given a random timezone offset
         val testDoc = """{ "timestamp" : "$testTime", "abc": "$abc", "number" : "$number" }"""
-        indexDoc(TEST_INDEX_NAME, UUID.randomUUID().toString(), testDoc)
+        indexDoc(TEST_INDEX_NAME, id, testDoc)
     }
 
     protected fun ensureNumMonitors(expectedNum: Int) {
@@ -2112,21 +2109,5 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             }
         }
         return false
-    }
-
-    protected fun getAlertV2HistoryDocCount(): Long {
-        val request = """
-            {
-                "query": {
-                    "match_all": {}
-                }
-            }
-        """.trimIndent()
-        val response = adminClient().makeRequest(
-            "POST", "${AlertV2Indices.ALERT_V2_HISTORY_ALL}/_search", emptyMap(),
-            StringEntity(request, APPLICATION_JSON)
-        )
-        assertEquals("Request to get alert v2 history failed", RestStatus.OK, response.restStatus())
-        return SearchResponse.fromXContent(createParser(jsonXContent, response.entity.content)).hits.totalHits!!.value
     }
 }

@@ -20,13 +20,9 @@ object PPLUtils {
     // captures the name of the result variable in a PPL monitor's custom condition
     // e.g. custom condition: `eval apple = avg_latency > 100`
     // captures: "apple"
-    private val evalResultVarRegex = """\beval\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=""".toRegex()
+    private val evalResultVarRegex = """^(?!.*\|)\s*(?i:eval)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=""".toRegex()
 
-    // captures the list of indices and index patterns that a given PPL query searches
-    // e.g. PPL query: search source = index_1,index_pattern*,index_3 | where responseCode = 500 | head 10
-    // captures: index_1,index_pattern*,index_3
-    private val indicesListRegex =
-        """(?i)source(?:\s*)=(?:\s*)((?:`[^`]+`|[-\w.*'+]+(?:\*)?)(?:\s*,\s*(?:`[^`]+`|[-\w.*'+]+\*?))*)\s*\|*""".toRegex()
+    const val PPL_RESULTS_SIZE_EXCEEDED_MESSAGE = "The PPL Query results were too large and thus excluded."
 
     /**
      * Appends a user-defined custom condition to a PPL query.
@@ -196,62 +192,11 @@ object PPLUtils {
     }
 
     /**
-     * Extracts the list of indices from a PPL query's source statement.
-     *
-     * Parses the PPL `source=` clause to identify which indices, index patterns, or index
-     * aliases are being queried. This information is primarily used for permission checks.
-     * Supports comma-separated lists of indices and wildcard patterns.
-     *
-     * @param pplQuery The complete PPL query string containing a source statement
-     * @return A list of index names, patterns, or aliases (e.g., ["logs-*", "metrics-2024"])
-     * @throws IllegalStateException if no valid source statement is found, even after
-     *         the query has been validated by the SQL/PPL plugin
-     *
-     * @example
-     * ```
-     * val query = "source=logs-* | where level='ERROR'"
-     * val indices = getIndicesFromPplQuery(query)
-     * // Returns: ["logs-*"]
-     *
-     * val multiQuery = "source=logs-*, metrics-2024, .kibana | stats count()"
-     * val multiIndices = getIndicesFromPplQuery(multiQuery)
-     * // Returns: ["logs-*", "metrics-2024", ".kibana"]
-     * ```
-     *
-     * @note Supports concrete indices, wildcard patterns (*), dot-prefixed system indices,
-     *       and index aliases
-     * @note PPL queries contain exactly one source statement, so only the first match is used
-     * @note The regex pattern handles optional whitespace around `=` and commas
-     *
-     */
-    fun getIndicesFromPplQuery(pplQuery: String): List<String> {
-        // use find() instead of findAll() because a PPL query only ever has one source statement
-        // the only capture group specified in the regex captures the comma separated string of indices/index patterns
-        val indices = indicesListRegex.find(pplQuery)?.groupValues?.get(1)?.split(",")?.map { it.trim() }
-            ?: throw IllegalStateException(
-                "Could not find indices that PPL Monitor query searches even " +
-                    "after validating the query through SQL/PPL plugin."
-            )
-
-        // remove any backticks that might have been read in
-        val unBackTickedIndices = mutableListOf<String>()
-        indices.forEach {
-            if (it.startsWith("`") && it.endsWith("`")) {
-                unBackTickedIndices.add(it.substring(1, it.length - 1))
-            } else {
-                unBackTickedIndices.add(it)
-            }
-        }
-
-        return unBackTickedIndices.toList()
-    }
-
-    /**
      * Caps the size of PPL query results to prevent memory issues and oversized alert payloads.
      *
      * Checks if the serialized query results exceed a specified size limit. If the results
-     * are within the limit, they are returned unchanged. If they exceed the limit, the datarows
-     * are replaced with an informational message while preserving the schema and metadata fields.
+     * are within the limit, they are returned unchanged. If they exceed the limit, the whole response
+     * is replaced with an informational message while preserving the original structure of the response.
      * This ensures alerts can still be created even when query results are too large.
      *
      * @param pplQueryResults The PPL query response JSONObject
@@ -290,16 +235,89 @@ object PPLUtils {
         // ppl query response fields like schema, total, and size
         val limitExceedMessageQueryResults = JSONObject()
 
-        val schema = JSONArray(pplQueryResults.getJSONArray("schema").toList())
-        val datarows = JSONArray().put(JSONArray(listOf("The PPL Query results were too large and thus excluded")))
-        val total = pplQueryResults.getInt("total")
-        val size = pplQueryResults.getInt("size")
+        val schema = JSONArray().put(JSONObject(mapOf("name" to "message", "type" to "string")))
+//        val schema = JSONArray(pplQueryResults.getJSONArray("schema").toList())
+        val datarows = JSONArray().put(JSONArray(listOf(PPL_RESULTS_SIZE_EXCEEDED_MESSAGE)))
 
         limitExceedMessageQueryResults.put("schema", schema)
         limitExceedMessageQueryResults.put("datarows", datarows)
-        limitExceedMessageQueryResults.put("total", total)
-        limitExceedMessageQueryResults.put("size", size)
+        limitExceedMessageQueryResults.put("total", 1)
+        limitExceedMessageQueryResults.put("size", 1)
 
         return limitExceedMessageQueryResults
+    }
+
+    /**
+     * Transforms PPL query results from array-based format (that SQL Plugin Execute API response uses)
+     * to map-based format for easier template access.
+     *
+     * PPL query responses contain a `schema` array that defines field names and types, and a `datarows` array
+     * that contains the actual data values in positional format. This function combines them into a list of maps
+     * where each list element represents a row with field names as keys and corresponding values from the datarows.
+     *
+     * ### Input Format
+     * The input should be a PPL query result with this structure:
+     * ```json
+     * {
+     *   "schema": [
+     *     {"name": "abc", "type": "string"},
+     *     {"name": "number", "type": "integer"}
+     *   ],
+     *   "datarows": [
+     *     ["xyz", 3],
+     *     ["def", 5]
+     *   ]
+     * }
+     * ```
+     *
+     * ### Output Format
+     * The function returns a list where each element is a map representing a data row:
+     * ```json
+     * [
+     *   {"abc": "xyz", "number": 3},
+     *   {"abc": "def", "number": 5}
+     * ]
+     * ```
+     *
+     * ### Edge Cases
+     * - If `schema` is missing or empty, returns an empty list
+     * - If `datarows` is missing or empty, returns an empty list
+     * - If a schema entry is malformed (not a map or missing "name" field), it is skipped
+     * - If a datarow has fewer values than schema fields, missing values are set to `null`
+     * - If a datarow has more values than schema fields, extra values are ignored
+     * - If a datarow is not a list, that row is skipped
+     *
+     * @param rawQueryResults The PPL query results map from SQL Plugin Execute API response
+     *                        containing "schema" and "datarows" fields.
+     * @return A list of maps where each map represents a data row with field names as keys and
+     *         corresponding values from datarows. Returns an empty list if schema or datarows
+     *         are missing, empty, or malformed.
+     *
+     * @see org.opensearch.alerting.script.QueryLevelTriggerExecutionContext.asTemplateArg
+     * @see org.opensearch.alerting.PPLUtils.executePplQuery
+     */
+    fun constructPPLQueryResultsMap(rawQueryResults: Map<String, Any>): List<Map<String, Any?>> {
+        // Extract schema array
+        val schema = rawQueryResults["schema"] as? List<*> ?: return emptyList()
+
+        // Extract field names from schema
+        val fieldNames = schema.mapNotNull { schemaEntry ->
+            (schemaEntry as? Map<*, *>)?.get("name") as? String
+        }
+
+        if (fieldNames.isEmpty()) return emptyList()
+
+        // Extract datarows array
+        val datarows = rawQueryResults["datarows"] as? List<*> ?: return emptyList()
+
+        // Transform each row into a map
+        return datarows.mapNotNull { row ->
+            val rowList = row as? List<*> ?: return@mapNotNull null
+
+            // Create a map from field names to values
+            fieldNames.mapIndexed { index, fieldName ->
+                fieldName to rowList.getOrNull(index)
+            }.toMap()
+        }
     }
 }
