@@ -41,10 +41,6 @@ import org.opensearch.alerting.service.ExternalSchedulerService
 import org.opensearch.alerting.service.SchedulerRoutingResolver
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_EXPIRE_DURATION
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_THROTTLE_DURATION
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTION_THROTTLE_VALUE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_TRIGGERS_PER_MONITOR
@@ -82,6 +78,8 @@ import org.opensearch.commons.alerting.model.MonitorMetadata
 import org.opensearch.commons.alerting.model.PPLInput
 import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.ScheduleJobPayload
+import org.opensearch.commons.alerting.model.PPLInput
+import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.SearchInput
@@ -382,7 +380,6 @@ class TransportIndexMonitorAction @Inject constructor(
     private fun validatePPLMonitor(pplMonitor: Monitor, actionListener: ActionListener<IndexMonitorResponse>): Boolean {
         pplMonitor.triggers.forEach { trigger ->
             val pplTrigger = trigger as PPLTrigger
-
             if (pplTrigger.conditionType == PPLTrigger.ConditionType.NUMBER_OF_RESULTS &&
                 pplTrigger.numResultsValue!! > maxQueryResults
             ) {

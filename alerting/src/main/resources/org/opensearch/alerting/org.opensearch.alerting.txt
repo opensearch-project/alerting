@@ -23,7 +23,7 @@ class org.opensearch.alerting.script.TriggerExecutionContext {
 
 class org.opensearch.alerting.script.QueryLevelTriggerExecutionContext {
     Monitor getMonitor()
-    QueryLevelTrigger getTrigger()
+    Trigger getTrigger()
     List getResults()
     java.time.Instant getPeriodStart()
     java.time.Instant getPeriodEnd()
@@ -38,7 +38,7 @@ class org.opensearch.commons.alerting.model.Monitor {
     boolean getEnabled()
 }
 
-class org.opensearch.commons.alerting.model.QueryLevelTrigger {
+class org.opensearch.commons.alerting.model.Trigger {
     String getId()
     String getName()
     String getSeverity()

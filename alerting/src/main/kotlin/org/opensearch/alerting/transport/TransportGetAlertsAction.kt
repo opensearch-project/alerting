@@ -14,7 +14,6 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.alertsv2.AlertV2Indices.Companion.ALERT_V2_INDEX
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use

@@ -6,17 +6,20 @@
 package org.opensearch.alerting
 
 import org.junit.Assert
+import org.opensearch.alerting.PPLUtils.PPL_RESULTS_SIZE_EXCEEDED_MESSAGE
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.model.destination.CustomWebhook
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.email.Email
 import org.opensearch.alerting.model.destination.email.Recipient
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.client.Request
 import org.opensearch.client.ResponseException
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.commons.alerting.alerts.AlertError
 import org.opensearch.commons.alerting.model.ActionExecutionResult
@@ -31,6 +34,7 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.AlertCategory
@@ -2226,6 +2230,581 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 }
             }
         }
+    }
+
+    fun `test execute num results PPL monitor execution timeout generates error alert`() {
+        // Create test index with PPL-compatible mappings
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
+
+        // Create PPL monitor with NUMBER_OF_RESULTS trigger condition
+        val monitor = createRandomPPLMonitor(
+            randomPPLMonitor(
+                enabled = true,
+                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                triggers = listOf(
+                    randomPPLTrigger(
+                        conditionType = PPLTrigger.ConditionType.NUMBER_OF_RESULTS,
+                        numResultsCondition = PPLTrigger.NumResultsCondition.GREATER_THAN,
+                        numResultsValue = 0L,
+                        customCondition = null
+                    )
+                ),
+                query = "source = $TEST_INDEX_NAME | head 10"
+            )
+        )
+
+        // Set monitor execution timeout to 1 nanosecond to force a timeout
+        adminClient().updateSettings(AlertingSettings.PPL_MONITOR_EXECUTION_MAX_DURATION.key, TimeValue.timeValueNanos(1))
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        // Verify execute response contains error
+        @Suppress("UNCHECKED_CAST")
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertTrue("Missing trigger error message", (triggerResult?.get("error") as? String)?.isNotEmpty() == true)
+        }
+
+        // Verify ERROR alert was created
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert not saved", 1, alerts.size)
+        verifyAlert(alerts.single(), monitor, ERROR)
+    }
+
+    fun `test execute custom condition PPL monitor execution timeout generates error alert`() {
+        // Create test index with PPL-compatible mappings
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
+
+        // Create PPL monitor with NUMBER_OF_RESULTS trigger condition
+        val monitor = createRandomPPLMonitor(
+            randomPPLMonitor(
+                enabled = true,
+                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                triggers = listOf(
+                    randomPPLTrigger(
+                        conditionType = PPLTrigger.ConditionType.CUSTOM,
+                        customCondition = "where max_num > 5",
+                        numResultsCondition = null,
+                        numResultsValue = null
+                    )
+                ),
+                query = "source = $TEST_INDEX_NAME | stats max(number) as max_num by abc"
+            )
+        )
+
+        // Set monitor execution timeout to 1 nanosecond to force a timeout
+        adminClient().updateSettings(AlertingSettings.PPL_MONITOR_EXECUTION_MAX_DURATION.key, TimeValue.timeValueNanos(1))
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        // Verify execute response contains error
+        @Suppress("UNCHECKED_CAST")
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertTrue("Missing trigger error message", (triggerResult?.get("error") as? String)?.isNotEmpty() == true)
+        }
+
+        // Verify ERROR alert was created
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert not saved", 1, alerts.size)
+        verifyAlert(alerts.single(), monitor, ERROR)
+    }
+
+    fun `test execute PPL monitor with size exceeded query results`() {
+        // Create test index with PPL-compatible mappings
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
+
+        // Create PPL monitor with NUMBER_OF_RESULTS trigger condition
+        val monitor = createRandomPPLMonitor(
+            randomPPLMonitor(
+                enabled = true,
+                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                triggers = listOf(
+                    randomPPLTrigger(
+                        conditionType = PPLTrigger.ConditionType.NUMBER_OF_RESULTS,
+                        numResultsCondition = PPLTrigger.NumResultsCondition.GREATER_THAN,
+                        numResultsValue = 0L,
+                        customCondition = null
+                    )
+                ),
+                query = "source = $TEST_INDEX_NAME | head 10"
+            )
+        )
+
+        // Set max PPL query results size to guarantee it will be exceeded
+        adminClient().updateSettings(AlertingSettings.PPL_QUERY_RESULTS_MAX_SIZE.key, 5L)
+
+        executeMonitor(monitor.id)
+
+        val alerts = searchAlerts(monitor)
+        assertEquals(1, alerts.size)
+
+        val alert = alerts[0]
+        assertEquals(ACTIVE, alert.state)
+        assertEquals(monitor.id, alert.monitorId)
+        assertEquals(monitor.triggers[0].id, alert.triggerId)
+
+        // Verify ppl_query_results contains the size exceeded message
+        assertNotNull(alert.queryResults)
+        assertEquals(1, alert.queryResults.size)
+
+        val firstResultRow = alert.queryResults[0]
+        assertTrue(firstResultRow.containsKey("message"))
+        assertEquals(PPL_RESULTS_SIZE_EXCEEDED_MESSAGE, firstResultRow["message"])
+    }
+
+    fun `test execute PPL monitor with number of results condition basic case`() {
+        // Setup test index and data
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        val docId = "test-doc-1"
+        indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5, docId)
+
+        // Create PPL monitor with NUMBER_OF_RESULTS condition
+        val monitor = createMonitor(
+            randomPPLMonitor(
+                enabled = true,
+                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                triggers = listOf(
+                    randomPPLTrigger(
+                        conditionType = PPLTrigger.ConditionType.NUMBER_OF_RESULTS,
+                        numResultsCondition = PPLTrigger.NumResultsCondition.GREATER_THAN,
+                        numResultsValue = 0L,
+                        customCondition = null
+                    )
+                ),
+                query = "source = $TEST_INDEX_NAME | head 10"
+            )
+        )
+
+        val versionBefore = monitor.version
+
+        // Execute monitor - should trigger because document exists
+        val response = executeMonitor(monitor.id)
+
+        // Verify monitor execution response
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val triggerResults = output.objectMap("trigger_results")
+        assertTrue("Trigger should have run", triggerResults.isNotEmpty())
+
+        // Verify alert was generated with ACTIVE state
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert should have been generated", 1, alerts.size)
+
+        val activeAlert = alerts.single()
+        verifyAlert(activeAlert, monitor, ACTIVE)
+
+        // Verify alert contains PPL query and results
+        assertNotNull("PPL query should be stored in alert", activeAlert.query)
+        assertEquals("source = $TEST_INDEX_NAME | head 10", activeAlert.query)
+        assertTrue("PPL query results should not be empty", activeAlert.queryResults.isNotEmpty())
+
+        // Verify the query results are in the new transformed format (list of maps)
+        assertEquals("Should have exactly 1 result row from the indexed document", 1, activeAlert.queryResults.size)
+
+        // Get the first (and only) result row
+        val resultRow = activeAlert.queryResults[0]
+
+        // Verify the result row contains the expected fields from the indexed document
+        assertTrue("Result should contain 'timestamp' field", resultRow.containsKey("timestamp"))
+        assertTrue("Result should contain 'abc' field", resultRow.containsKey("abc"))
+        assertTrue("Result should contain 'number' field", resultRow.containsKey("number"))
+
+        // Verify the field values match what we indexed
+        assertEquals("Field 'abc' should match indexed value", "abc", resultRow["abc"])
+        assertEquals("Field 'number' should match indexed value", 5, resultRow["number"])
+
+        // Verify timestamp field exists and is not null (exact value varies due to time calculation)
+        assertNotNull("Field 'timestamp' should not be null", resultRow["timestamp"])
+
+        // Verify monitor version didn't change after execution
+        val monitorAfter = getMonitor(monitor.id)
+        assertEquals("Monitor version should not change after execution", versionBefore, monitorAfter.version)
+
+        // Delete the document to make the trigger condition no longer true
+        val deleteRequest = Request("DELETE", "/$TEST_INDEX_NAME/_doc/$docId?refresh=true")
+        client().performRequest(deleteRequest)
+
+        // Execute monitor again - should NOT trigger because document is deleted
+        val responseAfterDelete = executeMonitor(monitor.id)
+
+        val outputAfterDelete = entityAsMap(responseAfterDelete)
+        assertEquals(monitor.name, outputAfterDelete["monitor_name"])
+
+        // Verify there are no ACTIVE alerts (moved to history)
+        assertTrue("Active alert should have moved to history", searchAlerts(monitor, AlertIndices.ALERT_INDEX).isEmpty())
+
+        // Verify the same alert is now in COMPLETED state (search ALL alert indices including history)
+        val alertsAfterDelete = searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN)
+        assertEquals("Should still have exactly one alert", 1, alertsAfterDelete.size)
+
+        val completedAlert = alertsAfterDelete.single()
+
+        // Verify it's the same alert (same ID)
+        assertEquals("Alert ID should be the same", activeAlert.id, completedAlert.id)
+        assertEquals("Alert should transition to COMPLETED state", COMPLETED, completedAlert.state)
+        verifyAlert(completedAlert, monitor, COMPLETED)
+
+        // Verify the alert has an end time now
+        assertNotNull("Completed alert should have an end time", completedAlert.endTime)
+
+        // Verify completed alert has no error message
+        assertNull("Completed alert should not have an error message", completedAlert.errorMessage)
+    }
+
+    fun `test execute PPL monitor with custom condition basic case`() {
+        // Setup test index and data with multiple groups
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+
+        // Index documents for group "abc" - max number = 3 (won't satisfy condition)
+        indexDocFromSomeTimeAgo(1, MINUTES, "abc", 1, "abc-doc-1")
+        indexDocFromSomeTimeAgo(2, MINUTES, "abc", 2, "abc-doc-2")
+        indexDocFromSomeTimeAgo(3, MINUTES, "abc", 3, "abc-doc-3")
+
+        // Index documents for group "def" - max number = 6 (will satisfy condition max_num > 5)
+        indexDocFromSomeTimeAgo(4, MINUTES, "def", 4, "def-doc-1")
+        indexDocFromSomeTimeAgo(5, MINUTES, "def", 5, "def-doc-2")
+        indexDocFromSomeTimeAgo(6, MINUTES, "def", 6, "def-doc-3")
+
+        // Index documents for group "ghi" - max number = 9 (will satisfy condition max_num > 5)
+        indexDocFromSomeTimeAgo(7, MINUTES, "ghi", 7, "ghi-doc-1")
+        indexDocFromSomeTimeAgo(8, MINUTES, "ghi", 8, "ghi-doc-2")
+        indexDocFromSomeTimeAgo(9, MINUTES, "ghi", 9, "ghi-doc-3")
+
+        // Create PPL monitor with CUSTOM condition
+        // Query aggregates by "abc" field and computes max(number)
+        // Custom condition evaluates: max_num > 5
+        val monitor = createMonitor(
+            randomPPLMonitor(
+                enabled = true,
+                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                triggers = listOf(
+                    randomPPLTrigger(
+                        conditionType = PPLTrigger.ConditionType.CUSTOM,
+                        customCondition = "where max_num > 5",
+                        numResultsCondition = null,
+                        numResultsValue = null
+                    )
+                ),
+                query = "source = $TEST_INDEX_NAME | stats max(number) as max_num by abc"
+            )
+        )
+
+        // Execute monitor - should trigger because def and ghi groups have max > 5
+        val response = executeMonitor(monitor.id)
+
+        // Verify monitor execution response
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+        @Suppress("UNCHECKED_CAST")
+        val triggerResults = output.objectMap("trigger_results")
+        assertTrue("Trigger should have run", triggerResults.isNotEmpty())
+
+        // Verify alert was generated with ACTIVE state
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert should have been generated", 1, alerts.size)
+
+        val activeAlert = alerts.single()
+        verifyAlert(activeAlert, monitor, ACTIVE)
+
+        // Verify alert contains PPL query and aggregated results
+        assertNotNull("PPL query should be stored in alert", activeAlert.query)
+        assertEquals("source = $TEST_INDEX_NAME | stats max(number) as max_num by abc", activeAlert.query)
+        assertTrue("PPL query results should not be empty", activeAlert.queryResults.isNotEmpty())
+
+        // Verify the query results are in the new transformed format (list of maps),
+        // and only have the 2 buckets that met the custom condition
+        assertEquals("Should have 2 aggregation result rows", 2, activeAlert.queryResults.size)
+
+        // Convert results to a map of group name -> result row for easier validation
+        val groupResults = activeAlert.queryResults.associateBy { it["abc"] as String }
+
+        // Verify all expected groups are present
+        assertTrue("Should contain group 'def'", groupResults.containsKey("def"))
+        assertTrue("Should contain group 'ghi'", groupResults.containsKey("ghi"))
+
+        // Verify each result row has the expected structure and values
+        val defResult = groupResults["def"]!!
+        assertTrue("def result should contain 'max_num' field", defResult.containsKey("max_num"))
+        assertTrue("def result should contain 'abc' field", defResult.containsKey("abc"))
+        assertEquals("Group 'def' max should be 6", 6, (defResult["max_num"] as Number).toInt())
+        assertEquals("Group 'def' abc field should be 'def'", "def", defResult["abc"])
+
+        val ghiResult = groupResults["ghi"]!!
+        assertTrue("ghi result should contain 'max_num' field", ghiResult.containsKey("max_num"))
+        assertTrue("ghi result should contain 'abc' field", ghiResult.containsKey("abc"))
+        assertEquals("Group 'ghi' max should be 9", 9, (ghiResult["max_num"] as Number).toInt())
+        assertEquals("Group 'ghi' abc field should be 'ghi'", "ghi", ghiResult["abc"])
+
+        // Custom condition "where max_num > 5" should evaluate to true for def (6 > 5) and ghi (9 > 5)
+        // This caused the trigger to fire and create an ACTIVE alert
+
+        // Delete documents from "def" and "ghi" groups to make condition no longer true
+        // After deletion, only "abc" group remains with max=3, which doesn't satisfy max_num > 5
+        val deleteDefDocs = """
+          {
+            "query": {
+              "term": {
+                "abc": "def"
+              }
+            }
+          }
+        """.trimIndent()
+        val deleteGhiDocs = """
+          {
+            "query": {
+              "term": {
+                "abc": "ghi"
+              }
+            }
+          }
+        """.trimIndent()
+
+        val deleteDefRequest = Request("POST", "/$TEST_INDEX_NAME/_delete_by_query?refresh=true")
+        deleteDefRequest.setJsonEntity(deleteDefDocs)
+        client().performRequest(deleteDefRequest)
+
+        val deleteGhiRequest = Request("POST", "/$TEST_INDEX_NAME/_delete_by_query?refresh=true")
+        deleteGhiRequest.setJsonEntity(deleteGhiDocs)
+        client().performRequest(deleteGhiRequest)
+
+        // Execute monitor again - should NOT trigger because only abc group remains (max=3 <= 5)
+        val responseAfterDelete = executeMonitor(monitor.id)
+
+        val outputAfterDelete = entityAsMap(responseAfterDelete)
+        assertEquals(monitor.name, outputAfterDelete["monitor_name"])
+
+        // Verify there are no ACTIVE alerts (moved to history)
+        assertTrue("Active alert should have moved to history", searchAlerts(monitor, AlertIndices.ALERT_INDEX).isEmpty())
+
+        // Verify the same alert is now in COMPLETED state (search ALL alert indices including history)
+        val alertsAfterDelete = searchAlerts(monitor, AlertIndices.ALL_ALERT_INDEX_PATTERN)
+        assertEquals("Should still have exactly one alert", 1, alertsAfterDelete.size)
+
+        val completedAlert = alertsAfterDelete.single()
+
+        // Verify it's the same alert (same ID)
+        assertEquals("Alert ID should be the same", activeAlert.id, completedAlert.id)
+        assertEquals("Alert should transition to COMPLETED state", COMPLETED, completedAlert.state)
+        verifyAlert(completedAlert, monitor, COMPLETED)
+
+        // Verify the alert has an end time now
+        assertNotNull("Completed alert should have an end time", completedAlert.endTime)
+    }
+
+    fun `test execute PPL monitor updates query results on subsequent runs`() {
+        // Setup test index and data
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        val docId1 = "test-doc-1"
+        indexDocFromSomeTimeAgo(2, MINUTES, "test-value", 5, docId1)
+
+        // Create PPL monitor with NUMBER_OF_RESULTS condition
+        val monitor = createMonitor(
+            randomPPLMonitor(
+                enabled = true,
+                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                triggers = listOf(
+                    randomPPLTrigger(
+                        conditionType = PPLTrigger.ConditionType.NUMBER_OF_RESULTS,
+                        numResultsCondition = PPLTrigger.NumResultsCondition.GREATER_THAN,
+                        numResultsValue = 0L,
+                        customCondition = null
+                    )
+                ),
+                query = "source = $TEST_INDEX_NAME | head 10"
+            )
+        )
+
+        // Execute monitor - should trigger because document exists
+        val response = executeMonitor(monitor.id)
+
+        // Verify monitor execution response
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        // Verify alert was generated with ACTIVE state
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert should have been generated", 1, alerts.size)
+
+        val firstAlert = alerts.single()
+        verifyAlert(firstAlert, monitor, ACTIVE)
+
+        // Verify alert contains PPL query and results with 1 document
+        assertNotNull("PPL query should be stored in alert", firstAlert.query)
+        assertEquals("source = $TEST_INDEX_NAME | head 10", firstAlert.query)
+        assertTrue("PPL query results should not be empty", firstAlert.queryResults.isNotEmpty())
+
+        // Verify the query results are in the new transformed format (list of maps)
+        assertEquals("Should have 1 result row from the first indexed document", 1, firstAlert.queryResults.size)
+
+        // Get the first result row and verify it has the expected structure
+        val firstResultRow = firstAlert.queryResults[0]
+        assertTrue("Result should contain 'timestamp' field", firstResultRow.containsKey("timestamp"))
+        assertTrue("Result should contain 'abc' field", firstResultRow.containsKey("abc"))
+        assertTrue("Result should contain 'number' field", firstResultRow.containsKey("number"))
+
+        // Verify the field values match the first document we indexed
+        assertEquals("Field 'abc' should match first document", "test-value", firstResultRow["abc"])
+        assertEquals("Field 'number' should match first document", 5, (firstResultRow["number"] as Number).toInt())
+
+        // Add a second document to the index
+        val docId2 = "test-doc-2"
+        indexDocFromSomeTimeAgo(3, MINUTES, "test-value-2", 10, docId2)
+
+        // Execute monitor again - should still trigger because documents still exist (now 2 docs)
+        val responseAfterSecondDoc = executeMonitor(monitor.id)
+
+        val outputAfterSecondDoc = entityAsMap(responseAfterSecondDoc)
+        assertEquals(monitor.name, outputAfterSecondDoc["monitor_name"])
+
+        // Verify the same alert still exists
+        val alertsAfterSecondDoc = searchAlerts(monitor)
+        assertEquals("Should still have exactly one alert", 1, alertsAfterSecondDoc.size)
+
+        val updatedAlert = alertsAfterSecondDoc.single()
+
+        // Verify it's the same alert (same ID)
+        assertEquals("Alert ID should be the same", firstAlert.id, updatedAlert.id)
+
+        // Verify the alert's query results have been updated to include both documents
+        assertNotNull("PPL query should still be stored in alert", updatedAlert.query)
+        assertTrue("PPL query results should not be empty", updatedAlert.queryResults.isNotEmpty())
+
+        // Verify the query results now contain 2 rows (updated from previous 1 row)
+        assertEquals("Should now have 2 result rows from both indexed documents", 2, updatedAlert.queryResults.size)
+
+        // Verify both result rows have the expected structure
+        updatedAlert.queryResults.forEach { row ->
+            assertTrue("Each result row should contain 'timestamp' field", row.containsKey("timestamp"))
+            assertTrue("Each result row should contain 'abc' field", row.containsKey("abc"))
+            assertTrue("Each result row should contain 'number' field", row.containsKey("number"))
+        }
+
+        // Verify we can find both documents in the results by their unique 'abc' values
+        val abcValues = updatedAlert.queryResults.map { it["abc"] }.toSet()
+        assertTrue("Results should contain first document with abc='test-value'", abcValues.contains("test-value"))
+        assertTrue("Results should contain second document with abc='test-value-2'", abcValues.contains("test-value-2"))
+
+        // Verify we can find both documents by their number values
+        val numberValues = updatedAlert.queryResults.map { (it["number"] as Number).toInt() }.toSet()
+        assertTrue("Results should contain first document with number=5", numberValues.contains(5))
+        assertTrue("Results should contain second document with number=10", numberValues.contains(10))
+
+        // Verify lastNotificationTime was updated
+        assertNotEquals(
+            "Last notification time should be updated",
+            firstAlert.lastNotificationTime,
+            updatedAlert.lastNotificationTime
+        )
+
+        // Verify startTime remains the same (alert not recreated)
+        assertEquals(
+            "Start time should remain the same",
+            firstAlert.startTime,
+            updatedAlert.startTime
+        )
+    }
+
+    fun `test PPL monitor action template renders query results correctly`() {
+        // Setup test index and data
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        indexDocFromSomeTimeAgo(1, MINUTES, "group-a", 10)
+        indexDocFromSomeTimeAgo(2, MINUTES, "group-b", 20)
+        indexDocFromSomeTimeAgo(3, MINUTES, "group-a", 30)
+
+        // Create complex template that accesses PPL query results at multiple levels
+        val messageTemplate = """
+          Monitor: {{ctx.monitor.name}}
+          Trigger: {{ctx.trigger.name}}
+
+          === PPL Query Results ===
+          Query: {{ctx.monitor.inputs.0.ppl_input.query}}
+
+          --- Fine-Grained Access to First Row ---
+          {{#ctx.ppl_query_results}}
+          Row:
+          Field 1 (number): {{number}}
+          Field 2 (abc): {{abc}}
+          Field 3 (timestamp): {{timestamp}}
+
+          {{/ctx.ppl_query_results}}
+        """.trimIndent()
+
+        val destination = createDestination()
+        val action = randomAction(
+            template = randomTemplateScript(messageTemplate),
+            subjectTemplate = randomTemplateScript("A Subject"),
+            destinationId = destination.id
+        )
+
+        val query = "source = $TEST_INDEX_NAME | head 10"
+
+        // Create PPL monitor with action
+        val monitor = createMonitor(
+            randomPPLMonitor(
+                enabled = true,
+                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                triggers = listOf(
+                    randomPPLTrigger(
+                        conditionType = PPLTrigger.ConditionType.NUMBER_OF_RESULTS,
+                        numResultsCondition = PPLTrigger.NumResultsCondition.GREATER_THAN,
+                        numResultsValue = 0L,
+                        customCondition = null,
+                        actions = listOf(action)
+                    )
+                ),
+                query = query
+            )
+        )
+
+        // Execute monitor to trigger action
+        val response = executeMonitor(monitor.id, params = DRYRUN_MONITOR)
+        val output = entityAsMap(response)
+
+        // Verify action was executed
+        assertEquals(monitor.name, output["monitor_name"])
+        val triggerResults = output.objectMap("trigger_results")
+        assertTrue("Trigger should have executed", triggerResults.isNotEmpty())
+
+        // Extract and verify action output
+        val triggerResult = triggerResults.values.first()
+        val actionResults = triggerResult.objectMap("action_results")
+        assertTrue("Action results should exist", actionResults.isNotEmpty())
+
+        val actionResult = actionResults.values.first()
+
+        @Suppress("UNCHECKED_CAST")
+        val actionOutputMap = actionResult["output"] as? Map<String, String>
+        assertNotNull("Action output should not be null", actionOutputMap)
+
+        val message = actionOutputMap?.get("message")
+
+        logger.info("Rendered message: $message")
+
+        assertNotNull("Action message should not be null", message)
+        assertNull("Action should not have error", actionResult["error"])
+
+        // Verify basic context variables
+        assertTrue("Message should contain monitor name", message!!.contains("Monitor: ${monitor.name}"))
+        assertTrue("Message should contain trigger name", message.contains("Trigger: ${triggerResult["name"]}"))
+
+        // Verify PPL query is accessible
+        assertTrue("Message should contain the PPL query", message.contains(query))
+
+        // Verify fine-grained access to each row's fields (order may vary)
+        assertTrue("Message should contain group-a", message.contains("group-a"))
+        assertTrue("Message should contain group-b", message.contains("group-b"))
+        assertTrue("Message should contain value 10", message.contains("10"))
+        assertTrue("Message should contain value 20", message.contains("20"))
+        assertTrue("Message should contain value 30", message.contains("30"))
     }
 
     private fun prepareTestAnomalyResult(detectorId: String, user: User) {

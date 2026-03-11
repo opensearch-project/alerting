@@ -16,9 +16,6 @@ import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
-import org.opensearch.alerting.alertsv2.AlertV2Indices
-import org.opensearch.alerting.alertsv2.AlertV2Indices.Companion.ALL_ALERT_V2_INDEX_PATTERN
-import org.opensearch.alerting.alertsv2.AlertV2Mover
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.comments.CommentsIndices.Companion.ALL_COMMENTS_INDEX_PATTERN
 import org.opensearch.alerting.core.JobSweeper
@@ -202,10 +199,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var docLevelMonitorQueries: DocLevelMonitorQueries
     lateinit var threadPool: ThreadPool
     lateinit var alertIndices: AlertIndices
-    lateinit var alertV2Indices: AlertV2Indices
     lateinit var clusterService: ClusterService
     lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
-    lateinit var alertV2Mover: AlertV2Mover
     var monitorTypeToMonitorRunners: MutableMap<String, RemoteMonitorRegistry> = mutableMapOf()
 
     override fun getRestHandlers(
@@ -313,7 +308,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         val settings = environment.settings()
         val lockService = LockService(client, clusterService)
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
-        alertV2Indices = AlertV2Indices(settings, client, threadPool, clusterService)
 
         val sdkClient: SdkClient = SdkClientFactory.createSdkClient(
             client,
@@ -339,7 +333,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerSettings(settings)
             .registerThreadPool(threadPool)
             .registerAlertIndices(alertIndices)
-            .registerAlertV2Indices(alertV2Indices)
             .registerInputService(
                 InputService(
                     client,
@@ -366,7 +359,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
-        alertV2Mover = AlertV2Mover(environment.settings(), client, threadPool, clusterService, xContentRegistry)
         this.threadPool = threadPool
         this.clusterService = clusterService
 
@@ -420,7 +412,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             commentsIndices,
             docLevelMonitorQueries,
             destinationMigrationCoordinator,
-            alertV2Mover,
             lockService,
             alertService,
             triggerService,
@@ -528,7 +519,13 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME,
             AlertingSettings.JOB_QUEUE_ACCOUNT_ID,
             AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE,
-            AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME
+            AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME,
+            AlertingSettings.PPL_MONITOR_EXECUTION_MAX_DURATION,
+            AlertingSettings.PPL_MAX_QUERY_LENGTH,
+            AlertingSettings.PPL_QUERY_RESULTS_MAX_DATAROWS,
+            AlertingSettings.PPL_QUERY_RESULTS_MAX_SIZE,
+            AlertingSettings.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH,
+            AlertingSettings.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH
         )
     }
 
@@ -547,8 +544,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         return listOf(
             SystemIndexDescriptor(ALL_ALERT_INDEX_PATTERN, "Alerting Plugin system index pattern"),
             SystemIndexDescriptor(SCHEDULED_JOBS_INDEX, "Alerting Plugin Configuration index"),
-            SystemIndexDescriptor(ALL_COMMENTS_INDEX_PATTERN, "Alerting Comments system index pattern"),
-            SystemIndexDescriptor(ALL_ALERT_V2_INDEX_PATTERN, "Alerting V2 Alerts index pattern")
+            SystemIndexDescriptor(ALL_COMMENTS_INDEX_PATTERN, "Alerting Comments system index pattern")
         )
     }
 
