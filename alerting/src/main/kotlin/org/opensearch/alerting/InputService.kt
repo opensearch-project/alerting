@@ -7,9 +7,14 @@ package org.opensearch.alerting
 
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.apache.logging.log4j.LogManager
+import org.json.JSONObject
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
+import org.opensearch.alerting.PPLUtils.appendDataRowsLimit
+import org.opensearch.alerting.PPLUtils.capAndReformatPPLQueryResults
+import org.opensearch.alerting.PPLUtils.executePplQuery
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -35,6 +40,7 @@ import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.PPLInput
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.TriggerAfterKey
 import org.opensearch.commons.alerting.model.WorkflowRunContext
@@ -52,9 +58,12 @@ import org.opensearch.script.ScriptService
 import org.opensearch.script.ScriptType
 import org.opensearch.script.TemplateScript
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
+import org.opensearch.transport.client.node.NodeClient
 import java.time.Duration
 import java.time.Instant
+import kotlin.time.measureTimedValue
 
 /** Service that handles the collection of input results for Monitor executions */
 class InputService(
@@ -218,6 +227,87 @@ class InputService(
             logger.info("Error collecting anomaly result inputs for monitor: ${monitor.id}", e)
             InputRunResults(emptyList(), e)
         }
+    }
+
+    suspend fun collectInputResultsForPPLMonitor(
+        monitor: Monitor,
+        monitorCtx: MonitorRunnerExecutionContext,
+        transportService: TransportService
+    ): InputRunResults {
+        return try {
+            // PPL Alerting:
+            // these query results are for number_of_results PPL triggers,
+            // only the number of results returned by base query matters
+            // for those triggers, not the contents themselves
+            val basePplQueryResults = runPPLBaseQuery(
+                monitor,
+                (monitor.inputs[0] as PPLInput).query,
+                monitorCtx,
+                transportService
+            )
+            val numPplResults = basePplQueryResults.getLong("total")
+
+            // PPL Alerting:
+            // PPL Trigger evaluations won't read this input result in.
+            // for num results triggers, this is because the contents of the query results
+            // are unimportant, only the number of results matters.
+            // for custom trigger, this is because it'll be running its own query
+            // (base query + custom condition) and evaluating on those query results.
+            // thus, the size capped and reformatted base query results are included
+            // here to populate the final customer facing response of monitor execution
+            val cappedPPLBaseQueryResults = capAndReformatPPLQueryResults(
+                basePplQueryResults,
+                monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.PPL_QUERY_RESULTS_MAX_SIZE)
+            )
+
+            InputRunResults(emptyList(), null, null, cappedPPLBaseQueryResults, numPplResults)
+        } catch (e: Exception) {
+            logger.error(
+                "failed to run PPL Monitor base query " +
+                    "from PPL Monitor ${monitor.name} (id: ${monitor.id}",
+                e
+            )
+            InputRunResults(emptyList(), e, null, listOf(), null)
+        }
+    }
+
+    // for PPL Monitor execution, the base PPL query is run once
+    // for number_of_results PPL triggers
+    private suspend fun runPPLBaseQuery(
+        pplMonitor: Monitor,
+        baseQuery: String,
+        monitorCtx: MonitorRunnerExecutionContext,
+        transportService: TransportService
+    ): JSONObject {
+
+        // TODO: change name to trigger max duration
+        val monitorExecutionDuration = monitorCtx
+            .clusterService!!
+            .clusterSettings
+            .get(AlertingSettings.PPL_MONITOR_EXECUTION_MAX_DURATION)
+
+        var queryResponseJson: JSONObject? = null
+
+        withTimeout(monitorExecutionDuration.millis) {
+            // limit the number of PPL query result data rows returned
+            val dataRowsLimit = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.PPL_QUERY_RESULTS_MAX_DATAROWS)
+            val limitedQueryToExecute = appendDataRowsLimit(baseQuery, dataRowsLimit)
+
+            logger.debug("executing the base PPL query of monitor: ${pplMonitor.id}")
+            val (queryResponseJsonReceived, timeTaken) = measureTimedValue {
+                executePplQuery(
+                    limitedQueryToExecute,
+                    false,
+                    monitorCtx.client!! as NodeClient
+                )
+            }
+            logger.debug("base query results: $queryResponseJsonReceived")
+            logger.debug("time taken to execute base query against sql/ppl plugin: $timeTaken")
+
+            queryResponseJson = queryResponseJsonReceived
+        }
+
+        return queryResponseJson!!
     }
 
     fun getSearchRequest(

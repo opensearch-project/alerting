@@ -106,7 +106,6 @@ object PPLUtils {
             "/_plugins/_ppl"
         }
 
-        // call PPL plugin to execute query
         // prepare request to SQL/PPL Plugin
         val transportPplQueryRequest = TransportPPLQueryRequest(
             query,

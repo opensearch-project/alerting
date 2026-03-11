@@ -19,7 +19,6 @@ import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_ACCOUNT_BASE_URI
 import org.opensearch.alerting.AlertingPlugin.Companion.EMAIL_GROUP_BASE_URI
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
-import org.opensearch.alerting.alertsv2.AlertV2Indices
 import org.opensearch.alerting.core.settings.ScheduledJobSettings
 import org.opensearch.alerting.model.destination.Chime
 import org.opensearch.alerting.model.destination.CustomWebhook
@@ -43,12 +42,8 @@ import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.common.xcontent.json.JsonXContent.jsonXContent
-import org.opensearch.commons.alerting.action.GetAlertsResponse.Companion.ALERTS_FIELD
-import org.opensearch.commons.alerting.action.GetAlertsResponse.Companion.TOTAL_ALERTS_FIELD
 import org.opensearch.commons.alerting.action.GetFindingsResponse
 import org.opensearch.commons.alerting.model.Alert
-import org.opensearch.commons.alerting.model.Alert.Companion.ERROR_MESSAGE_FIELD
-import org.opensearch.commons.alerting.model.Alert.Companion.STATE_FIELD
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.Comment
@@ -59,8 +54,8 @@ import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Finding
 import org.opensearch.commons.alerting.model.FindingWithDocs
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.PPLSQLInput
-import org.opensearch.commons.alerting.model.PPLSQLTrigger
+import org.opensearch.commons.alerting.model.PPLInput
+import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
@@ -114,11 +109,11 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
                 Monitor.XCONTENT_REGISTRY,
                 SearchInput.XCONTENT_REGISTRY,
                 DocLevelMonitorInput.XCONTENT_REGISTRY,
-                PPLSQLInput.XCONTENT_REGISTRY,
+                PPLInput.XCONTENT_REGISTRY,
                 QueryLevelTrigger.XCONTENT_REGISTRY,
                 BucketLevelTrigger.XCONTENT_REGISTRY,
                 DocumentLevelTrigger.XCONTENT_REGISTRY,
-                PPLSQLTrigger.XCONTENT_REGISTRY,
+                PPLTrigger.XCONTENT_REGISTRY,
                 Workflow.XCONTENT_REGISTRY,
                 ChainedAlertTrigger.XCONTENT_REGISTRY
             ) + SearchModule(Settings.EMPTY, emptyList()).namedXContents
@@ -1322,14 +1317,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertIndices.FINDING_HISTORY_WRITE_INDEX}\" : {}")
     }
 
-    fun putAlertV2Mappings(mapping: String? = null) {
-        val mappingHack = if (mapping != null) mapping else AlertV2Indices.alertMapping().trimStart('{').trimEnd('}')
-        val encodedHistoryIndex = URLEncoder.encode(AlertV2Indices.ALERT_V2_HISTORY_INDEX_PATTERN, Charsets.UTF_8.toString())
-        val settings = Settings.builder().put("index.hidden", true).build()
-        createIndex(AlertV2Indices.ALERT_V2_INDEX, settings, mappingHack)
-        createIndex(encodedHistoryIndex, settings, mappingHack, "\"${AlertV2Indices.ALERT_V2_HISTORY_WRITE_INDEX}\" : {}")
-    }
-
     fun scheduledJobMappings(): String {
         return javaClass.classLoader.getResource("mappings/scheduled-jobs.json").readText()
     }
@@ -2055,11 +2042,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     // this function only works on the TEST_INDEX_NAME index created
     // specifically for this IT suite. It has fields
     // "timestamp" (date), "abc" (string), "number" (integer)
-    protected fun indexDocFromSomeTimeAgo(timeValue: Long, timeUnit: ChronoUnit, abc: String, number: Int) {
+    protected fun indexDocFromSomeTimeAgo(
+        timeValue: Long,
+        timeUnit: ChronoUnit,
+        abc: String,
+        number: Int,
+        id: String = UUID.randomUUID().toString()
+    ) {
         val someTimeAgo = ZonedDateTime.now().minus(timeValue, timeUnit).truncatedTo(MILLIS)
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(someTimeAgo) // the timestamp string is given a random timezone offset
         val testDoc = """{ "timestamp" : "$testTime", "abc": "$abc", "number" : "$number" }"""
-        indexDoc(TEST_INDEX_NAME, UUID.randomUUID().toString(), testDoc)
+        indexDoc(TEST_INDEX_NAME, id, testDoc)
     }
 
     protected fun ensureNumMonitors(expectedNum: Int) {
@@ -2084,49 +2077,5 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
         val numberDocsFound = hits["total"]?.get("value")
         assertEquals("Unexpected number of PPL Monitors found in Search Monitors", expectedNum, numberDocsFound)
-    }
-
-    // takes in an execute monitor API response and returns true if the
-    // trigger condition was met. assumes the monitor executed only had 1 trigger
-    protected fun isTriggered(pplMonitor: Monitor, executeResponse: Response): Boolean {
-        val executeResponseMap = entityAsMap(executeResponse)
-        val triggerResultsObj = (executeResponseMap["trigger_results"] as Map<String, Any>)[pplMonitor.triggers[0].id] as Map<String, Any>
-        return triggerResultsObj["triggered"] as Boolean
-    }
-
-    // takes in a get alerts API response and returns the current number of active alerts
-    protected fun numAlerts(getAlertsResponse: Response): Int {
-        logger.info("get alerts response: ${entityAsMap(getAlertsResponse)}")
-        return entityAsMap(getAlertsResponse)[TOTAL_ALERTS_FIELD] as Int
-    }
-
-    protected fun containsErrorAlert(getAlertsResponse: Response): Boolean {
-        val getAlertsMap = entityAsMap(getAlertsResponse)
-        val alertsList = getAlertsMap[ALERTS_FIELD] as List<Map<String, Any>>
-        alertsList.forEach { alert ->
-            val errorMessage = alert[ERROR_MESSAGE_FIELD] as String?
-            val state = Alert.State.valueOf((alert[STATE_FIELD] as String?)!!.uppercase(Locale.ROOT))
-
-            if (state == Alert.State.ERROR && errorMessage != null) {
-                return true
-            }
-        }
-        return false
-    }
-
-    protected fun getAlertV2HistoryDocCount(): Long {
-        val request = """
-            {
-                "query": {
-                    "match_all": {}
-                }
-            }
-        """.trimIndent()
-        val response = adminClient().makeRequest(
-            "POST", "${AlertV2Indices.ALERT_V2_HISTORY_ALL}/_search", emptyMap(),
-            StringEntity(request, APPLICATION_JSON)
-        )
-        assertEquals("Request to get alert v2 history failed", RestStatus.OK, response.restStatus())
-        return SearchResponse.fromXContent(createParser(jsonXContent, response.entity.content)).hits.totalHits!!.value
     }
 }

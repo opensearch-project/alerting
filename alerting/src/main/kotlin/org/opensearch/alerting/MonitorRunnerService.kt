@@ -23,8 +23,6 @@ import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertMover.Companion.moveAlerts
-import org.opensearch.alerting.alertsv2.AlertV2Indices
-import org.opensearch.alerting.alertsv2.AlertV2Mover.Companion.moveAlertV2s
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.lock.LockModel
@@ -74,7 +72,7 @@ import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.IndexPatternUtils
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
-import org.opensearch.commons.alerting.util.isPplSqlMonitor
+import org.opensearch.commons.alerting.util.isPPLMonitor
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -137,11 +135,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     fun registerAlertIndices(alertIndices: AlertIndices): MonitorRunnerService {
         this.monitorCtx.alertIndices = alertIndices
-        return this
-    }
-
-    fun registerAlertV2Indices(alertV2Indices: AlertV2Indices): MonitorRunnerService {
-        this.monitorCtx.alertV2Indices = alertV2Indices
         return this
     }
 
@@ -317,9 +310,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         if (monitorCtx.alertIndices!!.isAlertInitialized(job.dataSources)) {
                             moveAlerts(monitorCtx.client!!, job.id, job)
                         }
-                        if (monitorCtx.alertV2Indices!!.isAlertV2Initialized()) {
-                            moveAlertV2s(job.id, job, monitorCtx)
-                        }
                     }
                 } catch (e: Exception) {
                     logger.error("Failed to move active alerts for monitor [${job.id}].", e)
@@ -358,15 +348,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 }
             } catch (e: Exception) {
                 logger.error("Failed to move active alerts for monitor [$jobId].", e)
-            }
-            try {
-                monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
-                    if (monitorCtx.alertV2Indices!!.isAlertV2Initialized()) {
-                        moveAlertV2s(jobId, null, monitorCtx)
-                    }
-                }
-            } catch (e: Exception) {
-                logger.error("Failed to move active alertV2s for monitorV2 [$jobId].", e)
             }
         }
     }
@@ -507,8 +488,10 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 "Executing scheduled monitor - id: ${monitor.id}, type: ${monitor.monitorType}, periodStart: $periodStart, " +
                     "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
             )
-            val runResult = if (monitor.isPplSqlMonitor()) {
-                PPLSQLMonitorRunner.runMonitor(
+            val runResult = if (monitor.isPPLMonitor()) {
+                // PPL Monitor runs with QueryLevelMonitorRunner
+                // as PPL Monitors are ultimately query-based
+                QueryLevelMonitorRunner.runMonitor(
                     monitor,
                     monitorCtx,
                     periodStart,
