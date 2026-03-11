@@ -31,6 +31,12 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
     private val scheduledJobIdToInfo = ConcurrentHashMap<String, ScheduledJobInfo>()
 
     /**
+     * The scheduled job type of Monitor V2s, for filtering
+     * out V1 vs V2 Monitors when collecting Monitor Stats
+     */
+    private val monitorV2Type = "monitor_v2"
+
+    /**
      * Schedules the jobs in [jobsToSchedule] for execution.
      *
      * @return List of jobs that could not be scheduled
@@ -191,8 +197,19 @@ class JobScheduler(private val threadPool: ThreadPool, private val jobRunner: Jo
         return true
     }
 
-    fun getJobSchedulerMetric(): List<JobSchedulerMetrics> {
-        return scheduledJobIdToInfo.entries.stream()
+    fun getJobSchedulerMetric(showAlertingV2ScheduledJobs: Boolean?): List<JobSchedulerMetrics> {
+        val scheduledJobEntries = scheduledJobIdToInfo.entries
+
+        val filteredScheduledJobEntries = if (showAlertingV2ScheduledJobs == null) {
+            // if no alerting version was specified, do not filter
+            scheduledJobEntries
+        } else if (showAlertingV2ScheduledJobs) {
+            scheduledJobEntries.filter { it.value.scheduledJob.type == monitorV2Type }
+        } else {
+            scheduledJobEntries.filter { it.value.scheduledJob.type != monitorV2Type }
+        }
+
+        return filteredScheduledJobEntries.stream()
             .map { entry ->
                 JobSchedulerMetrics(
                     entry.value.scheduledJobId,

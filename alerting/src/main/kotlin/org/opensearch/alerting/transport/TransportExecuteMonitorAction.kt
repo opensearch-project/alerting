@@ -16,6 +16,7 @@ import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteMonitorAction
@@ -119,7 +120,12 @@ class TransportExecuteMonitorAction @Inject constructor(
                                     xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                                     response.sourceAsBytesRef, XContentType.JSON
                                 ).use { xcp ->
-                                    val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
+                                    val scheduledJob = ScheduledJob.parse(xcp, response.id, response.version)
+                                    validateMonitorV1(scheduledJob)?.let {
+                                        actionListener.onFailure(AlertingException.wrap(it))
+                                        return
+                                    }
+                                    val monitor = scheduledJob as Monitor
                                     executeMonitor(monitor)
                                 }
                             }
