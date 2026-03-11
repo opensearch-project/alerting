@@ -107,7 +107,7 @@ interface SecureTransportAction {
 
     fun doUserBackendRolesMatchResource(userBackendRoles: List<String>, resourceBackendRoles: List<String>): Boolean {
         if (filterByAccessStrategy == FilterByBackendRolesAccessStrategy.INTERSECT.strategy) {
-            return resourceBackendRoles.any { it in resourceBackendRoles }
+            return resourceBackendRoles.any { it in userBackendRoles }
         } else if (filterByAccessStrategy == FilterByBackendRolesAccessStrategy.ALL.strategy) {
             return resourceBackendRoles.sorted().equals(userBackendRoles.sorted())
         }
@@ -116,7 +116,6 @@ interface SecureTransportAction {
         throw IllegalArgumentException(
             "Invalid filter by access strategy: $filterByAccessStrategy"
         )
-        return false
     }
 
     /**
