@@ -1586,4 +1586,44 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val executeResponse = executeMonitor(monitor2.id)
         assertEquals("Execute monitor failed", RestStatus.OK, executeResponse.restStatus())
     }
+
+    fun `test existing monitor with triggers over new limit still executes`() {
+        // Create monitor with 10 triggers at default limit
+        val triggers = (1..10).map {
+            randomQueryLevelTrigger(name = "trigger-$it", condition = Script("return true"))
+        }
+        val monitor = createMonitor(randomQueryLevelMonitor(triggers = triggers, enabled = true))
+        assertEquals("Monitor should have 10 triggers", 10, monitor.triggers.size)
+
+        // Execute monitor — should succeed
+        val executeResponse = executeMonitor(monitor.id)
+        assertEquals("Execute monitor failed", RestStatus.OK, executeResponse.restStatus())
+
+        // Lower the limit to 5
+        client().updateSettings("plugins.alerting.monitor.max_triggers", 5)
+
+        // Execute the existing monitor again — should still succeed
+        val executeResponse2 = executeMonitor(monitor.id)
+        assertEquals("Existing monitor should still execute after lowering limit", RestStatus.OK, executeResponse2.restStatus())
+
+        // Reset setting
+        client().updateSettings("plugins.alerting.monitor.max_triggers", 10)
+    }
+
+    fun `test new monitor rejected when over trigger limit`() {
+        client().updateSettings("plugins.alerting.monitor.max_triggers", 5)
+        try {
+            val triggers = (1..6).map {
+                randomQueryLevelTrigger(name = "trigger-$it", condition = Script("return true"))
+            }
+            try {
+                createMonitor(randomQueryLevelMonitor(triggers = triggers))
+                fail("Expected monitor creation to fail")
+            } catch (e: ResponseException) {
+                assertEquals("Should be bad request", RestStatus.BAD_REQUEST.status, e.response.statusLine.statusCode)
+            }
+        } finally {
+            client().updateSettings("plugins.alerting.monitor.max_triggers", 10)
+        }
+    }
 }

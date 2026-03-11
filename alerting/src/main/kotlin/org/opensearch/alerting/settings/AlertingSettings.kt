@@ -25,10 +25,19 @@ class AlertingSettings {
         const val DEFAULT_MAX_DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION_MINUTES = 3L
         const val DEFAULT_MAX_DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION_MINUTES = 4L
         const val DEFAULT_FAN_OUT_NODES = 1000
+        const val DEFAULT_MAX_TRIGGERS_PER_MONITOR = 10
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
             LegacyOpenDistroAlertingSettings.ALERTING_MAX_MONITORS,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val MAX_TRIGGERS_PER_MONITOR = Setting.intSetting(
+            "plugins.alerting.monitor.max_triggers",
+            DEFAULT_MAX_TRIGGERS_PER_MONITOR,
+            0,
+            50,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
