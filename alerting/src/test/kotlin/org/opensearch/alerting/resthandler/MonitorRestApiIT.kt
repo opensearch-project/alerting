@@ -1559,4 +1559,31 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             alertingStatsResponse[statsResponseOpenSearchSweeperEnabledField]
         )
     }
+
+    fun `test sweeper works with id field data disabled`() {
+        client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
+        val monitor = createRandomMonitor(refresh = true)
+        // Disable _id fielddata — this previously broke the sweeper
+        client().updateSettings("indices.id_field_data.enabled", false)
+        try {
+            val monitor2 = createRandomMonitor(refresh = true)
+            assertNotNull("Monitor was not created", monitor2.id)
+            val executeResponse = executeMonitor(monitor2.id)
+            assertEquals("Execute monitor failed", RestStatus.OK, executeResponse.restStatus())
+        } finally {
+            client().updateSettings("indices.id_field_data.enabled", true)
+        }
+    }
+
+    fun `test sweeper works after all monitors deleted`() {
+        client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
+        val monitor = createRandomMonitor(refresh = true)
+        client().makeRequest("DELETE", "$ALERTING_BASE_URI/${monitor.id}")
+        refreshIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)
+        // Create a new monitor after index was emptied — sweeper should handle this
+        val monitor2 = createRandomMonitor(refresh = true)
+        assertNotNull("Monitor was not created", monitor2.id)
+        val executeResponse = executeMonitor(monitor2.id)
+        assertEquals("Execute monitor failed", RestStatus.OK, executeResponse.restStatus())
+    }
 }
