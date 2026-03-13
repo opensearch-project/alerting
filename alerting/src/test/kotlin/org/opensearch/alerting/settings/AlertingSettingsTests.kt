@@ -80,6 +80,7 @@ class AlertingSettingsTests : OpenSearchTestCase() {
                     AlertingSettings.REQUEST_TIMEOUT,
                     AlertingSettings.MAX_ACTION_THROTTLE_VALUE,
                     AlertingSettings.FILTER_BY_BACKEND_ROLES,
+                    AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY,
                     ScheduledJobSettings.SWEEP_PERIOD,
                     ScheduledJobSettings.SWEEP_PAGE_SIZE,
                     ScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,

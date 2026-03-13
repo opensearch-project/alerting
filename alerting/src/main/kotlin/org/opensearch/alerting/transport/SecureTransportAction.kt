@@ -8,6 +8,7 @@ package org.opensearch.alerting.transport
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.settings.FilterByBackendRolesAccessStrategy
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.alerting.util.AlertingException
@@ -38,9 +39,13 @@ private val log = LogManager.getLogger(SecureTransportAction::class.java)
 interface SecureTransportAction {
 
     var filterByEnabled: Boolean
+    var filterByAccessStrategy: String
 
     fun listenFilterBySettingChange(clusterService: ClusterService) {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FILTER_BY_BACKEND_ROLES) { filterByEnabled = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY) {
+            filterByAccessStrategy = it
+        }
     }
 
     fun readUserFromThreadContext(client: Client): User? {
@@ -100,6 +105,19 @@ interface SecureTransportAction {
         return true
     }
 
+    fun doUserBackendRolesMatchResource(userBackendRoles: List<String>, resourceBackendRoles: List<String>): Boolean {
+        if (filterByAccessStrategy == FilterByBackendRolesAccessStrategy.INTERSECT.strategy) {
+            return resourceBackendRoles.any { it in userBackendRoles }
+        } else if (filterByAccessStrategy == FilterByBackendRolesAccessStrategy.ALL.strategy) {
+            return resourceBackendRoles.sorted().equals(userBackendRoles.sorted())
+        }
+        // Not sure if this is necessary, since there is a validator
+        // on the setting itself
+        throw IllegalArgumentException(
+            "Invalid filter by access strategy: $filterByAccessStrategy"
+        )
+    }
+
     /**
      * If FilterBy is enabled, this function verifies that the requester user has FilterBy permissions to access
      * the resource. If FilterBy is disabled, we will assume the user has permissions and return true.
@@ -122,7 +140,7 @@ interface SecureTransportAction {
         if (
             resourceBackendRoles == null ||
             requesterBackendRoles == null ||
-            resourceBackendRoles.intersect(requesterBackendRoles).isEmpty()
+            !doUserBackendRolesMatchResource(requesterBackendRoles, resourceBackendRoles)
         ) {
             actionListener.onFailure(
                 AlertingException.wrap(
