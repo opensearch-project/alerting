@@ -37,6 +37,7 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTION_THROTTLE_VALUE
+import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_TRIGGERS_PER_MONITOR
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.DocLevelMonitorQueries
@@ -106,6 +107,7 @@ class TransportIndexMonitorAction @Inject constructor(
     SecureTransportAction {
 
     @Volatile private var maxMonitors = ALERTING_MAX_MONITORS.get(settings)
+    @Volatile private var maxTriggersPerMonitor = MAX_TRIGGERS_PER_MONITOR.get(settings)
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
     @Volatile private var maxActionThrottle = MAX_ACTION_THROTTLE_VALUE.get(settings)
@@ -114,6 +116,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_MAX_MONITORS) { maxMonitors = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_TRIGGERS_PER_MONITOR) { maxTriggersPerMonitor = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTION_THROTTLE_VALUE) { maxActionThrottle = it }
@@ -378,6 +381,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
             try {
                 validateActionThrottle(request.monitor, maxActionThrottle, TimeValue.timeValueMinutes(1))
+                validateTriggerCount(request.monitor)
             } catch (e: RuntimeException) {
                 actionListener.onFailure(AlertingException.wrap(e))
                 return
@@ -404,6 +408,12 @@ class TransportIndexMonitorAction @Inject constructor(
                         }
                     }
                 )
+            }
+        }
+
+        private fun validateTriggerCount(monitor: Monitor) {
+            require(monitor.triggers.size <= maxTriggersPerMonitor) {
+                "The current cluster settings only allow up to $maxTriggersPerMonitor triggers per monitor."
             }
         }
 
