@@ -12,9 +12,11 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
+import org.opensearch.test.OpenSearchTestCase
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit.MILLIS
+import java.util.concurrent.TimeUnit
 
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 class DocLeveFanOutIT : AlertingRestTestCase() {
@@ -64,7 +66,9 @@ class DocLeveFanOutIT : AlertingRestTestCase() {
         assertEquals(findingsSize1, 2)
         adminClient().updateSettings(AlertingSettings.DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION.key, TimeValue.timeValueNanos(1))
         executeMonitor(monitor.id)
-        Thread.sleep(1000)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil true
+        }, 2, TimeUnit.SECONDS)
         adminClient().updateSettings(AlertingSettings.DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION.key, TimeValue.timeValueMinutes(4))
         indexDoc(testIndex, "3", testDoc)
         indexDoc(testIndex, "4", testDoc)
