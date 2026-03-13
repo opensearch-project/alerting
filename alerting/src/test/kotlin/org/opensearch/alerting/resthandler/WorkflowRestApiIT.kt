@@ -1226,7 +1226,11 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
         indexDoc(testIndex, "1", testDoc)
         indexDoc(testIndex, "5", testDoc)
-        Thread.sleep(240000)
+
+        OpenSearchTestCase.waitUntil({
+            val alerts = searchAlerts(monitor)
+            return@waitUntil alerts.isNotEmpty()
+        }, 5, TimeUnit.MINUTES)
 
         val alerts = searchAlerts(monitor)
         alerts.forEach {
