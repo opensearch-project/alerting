@@ -205,6 +205,20 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        val QUERY_INDEX_CLEANUP_ENABLED = Setting.boolSetting(
+            "plugins.alerting.query_index_cleanup.enabled",
+            true,
+            Setting.Property.NodeScope,
+            Setting.Property.Dynamic
+        )
+
+        val QUERY_INDEX_CLEANUP_PERIOD = Setting.positiveTimeSetting(
+            "plugins.alerting.query_index_cleanup.period",
+            TimeValue.timeValueHours(1),
+            Setting.Property.NodeScope,
+            Setting.Property.Dynamic
+        )
+
         val REQUEST_TIMEOUT = Setting.positiveTimeSetting(
             "plugins.alerting.request_timeout",
             LegacyOpenDistroAlertingSettings.REQUEST_TIMEOUT,

@@ -180,6 +180,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var docLevelMonitorQueries: DocLevelMonitorQueries
     lateinit var threadPool: ThreadPool
     lateinit var alertIndices: AlertIndices
+    lateinit var queryIndexCleanup: QueryIndexCleanup
     lateinit var clusterService: ClusterService
     lateinit var destinationMigrationCoordinator: DestinationMigrationCoordinator
     var monitorTypeToMonitorRunners: MutableMap<String, RemoteMonitorRegistry> = mutableMapOf()
@@ -285,6 +286,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         val settings = environment.settings()
         val lockService = LockService(client, clusterService)
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
+        queryIndexCleanup = QueryIndexCleanup(settings, client, threadPool, clusterService, xContentRegistry)
         val alertService = AlertService(client, xContentRegistry, alertIndices)
         val triggerService = TriggerService(scriptService)
         runner = MonitorRunnerService
@@ -348,6 +350,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             scheduledJobIndices,
             commentsIndices,
             docLevelMonitorQueries,
+            queryIndexCleanup,
             destinationMigrationCoordinator,
             lockService,
             alertService,
@@ -423,6 +426,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE,
             AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD,
             AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD,
+            AlertingSettings.QUERY_INDEX_CLEANUP_ENABLED,
+            AlertingSettings.QUERY_INDEX_CLEANUP_PERIOD,
             AlertingSettings.FINDINGS_INDEXING_BATCH_SIZE,
             AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED,
             AlertingSettings.ALERTING_COMMENTS_ENABLED,
