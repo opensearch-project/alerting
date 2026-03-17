@@ -5,6 +5,8 @@
 
 package org.opensearch.alerting.util
 
+import org.opensearch.alerting.AlertService
+import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.randomAction
 import org.opensearch.alerting.randomBucketLevelTrigger
@@ -14,6 +16,7 @@ import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomTemplateScript
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.test.OpenSearchTestCase
 
 class AlertingUtilsTests : OpenSearchTestCase() {
@@ -175,5 +178,36 @@ class AlertingUtilsTests : OpenSearchTestCase() {
         )
 
         triggers.forEach { trigger -> assertFalse(printsSampleDocData(trigger)) }
+    }
+
+    fun `test getCancelAfterTimeInterval returns -1 when setting is default`() {
+        val original = MonitorRunnerService.monitorCtx.cancelAfterTimeInterval
+        try {
+            MonitorRunnerService.monitorCtx.cancelAfterTimeInterval = TimeValue.timeValueMinutes(-1)
+            assertEquals(-1L, getCancelAfterTimeInterval())
+        } finally {
+            MonitorRunnerService.monitorCtx.cancelAfterTimeInterval = original
+        }
+    }
+
+    fun `test getCancelAfterTimeInterval returns at least ALERTS_SEARCH_TIMEOUT`() {
+        val original = MonitorRunnerService.monitorCtx.cancelAfterTimeInterval
+        try {
+            // Setting lower than ALERTS_SEARCH_TIMEOUT (5 min) should return 5 min
+            MonitorRunnerService.monitorCtx.cancelAfterTimeInterval = TimeValue.timeValueMinutes(1)
+            assertEquals(AlertService.ALERTS_SEARCH_TIMEOUT.minutes, getCancelAfterTimeInterval())
+        } finally {
+            MonitorRunnerService.monitorCtx.cancelAfterTimeInterval = original
+        }
+    }
+
+    fun `test getCancelAfterTimeInterval returns setting when higher than ALERTS_SEARCH_TIMEOUT`() {
+        val original = MonitorRunnerService.monitorCtx.cancelAfterTimeInterval
+        try {
+            MonitorRunnerService.monitorCtx.cancelAfterTimeInterval = TimeValue.timeValueMinutes(10)
+            assertEquals(10L, getCancelAfterTimeInterval())
+        } finally {
+            MonitorRunnerService.monitorCtx.cancelAfterTimeInterval = original
+        }
     }
 }
