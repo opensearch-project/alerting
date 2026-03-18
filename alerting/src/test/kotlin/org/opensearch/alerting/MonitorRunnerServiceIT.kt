@@ -1267,7 +1267,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
     fun `test execute bucket-level monitor with alias optimization - indices skipped from query`() {
         val skipIndex = createTestIndex("to_skip_index")
-        Thread.sleep(10000)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil true
+        }, 10, TimeUnit.SECONDS)
         val previousIndex = createTestIndex("to_include_index")
         insertSampleTimeSerializedDataWithTime(
             previousIndex,
@@ -1287,7 +1289,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             ),
             ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS).plusSeconds(10)
         )
-        Thread.sleep(10000)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil true
+        }, 10, TimeUnit.SECONDS)
         val indexMapping = """
                 "properties" : {
                   "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },

@@ -266,7 +266,9 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         updateSettings =
             adminClient().updateSettings(AlertingSettings.DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION.key, TimeValue.timeValueMinutes(4))
         logger.info(updateSettings)
-        Thread.sleep(1000)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil true
+        }, 2, TimeUnit.SECONDS)
         response = executeMonitor(monitor.id)
         output = entityAsMap(response)
         assertEquals(monitor.name, output["monitor_name"])
@@ -597,10 +599,14 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         indexDoc(testIndex, "1", testDoc)
         indexDoc(testIndex, "5", testDoc)
-        Thread.sleep(240000)
 
         val inputMap = HashMap<String, Any>()
         inputMap["searchString"] = monitor.name
+        OpenSearchTestCase.waitUntil({
+            val responseMap = getAlerts(inputMap).asMap()
+            val alerts = (responseMap["alerts"] as ArrayList<Map<String, Any>>)
+            return@waitUntil alerts.isNotEmpty()
+        }, 5, TimeUnit.MINUTES)
 
         val responseMap = getAlerts(inputMap).asMap()
         val alerts = (responseMap["alerts"] as ArrayList<Map<String, Any>>)
