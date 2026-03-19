@@ -172,6 +172,8 @@ dependencies {
     implementation "com.github.seancfoley:ipaddress:5.4.1"
     implementation project(path: ":alerting-spi", configuration: 'shadow')
 
+    implementation "org.opensearch:opensearch-remote-metadata-sdk:${opensearch_build}"
+
     testImplementation "org.antlr:antlr4-runtime:${versions.antlr4}"
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
     testImplementation "org.mockito:mockito-core:${versions.mockito}"
