@@ -85,7 +85,6 @@ import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
-import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.node.DiscoveryNodes
 import org.opensearch.cluster.service.ClusterService
@@ -97,6 +96,7 @@ import org.opensearch.common.settings.SettingsFilter
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutAction
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
+import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorIndices
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
@@ -135,6 +135,7 @@ import org.opensearch.rest.RestHandler
 import org.opensearch.script.ScriptContext
 import org.opensearch.script.ScriptService
 import org.opensearch.threadpool.ThreadPool
+import org.opensearch.transport.client.Client
 import org.opensearch.watcher.ResourceWatcherService
 import java.util.function.Supplier
 
@@ -381,10 +382,13 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.ALERT_HISTORY_MAX_DOCS,
             AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD,
             AlertingSettings.ALERTING_MAX_MONITORS,
+            AlertingSettings.MAX_TRIGGERS_PER_MONITOR,
             AlertingSettings.PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT,
             AlertingSettings.DOC_LEVEL_MONITOR_FAN_OUT_NODES,
             DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE,
             AlertingSettings.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY,
+            AlertingSettings.DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION,
+            AlertingSettings.DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION,
             AlertingSettings.REQUEST_TIMEOUT,
             AlertingSettings.MAX_ACTION_THROTTLE_VALUE,
             AlertingSettings.FILTER_BY_BACKEND_ROLES,
@@ -428,7 +432,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.COMMENTS_HISTORY_RETENTION_PERIOD,
             AlertingSettings.COMMENTS_MAX_CONTENT_SIZE,
             AlertingSettings.MAX_COMMENTS_PER_ALERT,
-            AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION
+            AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION,
+            AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES
         )
     }
 
@@ -459,10 +464,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             SearchPlugin.PipelineAggregationSpec(
                 BucketSelectorExtAggregationBuilder.NAME,
                 { sin: StreamInput -> BucketSelectorExtAggregationBuilder(sin) },
-                { parser: XContentParser, agg_name: String ->
-                    BucketSelectorExtAggregationBuilder.parse(agg_name, parser)
-                }
-            )
+                { parser: XContentParser, agg_name: String -> BucketSelectorExtAggregationBuilder.parse(agg_name, parser) }
+            ).addResultReader({ sin: StreamInput -> BucketSelectorIndices(sin) })
         )
     }
 

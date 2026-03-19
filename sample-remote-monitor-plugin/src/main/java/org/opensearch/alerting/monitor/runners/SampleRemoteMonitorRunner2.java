@@ -12,7 +12,6 @@ import org.opensearch.action.support.WriteRequest;
 import org.opensearch.alerting.monitor.inputs.SampleRemoteMonitorInput2;
 import org.opensearch.alerting.monitor.trigger.results.SampleRemoteMonitorTriggerRunResult;
 import org.opensearch.alerting.spi.RemoteMonitorRunner;
-import org.opensearch.client.Client;
 import org.opensearch.commons.alerting.model.Input;
 import org.opensearch.commons.alerting.model.InputRunResults;
 import org.opensearch.commons.alerting.model.Monitor;
@@ -22,6 +21,7 @@ import org.opensearch.commons.alerting.model.remote.monitors.RemoteMonitorInput;
 import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.transport.TransportService;
+import org.opensearch.transport.client.Client;
 
 import java.time.Instant;
 import java.util.Map;

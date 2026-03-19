@@ -22,7 +22,7 @@ abstract class TriggerScript(_scriptParams: Map<String, Any>) {
     companion object {
         /**
          * [PARAMETERS] contains the names of the formal arguments to the [execute] method which define the
-         * script's execution context. These argument names (`_results` etc.)  are available as named parameters
+         * script's execution context. These argument names (`results` etc.)  are available as named parameters
          * in the painless script. These arguments passed to the [execute] method change every time the trigger is executed.
          * In a sane world this would have been named `ARGUMENTS` to avoid confusing the hell out of everyone who has to
          * work with this code.

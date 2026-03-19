@@ -13,7 +13,6 @@ import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.update.UpdateRequest
 import org.opensearch.action.update.UpdateResponse
-import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
@@ -28,6 +27,7 @@ import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.engine.DocumentMissingException
 import org.opensearch.index.engine.VersionConflictEngineException
 import org.opensearch.index.seqno.SequenceNumbers
+import org.opensearch.transport.client.Client
 import java.io.IOException
 import java.time.Instant
 import java.util.concurrent.TimeUnit

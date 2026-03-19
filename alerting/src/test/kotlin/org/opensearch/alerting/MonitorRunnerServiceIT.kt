@@ -1072,7 +1072,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             // for old monitor before enable FGAC, the user field is empty
             val monitor = randomADMonitor(
                 inputs = listOf(adSearchInput(detectorId)), triggers = listOf(adMonitorTrigger()),
-                user = User(user.name, listOf(), user.roles, user.customAttNames)
+                user = User(user.name, listOf(), user.roles, user.customAttributes)
             )
             val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
             val output = entityAsMap(response)
@@ -1267,7 +1267,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
 
     fun `test execute bucket-level monitor with alias optimization - indices skipped from query`() {
         val skipIndex = createTestIndex("to_skip_index")
-        Thread.sleep(10000)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil true
+        }, 10, TimeUnit.SECONDS)
         val previousIndex = createTestIndex("to_include_index")
         insertSampleTimeSerializedDataWithTime(
             previousIndex,
@@ -1287,7 +1289,9 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             ),
             ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS).plusSeconds(10)
         )
-        Thread.sleep(10000)
+        OpenSearchTestCase.waitUntil({
+            return@waitUntil true
+        }, 10, TimeUnit.SECONDS)
         val indexMapping = """
                 "properties" : {
                   "test_strict_date_time" : { "type" : "date", "format" : "strict_date_time" },
@@ -2252,7 +2256,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         indexDoc(adResultIndex, "3", testResult3)
         val testResult4 = randomAnomalyResult(
             detectorId = detectorId, executionEndTime = testTime,
-            user = User(user.name, listOf(), user.roles, user.customAttNames),
+            user = User(user.name, listOf(), user.roles, user.customAttributes),
             anomalyGrade = 0.9
         )
         indexDoc(adResultIndex, "4", testResult4)

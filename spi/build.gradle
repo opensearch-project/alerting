@@ -13,7 +13,7 @@ apply plugin: 'java'
 apply plugin: 'opensearch.java-rest-test'
 apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'jacoco'
-apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'com.gradleup.shadow'
 apply plugin: 'opensearch.repositories'
 
 dependencies {
@@ -44,16 +44,17 @@ publishing {
         }
         maven {
             name = "Snapshots"
-            url = "https://aws.oss.sonatype.org/content/repositories/snapshots"
-            credentials {
-                username "$System.env.SONATYPE_USERNAME"
-                password "$System.env.SONATYPE_PASSWORD"
+            url = System.getenv("MAVEN_SNAPSHOTS_S3_REPO")
+            credentials(AwsCredentials) {
+                accessKey = System.getenv("AWS_ACCESS_KEY_ID")
+                secretKey = System.getenv("AWS_SECRET_ACCESS_KEY")
+                sessionToken = System.getenv("AWS_SESSION_TOKEN")
             }
         }
     }
     publications {
         shadow(MavenPublication) {
-            project.shadow.component(it)
+            from components.shadow
             groupId = 'org.opensearch.alerting'
             artifactId = 'alerting-spi'
 

@@ -17,7 +17,6 @@ import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEE
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_PERIOD
 import org.opensearch.alerting.opensearchapi.firstFailureOrNull
 import org.opensearch.alerting.opensearchapi.retry
-import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.routing.IndexShardRoutingTable
@@ -48,6 +47,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.FieldSortBuilder
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
+import org.opensearch.transport.client.Client
 import java.util.TreeMap
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -295,7 +295,7 @@ class JobSweeper(
         lastFullSweepTimeNano = System.nanoTime()
     }
 
-    private fun sweepShard(shardId: ShardId, shardNodes: ShardNodes, startAfter: String = "") {
+    private fun sweepShard(shardId: ShardId, shardNodes: ShardNodes, startAfter: Long = -1L) {
         val logger = Loggers.getLogger(javaClass, shardId)
         logger.debug("Sweeping shard $shardId")
 
@@ -308,7 +308,7 @@ class JobSweeper(
 
         // sweep the shard for new and updated jobs. Uses a search after query to paginate, assuming that any concurrent
         // updates and deletes are handled by the index operation listener.
-        var searchAfter: String? = startAfter
+        var searchAfter: Long? = startAfter
         while (searchAfter != null) {
             val boolQueryBuilder = BoolQueryBuilder()
             sweepableJobTypes.forEach { boolQueryBuilder.should(QueryBuilders.existsQuery(it)) }
@@ -318,18 +318,23 @@ class JobSweeper(
                 .source(
                     SearchSourceBuilder.searchSource()
                         .version(true)
+                        .seqNoAndPrimaryTerm(true)
                         .sort(
-                            FieldSortBuilder("_id")
-                                .unmappedType("keyword")
-                                .missing("_last")
+                            FieldSortBuilder("_seq_no")
+                                .unmappedType("long")
                         )
                         .searchAfter(arrayOf(searchAfter))
                         .size(sweepPageSize)
                         .query(boolQueryBuilder)
                 )
 
-            val response = sweepSearchBackoff.retry {
-                client.search(jobSearchRequest).actionGet(requestTimeout)
+            val response = try {
+                sweepSearchBackoff.retry {
+                    client.search(jobSearchRequest).actionGet(requestTimeout)
+                }
+            } catch (e: Exception) {
+                logger.error("Aborting sweep of shard $shardId, will retry on next sweep cycle.", e)
+                return
             }
             if (response.status() != RestStatus.OK) {
                 logger.error("Error sweeping shard $shardId.", response.firstFailureOrNull())
@@ -344,7 +349,7 @@ class JobSweeper(
                     parseAndSweepJob(xcp, shardId, hit.id, hit.version, hit.sourceRef)
                 }
             }
-            searchAfter = response.hits.lastOrNull()?.id
+            searchAfter = response.hits.lastOrNull()?.seqNo
         }
     }
 

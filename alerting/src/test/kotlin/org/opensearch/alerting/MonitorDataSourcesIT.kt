@@ -5053,6 +5053,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertNotNull(getWorkflowResponse)
         assertEquals(workflowId, getWorkflowResponse.id)
 
+        // Verify that monitor workflow metadata exists
+        assertNotNull(searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata"))
+
         deleteWorkflow(workflowId, false)
         // Verify that the workflow is deleted
         try {
@@ -5068,6 +5071,19 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         // Verify that the monitor is not deleted
         val existingDelegate = getMonitorResponse(monitorResponse.id)
         assertNotNull(existingDelegate)
+
+        // Verify that the monitor workflow metadata is deleted
+        try {
+            searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata")
+            fail("expected searchMonitorMetadata method to throw exception")
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Expected 0 hits for searchMonitorMetadata, got non-0 results.",
+                    it.contains("List is empty")
+                )
+            }
+        }
     }
 
     fun `test delete workflow delegate monitor deleted`() {
@@ -5093,6 +5109,9 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertNotNull(getWorkflowResponse)
         assertEquals(workflowId, getWorkflowResponse.id)
 
+        // Verify that monitor workflow metadata exists
+        assertNotNull(searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata"))
+
         deleteWorkflow(workflowId, true)
         // Verify that the workflow is deleted
         try {
@@ -5113,6 +5132,18 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 assertTrue(
                     "Exception not returning GetMonitor Action error ",
                     it.contains("Monitor not found")
+                )
+            }
+        }
+        // Verify that the monitor workflow metadata is deleted
+        try {
+            searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata")
+            fail("expected searchMonitorMetadata method to throw exception")
+        } catch (e: Exception) {
+            e.message?.let {
+                assertTrue(
+                    "Expected 0 hits for searchMonitorMetadata, got non-0 results.",
+                    it.contains("List is empty")
                 )
             }
         }
@@ -6232,5 +6263,303 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 IndexMetadata.SETTING_NUMBER_OF_REPLICAS
             )
         )
+    }
+
+    fun `test execute workflow when bucket monitor is used in chained finding of ignored doc monitor`() {
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeSources = listOf(
+            TermsValuesSourceBuilder("test_field_1").field("test_field_1")
+        )
+        val compositeAgg = CompositeAggregationBuilder("composite_agg", compositeSources)
+        val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        // Bucket level monitor will reduce the size of matched doc ids on those that belong
+        // to a bucket that contains more than 1 document after term grouping
+        val triggerScript = """
+            params.docCount > 1
+        """.trimIndent()
+
+        var trigger = randomBucketLevelTrigger()
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script(triggerScript),
+                parentBucketPath = "composite_agg",
+                filter = null,
+            )
+        )
+        val bucketCustomAlertsIndex = "custom_alerts_index"
+        val bucketCustomFindingsIndex = "custom_findings_index"
+        val bucketCustomFindingsIndexPattern = "custom_findings_index-1"
+
+        val bucketLevelMonitorResponse = createMonitor(
+            randomBucketLevelMonitor(
+                inputs = listOf(input),
+                enabled = false,
+                triggers = listOf(trigger),
+                dataSources = DataSources(
+                    findingsEnabled = true,
+                    alertsIndex = bucketCustomAlertsIndex,
+                    findingsIndex = bucketCustomFindingsIndex,
+                    findingsIndexPattern = bucketCustomFindingsIndexPattern
+                )
+            )
+        )!!
+
+        val docQuery1 = DocLevelQuery(query = "test_field_1:\"test_value_2\"", name = "1", fields = listOf())
+        val docQuery2 = DocLevelQuery(query = "test_field_1:\"test_value_1\"", name = "2", fields = listOf())
+        val docQuery3 = DocLevelQuery(query = "test_field_1:\"test_value_3\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery1, docQuery2, docQuery3))
+        val docTrigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val docCustomAlertsIndex = "custom_alerts_index"
+        val docCustomFindingsIndex = "custom_findings_index"
+        val docCustomFindingsIndexPattern = "custom_findings_index-1"
+        var docLevelMonitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(docTrigger),
+            dataSources = DataSources(
+                alertsIndex = docCustomAlertsIndex,
+                findingsIndex = docCustomFindingsIndex,
+                findingsIndexPattern = docCustomFindingsIndexPattern
+            ),
+            ignoreFindingsAndAlerts = true
+        )
+
+        val docLevelMonitorResponse = createMonitor(docLevelMonitor)!!
+        // 1. bucketMonitor (chainedFinding = null) 2. docMonitor (chainedFinding = bucketMonitor)
+        var workflow = randomWorkflow(
+            monitorIds = listOf(bucketLevelMonitorResponse.id, docLevelMonitorResponse.id),
+            enabled = false,
+            auditDelegateMonitorAlerts = false
+        )
+        val workflowResponse = upsertWorkflow(workflow)!!
+        val workflowById = searchWorkflow(workflowResponse.id)
+        assertNotNull(workflowById)
+
+        // Creates 5 documents
+        insertSampleTimeSerializedData(
+            index,
+            listOf(
+                "test_value_1",
+                "test_value_1", // adding duplicate to verify aggregation
+                "test_value_2",
+                "test_value_2",
+                "test_value_3"
+            )
+        )
+
+        val workflowId = workflowResponse.id
+        // 1. bucket level monitor should reduce the doc findings to 4 (1, 2, 3, 4)
+        // 2. Doc level monitor will match those 4 documents although it contains rules for matching all 5 documents (docQuery3 matches the fifth)
+        val executeWorkflowResponse = executeWorkflow(workflowById, workflowId, false)!!
+        assertNotNull(executeWorkflowResponse)
+
+        for (monitorRunResults in executeWorkflowResponse.workflowRunResult.monitorRunResults) {
+            if (bucketLevelMonitorResponse.monitor.name == monitorRunResults.monitorName) {
+                val searchResult = monitorRunResults.inputResults.results.first()
+
+                @Suppress("UNCHECKED_CAST")
+                val buckets = searchResult.stringMap("aggregations")?.stringMap("composite_agg")
+                    ?.get("buckets") as List<kotlin.collections.Map<String, Any>>
+                assertEquals("Incorrect search result", 3, buckets.size)
+
+                val getAlertsResponse = assertAlerts(bucketLevelMonitorResponse.id, bucketCustomAlertsIndex, 2, workflowId)
+                assertAcknowledges(getAlertsResponse.alerts, bucketLevelMonitorResponse.id, 2)
+                assertFindings(bucketLevelMonitorResponse.id, bucketCustomFindingsIndex, 1, 4, listOf("1", "2", "3", "4"))
+            } else {
+                assertEquals(1, monitorRunResults.inputResults.results.size)
+                val values = monitorRunResults.triggerResults.values
+                assertEquals(1, values.size)
+
+                val getAlertsResponse = assertAlerts(docLevelMonitorResponse.id, docCustomAlertsIndex, 1, workflowId)
+                assertAcknowledges(getAlertsResponse.alerts, docLevelMonitorResponse.id, 1)
+                assertFindings(docLevelMonitorResponse.id, docCustomFindingsIndex, 0, 0, listOf("1", "2", "3", "4"))
+            }
+        }
+    }
+
+    fun `test execute workflow when monitor is disabled and re-enabled`() {
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val index1 = "index_123"
+        createIndex(index1, Settings.EMPTY)
+        val q1 = DocLevelQuery(query = "properties:\"abcd\"", name = "1", fields = listOf())
+
+        val docLevelInput = DocLevelMonitorInput(
+            "description",
+            listOf(index1),
+            listOf(q1)
+        )
+
+        val customQueryIndex = "custom_alerts_index"
+
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(trigger),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex
+            )
+        )
+
+        val monitorResponse = createMonitor(monitor)!!
+
+        val workflowRequest = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id)
+        )
+        val workflowResponse = upsertWorkflow(workflowRequest)!!
+        val workflowId = workflowResponse.id
+        val getWorkflowResponse = getWorkflowById(id = workflowResponse.id)
+
+        assertNotNull(getWorkflowResponse)
+        assertEquals(workflowId, getWorkflowResponse.id)
+
+        // Verify that monitor workflow metadata exists
+        assertNotNull(searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata"))
+
+        val testDoc1 = """{
+            "properties": "abcd"
+        }"""
+        indexDoc(index1, "1", testDoc1)
+        indexDoc(index1, "2", testDoc1)
+        indexDoc(index1, "3", testDoc1)
+
+        // Run workflow
+        var executeWorkflowResponse = executeWorkflow(workflowRequest, workflowId, false)
+        Assert.assertNotNull(executeWorkflowResponse)
+        var findings = searchFindings(monitorResponse.id)
+        assertEquals(3, findings.size)
+
+        // Verify that monitor workflow metadata is updated with lastRunContext
+        var monitorWokflowMetadata = searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata")
+        val lastRunContextBeforeDisable = (monitorWokflowMetadata?.lastRunContext?.get(index1) as? Map<String, Any>)
+        assertEquals(2, lastRunContextBeforeDisable?.get("0"))
+
+        // Disable workflow
+        val disabledWorkflowRequest = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id),
+            id = workflowId,
+            enabled = false
+        )
+        upsertWorkflow(disabledWorkflowRequest, method = RestRequest.Method.PUT, id = workflowId)
+
+        // Index doc. Since workflow is disabled, monitor workflow metadata shouldn't be updated
+        indexDoc(index1, "4", testDoc1)
+
+        // re-enable workflow
+        val enabledWorkflowRequest = randomWorkflow(
+            monitorIds = listOf(monitorResponse.id),
+            id = workflowId,
+            enabled = true
+        )
+        upsertWorkflow(enabledWorkflowRequest, method = RestRequest.Method.PUT, id = workflowId)
+
+        // Assert no new findings generated after workflow is re-enabled
+        executeWorkflowResponse = executeWorkflow(workflowRequest, workflowId, false)
+        Assert.assertNotNull(executeWorkflowResponse)
+        findings = searchFindings(monitorResponse.id)
+        assertEquals(3, findings.size)
+
+        // Verify that monitor workflow metadata exists
+        // Since workflow is re-enabled, last run context should be updated with latest sequence number
+        monitorWokflowMetadata = searchMonitorMetadata("${workflowResponse.id}-metadata-${monitorResponse.id}-metadata")
+        assertNotNull(monitorWokflowMetadata)
+        val lastRunContext = (monitorWokflowMetadata?.lastRunContext?.get(index1) as? Map<String, Any>)
+        assertEquals(3, lastRunContext?.get("0"))
+    }
+
+    fun `test doc level monitor when it is disabled and re-enabled`() {
+        // Setup doc level monitor
+        val docQuery = DocLevelQuery(query = "eventType:\"login\"", name = "3", fields = listOf())
+
+        val docLevelInput = DocLevelMonitorInput(
+            "description", listOf(index), listOf(docQuery)
+        )
+        val customFindingsIndex = "custom_findings_index"
+        val customFindingsIndexPattern = "custom_findings_index-1"
+        val customQueryIndex = "custom_alerts_index"
+        var monitor = randomDocumentLevelMonitor(
+            inputs = listOf(docLevelInput),
+            triggers = listOf(),
+            dataSources = DataSources(
+                queryIndex = customQueryIndex,
+                findingsIndex = customFindingsIndex,
+                findingsIndexPattern = customFindingsIndexPattern
+            )
+        )
+        val monitorResponse = createMonitor(monitor)
+        assertFalse(monitorResponse?.id.isNullOrEmpty())
+
+        val testDoc = """{
+            "eventType" : "login"
+        }"""
+        indexDoc(index, "1", testDoc)
+
+        monitor = monitorResponse!!.monitor
+        val id = monitorResponse.id
+
+        // Execute monitor
+        var executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertNotNull(executeMonitorResponse)
+
+        // Assert findings generated and last run context in monitor metadata is updated
+        var findings = searchFindings(id, customFindingsIndex)
+        assertEquals(1, findings.size)
+
+        var monitorMetadata = searchMonitorMetadata("${monitorResponse.id}-metadata")
+        val lastRunContextBeforeDisable = (monitorMetadata?.lastRunContext?.get(index) as? Map<String, Any>)
+        assertEquals(0, lastRunContextBeforeDisable?.get("0"))
+
+        // Disable monitor
+        var updateMonitorResponse = updateMonitor(
+            monitor.copy(
+                id = monitorResponse.id,
+                dataSources = DataSources(
+                    queryIndex = customQueryIndex,
+                ),
+                enabled = false,
+                enabledTime = null
+            ),
+            monitorResponse.id
+        )
+        Assert.assertNotNull(updateMonitorResponse)
+
+        // Index doc. Since monitor is disabled, monitor workflow metadata shouldn't be updated
+        indexDoc(index, "2", testDoc)
+        indexDoc(index, "3", testDoc)
+        indexDoc(index, "4", testDoc)
+
+        executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertNotNull(executeMonitorResponse)
+
+        // Assert no new findings since monitor was disabled
+        findings = searchFindings(id, customFindingsIndex)
+        assertEquals(1, findings.size)
+
+        // re-enable monitor
+        updateMonitorResponse = updateMonitor(
+            monitor.copy(
+                id = monitorResponse.id,
+                dataSources = DataSources(
+                    queryIndex = customQueryIndex,
+                ),
+                enabled = true,
+                enabledTime = Instant.now().truncatedTo(ChronoUnit.MILLIS)
+            ),
+            monitorResponse.id
+        )
+        Assert.assertNotNull(updateMonitorResponse)
+        executeMonitorResponse = executeMonitor(monitor, id, false)
+        Assert.assertNotNull(executeMonitorResponse)
+
+        // Assert no new findings since monitor didnt run
+        findings = searchFindings(id, customFindingsIndex)
+        assertEquals(1, findings.size)
+        // Assert last run context in monitor metadata updated on enabling it, with no new findings generated
+        monitorMetadata = searchMonitorMetadata("${monitorResponse.id}-metadata")
+        val lastRunContextAfterEnable = (monitorMetadata?.lastRunContext?.get(index) as? Map<String, Any>)
+        assertEquals(3, lastRunContextAfterEnable?.get("0"))
     }
 }

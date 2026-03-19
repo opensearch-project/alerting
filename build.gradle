@@ -7,7 +7,7 @@ buildscript {
     apply from: 'build-tools/repositories.gradle'
 
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "3.0.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.5.0-SNAPSHOT")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         // 3.0.0-SNAPSHOT -> 3.0.0.0-SNAPSHOT
@@ -23,15 +23,21 @@ buildscript {
         }
         opensearch_no_snapshot = opensearch_version.replace("-SNAPSHOT","")
         common_utils_version = System.getProperty("common_utils.version", opensearch_build)
-        kotlin_version = '1.9.25'
+        kotlin_version = '2.2.0'
     }
 
     repositories {
         mavenLocal()
-        maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
+        maven {
+            url "https://ci.opensearch.org/ci/dbc/snapshots/maven/"
+            mavenContent {
+                snapshotsOnly()
+            }
+        }
         mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
     }
+
     dependencies {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlin_version}"
@@ -39,21 +45,37 @@ buildscript {
 }
 
 plugins {
-    id 'com.netflix.nebula.ospackage' version "11.5.0"
+    id 'com.netflix.nebula.ospackage' version "12.0.0"
     id "com.dorongold.task-tree" version "1.5"
+    id "de.undercouch.download" version "5.6.0"
 }
 
 apply plugin: 'base'
 apply plugin: 'jacoco'
+apply plugin: 'opensearch.java-agent'
 apply from: 'build-tools/merged-coverage.gradle'
 
+// Add explicit repository configuration for ktlint
+repositories {
+    mavenCentral()
+}
+
+// Configure ktlint with explicit repository
 configurations {
     ktlint {
-      resolutionStrategy {
-          force "ch.qos.logback:logback-classic:1.3.14"
-          force "ch.qos.logback:logback-core:1.3.14"
-      }
-   }
+        resolutionStrategy {
+            force "ch.qos.logback:logback-classic:1.5.19"
+            force "ch.qos.logback:logback-core:1.5.19"
+        }
+    }
+}
+
+// Add repository ONLY for ktlint resolution
+configurations.ktlint.incoming.beforeResolve {
+    repositories.clear()
+    repositories {
+        mavenCentral()
+    }
 }
 
 dependencies {
@@ -66,16 +88,26 @@ dependencies {
 
 task ktlint(type: JavaExec, group: "verification") {
     description = "Check Kotlin code style."
-    main = "com.pinterest.ktlint.Main"
+    mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
     args "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+    
+    // Skip on JDK 25
+    onlyIf {
+        JavaVersion.current() < JavaVersion.VERSION_25
+    }
 }
 
 task ktlintFormat(type: JavaExec, group: "formatting") {
     description = "Fix Kotlin code style deviations."
-    main = "com.pinterest.ktlint.Main"
+    mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
     args "-F", "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+    
+    // Skip on JDK 25 until ktlint fully supports it
+    onlyIf {
+        JavaVersion.current() < JavaVersion.VERSION_25
+    }
 }
 
 check.dependsOn ktlint
@@ -85,6 +117,16 @@ allprojects {
     version = "${opensearch_build}"
 
     apply from: "$rootDir/build-tools/repositories.gradle"
+
+    configurations.all {
+        resolutionStrategy {
+            force "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
+            force "org.jetbrains.kotlin:kotlin-stdlib-common:${kotlin_version}"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${kotlin_version}"
+            force "org.jetbrains.kotlin:kotlin-reflect:${kotlin_version}"
+        }
+    }
 
     tasks.withType(JavaCompile) {
         sourceCompatibility = JavaVersion.VERSION_21

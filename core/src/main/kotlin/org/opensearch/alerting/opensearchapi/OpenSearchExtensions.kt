@@ -14,7 +14,6 @@ import org.opensearch.OpenSearchException
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.search.ShardSearchFailure
-import org.opensearch.client.OpenSearchClient
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.common.xcontent.XContentHelper
@@ -31,6 +30,7 @@ import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.transport.client.OpenSearchClient
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException

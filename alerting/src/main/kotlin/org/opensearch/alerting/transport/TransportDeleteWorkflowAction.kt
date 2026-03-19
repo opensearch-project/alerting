@@ -31,7 +31,6 @@ import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_MONITOR_PATH
-import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -62,6 +61,7 @@ import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.Client
 
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 /**
@@ -137,11 +137,12 @@ class TransportDeleteWorkflowAction @Inject constructor(
                 if (canDelete) {
                     val delegateMonitorIds = (workflow.inputs[0] as CompositeInput).getMonitorIds()
                     var deletableMonitors = listOf<Monitor>()
+                    val delegateMonitors = getDeletableDelegates(workflowId, delegateMonitorIds, user)
                     // User can only delete the delegate monitors only in the case if all monitors can be deleted
                     // if there are monitors in this workflow that are referenced in other workflows, we cannot delete the monitors.
                     // We will not partially delete monitors. we delete them all or fail the request.
                     if (deleteDelegateMonitors == true) {
-                        deletableMonitors = getDeletableDelegates(workflowId, delegateMonitorIds, user)
+                        deletableMonitors = delegateMonitors
                         val monitorsDiff = delegateMonitorIds.toMutableList()
                         monitorsDiff.removeAll(deletableMonitors.map { it.id })
 
@@ -168,10 +169,11 @@ class TransportDeleteWorkflowAction @Inject constructor(
                         val failedMonitorIds = tryDeletingMonitors(deletableMonitors, RefreshPolicy.IMMEDIATE)
                         // Update delete workflow response
                         deleteWorkflowResponse.nonDeletedMonitors = failedMonitorIds
-                        // Delete monitors workflow metadata
-                        // Monitor metadata will be in workflowId-monitorId-metadata format
-                        metadataIdsToDelete.addAll(deletableMonitors.map { MonitorMetadata.getId(it, workflowMetadataId) })
                     }
+
+                    // Delete monitors workflow metadata
+                    // Monitor metadata will be in workflowId-metadata-monitorId-metadata format
+                    metadataIdsToDelete.addAll(delegateMonitors.map { MonitorMetadata.getId(it, workflowMetadataId) })
                     try {
                         // Delete the monitors workflow metadata
                         val deleteMonitorWorkflowMetadataResponse: BulkByScrollResponse = client.suspendUntil {

@@ -26,7 +26,7 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
-import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.MonitorRunnerService.monitorCtx
 import org.opensearch.alerting.WorkflowMetadataService
@@ -39,6 +39,7 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTION_THROTTLE_VALUE
+import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_TRIGGERS_PER_MONITOR
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.IndexUtils
@@ -46,7 +47,6 @@ import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isQueryLevelMonitor
 import org.opensearch.alerting.util.use
 import org.opensearch.alerting.workflow.CompositeWorkflowRunner
-import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -80,6 +80,7 @@ import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.Client
 import java.util.Locale
 import java.util.UUID
 import java.util.stream.Collectors
@@ -105,6 +106,9 @@ class TransportIndexWorkflowAction @Inject constructor(
     private var maxMonitors = ALERTING_MAX_MONITORS.get(settings)
 
     @Volatile
+    private var maxTriggersPerMonitor = MAX_TRIGGERS_PER_MONITOR.get(settings)
+
+    @Volatile
     private var requestTimeout = REQUEST_TIMEOUT.get(settings)
 
     @Volatile
@@ -121,6 +125,7 @@ class TransportIndexWorkflowAction @Inject constructor(
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_MAX_MONITORS) { maxMonitors = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_TRIGGERS_PER_MONITOR) { maxTriggersPerMonitor = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTION_THROTTLE_VALUE) { maxActionThrottle = it }
@@ -178,6 +183,17 @@ class TransportIndexWorkflowAction @Inject constructor(
 
         scope.launch {
             try {
+                val triggerCount = transformedRequest.workflow.triggers.size
+                if (triggerCount > maxTriggersPerMonitor) {
+                    actionListener.onFailure(
+                        AlertingException.wrap(
+                            IllegalArgumentException(
+                                "The current cluster settings only allow up to $maxTriggersPerMonitor triggers per monitor."
+                            )
+                        )
+                    )
+                    return@launch
+                }
                 validateMonitorAccess(
                     transformedRequest,
                     user,
@@ -223,11 +239,11 @@ class TransportIndexWorkflowAction @Inject constructor(
                 if (user == null) {
                     // Security is disabled, add empty user to Workflow. user is null for older versions.
                     request.workflow = request.workflow
-                        .copy(user = User("", listOf(), listOf(), listOf()))
+                        .copy(user = User("", listOf(), listOf(), mapOf()))
                     start()
                 } else {
                     request.workflow = request.workflow
-                        .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
+                        .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttributes))
                     start()
                 }
             }
@@ -346,7 +362,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 else request.rbacRoles
 
                 request.workflow = request.workflow.copy(
-                    user = User(user.name, rbacRoles.orEmpty().toList(), user.roles, user.customAttNames)
+                    user = User(user.name, rbacRoles.orEmpty().toList(), user.roles, user.customAttributes)
                 )
                 log.debug("Created workflow's backend roles: $rbacRoles")
             }
@@ -484,7 +500,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 if (request.rbacRoles != null) {
                     if (isAdmin(user)) {
                         request.workflow = request.workflow.copy(
-                            user = User(user.name, request.rbacRoles, user.roles, user.customAttNames)
+                            user = User(user.name, request.rbacRoles, user.roles, user.customAttributes)
                         )
                     } else {
                         // rolesToRemove: these are the backend roles to remove from the monitor
@@ -493,7 +509,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                         val updatedRbac =
                             currentWorkflow.user?.backendRoles.orEmpty() - rolesToRemove + request.rbacRoles.orEmpty()
                         request.workflow = request.workflow.copy(
-                            user = User(user.name, updatedRbac, user.roles, user.customAttNames)
+                            user = User(user.name, updatedRbac, user.roles, user.customAttributes)
                         )
                     }
                 } else {
@@ -503,7 +519,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                                 user.name,
                                 currentWorkflow.user!!.backendRoles,
                                 user.roles,
-                                user.customAttNames
+                                user.customAttributes
                             )
                         )
                 }
@@ -552,10 +568,17 @@ class TransportIndexWorkflowAction @Inject constructor(
                 val monitors = monitorCtx.workflowService!!.getMonitorsById(delegates.map { it.monitorId }, delegates.size)
 
                 for (monitor in monitors) {
+                    var isWorkflowRestarted = false
+
+                    if (request.workflow.enabled && !currentWorkflow.enabled) {
+                        isWorkflowRestarted = true
+                    }
+
                     val (monitorMetadata, created) = MonitorMetadataService.getOrCreateMetadata(
                         monitor = monitor,
                         createWithRunContext = true,
-                        workflowMetadataId = workflowMetadata.id
+                        workflowMetadataId = workflowMetadata.id,
+                        forceCreateLastRunContext = isWorkflowRestarted
                     )
 
                     if (!created &&

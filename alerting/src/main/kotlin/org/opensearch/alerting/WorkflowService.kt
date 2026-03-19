@@ -12,7 +12,6 @@ import org.opensearch.action.admin.indices.exists.indices.IndicesExistsResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.opensearchapi.suspendUntil
-import org.opensearch.client.Client
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Finding
@@ -24,6 +23,7 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.transport.client.Client
 
 private val log = LogManager.getLogger(WorkflowService::class.java)
 
@@ -41,15 +41,16 @@ class WorkflowService(
      * @param chainedMonitors Monitors that have previously executed
      * @param workflowExecutionId Execution id of the current workflow
      */
-    suspend fun getFindingDocIdsByExecutionId(chainedMonitors: List<Monitor>, workflowExecutionId: String): Map<String, List<String>> {
+    suspend fun getFindingDocIdsByExecutionId(chainedMonitors: List<Monitor>, workflowExecutionId: String):
+        Pair<Map<String, List<String>>, List<String>> {
         if (chainedMonitors.isEmpty())
-            return emptyMap()
+            return Pair(emptyMap(), listOf())
         val dataSources = chainedMonitors[0].dataSources
         try {
             val existsResponse: IndicesExistsResponse = client.admin().indices().suspendUntil {
                 exists(IndicesExistsRequest(dataSources.findingsIndex).local(true), it)
             }
-            if (existsResponse.isExists == false) return emptyMap()
+            if (existsResponse.isExists == false) return Pair(emptyMap(), listOf())
             // Search findings index to match id of monitors and workflow execution id
             val bqb = QueryBuilders.boolQuery()
                 .filter(
@@ -83,7 +84,7 @@ class WorkflowService(
             for (finding in findings) {
                 indexToRelatedDocIdsMap.getOrPut(finding.index) { mutableListOf() }.addAll(finding.relatedDocIds)
             }
-            return indexToRelatedDocIdsMap
+            return Pair(indexToRelatedDocIdsMap, findings.map { it.id })
         } catch (t: Exception) {
             log.error("Error getting finding doc ids: ${t.message}", t)
             throw AlertingException.wrap(t)

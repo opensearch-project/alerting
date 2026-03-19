@@ -14,7 +14,7 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.search.TransportSearchAction.SEARCH_CANCEL_AFTER_TIME_INTERVAL_SETTING
-import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
@@ -36,6 +36,8 @@ import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_COUNT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERT_BACKOFF_MILLIS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION
+import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION
 import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED
 import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDINGS_INDEXING_BATCH_SIZE
@@ -52,13 +54,13 @@ import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.alerting.workflow.CompositeWorkflowRunner
-import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.lifecycle.AbstractLifecycleComponent
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -66,6 +68,8 @@ import org.opensearch.commons.alerting.model.TriggerRunResult
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.WorkflowRunResult
 import org.opensearch.commons.alerting.model.action.Action
+import org.opensearch.commons.alerting.util.AlertingException
+import org.opensearch.commons.alerting.util.IndexPatternUtils
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.core.action.ActionListener
@@ -77,6 +81,7 @@ import org.opensearch.script.ScriptService
 import org.opensearch.script.TemplateScript
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.Client
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -223,6 +228,16 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         monitorCtx.percQueryMaxNumDocsInMemory = PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY.get(monitorCtx.settings)
         monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY) {
             monitorCtx.percQueryMaxNumDocsInMemory = it
+        }
+
+        monitorCtx.docLevelMonitorFanoutMaxDuration = DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION) {
+            monitorCtx.docLevelMonitorFanoutMaxDuration = it
+        }
+
+        monitorCtx.docLevelMonitorExecutionMaxDuration = DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION) {
+            monitorCtx.docLevelMonitorExecutionMaxDuration = it
         }
 
         monitorCtx.percQueryDocsSizeMemoryPercentageLimit =
@@ -441,6 +456,18 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         val executionId = "${monitor.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
 
         if (monitor.isMonitorOfStandardType()) {
+            if (
+                dryrun &&
+                monitor.inputs.isNotEmpty() &&
+                monitor.inputs[0] is DocLevelMonitorInput &&
+                (monitor.inputs[0] as DocLevelMonitorInput).indices.stream().anyMatch { IndexPatternUtils.containsPatternSyntax(it) }
+            ) {
+                throw AlertingException(
+                    "Index patterns are not supported in doc level monitors.",
+                    RestStatus.BAD_REQUEST,
+                    IllegalArgumentException("Index patterns are not supported in doc level monitors.")
+                )
+            }
             logger.info(
                 "Executing scheduled monitor - id: ${monitor.id}, type: ${monitor.monitorType}, periodStart: $periodStart, " +
                     "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"

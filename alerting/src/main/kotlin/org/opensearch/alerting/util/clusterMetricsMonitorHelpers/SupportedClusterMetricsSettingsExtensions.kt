@@ -28,12 +28,12 @@ import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.SupportedClusterMetricsSettings
 import org.opensearch.alerting.settings.SupportedClusterMetricsSettings.Companion.resolveToActionRequest
-import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.Metadata
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.support.XContentMapValues
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.core.action.ActionResponse
+import org.opensearch.transport.client.Client
 
 /**
  * Calls the appropriate transport action for the API requested in the [clusterMetricsInput].

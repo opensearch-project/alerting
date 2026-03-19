@@ -27,7 +27,6 @@ import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCancelAfterTimeInterval
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
 import org.opensearch.alerting.util.printsSampleDocData
-import org.opensearch.client.Client
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
@@ -58,7 +57,9 @@ import org.opensearch.search.aggregations.AggregatorFactories
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.sort.SortOrder
 import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.Client
 import java.time.Instant
 import java.util.UUID
 
@@ -123,7 +124,15 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             //  If a setting is imposed that limits buckets that can be processed for Bucket-Level Monitors, we'd need to iterate over
             //  the buckets until we hit that threshold. In that case, we'd want to exit the execution without creating any alerts since the
             //  buckets we iterate over before hitting the limit is not deterministic. Is there a better way to fail faster in this case?
-            withClosableContext(InjectorContextElement(monitor.id, monitorCtx.settings!!, monitorCtx.threadPool!!.threadContext, roles)) {
+            withClosableContext(
+                InjectorContextElement(
+                    monitor.id,
+                    monitorCtx.settings!!,
+                    monitorCtx.threadPool!!.threadContext,
+                    roles,
+                    monitor.user
+                )
+            ) {
                 // Storing the first page of results in the case of pagination input results to prevent empty results
                 // in the final output of monitorResult which occurs when all pages have been exhausted.
                 // If it's favorable to return the last page, will need to check how to accomplish that with multiple aggregation paths
@@ -145,7 +154,12 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             for (trigger in monitor.triggers) {
                 // The currentAlerts map is formed by iterating over the Monitor's Triggers as keys so null should not be returned here
                 val currentAlertsForTrigger = currentAlerts[trigger]!!
-                val triggerCtx = BucketLevelTriggerExecutionContext(monitor, trigger as BucketLevelTrigger, monitorResult)
+                val triggerCtx = BucketLevelTriggerExecutionContext(
+                    monitor,
+                    trigger as BucketLevelTrigger,
+                    monitorResult,
+                    clusterSettings = monitorCtx.clusterService!!.clusterSettings
+                )
                 triggerContexts[trigger.id] = triggerCtx
                 val triggerResult = monitorCtx.triggerService!!.runBucketLevelTrigger(monitor, trigger, triggerCtx)
                 triggerResults[trigger.id] = triggerResult.getCombinedTriggerRunResult(triggerResults[trigger.id])
@@ -479,7 +493,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             val queryBuilder = if (input.query.query() == null) BoolQueryBuilder()
                             else QueryBuilders.boolQuery().must(source.query())
                             queryBuilder.filter(QueryBuilders.termsQuery(fieldName, bucketValues))
-                            sr.source().query(queryBuilder)
+                            sr.source().query(queryBuilder).sort("_seq_no", SortOrder.DESC)
                         }
                     sr.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
                         getCancelAfterTimeInterval()

@@ -193,7 +193,7 @@ fun randomDocumentLevelMonitor(
     inputs: List<Input> = listOf(DocLevelMonitorInput("description", listOf("index"), emptyList())),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
     enabled: Boolean = randomBoolean(),
-    triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
+    triggers: List<Trigger> = (1..randomInt(10)).map { randomDocumentLevelTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false
@@ -211,17 +211,19 @@ fun randomDocumentLevelMonitor(
     inputs: List<Input> = listOf(DocLevelMonitorInput("description", listOf("index"), emptyList())),
     schedule: Schedule = IntervalSchedule(interval = 5, unit = ChronoUnit.MINUTES),
     enabled: Boolean = randomBoolean(),
-    triggers: List<Trigger> = (1..randomInt(10)).map { randomQueryLevelTrigger() },
+    triggers: List<Trigger> = (1..randomInt(10)).map { randomDocumentLevelTrigger() },
     enabledTime: Instant? = if (enabled) Instant.now().truncatedTo(ChronoUnit.MILLIS) else null,
     lastUpdateTime: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
     withMetadata: Boolean = false,
     dataSources: DataSources,
+    ignoreFindingsAndAlerts: Boolean? = false,
     owner: String? = null
 ): Monitor {
     return Monitor(
         name = name, monitorType = Monitor.MonitorType.DOC_LEVEL_MONITOR.value, enabled = enabled, inputs = inputs,
         schedule = schedule, triggers = triggers, enabledTime = enabledTime, lastUpdateTime = lastUpdateTime, user = user,
-        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf(), dataSources = dataSources, owner = owner
+        uiMetadata = if (withMetadata) mapOf("foo" to "bar") else mapOf(), dataSources = dataSources,
+        shouldCreateSingleAlertForFindings = ignoreFindingsAndAlerts, owner = owner
     )
 }
 
@@ -533,7 +535,7 @@ fun randomActionExecutionResult(
     throttledCount: Int = randomInt()
 ) = ActionExecutionResult(actionId, lastExecutionTime, throttledCount)
 
-fun randomQueryLevelMonitorRunResult(): MonitorRunResult<QueryLevelTriggerRunResult> {
+fun randomQueryLevelMonitorRunResult(results: List<Map<String, Any>> = listOf()): MonitorRunResult<QueryLevelTriggerRunResult> {
     val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
     val triggerRunResult = randomQueryLevelTriggerRunResult()
     triggerResults.plus(Pair("test", triggerRunResult))
@@ -543,12 +545,12 @@ fun randomQueryLevelMonitorRunResult(): MonitorRunResult<QueryLevelTriggerRunRes
         Instant.now(),
         Instant.now(),
         null,
-        randomInputRunResults(),
+        randomInputRunResults(results),
         triggerResults
     )
 }
 
-fun randomBucketLevelMonitorRunResult(): MonitorRunResult<BucketLevelTriggerRunResult> {
+fun randomBucketLevelMonitorRunResult(results: List<Map<String, Any>> = listOf()): MonitorRunResult<BucketLevelTriggerRunResult> {
     val triggerResults = mutableMapOf<String, BucketLevelTriggerRunResult>()
     val triggerRunResult = randomBucketLevelTriggerRunResult()
     triggerResults.plus(Pair("test", triggerRunResult))
@@ -558,12 +560,12 @@ fun randomBucketLevelMonitorRunResult(): MonitorRunResult<BucketLevelTriggerRunR
         Instant.now(),
         Instant.now(),
         null,
-        randomInputRunResults(),
+        randomInputRunResults(results),
         triggerResults
     )
 }
 
-fun randomDocumentLevelMonitorRunResult(): MonitorRunResult<DocumentLevelTriggerRunResult> {
+fun randomDocumentLevelMonitorRunResult(results: List<Map<String, Any>> = listOf()): MonitorRunResult<DocumentLevelTriggerRunResult> {
     val triggerResults = mutableMapOf<String, DocumentLevelTriggerRunResult>()
     val triggerRunResult = randomDocumentLevelTriggerRunResult()
     triggerResults.plus(Pair("test", triggerRunResult))
@@ -573,13 +575,13 @@ fun randomDocumentLevelMonitorRunResult(): MonitorRunResult<DocumentLevelTrigger
         Instant.now(),
         Instant.now(),
         null,
-        randomInputRunResults(),
+        randomInputRunResults(results),
         triggerResults
     )
 }
 
-fun randomInputRunResults(): InputRunResults {
-    return InputRunResults(listOf(), null)
+fun randomInputRunResults(results: List<Map<String, Any>> = listOf()): InputRunResults {
+    return InputRunResults(results, null)
 }
 
 fun randomQueryLevelTriggerRunResult(): QueryLevelTriggerRunResult {
@@ -654,20 +656,20 @@ fun Alert.toJsonString(): String {
     return this.toXContent(builder, ToXContent.EMPTY_PARAMS).string()
 }
 
-fun randomUser(): User {
+fun randomUser(roles: List<String> = listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE)): User {
     return User(
         OpenSearchRestTestCase.randomAlphaOfLength(10),
         listOf(
             OpenSearchRestTestCase.randomAlphaOfLength(10),
             OpenSearchRestTestCase.randomAlphaOfLength(10)
         ),
-        listOf(OpenSearchRestTestCase.randomAlphaOfLength(10), ALL_ACCESS_ROLE),
-        listOf("test_attr=test")
+        roles,
+        mapOf("test_attr" to "test"),
     )
 }
 
 fun randomUserEmpty(): User {
-    return User("", listOf(), listOf(), listOf())
+    return User("", listOf(), listOf(), mapOf())
 }
 
 fun EmailAccount.toJsonString(): String {
