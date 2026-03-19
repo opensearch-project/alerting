@@ -311,5 +311,11 @@ class AlertingSettings {
             Setting.Property.NodeScope,
             Setting.Property.Dynamic
         )
+
+        val WORKSPACE_ISOLATION_ENABLED = Setting.boolSetting(
+            "plugins.alerting.workspace_isolation_enabled",
+            false,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }
