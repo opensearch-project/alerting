@@ -237,7 +237,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 // This is all information we need to update this node
                 val (oldName, newName, props) = processLeafFn(it.key, fullPath, it.value as MutableMap<String, Any>)
                 newNodes.add(Triple(oldName, newName, props))
-            } else {
+            } else if (nodeProps.containsKey(PROPERTIES) && nodeProps[PROPERTIES] != null) {
                 // Internal(non-leaf) node - visit children
                 traverseMappingsAndUpdate(nodeProps[PROPERTIES] as MutableMap<String, Any>, fullPath, processLeafFn, flattenPaths)
             }

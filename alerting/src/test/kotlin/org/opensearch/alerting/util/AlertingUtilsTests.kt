@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.util
 
+import org.mockito.Mockito.mock
 import org.opensearch.alerting.AlertService
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.model.AlertContext
@@ -16,9 +17,10 @@ import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomTemplateScript
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
+import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.test.OpenSearchTestCase
-
+import org.opensearch.transport.client.Client
 class AlertingUtilsTests : OpenSearchTestCase() {
     fun `test parseSampleDocTags only returns expected tags`() {
         val expectedDocSourceTags = (0..3).map { "field$it" }
@@ -209,5 +211,49 @@ class AlertingUtilsTests : OpenSearchTestCase() {
         } finally {
             MonitorRunnerService.monitorCtx.cancelAfterTimeInterval = original
         }
+    }
+
+    fun `test traverseMappingsAndUpdate with nested field type without properties succeeds`() {
+        // Verifies fix for https://github.com/opensearch-project/security-analytics/issues/1472
+        val docLevelMonitorQueries = DocLevelMonitorQueries(mock(Client::class.java), mock(ClusterService::class.java))
+        val mappings = mutableMapOf<String, Any>(
+            "message" to mutableMapOf<String, Any>("type" to "text"),
+            "http_request_headers" to mutableMapOf<String, Any>("type" to "nested")
+        )
+        val flattenPaths = mutableMapOf<String, MutableMap<String, Any>>()
+        val leafProcessor =
+            fun(fieldName: String, _: String, props: MutableMap<String, Any>):
+                Triple<String, String, MutableMap<String, Any>> {
+                return Triple(fieldName, fieldName, props)
+            }
+
+        docLevelMonitorQueries.traverseMappingsAndUpdate(mappings, "", leafProcessor, flattenPaths)
+
+        assertTrue("Expected 'message' in flatten paths", flattenPaths.containsKey("message"))
+        assertFalse("Expected nested field to be skipped", flattenPaths.containsKey("http_request_headers"))
+    }
+
+    fun `test traverseMappingsAndUpdate with nested field type with properties works`() {
+        val docLevelMonitorQueries = DocLevelMonitorQueries(mock(Client::class.java), mock(ClusterService::class.java))
+        val mappings = mutableMapOf<String, Any>(
+            "message" to mutableMapOf<String, Any>("type" to "text"),
+            "dll" to mutableMapOf<String, Any>(
+                "type" to "nested",
+                "properties" to mutableMapOf<String, Any>(
+                    "name" to mutableMapOf<String, Any>("type" to "keyword")
+                )
+            )
+        )
+        val flattenPaths = mutableMapOf<String, MutableMap<String, Any>>()
+        val leafProcessor =
+            fun(fieldName: String, _: String, props: MutableMap<String, Any>):
+                Triple<String, String, MutableMap<String, Any>> {
+                return Triple(fieldName, fieldName, props)
+            }
+
+        docLevelMonitorQueries.traverseMappingsAndUpdate(mappings, "", leafProcessor, flattenPaths)
+
+        assertTrue("Expected 'message' in flatten paths", flattenPaths.containsKey("message"))
+        assertTrue("Expected 'dll.name' in flatten paths", flattenPaths.containsKey("dll.name"))
     }
 }
