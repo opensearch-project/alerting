@@ -43,6 +43,7 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.RemoteTransportException
@@ -59,6 +60,7 @@ class TransportGetMonitorAction @Inject constructor(
     val xContentRegistry: NamedXContentRegistry,
     val clusterService: ClusterService,
     settings: Settings,
+    val sdkClient: SdkClient,
 ) : HandledTransportAction<ActionRequest, GetMonitorResponse>(
     AlertingActions.GET_MONITOR_ACTION_NAME,
     transportService,

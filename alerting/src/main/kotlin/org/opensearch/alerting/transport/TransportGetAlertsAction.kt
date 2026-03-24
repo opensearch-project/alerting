@@ -44,6 +44,7 @@ import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortBuilders
 import org.opensearch.search.sort.SortOrder
@@ -62,7 +63,8 @@ class TransportGetAlertsAction @Inject constructor(
     actionFilters: ActionFilters,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
-    val namedWriteableRegistry: NamedWriteableRegistry
+    val namedWriteableRegistry: NamedWriteableRegistry,
+    val sdkClient: SdkClient
 ) : HandledTransportAction<ActionRequest, GetAlertsResponse>(
     AlertingActions.GET_ALERTS_ACTION_NAME,
     transportService,

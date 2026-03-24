@@ -36,6 +36,7 @@ import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.ExistsQueryBuilder
 import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.search.SearchHits
 import org.opensearch.search.aggregations.InternalAggregations
 import org.opensearch.search.internal.InternalSearchResponse
@@ -55,7 +56,8 @@ class TransportSearchMonitorAction @Inject constructor(
     val client: Client,
     clusterService: ClusterService,
     actionFilters: ActionFilters,
-    val namedWriteableRegistry: NamedWriteableRegistry
+    val namedWriteableRegistry: NamedWriteableRegistry,
+    val sdkClient: SdkClient
 ) : HandledTransportAction<ActionRequest, SearchResponse>(
     AlertingActions.SEARCH_MONITORS_ACTION_NAME, transportService, actionFilters, ::SearchMonitorRequest
 ),
