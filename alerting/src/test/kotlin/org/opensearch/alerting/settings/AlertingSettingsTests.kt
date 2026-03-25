@@ -85,12 +85,7 @@ class AlertingSettingsTests : OpenSearchTestCase() {
                     ScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
                     ScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
                     ScheduledJobSettings.SWEEPER_ENABLED,
-                    ScheduledJobSettings.REQUEST_TIMEOUT,
-                    AlertingSettings.MULTI_TENANCY_ENABLED,
-                    AlertingSettings.REMOTE_METADATA_STORE_TYPE,
-                    AlertingSettings.REMOTE_METADATA_ENDPOINT,
-                    AlertingSettings.REMOTE_METADATA_REGION,
-                    AlertingSettings.REMOTE_METADATA_SERVICE_NAME
+                    ScheduledJobSettings.REQUEST_TIMEOUT
                 )
             )
         )
@@ -190,20 +185,5 @@ class AlertingSettingsTests : OpenSearchTestCase() {
                 LegacyOpenDistroScheduledJobSettings.SWEEP_PERIOD
             )
         )
-    }
-
-    fun `test remote metadata settings defaults`() {
-        assertEquals(false, AlertingSettings.MULTI_TENANCY_ENABLED.getDefault(Settings.EMPTY))
-        assertEquals("", AlertingSettings.REMOTE_METADATA_STORE_TYPE.getDefault(Settings.EMPTY))
-        assertEquals("", AlertingSettings.REMOTE_METADATA_ENDPOINT.getDefault(Settings.EMPTY))
-        assertEquals("", AlertingSettings.REMOTE_METADATA_REGION.getDefault(Settings.EMPTY))
-        assertEquals("", AlertingSettings.REMOTE_METADATA_SERVICE_NAME.getDefault(Settings.EMPTY))
-    }
-
-    fun `test multi_tenancy_enabled setting reads from config`() {
-        val settings = Settings.builder()
-            .put("plugins.alerting.multi_tenancy_enabled", true)
-            .build()
-        assertEquals(true, AlertingSettings.MULTI_TENANCY_ENABLED.get(settings))
     }
 }

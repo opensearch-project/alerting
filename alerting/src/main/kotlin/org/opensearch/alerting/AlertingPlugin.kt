@@ -55,11 +55,6 @@ import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE
-import org.opensearch.alerting.settings.AlertingSettings.Companion.MULTI_TENANCY_ENABLED
-import org.opensearch.alerting.settings.AlertingSettings.Companion.REMOTE_METADATA_ENDPOINT
-import org.opensearch.alerting.settings.AlertingSettings.Companion.REMOTE_METADATA_REGION
-import org.opensearch.alerting.settings.AlertingSettings.Companion.REMOTE_METADATA_SERVICE_NAME
-import org.opensearch.alerting.settings.AlertingSettings.Companion.REMOTE_METADATA_STORE_TYPE
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroAlertingSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
@@ -134,13 +129,6 @@ import org.opensearch.plugins.ReloadablePlugin
 import org.opensearch.plugins.ScriptPlugin
 import org.opensearch.plugins.SearchPlugin
 import org.opensearch.plugins.SystemIndexPlugin
-import org.opensearch.remote.metadata.client.SdkClient
-import org.opensearch.remote.metadata.client.impl.SdkClientFactory
-import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_ENDPOINT_KEY
-import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_REGION_KEY
-import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_SERVICE_NAME_KEY
-import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_TYPE_KEY
-import org.opensearch.remote.metadata.common.CommonValue.TENANT_AWARE_KEY
 import org.opensearch.repositories.RepositoriesService
 import org.opensearch.rest.RestController
 import org.opensearch.rest.RestHandler
@@ -337,19 +325,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         this.threadPool = threadPool
         this.clusterService = clusterService
 
-        val sdkClient: SdkClient = SdkClientFactory.createSdkClient(
-            client,
-            xContentRegistry,
-            mapOf(
-                REMOTE_METADATA_TYPE_KEY to REMOTE_METADATA_STORE_TYPE.get(settings),
-                REMOTE_METADATA_ENDPOINT_KEY to REMOTE_METADATA_ENDPOINT.get(settings),
-                REMOTE_METADATA_REGION_KEY to REMOTE_METADATA_REGION.get(settings),
-                REMOTE_METADATA_SERVICE_NAME_KEY to REMOTE_METADATA_SERVICE_NAME.get(settings),
-                TENANT_AWARE_KEY to MULTI_TENANCY_ENABLED.get(settings).toString()
-            ),
-            client.threadPool().executor(ThreadPool.Names.GENERIC)
-        )
-
         MonitorMetadataService.initialize(
             client,
             clusterService,
@@ -376,8 +351,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             destinationMigrationCoordinator,
             lockService,
             alertService,
-            triggerService,
-            sdkClient
+            triggerService
         )
     }
 
@@ -459,12 +433,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.COMMENTS_MAX_CONTENT_SIZE,
             AlertingSettings.MAX_COMMENTS_PER_ALERT,
             AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION,
-            AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES,
-            AlertingSettings.MULTI_TENANCY_ENABLED,
-            AlertingSettings.REMOTE_METADATA_STORE_TYPE,
-            AlertingSettings.REMOTE_METADATA_ENDPOINT,
-            AlertingSettings.REMOTE_METADATA_REGION,
-            AlertingSettings.REMOTE_METADATA_SERVICE_NAME
+            AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES
         )
     }
 
