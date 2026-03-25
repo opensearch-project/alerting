@@ -38,7 +38,6 @@ import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -53,8 +52,7 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
     actionFilters: ActionFilters,
     val clusterService: ClusterService,
     settings: Settings,
-    val xContentRegistry: NamedXContentRegistry,
-    val sdkClient: SdkClient
+    val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<ActionRequest, DeleteCommentResponse>(
     AlertingActions.DELETE_COMMENT_ACTION_NAME, transportService, actionFilters, ::DeleteCommentRequest
 ),

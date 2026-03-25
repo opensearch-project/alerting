@@ -40,7 +40,6 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortBuilders
 import org.opensearch.search.sort.SortOrder
@@ -59,7 +58,6 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
     actionFilters: ActionFilters,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
-    val sdkClient: SdkClient,
 ) : HandledTransportAction<ActionRequest, GetWorkflowAlertsResponse>(
     AlertingActions.GET_WORKFLOW_ALERTS_ACTION_NAME,
     transportService,

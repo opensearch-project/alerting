@@ -39,7 +39,6 @@ import org.opensearch.commons.authuser.User
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
-import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
@@ -57,8 +56,7 @@ class TransportExecuteMonitorAction @Inject constructor(
     actionFilters: ActionFilters,
     val xContentRegistry: NamedXContentRegistry,
     private val docLevelMonitorQueries: DocLevelMonitorQueries,
-    private val settings: Settings,
-    private val sdkClient: SdkClient
+    private val settings: Settings
 ) : HandledTransportAction<ExecuteMonitorRequest, ExecuteMonitorResponse> (
     ExecuteMonitorAction.NAME, transportService, actionFilters, ::ExecuteMonitorRequest
 ) {

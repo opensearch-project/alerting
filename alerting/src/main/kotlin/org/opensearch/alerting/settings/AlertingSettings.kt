@@ -8,10 +8,6 @@ package org.opensearch.alerting.settings
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.unit.TimeValue
-import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_ENDPOINT_KEY
-import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_REGION_KEY
-import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_SERVICE_NAME_KEY
-import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_TYPE_KEY
 import java.util.concurrent.TimeUnit
 import java.util.function.Function
 
@@ -23,7 +19,6 @@ class AlertingSettings {
     companion object {
         const val DEFAULT_MAX_ACTIONABLE_ALERT_COUNT = 50L
         const val DEFAULT_FINDINGS_INDEXING_BATCH_SIZE = 1000
-        private const val REMOTE_METADATA_KEY_PREFIX = "plugins.alerting"
         const val DEFAULT_PERCOLATE_QUERY_NUM_DOCS_IN_MEMORY = 50000
         const val DEFAULT_PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT = 10
         const val DEFAULT_DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE = 10000
@@ -315,37 +310,6 @@ class AlertingSettings {
             Function.identity(),
             Setting.Property.NodeScope,
             Setting.Property.Dynamic
-        )
-
-        val MULTI_TENANCY_ENABLED: Setting<Boolean> = Setting.boolSetting(
-            "$REMOTE_METADATA_KEY_PREFIX.multi_tenancy_enabled",
-            false,
-            Setting.Property.NodeScope,
-            Setting.Property.Final
-        )
-
-        val REMOTE_METADATA_STORE_TYPE: Setting<String?> = Setting.simpleString(
-            "$REMOTE_METADATA_KEY_PREFIX.$REMOTE_METADATA_TYPE_KEY",
-            Setting.Property.NodeScope,
-            Setting.Property.Final
-        )
-
-        val REMOTE_METADATA_ENDPOINT: Setting<String?> = Setting.simpleString(
-            "$REMOTE_METADATA_KEY_PREFIX.$REMOTE_METADATA_ENDPOINT_KEY",
-            Setting.Property.NodeScope,
-            Setting.Property.Final
-        )
-
-        val REMOTE_METADATA_REGION: Setting<String?> = Setting.simpleString(
-            "$REMOTE_METADATA_KEY_PREFIX.$REMOTE_METADATA_REGION_KEY",
-            Setting.Property.NodeScope,
-            Setting.Property.Final
-        )
-
-        val REMOTE_METADATA_SERVICE_NAME: Setting<String?> = Setting.simpleString(
-            "$REMOTE_METADATA_KEY_PREFIX.$REMOTE_METADATA_SERVICE_NAME_KEY",
-            Setting.Property.NodeScope,
-            Setting.Property.Final
         )
     }
 }
