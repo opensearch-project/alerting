@@ -36,7 +36,6 @@ import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
-import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
@@ -50,8 +49,7 @@ class TransportDeleteMonitorAction @Inject constructor(
     actionFilters: ActionFilters,
     val clusterService: ClusterService,
     settings: Settings,
-    val xContentRegistry: NamedXContentRegistry,
-    val sdkClient: SdkClient
+    val xContentRegistry: NamedXContentRegistry
 ) : HandledTransportAction<ActionRequest, DeleteMonitorResponse>(
     AlertingActions.DELETE_MONITOR_ACTION_NAME, transportService, actionFilters, ::DeleteMonitorRequest
 ),

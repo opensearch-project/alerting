@@ -31,18 +31,17 @@ class MonitorTests : OpenSearchTestCase() {
     }
 
     fun `test max triggers`() {
-        // Monitor no longer validates trigger count at construction time.
-        // Trigger count validation is now handled at the transport action level
-        // via the configurable MAX_TRIGGERS_PER_MONITOR setting.
         val monitor = randomQueryLevelMonitor()
 
-        val manyTriggers = mutableListOf<Trigger>()
+        val tooManyTriggers = mutableListOf<Trigger>()
         for (i in 0..10) {
-            manyTriggers.add(randomQueryLevelTrigger())
+            tooManyTriggers.add(randomQueryLevelTrigger())
         }
 
-        // Should not throw — validation moved to transport layer
-        val monitorWithManyTriggers = monitor.copy(triggers = manyTriggers)
-        assertEquals(11, monitorWithManyTriggers.triggers.size)
+        try {
+            monitor.copy(triggers = tooManyTriggers)
+            fail("Monitor with too many triggers should be rejected.")
+        } catch (e: IllegalArgumentException) {
+        }
     }
 }

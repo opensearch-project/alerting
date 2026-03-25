@@ -40,7 +40,6 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -56,8 +55,7 @@ class TransportSearchAlertingCommentAction @Inject constructor(
     val client: Client,
     clusterService: ClusterService,
     actionFilters: ActionFilters,
-    val namedWriteableRegistry: NamedWriteableRegistry,
-    val sdkClient: SdkClient
+    val namedWriteableRegistry: NamedWriteableRegistry
 ) : HandledTransportAction<ActionRequest, SearchResponse>(
     AlertingActions.SEARCH_COMMENTS_ACTION_NAME, transportService, actionFilters, ::SearchRequest
 ),
