@@ -79,6 +79,7 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
 import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
+import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
@@ -101,6 +102,7 @@ class TransportIndexMonitorAction @Inject constructor(
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
     val namedWriteableRegistry: NamedWriteableRegistry,
+    val sdkClient: SdkClient,
 ) : HandledTransportAction<ActionRequest, IndexMonitorResponse>(
     AlertingActions.INDEX_MONITOR_ACTION_NAME, transportService, actionFilters, ::IndexMonitorRequest
 ),

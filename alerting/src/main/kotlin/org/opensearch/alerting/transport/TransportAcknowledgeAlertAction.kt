@@ -45,6 +45,7 @@ import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.fetch.subphase.FetchSourceContext
@@ -64,7 +65,8 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     actionFilters: ActionFilters,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
-    val transportGetMonitorAction: TransportGetMonitorAction
+    val transportGetMonitorAction: TransportGetMonitorAction,
+    val sdkClient: SdkClient
 ) : HandledTransportAction<ActionRequest, AcknowledgeAlertResponse>(
     AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_NAME, transportService, actionFilters, ::AcknowledgeAlertRequest
 ) {

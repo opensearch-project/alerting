@@ -33,6 +33,7 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.search.sort.SortBuilders
@@ -50,7 +51,8 @@ class TransportGetDestinationsAction @Inject constructor(
     clusterService: ClusterService,
     actionFilters: ActionFilters,
     val settings: Settings,
-    val xContentRegistry: NamedXContentRegistry
+    val xContentRegistry: NamedXContentRegistry,
+    val sdkClient: SdkClient
 ) : HandledTransportAction<GetDestinationsRequest, GetDestinationsResponse> (
     GetDestinationsAction.NAME, transportService, actionFilters, ::GetDestinationsRequest
 ),

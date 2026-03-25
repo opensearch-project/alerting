@@ -50,6 +50,7 @@ import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
@@ -72,6 +73,7 @@ constructor(
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
     val namedWriteableRegistry: NamedWriteableRegistry,
+    val sdkClient: SdkClient,
 ) : HandledTransportAction<ActionRequest, IndexCommentResponse>(
     AlertingActions.INDEX_COMMENT_ACTION_NAME,
     transportService,
