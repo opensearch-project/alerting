@@ -168,6 +168,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     companion object {
         @JvmField val OPEN_SEARCH_DASHBOARDS_USER_AGENT = "OpenSearch-Dashboards"
         @JvmField val UI_METADATA_EXCLUDE = arrayOf("monitor.${Monitor.UI_METADATA_FIELD}")
+        @JvmField val TENANT_ID_HEADER = "x-tenant-id"
         @JvmField val MONITOR_BASE_URI = "/_plugins/_alerting/monitors"
         @JvmField val WORKFLOW_BASE_URI = "/_plugins/_alerting/workflows"
         @JvmField val REMOTE_BASE_URI = "/_plugins/_alerting/remote"
