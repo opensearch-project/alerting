@@ -6,10 +6,9 @@
 package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.action.search.SearchRequest
-import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.GetDestinationsResponse
@@ -34,6 +33,8 @@ import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
+import org.opensearch.remote.metadata.common.SdkClientUtils
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.search.sort.SortBuilders
@@ -42,7 +43,6 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.io.IOException
-
 private val log = LogManager.getLogger(TransportGetDestinationsAction::class.java)
 
 class TransportGetDestinationsAction @Inject constructor(
@@ -136,34 +136,42 @@ class TransportGetDestinationsAction @Inject constructor(
     }
 
     fun search(searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetDestinationsResponse>) {
-        val searchRequest = SearchRequest()
-            .source(searchSourceBuilder)
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        val sdkSearchRequest = SearchDataObjectRequest.builder()
             .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
-        client.search(
-            searchRequest,
-            object : ActionListener<SearchResponse> {
-                override fun onResponse(response: SearchResponse) {
-                    val totalDestinationCount = response.hits.totalHits?.value?.toInt()
-                    val destinations = mutableListOf<Destination>()
-                    for (hit in response.hits) {
-                        val id = hit.id
-                        val version = hit.version
-                        val seqNo = hit.seqNo.toInt()
-                        val primaryTerm = hit.primaryTerm.toInt()
-                        val xcp = XContentType.JSON.xContent()
-                            .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
-                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
-                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                        destinations.add(Destination.parse(xcp, id, version, seqNo, primaryTerm))
-                    }
-                    actionListener.onResponse(GetDestinationsResponse(RestStatus.OK, totalDestinationCount, destinations))
-                }
+            .tenantId(tenantId)
+            .searchSourceBuilder(searchSourceBuilder)
+            .build()
 
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
+        sdkClient.searchDataObjectAsync(sdkSearchRequest).whenComplete { response, throwable ->
+            if (throwable != null) {
+                actionListener.onFailure(AlertingException.wrap(SdkClientUtils.unwrapAndConvertToException(throwable)))
+                return@whenComplete
             }
-        )
+            try {
+                val searchResponse = response.searchResponse()
+                if (searchResponse == null) {
+                    actionListener.onResponse(GetDestinationsResponse(RestStatus.OK, 0, emptyList()))
+                    return@whenComplete
+                }
+                val totalDestinationCount = searchResponse.hits.totalHits?.value?.toInt()
+                val destinations = mutableListOf<Destination>()
+                for (hit in searchResponse.hits) {
+                    val id = hit.id
+                    val version = hit.version
+                    val seqNo = hit.seqNo.toInt()
+                    val primaryTerm = hit.primaryTerm.toInt()
+                    val xcp = XContentType.JSON.xContent()
+                        .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
+                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                    destinations.add(Destination.parse(xcp, id, version, seqNo, primaryTerm))
+                }
+                actionListener.onResponse(GetDestinationsResponse(RestStatus.OK, totalDestinationCount, destinations))
+            } catch (e: Exception) {
+                actionListener.onFailure(AlertingException.wrap(e))
+            }
+        }
     }
 }
