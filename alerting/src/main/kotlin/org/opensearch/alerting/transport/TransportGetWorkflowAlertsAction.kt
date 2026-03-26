@@ -14,9 +14,9 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.addFilter
-import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
@@ -41,6 +41,7 @@ import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortBuilders
 import org.opensearch.search.sort.SortOrder
@@ -207,17 +208,20 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
         actionListener: ActionListener<GetWorkflowAlertsResponse>,
     ) {
         try {
-            val searchRequest = SearchRequest()
+            val searchRequest = SearchDataObjectRequest.builder()
                 .indices(alertIndex)
-                .source(searchSourceBuilder)
+                .tenantId(client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER))
+                .searchSourceBuilder(searchSourceBuilder)
+                .build()
             val alerts = mutableListOf<Alert>()
             val associatedAlerts = mutableListOf<Alert>()
 
-            val response: SearchResponse = client.suspendUntil { search(searchRequest, it) }
-            val totalAlertCount = response.hits.totalHits?.value?.toInt()
-            alerts.addAll(
-                parseAlertsFromSearchResponse(response)
-            )
+            val sdkResponse = sdkClient.searchDataObject(searchRequest)
+            val response = sdkResponse.searchResponse()
+            val totalAlertCount = response?.hits?.totalHits?.value?.toInt()
+            if (response != null) {
+                alerts.addAll(parseAlertsFromSearchResponse(response))
+            }
             if (alerts.isNotEmpty() && getWorkflowAlertsRequest.getAssociatedAlerts == true)
                 getAssociatedAlerts(
                     associatedAlerts,
@@ -256,8 +260,16 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
             queryBuilder.must(QueryBuilders.termsQuery("_id", associatedAlertIds))
             queryBuilder.must(QueryBuilders.termQuery(Alert.STATE_FIELD, Alert.State.AUDIT.name))
             searchRequest.source().query(queryBuilder)
-            val response: SearchResponse = client.suspendUntil { search(searchRequest, it) }
-            associatedAlerts.addAll(parseAlertsFromSearchResponse(response))
+            val sdkSearchRequest = SearchDataObjectRequest.builder()
+                .indices(*searchRequest.indices())
+                .tenantId(client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER))
+                .searchSourceBuilder(searchRequest.source())
+                .build()
+            val sdkResponse = sdkClient.searchDataObject(sdkSearchRequest)
+            val response = sdkResponse.searchResponse()
+            if (response != null) {
+                associatedAlerts.addAll(parseAlertsFromSearchResponse(response))
+            }
         } catch (e: Exception) {
             log.error("Failed to get associated alerts in get workflow alerts action", e)
         }
