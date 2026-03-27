@@ -10,7 +10,6 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.util.context
-import org.opensearch.client.node.NodeClient
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
@@ -20,6 +19,7 @@ import org.opensearch.rest.RestRequest
 import org.opensearch.rest.action.RestActions
 import org.opensearch.rest.action.RestToXContentListener
 import org.opensearch.search.fetch.subphase.FetchSourceContext
+import org.opensearch.transport.client.node.NodeClient
 
 /**
  * This class consists of the REST handler to retrieve destinations .

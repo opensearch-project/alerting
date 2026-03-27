@@ -28,7 +28,6 @@ import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.IndexUtils
-import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
@@ -49,6 +48,7 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.transport.RemoteTransportException
+import org.opensearch.transport.client.Client
 
 private val log = LogManager.getLogger(MonitorMetadataService::class.java)
 

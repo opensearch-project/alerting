@@ -10,7 +10,6 @@ import org.opensearch.alerting.monitor.inputs.SampleRemoteDocLevelMonitorInput;
 import org.opensearch.alerting.monitor.inputs.SampleRemoteMonitorInput1;
 import org.opensearch.alerting.monitor.inputs.SampleRemoteMonitorInput2;
 import org.opensearch.alerting.monitor.triggers.SampleRemoteMonitorTrigger1;
-import org.opensearch.client.node.NodeClient;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.common.xcontent.json.JsonXContent;
 import org.opensearch.commons.alerting.action.AlertingActions;
@@ -37,6 +36,7 @@ import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.RestResponse;
 import org.opensearch.script.Script;
 import org.opensearch.script.ScriptType;
+import org.opensearch.transport.client.node.NodeClient;
 
 import java.io.IOException;
 import java.time.Instant;

@@ -19,7 +19,6 @@ import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.ScheduledJobUtils
-import org.opensearch.client.Client
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
@@ -38,6 +37,7 @@ import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.VersionType
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.transport.client.Client
 
 private val log = LogManager.getLogger(AlertMover::class.java)
 

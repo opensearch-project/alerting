@@ -28,7 +28,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
-import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -37,6 +37,7 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTION_THROTTLE_VALUE
+import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_TRIGGERS_PER_MONITOR
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.DocLevelMonitorQueries
@@ -45,7 +46,6 @@ import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.use
-import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -83,6 +83,7 @@ import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.Client
 import java.io.IOException
 import java.time.Duration
 import java.util.Locale
@@ -106,6 +107,7 @@ class TransportIndexMonitorAction @Inject constructor(
     SecureTransportAction {
 
     @Volatile private var maxMonitors = ALERTING_MAX_MONITORS.get(settings)
+    @Volatile private var maxTriggersPerMonitor = MAX_TRIGGERS_PER_MONITOR.get(settings)
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
     @Volatile private var maxActionThrottle = MAX_ACTION_THROTTLE_VALUE.get(settings)
@@ -114,6 +116,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_MAX_MONITORS) { maxMonitors = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_TRIGGERS_PER_MONITOR) { maxTriggersPerMonitor = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTION_THROTTLE_VALUE) { maxActionThrottle = it }
@@ -267,11 +270,11 @@ class TransportIndexMonitorAction @Inject constructor(
             if (user == null) {
                 // Security is disabled, add empty user to Monitor. user is null for older versions.
                 request.monitor = request.monitor
-                    .copy(user = User("", listOf(), listOf(), listOf()))
+                    .copy(user = User("", listOf(), listOf(), mapOf()))
                 start()
             } else {
                 request.monitor = request.monitor
-                    .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
+                    .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttributes))
                 start()
             }
         }
@@ -280,12 +283,12 @@ class TransportIndexMonitorAction @Inject constructor(
             if (user == null) {
                 // Security is disabled, add empty user to Monitor. user is null for older versions.
                 request.monitor = request.monitor
-                    .copy(user = User("", listOf(), listOf(), listOf()))
+                    .copy(user = User("", listOf(), listOf(), mapOf()))
                 start()
             } else {
                 try {
                     request.monitor = request.monitor
-                        .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttNames))
+                        .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttributes))
                     val searchSourceBuilder = SearchSourceBuilder().size(0)
                     if (getRoleFilterEnabled(clusterService, settings, "plugins.anomaly_detection.filter_by_backend_roles")) {
                         addUserBackendRolesFilter(user, searchSourceBuilder)
@@ -378,6 +381,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
             try {
                 validateActionThrottle(request.monitor, maxActionThrottle, TimeValue.timeValueMinutes(1))
+                validateTriggerCount(request.monitor)
             } catch (e: RuntimeException) {
                 actionListener.onFailure(AlertingException.wrap(e))
                 return
@@ -404,6 +408,12 @@ class TransportIndexMonitorAction @Inject constructor(
                         }
                     }
                 )
+            }
+        }
+
+        private fun validateTriggerCount(monitor: Monitor) {
+            require(monitor.triggers.size <= maxTriggersPerMonitor) {
+                "The current cluster settings only allow up to $maxTriggersPerMonitor triggers per monitor."
             }
         }
 
@@ -491,7 +501,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 else request.rbacRoles
 
                 request.monitor = request.monitor.copy(
-                    user = User(user.name, rbacRoles.orEmpty().toList(), user.roles, user.customAttNames)
+                    user = User(user.name, rbacRoles.orEmpty().toList(), user.roles, user.customAttributes)
                 )
                 log.debug("Created monitor's backend roles: $rbacRoles")
             }
@@ -649,7 +659,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 if (request.rbacRoles != null) {
                     if (isAdmin(user)) {
                         request.monitor = request.monitor.copy(
-                            user = User(user.name, request.rbacRoles, user.roles, user.customAttNames)
+                            user = User(user.name, request.rbacRoles, user.roles, user.customAttributes)
                         )
                     } else {
                         // rolesToRemove: these are the backend roles to remove from the monitor
@@ -657,12 +667,12 @@ class TransportIndexMonitorAction @Inject constructor(
                         // remove the monitor's roles with rolesToRemove and add any roles passed into the request.rbacRoles
                         val updatedRbac = currentMonitor.user?.backendRoles.orEmpty() - rolesToRemove + request.rbacRoles.orEmpty()
                         request.monitor = request.monitor.copy(
-                            user = User(user.name, updatedRbac, user.roles, user.customAttNames)
+                            user = User(user.name, updatedRbac, user.roles, user.customAttributes)
                         )
                     }
                 } else {
                     request.monitor = request.monitor
-                        .copy(user = User(user.name, currentMonitor.user!!.backendRoles, user.roles, user.customAttNames))
+                        .copy(user = User(user.name, currentMonitor.user!!.backendRoles, user.roles, user.customAttributes))
                 }
                 log.debug("Update monitor backend roles to: ${request.monitor.user?.backendRoles}")
             }

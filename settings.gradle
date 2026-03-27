@@ -13,3 +13,4 @@ project(":spi").name = 'alerting-spi'
 
 include 'sample-remote-monitor-plugin'
 project(":sample-remote-monitor-plugin").name = "alerting-sample-remote-monitor-plugin"
+// startParameter.excludedTaskNames=["generatePomFileForShadowPublication"]

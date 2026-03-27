@@ -19,14 +19,15 @@ import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.executeTransportAction
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.toMap
+import org.opensearch.alerting.util.getCancelAfterTimeInterval
 import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.util.use
-import org.opensearch.client.Client
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.routing.Preference
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.io.stream.BytesStreamOutput
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
@@ -49,6 +50,7 @@ import org.opensearch.script.ScriptService
 import org.opensearch.script.ScriptType
 import org.opensearch.script.TemplateScript
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.transport.client.Client
 import java.time.Duration
 import java.time.Instant
 
@@ -186,6 +188,11 @@ class InputService(
                 searchRequest.source(SearchSourceBuilder.fromXContent(it))
             }
 
+            val cancelTimeout = getCancelAfterTimeInterval()
+            if (cancelTimeout != -1L) {
+                searchRequest.cancelAfterTimeInterval = TimeValue.timeValueMinutes(cancelTimeout)
+            }
+
             // Add user role filter for AD result
             client.threadPool().threadContext.stashContext().use {
                 // Possible long term solution:
@@ -267,6 +274,11 @@ class InputService(
 
         XContentType.JSON.xContent().createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource).use {
             searchRequest.source(SearchSourceBuilder.fromXContent(it))
+        }
+
+        val cancelTimeout = getCancelAfterTimeInterval()
+        if (cancelTimeout != -1L) {
+            searchRequest.cancelAfterTimeInterval = TimeValue.timeValueMinutes(cancelTimeout)
         }
 
         return searchRequest

@@ -1504,13 +1504,20 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     fun createUser(name: String, backendRoles: Array<String>) {
+        this.createUserWithAttributes(name, backendRoles, mapOf())
+    }
+
+    fun createUserWithAttributes(name: String, backendRoles: Array<String>, customAttributes: Map<String, String>) {
         val request = Request("PUT", "/_plugins/_security/api/internalusers/$name")
         val broles = backendRoles.joinToString { it -> "\"$it\"" }
+        val customAttributesString = customAttributes.entries.joinToString(prefix = "{", separator = ", ", postfix = "}") {
+            "\"${it.key}\": \"${it.value}\""
+        }
         var entity = " {\n" +
             "\"password\": \"$password\",\n" +
             "\"backend_roles\": [$broles],\n" +
-            "\"attributes\": {\n" +
-            "}} "
+            "\"attributes\": $customAttributesString\n" +
+            "} "
         request.setJsonEntity(entity)
         client().performRequest(request)
     }
@@ -1553,9 +1560,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     fun createCustomIndexRole(name: String, index: String, clusterPermissions: String?) {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
+        val clusterPermissionsArray = if (clusterPermissions.isNullOrBlank()) "" else "\"$clusterPermissions\""
         var entity = "{\n" +
             "\"cluster_permissions\": [\n" +
-            "\"$clusterPermissions\"\n" +
+            "$clusterPermissionsArray\n" +
             "],\n" +
             "\"index_permissions\": [\n" +
             "{\n" +
@@ -1580,9 +1588,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val request = Request("PUT", "/_plugins/_security/api/roles/$name")
 
         val clusterPermissionsStr =
-            clusterPermissions.stream().map { p: String? -> "\"" + p + "\"" }.collect(
-                Collectors.joining(",")
-            )
+            clusterPermissions.stream()
+                .filter { p -> !p.isNullOrBlank() }
+                .map { p: String? -> "\"" + p + "\"" }
+                .collect(Collectors.joining(","))
 
         var entity = "{\n" +
             "\"cluster_permissions\": [\n" +

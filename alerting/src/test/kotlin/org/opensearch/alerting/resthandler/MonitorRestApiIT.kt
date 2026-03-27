@@ -396,6 +396,31 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    fun `test get monitor returns 404 when alerting config index is missing`() {
+        try {
+            deleteIndex(".opendistro-alerting-config")
+        } catch (e: ResponseException) {
+            if (e.response.restStatus() != RestStatus.NOT_FOUND) {
+                throw e
+            }
+        }
+        val fakeMonitorId = "nonexistent-monitor-id"
+        try {
+            client().makeRequest("GET", "$ALERTING_BASE_URI/$fakeMonitorId")
+            fail("Expected 404 when config index is missing")
+        } catch (e: ResponseException) {
+            val errorMessage = e.message ?: ""
+            assertTrue(
+                "Error message should indicate missing monitor or index",
+                errorMessage.contains("Monitor not found") ||
+                    errorMessage.contains("index not found") ||
+                    errorMessage.contains("no such index") ||
+                    errorMessage.contains("Configured indices are not found")
+            )
+        }
+    }
+
+    @Throws(Exception::class)
     fun `test checking if a monitor exists`() {
         val monitor = createRandomMonitor()
 
@@ -499,6 +524,65 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val hits = xcp.map()["hits"]!! as Map<String, Map<String, Any>>
         val numberDocsFound = hits["total"]?.get("value")
         assertEquals("Monitor found during search when no document present.", 0, numberDocsFound)
+    }
+
+    @Throws(Exception::class)
+    fun `test search monitor returns empty response when index is missing`() {
+        try {
+            deleteIndex(".opendistro-alerting-config")
+        } catch (e: ResponseException) {
+            if (e.response.restStatus() != RestStatus.NOT_FOUND) {
+                throw e
+            }
+        }
+        val searchBody = """
+            {
+                "query": {
+                    "match_all": {}
+                }
+            }
+        """.trimIndent()
+        val response = client().makeRequest(
+            "POST",
+            "$ALERTING_BASE_URI/_search",
+            emptyMap(),
+            StringEntity(searchBody, ContentType.APPLICATION_JSON)
+        )
+        val responseBody = response.asMap()
+        val total = ((responseBody["hits"] as? Map<*, *>)?.get("total") as? Map<*, *>)?.get("value") as? Int ?: 0
+        assertEquals("Expected no search results when config index is missing", 0, total)
+    }
+
+    @Throws(Exception::class)
+    fun `test search monitor fails with unexpected error`() {
+        val invalidSearchBody = """
+            {
+                "query": {
+                    "bad_query_type": {}
+                }
+            }
+        """.trimIndent()
+        try {
+            client().makeRequest(
+                "POST",
+                "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(invalidSearchBody, ContentType.APPLICATION_JSON)
+            )
+            fail("Expected failure due to bad query")
+        } catch (e: ResponseException) {
+            val responseBody = e.response.entity.content.bufferedReader().use { it.readText() }
+            assertTrue(
+                "Should receive an error from unexpected query type",
+                e.response.restStatus() === RestStatus.BAD_REQUEST ||
+                    e.response.restStatus() === RestStatus.INTERNAL_SERVER_ERROR
+            )
+            assertTrue(
+                "Response body should indicate query parsing error",
+                responseBody.contains("parsing_exception") ||
+                    responseBody.contains("failed to parse")
+            )
+        }
     }
 
     fun `test query a monitor with UI metadata from OpenSearch Dashboards`() {
@@ -1474,5 +1558,72 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             expected,
             alertingStatsResponse[statsResponseOpenSearchSweeperEnabledField]
         )
+    }
+
+    fun `test sweeper works with id field data disabled`() {
+        client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
+        val monitor = createRandomMonitor(refresh = true)
+        // Disable _id fielddata — this previously broke the sweeper
+        client().updateSettings("indices.id_field_data.enabled", false)
+        try {
+            val monitor2 = createRandomMonitor(refresh = true)
+            assertNotNull("Monitor was not created", monitor2.id)
+            val executeResponse = executeMonitor(monitor2.id)
+            assertEquals("Execute monitor failed", RestStatus.OK, executeResponse.restStatus())
+        } finally {
+            client().updateSettings("indices.id_field_data.enabled", true)
+        }
+    }
+
+    fun `test sweeper works after all monitors deleted`() {
+        client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
+        val monitor = createRandomMonitor(refresh = true)
+        client().makeRequest("DELETE", "$ALERTING_BASE_URI/${monitor.id}")
+        refreshIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)
+        // Create a new monitor after index was emptied — sweeper should handle this
+        val monitor2 = createRandomMonitor(refresh = true)
+        assertNotNull("Monitor was not created", monitor2.id)
+        val executeResponse = executeMonitor(monitor2.id)
+        assertEquals("Execute monitor failed", RestStatus.OK, executeResponse.restStatus())
+    }
+
+    fun `test existing monitor with triggers over new limit still executes`() {
+        // Create monitor with 10 triggers at default limit
+        val triggers = (1..10).map {
+            randomQueryLevelTrigger(name = "trigger-$it", condition = Script("return true"))
+        }
+        val monitor = createMonitor(randomQueryLevelMonitor(triggers = triggers, enabled = true))
+        assertEquals("Monitor should have 10 triggers", 10, monitor.triggers.size)
+
+        // Execute monitor — should succeed
+        val executeResponse = executeMonitor(monitor.id)
+        assertEquals("Execute monitor failed", RestStatus.OK, executeResponse.restStatus())
+
+        // Lower the limit to 5
+        client().updateSettings("plugins.alerting.monitor.max_triggers", 5)
+
+        // Execute the existing monitor again — should still succeed
+        val executeResponse2 = executeMonitor(monitor.id)
+        assertEquals("Existing monitor should still execute after lowering limit", RestStatus.OK, executeResponse2.restStatus())
+
+        // Reset setting
+        client().updateSettings("plugins.alerting.monitor.max_triggers", 10)
+    }
+
+    fun `test new monitor rejected when over trigger limit`() {
+        client().updateSettings("plugins.alerting.monitor.max_triggers", 5)
+        try {
+            val triggers = (1..6).map {
+                randomQueryLevelTrigger(name = "trigger-$it", condition = Script("return true"))
+            }
+            try {
+                createMonitor(randomQueryLevelMonitor(triggers = triggers))
+                fail("Expected monitor creation to fail")
+            } catch (e: ResponseException) {
+                assertEquals("Should be bad request", RestStatus.BAD_REQUEST.status, e.response.statusLine.statusCode)
+            }
+        } finally {
+            client().updateSettings("plugins.alerting.monitor.max_triggers", 10)
+        }
     }
 }

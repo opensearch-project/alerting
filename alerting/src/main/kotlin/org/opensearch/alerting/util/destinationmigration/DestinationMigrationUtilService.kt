@@ -21,7 +21,6 @@ import org.opensearch.alerting.util.destinationmigration.DestinationConversionUt
 import org.opensearch.alerting.util.destinationmigration.DestinationConversionUtils.Companion.convertEmailGroupToNotificationConfig
 import org.opensearch.alerting.util.destinationmigration.NotificationApiUtils.Companion.createNotificationConfig
 import org.opensearch.alerting.util.use
-import org.opensearch.client.node.NodeClient
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants
@@ -37,6 +36,7 @@ import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.fetch.subphase.FetchSourceContext
+import org.opensearch.transport.client.node.NodeClient
 import java.time.Instant
 
 class DestinationMigrationUtilService {

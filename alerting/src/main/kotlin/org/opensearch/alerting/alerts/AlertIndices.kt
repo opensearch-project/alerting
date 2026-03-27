@@ -25,7 +25,7 @@ import org.opensearch.action.admin.indices.rollover.RolloverResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.IndicesOptions
-import org.opensearch.action.support.master.AcknowledgedResponse
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_INDEX
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -43,7 +43,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTO
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.IndexUtils
-import org.opensearch.client.Client
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.metadata.IndexMetadata
@@ -64,6 +63,7 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.threadpool.Scheduler.Cancellable
 import org.opensearch.threadpool.ThreadPool
+import org.opensearch.transport.client.Client
 import java.time.Instant
 
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -189,7 +189,7 @@ class AlertIndices(
 
     private var scheduledFindingRollover: Cancellable? = null
 
-    fun onMaster() {
+    fun onClusterManager() {
         try {
             // try to rollover immediately as we might be restarting the cluster
             rolloverAlertHistoryIndex()
@@ -203,13 +203,13 @@ class AlertIndices(
             // This should be run on cluster startup
             logger.error(
                 "Error creating alert/finding indices. " +
-                    "Alerts/Findings can't be recorded until master node is restarted.",
+                    "Alerts/Findings can't be recorded until clustermanager node is restarted.",
                 e
             )
         }
     }
 
-    fun offMaster() {
+    fun offClusterManager() {
         scheduledAlertRollover?.cancel()
         scheduledFindingRollover?.cancel()
     }
@@ -219,15 +219,15 @@ class AlertIndices(
     }
 
     override fun clusterChanged(event: ClusterChangedEvent) {
-        // Instead of using a LocalNodeClusterManagerListener to track master changes, this service will
-        // track them here to avoid conditions where master listener events run after other
-        // listeners that depend on what happened in the master listener
+        // Instead of using a LocalNodeClusterManagerListener to track clustermanager changes, this service will
+        // track them here to avoid conditions where clustermanager listener events run after other
+        // listeners that depend on what happened in the clustermanager listener
         if (this.isClusterManager != event.localNodeClusterManager()) {
             this.isClusterManager = event.localNodeClusterManager()
             if (this.isClusterManager) {
-                onMaster()
+                onClusterManager()
             } else {
-                offMaster()
+                offClusterManager()
             }
         }
 
@@ -238,7 +238,7 @@ class AlertIndices(
     }
 
     private fun rescheduleAlertRollover() {
-        if (clusterService.state().nodes.isLocalNodeElectedMaster) {
+        if (clusterService.state().nodes.isLocalNodeElectedClusterManager) {
             scheduledAlertRollover?.cancel()
             scheduledAlertRollover = threadPool
                 .scheduleWithFixedDelay({ rolloverAndDeleteAlertHistoryIndices() }, alertHistoryRolloverPeriod, executorName())
@@ -246,7 +246,7 @@ class AlertIndices(
     }
 
     private fun rescheduleFindingRollover() {
-        if (clusterService.state().nodes.isLocalNodeElectedMaster) {
+        if (clusterService.state().nodes.isLocalNodeElectedClusterManager) {
             scheduledFindingRollover?.cancel()
             scheduledFindingRollover = threadPool
                 .scheduleWithFixedDelay({ rolloverAndDeleteFindingHistoryIndices() }, findingHistoryRolloverPeriod, executorName())

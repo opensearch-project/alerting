@@ -9,6 +9,7 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.unit.TimeValue
 import java.util.concurrent.TimeUnit
+import java.util.function.Function
 
 /**
  * settings specific to [AlertingPlugin]. These settings include things like history index max age, request timeout, etc...
@@ -21,11 +22,22 @@ class AlertingSettings {
         const val DEFAULT_PERCOLATE_QUERY_NUM_DOCS_IN_MEMORY = 50000
         const val DEFAULT_PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT = 10
         const val DEFAULT_DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE = 10000
+        const val DEFAULT_MAX_DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION_MINUTES = 3L
+        const val DEFAULT_MAX_DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION_MINUTES = 4L
         const val DEFAULT_FAN_OUT_NODES = 1000
+        const val DEFAULT_MAX_TRIGGERS_PER_MONITOR = 10
 
         val ALERTING_MAX_MONITORS = Setting.intSetting(
             "plugins.alerting.monitor.max_monitors",
             LegacyOpenDistroAlertingSettings.ALERTING_MAX_MONITORS,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val MAX_TRIGGERS_PER_MONITOR = Setting.intSetting(
+            "plugins.alerting.monitor.max_triggers",
+            DEFAULT_MAX_TRIGGERS_PER_MONITOR,
+            0,
+            50,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
@@ -47,6 +59,22 @@ class AlertingSettings {
             DEFAULT_DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE,
             1,
             10000,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /** Setting to help timebox doc level monitor fanout
+         */
+        val DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION = Setting.positiveTimeSetting(
+            "plugins.alerting.monitor.doc_level_monitor_fanout_max_duration",
+            TimeValue.timeValueMinutes(DEFAULT_MAX_DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION_MINUTES),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /** Setting to help timebox doc level monitor execution
+         */
+        val DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION = Setting.positiveTimeSetting(
+            "plugins.alerting.monitor.doc_level_monitor_execution_max_duration",
+            TimeValue.timeValueMinutes(DEFAULT_MAX_DOC_LEVEL_MONITOR_EXECUTION_MAX_DURATION_MINUTES),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
@@ -274,6 +302,14 @@ class AlertingSettings {
             3,
             0,
             Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES: Setting<List<String>> = Setting.listSetting(
+            "plugins.alerting.notification_context_results_allowed_roles",
+            listOf(),
+            Function.identity(),
+            Setting.Property.NodeScope,
+            Setting.Property.Dynamic
         )
     }
 }
