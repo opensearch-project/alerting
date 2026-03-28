@@ -59,6 +59,7 @@ import org.opensearch.alerting.util.destinationmigration.getTitle
 import org.opensearch.alerting.util.destinationmigration.publishLegacyNotification
 import org.opensearch.alerting.util.destinationmigration.sendNotification
 import org.opensearch.alerting.util.getActionExecutionPolicy
+import org.opensearch.alerting.util.getCancelAfterTimeInterval
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
 import org.opensearch.alerting.util.parseSampleDocTags
@@ -69,6 +70,7 @@ import org.opensearch.cluster.routing.Preference
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.AlertingPluginInterface
@@ -969,6 +971,11 @@ class TransportDocLevelMonitorFanOutAction
                     .query(boolQueryBuilder)
             )
 
+        val cancelTimeout = getCancelAfterTimeInterval()
+        if (cancelTimeout != -1L) {
+            request.cancelAfterTimeInterval = TimeValue.timeValueMinutes(cancelTimeout)
+        }
+
         val response: SearchResponse = client.suspendUntil { client.search(request, it) }
         if (response.status() !== RestStatus.OK) {
             throw IOException(
@@ -1013,6 +1020,10 @@ class TransportDocLevelMonitorFanOutAction
         val searchSourceBuilder = SearchSourceBuilder()
         searchSourceBuilder.query(boolQueryBuilder)
         searchRequest.source(searchSourceBuilder)
+        val cancelTimeout = getCancelAfterTimeInterval()
+        if (cancelTimeout != -1L) {
+            searchRequest.cancelAfterTimeInterval = TimeValue.timeValueMinutes(cancelTimeout)
+        }
         log.debug(
             "Monitor ${monitor.id}: " +
                 "Executing percolate query for docs from source indices " +
@@ -1091,6 +1102,11 @@ class TransportDocLevelMonitorFanOutAction
                     .query(boolQueryBuilder)
                     .size(docLevelMonitorShardFetchSize)
             )
+
+        val cancelTimeout = getCancelAfterTimeInterval()
+        if (cancelTimeout != -1L) {
+            request.cancelAfterTimeInterval = TimeValue.timeValueMinutes(cancelTimeout)
+        }
 
         if (fieldsToFetch.isNotEmpty() && fetchOnlyQueryFieldNames) {
             request.source().fetchSource(false)
