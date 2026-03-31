@@ -433,7 +433,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.COMMENTS_MAX_CONTENT_SIZE,
             AlertingSettings.MAX_COMMENTS_PER_ALERT,
             AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION,
-            AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES
+            AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES,
+            AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY
         )
     }
 

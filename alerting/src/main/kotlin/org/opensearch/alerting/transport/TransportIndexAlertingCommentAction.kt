@@ -86,6 +86,7 @@ constructor(
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
 
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile override var filterByAccessStrategy = AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_COMMENTS_ENABLED) { alertingCommentsEnabled = it }

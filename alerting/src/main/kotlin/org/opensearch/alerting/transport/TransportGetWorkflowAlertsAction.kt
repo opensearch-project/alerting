@@ -70,6 +70,9 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
     override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
     @Volatile
+    override var filterByAccessStrategy = AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.get(settings)
+
+    @Volatile
     private var isAlertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
 
     init {

@@ -62,6 +62,9 @@ class TransportSearchMonitorAction @Inject constructor(
     SecureTransportAction {
     @Volatile
     override var filterByEnabled: Boolean = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile
+    override var filterByAccessStrategy: String = AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.get(settings)
+
     init {
         listenFilterBySettingChange(clusterService)
     }
