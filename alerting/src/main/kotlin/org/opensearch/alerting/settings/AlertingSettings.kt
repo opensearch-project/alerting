@@ -311,5 +311,11 @@ class AlertingSettings {
             Setting.Property.NodeScope,
             Setting.Property.Dynamic
         )
+
+        val MULTI_TENANT_TRIGGER_EVAL_ENABLED = Setting.boolSetting(
+            "plugins.alerting.multi_tenant_trigger_eval_enabled",
+            false,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }
