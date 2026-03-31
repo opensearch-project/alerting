@@ -56,6 +56,19 @@ class AlertingSettingsTests : OpenSearchTestCase() {
         )
     }
 
+    fun `test multi tenant trigger eval setting defaults to false`() {
+        val value = AlertingSettings.MULTI_TENANT_TRIGGER_EVAL_ENABLED.get(Settings.EMPTY)
+        assertFalse("multi_tenant_trigger_eval_enabled should default to false", value)
+    }
+
+    fun `test multi tenant trigger eval setting is registered`() {
+        val settings = plugin.settings
+        assertTrue(
+            "MULTI_TENANT_TRIGGER_EVAL_ENABLED not registered",
+            settings.contains(AlertingSettings.MULTI_TENANT_TRIGGER_EVAL_ENABLED)
+        )
+    }
+
     fun `test all opensearch settings returned`() {
         val settings = plugin.settings
         assertTrue(
