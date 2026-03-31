@@ -106,9 +106,11 @@ interface SecureTransportAction {
     }
 
     fun doUserBackendRolesMatchResource(userBackendRoles: List<String>, resourceBackendRoles: List<String>): Boolean {
-        if (filterByAccessStrategy == FilterByBackendRolesAccessStrategy.INTERSECT.strategy) {
+        if (filterByAccessStrategy == FilterByBackendRolesAccessStrategy.ALL.strategy) {
+            return userBackendRoles.containsAll(resourceBackendRoles)
+        } else if (filterByAccessStrategy == FilterByBackendRolesAccessStrategy.INTERSECT.strategy) {
             return resourceBackendRoles.any { it in userBackendRoles }
-        } else if (filterByAccessStrategy == FilterByBackendRolesAccessStrategy.ALL.strategy) {
+        } else if (filterByAccessStrategy == FilterByBackendRolesAccessStrategy.EXACT.strategy) {
             return resourceBackendRoles.sorted().equals(userBackendRoles.sorted())
         }
         // Not sure if this is necessary, since there is a validator
