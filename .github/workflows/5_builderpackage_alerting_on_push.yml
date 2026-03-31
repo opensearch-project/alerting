@@ -1,0 +1,20 @@
+name: (5.x) Build packages (on push)
+
+# This workflow runs when any of the following occur:
+# - On push
+
+on:
+  push:
+    paths-ignore:
+      - "**/*.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  call-build-workflow:
+    uses: ./.github/workflows/5_builderpackage_alerting.yml
+    secrets: inherit
+    with:
+      id: ${{ github.ref }}

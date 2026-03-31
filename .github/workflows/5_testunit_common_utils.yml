@@ -1,0 +1,35 @@
+name: Security Test and Build Common Utils
+
+on: [push, pull_request]
+
+jobs:
+  build-linux:
+    strategy:
+      matrix:
+        java: [ 25 ]
+    # This job runs on Linux
+    runs-on: ubuntu-24.04
+    name: Build and test Common Utils with security-enabled
+    steps:
+      # This step uses the setup-java Github action: https://github.com/actions/setup-java
+      - name: Set Up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin # Temurin is a distribution of adoptium
+          java-version: ${{ matrix.java }}
+
+      # This step uses the checkout Github action: https://github.com/actions/checkout
+      - name: Checkout Branch
+        uses: actions/checkout@v6
+
+      - name: Run unit tests
+        run: |
+          ./gradlew test
+
+      - name: Upload failed logs
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: logs
+          overwrite: 'true'
+          path: build/test-results/test/

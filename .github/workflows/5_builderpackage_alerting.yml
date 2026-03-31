@@ -1,0 +1,81 @@
+run-name: Build Wazuh Indexer Common Utils | ${{ inputs.id}}
+name: (5.x) Build packages
+# This workflow runs when any of the following occur:
+# - Run manually
+# - Invoked from another workflow
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: "Revision"
+        type: string
+        default: "0"
+      id:
+        description: "ID used to identify the workflow uniquely."
+        type: string
+        required: false
+  workflow_call:
+    inputs:
+      revision:
+        description: "Revision"
+        type: string
+        default: "0"
+      id:
+        description: "ID used to identify the workflow uniquely."
+        type: string
+        required: false
+
+# ==========================
+# Bibliography
+# ==========================
+#
+# * Reusable workflows: limitations
+#   | https://docs.github.com/en/actions/using-workflows/reusing-workflows#limitations
+# * Using matrix in reusable workflows:
+#   | https://docs.github.com/en/actions/using-workflows/reusing-workflows#using-a-matrix-strategy-with-a-reusable-workflow
+# * Reading input from the called workflow
+#   | https://docs.github.com/en/enterprise-cloud@latest/actions/using-workflows/workflow-syntax-for-github-actions#onworkflow_callinputs
+# * Ternary operator
+#   | https://docs.github.com/en/actions/learn-github-actions/expressions#example
+
+jobs:
+  build:
+    env:
+      plugin_name: "wazuh-indexer-alerting"
+    strategy:
+      matrix:
+        java:
+          - 25
+        os:
+          - ubuntu-24.04-arm # arm64-preview
+          - ubuntu-24.04 # x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Java ${{ matrix.java }}
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ matrix.java }}
+          distribution: "temurin"
+
+      - name: Get version
+        id: version
+        run: echo "version=$(jq -r .version<VERSION.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and Test
+        run: ./gradlew build "-Dversion=${{ steps.version.outputs.version }}" "-Drevision=${{ inputs.revision }}"
+        shell: bash
+
+      - name: Prepare Artifacts
+        run: |
+          mkdir -p build-artifacts
+          find . -type f \( -name "*.zip" -o -name "*.jar" \) -path "*/build/distributions/*" -o -path "*/build/libs/*" -exec cp -v {} build-artifacts/ \;
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.plugin_name }}-${{ steps.version.outputs.version }}.${{ inputs.revision }}-${{ matrix.os }}
+          path: build-artifacts
+          if-no-files-found: error
