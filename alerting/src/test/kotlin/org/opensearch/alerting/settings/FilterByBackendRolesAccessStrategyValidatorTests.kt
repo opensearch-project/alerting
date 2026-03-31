@@ -10,31 +10,11 @@ import kotlin.test.assertFailsWith
 
 class FilterByBackendRolesAccessStrategyValidatorTests : OpenSearchTestCase() {
 
-    fun `test accepts strategy of all`() {
+    fun `test accepts valid strategies`() {
         val validator = FilterByBackendRolesAccessStrategyValidator()
-        try {
-            validator.validate("all")
-        } catch (e: Exception) {
-            fail("Unexpected exception")
-        }
-    }
-
-    fun `test accepts strategy of exact`() {
-        val validator = FilterByBackendRolesAccessStrategyValidator()
-        try {
-            validator.validate("exact")
-        } catch (e: Exception) {
-            fail("Unexpected exception")
-        }
-    }
-
-    fun `test accepts strategy of intersect`() {
-        val validator = FilterByBackendRolesAccessStrategyValidator()
-        try {
-            validator.validate("intersect")
-        } catch (e: Exception) {
-            fail("Unexpected exception")
-        }
+        validator.validate("all")
+        validator.validate("exact")
+        validator.validate("intersect")
     }
 
     fun `test rejects invalid strategy`() {
