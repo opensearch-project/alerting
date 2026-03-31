@@ -516,7 +516,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             getUser,
             TEST_HR_INDEX,
             TEST_HR_ROLE,
-            listOf("role1", "role2", "role3"),
+            listOf("role3", "role2", "role1"),
             getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
         )
         val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
