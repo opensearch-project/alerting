@@ -10,6 +10,11 @@ package org.opensearch.alerting.settings
  */
 enum class FilterByBackendRolesAccessStrategy(val strategy: String) {
     /**
+     * User backend roles must contain all resource backend roles to have access
+     */
+    ALL("all"),
+
+    /**
      * Backend roles must be exactly equal to have access
      */
     EXACT("exact"),
@@ -18,9 +23,4 @@ enum class FilterByBackendRolesAccessStrategy(val strategy: String) {
      * Backend roles must intersect to have access
      */
     INTERSECT("intersect"),
-
-    /**
-     * User backend roles must contain all resource backend roles to have access
-     */
-    ALL("all"),
 }
