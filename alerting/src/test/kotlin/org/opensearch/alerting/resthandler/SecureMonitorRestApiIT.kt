@@ -323,14 +323,14 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test get monitor succeeds for same backend roles in same order when filterByAccessStrategy is all`() {
+    fun `test get monitor succeeds for same backend roles in same order when filterByAccessStrategy is exact`() {
         enableFilterBy()
         if (!isHttps()) {
             // if security is disabled and filter by is enabled, we can't create monitor
             // refer: `test create monitor with enable filter by`
             return
         }
-        setFilterByBackendRolesStrategy("all")
+        setFilterByBackendRolesStrategy("exact")
 
         val monitor = randomQueryLevelMonitor(enabled = true)
 
@@ -376,14 +376,14 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test get monitor succeeds for same backend roles in different order when filterByAccessStrategy is all`() {
+    fun `test get monitor succeeds for same backend roles in different order when filterByAccessStrategy is exact`() {
         enableFilterBy()
         if (!isHttps()) {
             // if security is disabled and filter by is enabled, we can't create monitor
             // refer: `test create monitor with enable filter by`
             return
         }
-        setFilterByBackendRolesStrategy("all")
+        setFilterByBackendRolesStrategy("exact")
 
         val monitor = randomQueryLevelMonitor(enabled = true)
 
@@ -430,14 +430,14 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test get monitor fails for different backend roles when filterByAccessStrategy is all`() {
+    fun `test get monitor fails for different backend roles when filterByAccessStrategy is exact`() {
         enableFilterBy()
         if (!isHttps()) {
             // if security is disabled and filter by is enabled, we can't create monitor
             // refer: `test create monitor with enable filter by`
             return
         }
-        setFilterByBackendRolesStrategy("all")
+        setFilterByBackendRolesStrategy("exact")
 
         val monitor = randomQueryLevelMonitor(enabled = true)
 
