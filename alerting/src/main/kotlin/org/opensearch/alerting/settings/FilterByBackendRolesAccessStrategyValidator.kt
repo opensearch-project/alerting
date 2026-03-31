@@ -12,7 +12,7 @@ class FilterByBackendRolesAccessStrategyValidator : Setting.Validator<String> {
         val allStrategies: List<String> = FilterByBackendRolesAccessStrategy.entries.map { it.strategy }
 
         when (strategy) {
-            FilterByBackendRolesAccessStrategy.ALL.strategy
+            FilterByBackendRolesAccessStrategy.ALL.strategy,
             FilterByBackendRolesAccessStrategy.EXACT.strategy,
             FilterByBackendRolesAccessStrategy.INTERSECT.strategy -> {}
             else -> throw IllegalArgumentException(
