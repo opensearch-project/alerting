@@ -11,6 +11,7 @@ import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.trigger.RemoteQueryLevelTriggerEvaluator
 import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.commons.alerting.model.Alert
@@ -18,6 +19,7 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
+import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.transport.TransportService
 import java.time.Instant
@@ -77,6 +79,25 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         val updatedAlerts = mutableListOf<Alert>()
         val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
 
+        // When multi-tenant trigger eval is enabled, batch-evaluate all query-level triggers
+        // remotely on the customer's cluster instead of running Painless locally
+        val remoteTriggerResults = if (
+            monitorCtx.multiTenantTriggerEvalEnabled &&
+            Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.QUERY_LEVEL_MONITOR &&
+            monitorResult.inputResults.results.isNotEmpty()
+        ) {
+            val searchInput = monitor.inputs[0] as SearchInput
+            val queryLevelTriggers = monitor.triggers.filterIsInstance<QueryLevelTrigger>()
+            RemoteQueryLevelTriggerEvaluator.evaluate(
+                monitorCtx.client!!,
+                searchInput.indices,
+                queryLevelTriggers,
+                monitorResult.inputResults.results[0]
+            )
+        } else {
+            null
+        }
+
         val maxComments = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION)
         val alertsToExecuteActionsForIds = currentAlerts.mapNotNull { it.value }.map { it.id }
         val allAlertsComments = CommentsUtils.getCommentsForAlertNotification(
@@ -97,19 +118,27 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                 currentAlertContext,
                 monitorCtx.clusterService!!.clusterSettings
             )
-            val triggerResult = when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
-                Monitor.MonitorType.QUERY_LEVEL_MONITOR ->
-                    monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
-                Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> {
-                    val remoteMonitoringEnabled =
-                        monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
-                    logger.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
-                    if (remoteMonitoringEnabled)
-                        monitorCtx.triggerService!!.runClusterMetricsTrigger(monitor, trigger, triggerCtx, monitorCtx.clusterService!!)
-                    else monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
+            val triggerResult = if (remoteTriggerResults != null) {
+                // Use pre-computed remote evaluation results
+                remoteTriggerResults[trigger.id]
+                    ?: QueryLevelTriggerRunResult(trigger.name, true, null)
+            } else {
+                when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
+                    Monitor.MonitorType.QUERY_LEVEL_MONITOR ->
+                        monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
+                    Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> {
+                        val remoteMonitoringEnabled =
+                            monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
+                        logger.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
+                        if (remoteMonitoringEnabled)
+                            monitorCtx.triggerService!!.runClusterMetricsTrigger(
+                                monitor, trigger, triggerCtx, monitorCtx.clusterService!!
+                            )
+                        else monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger, triggerCtx)
+                    }
+                    else ->
+                        throw IllegalArgumentException("Unsupported monitor type: ${monitor.monitorType}.")
                 }
-                else ->
-                    throw IllegalArgumentException("Unsupported monitor type: ${monitor.monitorType}.")
             }
 
             triggerResults[trigger.id] = triggerResult
