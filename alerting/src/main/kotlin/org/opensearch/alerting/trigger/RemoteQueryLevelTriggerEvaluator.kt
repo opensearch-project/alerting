@@ -23,9 +23,9 @@ import org.opensearch.transport.client.Client
 /**
  * Evaluates query-level triggers remotely on the customer's cluster via filter aggregations.
  *
- * Instead of executing Painless scripts on the multi-tenant Oasis node, this evaluator:
+ * This evaluator:
  * 1. Rewrites trigger scripts from `ctx.results[0]` to `params.results_0`
- * 2. Sends a single search request with one filter agg per trigger
+ * 2. Sends a single search request with one filter agg each per trigger
  * 3. Passes the full search response from Call 1 as `params.results_0`
  * 4. Reads `doc_count > 0` per trigger agg to determine if the trigger fires
  */
@@ -64,13 +64,13 @@ object RemoteQueryLevelTriggerEvaluator {
             val parsedResults = parseEvalResponse(triggerIds, aggs)
 
             triggers.associate { trigger ->
-                val triggered = parsedResults[trigger.id] ?: true
+                val triggered = parsedResults[trigger.id] ?: false
                 trigger.id to QueryLevelTriggerRunResult(trigger.name, triggered, null)
             }
         } catch (e: Exception) {
             logger.error("Error evaluating triggers remotely", e)
-            // On error, trigger all triggers so the user gets notified (matches existing error handling)
-            triggers.associate { it.id to QueryLevelTriggerRunResult(it.name, true, e) }
+            // On error, fail closed — don't trigger alerts but surface the error
+            triggers.associate { it.id to QueryLevelTriggerRunResult(it.name, false, e) }
         }
     }
 
@@ -125,8 +125,8 @@ object RemoteQueryLevelTriggerEvaluator {
             val aggKey = "$TRIGGER_AGG_PREFIX$triggerId"
             val aggResult = aggResults[aggKey]
             if (aggResult == null) {
-                logger.warn("Missing evaluation result for trigger $triggerId, defaulting to triggered")
-                true
+                logger.warn("Missing evaluation result for trigger $triggerId, defaulting to not triggered")
+                false
             } else {
                 val docCount = (aggResult["doc_count"] as? Number)?.toLong() ?: 0L
                 docCount > 0

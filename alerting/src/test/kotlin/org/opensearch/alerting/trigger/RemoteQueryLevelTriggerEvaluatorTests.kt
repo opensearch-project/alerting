@@ -74,11 +74,11 @@ class RemoteQueryLevelTriggerEvaluatorTests : OpenSearchTestCase() {
         assertFalse("t2 should not be triggered", results["t2"]!!)
     }
 
-    fun `test parse eval response missing trigger defaults to triggered`() {
+    fun `test parse eval response missing trigger defaults to not triggered`() {
         val triggerIds = listOf("trigger-1")
         val aggResults = emptyMap<String, Map<String, Any>>()
         val results = RemoteQueryLevelTriggerEvaluator.parseEvalResponse(triggerIds, aggResults)
 
-        assertTrue("Missing trigger should default to triggered (fail-open)", results["trigger-1"]!!)
+        assertFalse("Missing trigger should default to not triggered (fail-closed)", results["trigger-1"]!!)
     }
 }

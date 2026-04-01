@@ -121,7 +121,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             val triggerResult = if (remoteTriggerResults != null) {
                 // Use pre-computed remote evaluation results
                 remoteTriggerResults[trigger.id]
-                    ?: QueryLevelTriggerRunResult(trigger.name, true, null)
+                    ?: QueryLevelTriggerRunResult(trigger.name, false, null)
             } else {
                 when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
                     Monitor.MonitorType.QUERY_LEVEL_MONITOR ->

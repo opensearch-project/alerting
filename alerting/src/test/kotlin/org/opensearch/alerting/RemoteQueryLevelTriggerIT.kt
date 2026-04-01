@@ -254,9 +254,11 @@ class RemoteQueryLevelTriggerIT : AlertingRestTestCase() {
             val response = executeMonitor(monitor.id)
             val output = entityAsMap(response)
 
-            val triggerResult = output.objectMap("trigger_results").objectMap(trigger.id)
-            // On error, trigger defaults to true (fail-open) so user gets notified
-            assertEquals(true, triggerResult["triggered"].toString().toBoolean())
+            @Suppress("UNCHECKED_CAST")
+            val triggerResult = (output.objectMap("trigger_results")[trigger.id] as Map<String, Any>)
+            // On error, trigger defaults to false (fail-closed) with error surfaced
+            assertEquals(false, triggerResult["triggered"].toString().toBoolean())
+            assertFalse("Expected error to be set", triggerResult["error"]?.toString().isNullOrEmpty())
         } finally {
             disableRemoteTriggerEval()
         }

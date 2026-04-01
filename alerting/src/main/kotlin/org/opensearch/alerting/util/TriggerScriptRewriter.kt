@@ -7,9 +7,7 @@ package org.opensearch.alerting.util
 
 /**
  * Rewrites Painless trigger scripts for remote evaluation on the customer's cluster.
- *
- * In multi-tenant mode, trigger scripts cannot be executed on the Oasis node.
- * Instead, they are sent to the customer's cluster via a filter aggregation.
+ * They are sent to the customer's cluster via a filter aggregation.
  * The script context on the customer's cluster uses `params` instead of `ctx`,
  * so all references to `ctx.results[0]` must be replaced with `params.results_0`.
  */
