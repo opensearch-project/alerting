@@ -23,7 +23,7 @@ class RemoteQueryLevelTriggerEvaluatorTests : OpenSearchTestCase() {
 
         assertNotNull(request)
         val requestString = request.toString()
-        assertTrue("Should contain trigger agg", requestString.contains("_oasis_trigger_trigger-1"))
+        assertTrue("Should contain trigger agg", requestString.contains("_query_trigger_trigger-1"))
         assertTrue("Should contain rewritten script", requestString.contains("params.results_0"))
     }
 
@@ -37,15 +37,15 @@ class RemoteQueryLevelTriggerEvaluatorTests : OpenSearchTestCase() {
         val request = RemoteQueryLevelTriggerEvaluator.buildEvalSearchSource(triggers, searchResponse)
 
         val requestString = request.toString()
-        assertTrue("Should contain t1 agg", requestString.contains("_oasis_trigger_t1"))
-        assertTrue("Should contain t2 agg", requestString.contains("_oasis_trigger_t2"))
-        assertTrue("Should contain t3 agg", requestString.contains("_oasis_trigger_t3"))
+        assertTrue("Should contain t1 agg", requestString.contains("_query_trigger_t1"))
+        assertTrue("Should contain t2 agg", requestString.contains("_query_trigger_t2"))
+        assertTrue("Should contain t3 agg", requestString.contains("_query_trigger_t3"))
     }
 
     fun `test parse eval response triggered`() {
         val triggerIds = listOf("trigger-1")
         val aggResults = mapOf(
-            "_oasis_trigger_trigger-1" to mapOf<String, Any>("doc_count" to 5)
+            "_query_trigger_trigger-1" to mapOf<String, Any>("doc_count" to 5)
         )
         val results = RemoteQueryLevelTriggerEvaluator.parseEvalResponse(triggerIds, aggResults)
 
@@ -55,7 +55,7 @@ class RemoteQueryLevelTriggerEvaluatorTests : OpenSearchTestCase() {
     fun `test parse eval response not triggered`() {
         val triggerIds = listOf("trigger-1")
         val aggResults = mapOf(
-            "_oasis_trigger_trigger-1" to mapOf<String, Any>("doc_count" to 0)
+            "_query_trigger_trigger-1" to mapOf<String, Any>("doc_count" to 0)
         )
         val results = RemoteQueryLevelTriggerEvaluator.parseEvalResponse(triggerIds, aggResults)
 
@@ -65,8 +65,8 @@ class RemoteQueryLevelTriggerEvaluatorTests : OpenSearchTestCase() {
     fun `test parse eval response multiple triggers mixed`() {
         val triggerIds = listOf("t1", "t2")
         val aggResults = mapOf(
-            "_oasis_trigger_t1" to mapOf<String, Any>("doc_count" to 3),
-            "_oasis_trigger_t2" to mapOf<String, Any>("doc_count" to 0)
+            "_query_trigger_t1" to mapOf<String, Any>("doc_count" to 3),
+            "_query_trigger_t2" to mapOf<String, Any>("doc_count" to 0)
         )
         val results = RemoteQueryLevelTriggerEvaluator.parseEvalResponse(triggerIds, aggResults)
 

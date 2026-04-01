@@ -32,7 +32,7 @@ import org.opensearch.transport.client.Client
 object RemoteQueryLevelTriggerEvaluator {
 
     private val logger = LogManager.getLogger(javaClass)
-    private const val TRIGGER_AGG_PREFIX = "_oasis_trigger_"
+    private const val TRIGGER_AGG_PREFIX = "_query_trigger_"
 
     /**
      * Evaluates all triggers for a query-level monitor by sending a filter-agg request
