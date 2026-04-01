@@ -321,6 +321,68 @@ class RemoteQueryLevelTriggerIT : AlertingRestTestCase() {
         }
     }
 
+    // ---- Regression tests (flag=false) ----
+
+    fun `test query level trigger flag disabled`() {
+        // Flag is false by default — do NOT enable it
+        val index = createIndexWithDocs(docCount = 3)
+        val input = buildInput(index)
+        val triggerScript = "return ctx.results[0].hits.total.value > 0"
+        val trigger = randomQueryLevelTrigger(condition = Script(triggerScript), actions = emptyList())
+        val monitor = randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger))
+
+        val response = executeMonitor(monitor, params = DRYRUN_MONITOR)
+        val output = entityAsMap(response)
+
+        val triggerResult = output.objectMap("trigger_results").objectMap(trigger.id)
+        assertEquals(true, triggerResult["triggered"].toString().toBoolean())
+        assertTrue("Unexpected error", triggerResult["error"]?.toString().isNullOrEmpty())
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun `test query level trigger flag default is false`() {
+        val settings = client().getSettings(includeDefaults = true)
+        val defaults = settings["defaults"] as Map<String, Any>
+        assertEquals("false", defaults[SETTING_KEY].toString())
+    }
+
+    fun `test query level trigger toggle flag during execution`() {
+        val index = createIndexWithDocs(docCount = 3)
+        val input = buildInput(index)
+        val triggerScript = "return ctx.results[0].hits.total.value > 0"
+        val trigger = randomQueryLevelTrigger(condition = Script(triggerScript), actions = emptyList())
+        val monitor = createMonitor(
+            randomQueryLevelMonitor(inputs = listOf(input), triggers = listOf(trigger))
+        )
+
+        try {
+            // Execute with flag=false (ScriptService path)
+            val response1 = executeMonitor(monitor.id)
+            val output1 = entityAsMap(response1)
+            val result1 = output1.objectMap("trigger_results").objectMap(trigger.id)
+            assertEquals(true, result1["triggered"].toString().toBoolean())
+            assertTrue("Unexpected error with flag off", result1["error"]?.toString().isNullOrEmpty())
+
+            // Toggle flag to true (remote eval path)
+            enableRemoteTriggerEval()
+            val response2 = executeMonitor(monitor.id)
+            val output2 = entityAsMap(response2)
+            val result2 = output2.objectMap("trigger_results").objectMap(trigger.id)
+            assertEquals(true, result2["triggered"].toString().toBoolean())
+            assertTrue("Unexpected error with flag on", result2["error"]?.toString().isNullOrEmpty())
+
+            // Toggle flag back to false (ScriptService path again)
+            disableRemoteTriggerEval()
+            val response3 = executeMonitor(monitor.id)
+            val output3 = entityAsMap(response3)
+            val result3 = output3.objectMap("trigger_results").objectMap(trigger.id)
+            assertEquals(true, result3["triggered"].toString().toBoolean())
+            assertTrue("Unexpected error after toggling back", result3["error"]?.toString().isNullOrEmpty())
+        } finally {
+            disableRemoteTriggerEval()
+        }
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun Map<String, Any>.objectMap(key: String): Map<String, Map<String, Any>> {
         return this[key] as Map<String, Map<String, Any>>
