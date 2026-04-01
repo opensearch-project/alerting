@@ -10,15 +10,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.ActionRequest
-import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
-import org.opensearch.action.search.SearchRequest
-import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.addFilter
-import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
@@ -44,7 +40,10 @@ import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.remote.metadata.client.GetDataObjectRequest
 import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
+import org.opensearch.remote.metadata.common.SdkClientUtils
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.SortBuilders
 import org.opensearch.search.sort.SortOrder
@@ -203,10 +202,16 @@ class TransportGetAlertsAction @Inject constructor(
     }
 
     private suspend fun getMonitor(getAlertsRequest: GetAlertsRequest): Monitor? {
-        val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, getAlertsRequest.monitorId!!)
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        val getRequest = GetDataObjectRequest.builder()
+            .index(ScheduledJob.SCHEDULED_JOBS_INDEX)
+            .id(getAlertsRequest.monitorId!!)
+            .tenantId(tenantId)
+            .build()
         try {
-            val getResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }
-            if (!getResponse.isExists) {
+            val response = sdkClient.getDataObject(getRequest)
+            val getResponse = response.getResponse()
+            if (getResponse == null || !getResponse.isExists) {
                 return null
             }
             val xcp = XContentHelper.createParser(
@@ -246,33 +251,40 @@ class TransportGetAlertsAction @Inject constructor(
     }
 
     fun search(alertIndex: String, searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetAlertsResponse>) {
-        val searchRequest = SearchRequest()
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        val sdkSearchRequest = SearchDataObjectRequest.builder()
             .indices(alertIndex)
-            .source(searchSourceBuilder)
+            .tenantId(tenantId)
+            .searchSourceBuilder(searchSourceBuilder)
+            .build()
 
-        client.search(
-            searchRequest,
-            object : ActionListener<SearchResponse> {
-                override fun onResponse(response: SearchResponse) {
-                    val totalAlertCount = response.hits.totalHits?.value?.toInt()
-                    val alerts = response.hits.map { hit ->
-                        val xcp = XContentHelper.createParser(
-                            xContentRegistry,
-                            LoggingDeprecationHandler.INSTANCE,
-                            hit.sourceRef,
-                            XContentType.JSON
-                        )
-                        XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                        val alert = Alert.parse(xcp, hit.id, hit.version)
-                        alert
-                    }
-                    actionListener.onResponse(GetAlertsResponse(alerts, totalAlertCount))
-                }
-
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(t)
-                }
+        sdkClient.searchDataObjectAsync(sdkSearchRequest).whenComplete { response, throwable ->
+            if (throwable != null) {
+                actionListener.onFailure(SdkClientUtils.unwrapAndConvertToException(throwable))
+                return@whenComplete
             }
-        )
+            try {
+                val searchResponse = response.searchResponse()
+                if (searchResponse == null) {
+                    actionListener.onResponse(GetAlertsResponse(emptyList(), 0))
+                    return@whenComplete
+                }
+                val totalAlertCount = searchResponse.hits.totalHits?.value?.toInt()
+                val alerts = searchResponse.hits.map { hit ->
+                    val xcp = XContentHelper.createParser(
+                        xContentRegistry,
+                        LoggingDeprecationHandler.INSTANCE,
+                        hit.sourceRef,
+                        XContentType.JSON
+                    )
+                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+                    Alert.parse(xcp, hit.id, hit.version)
+                }
+                actionListener.onResponse(GetAlertsResponse(alerts, totalAlertCount))
+            } catch (e: Exception) {
+                log.error("Failed to search alerts", e)
+                actionListener.onFailure(AlertingException.wrap(e))
+            }
+        }
     }
 }

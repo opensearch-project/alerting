@@ -11,13 +11,10 @@ import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionRequest
-import org.opensearch.action.delete.DeleteRequest
-import org.opensearch.action.search.SearchRequest
-import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.comments.CommentsIndices.Companion.ALL_COMMENTS_INDEX_PATTERN
-import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -38,7 +35,9 @@ import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.remote.metadata.client.DeleteDataObjectRequest
 import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -127,12 +126,16 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
                 // or if the user is Admin
                 val canDelete = user == null || user.name == comment.user?.name || isAdmin(user)
 
-                val deleteRequest = DeleteRequest(sourceIndex, commentId)
+                val deleteRequest = DeleteDataObjectRequest.builder()
+                    .index(sourceIndex)
+                    .id(commentId)
+                    .tenantId(client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER))
+                    .build()
 
                 if (canDelete) {
-                    log.debug("Deleting the comment with id ${deleteRequest.id()}")
-                    val deleteResponse = client.suspendUntil { delete(deleteRequest, it) }
-                    actionListener.onResponse(DeleteCommentResponse(deleteResponse.id))
+                    log.debug("Deleting the comment with id $commentId")
+                    val deleteResponse = sdkClient.deleteDataObject(deleteRequest)
+                    actionListener.onResponse(DeleteCommentResponse(deleteResponse.id()))
                 } else {
                     actionListener.onFailure(
                         AlertingException("Not allowed to delete this comment!", RestStatus.FORBIDDEN, IllegalStateException())
@@ -153,12 +156,15 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
                     .version(true)
                     .seqNoAndPrimaryTerm(true)
                     .query(queryBuilder)
-            val searchRequest = SearchRequest()
-                .source(searchSourceBuilder)
+            val searchRequest = SearchDataObjectRequest.builder()
                 .indices(ALL_COMMENTS_INDEX_PATTERN)
+                .tenantId(client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER))
+                .searchSourceBuilder(searchSourceBuilder)
+                .build()
 
-            val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
-            val comments = searchResponse.hits.map { hit ->
+            val sdkResponse = sdkClient.searchDataObject(searchRequest)
+            val searchResponse = sdkResponse.searchResponse()
+            val comments = searchResponse?.hits?.map { hit ->
                 val xcp = XContentHelper.createParser(
                     NamedXContentRegistry.EMPTY,
                     LoggingDeprecationHandler.INSTANCE,
@@ -171,7 +177,7 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
                 comment
             }
 
-            if (comments.isEmpty()) {
+            if (comments.isNullOrEmpty()) {
                 actionListener.onFailure(
                     AlertingException.wrap(
                         OpenSearchStatusException("Comment not found", RestStatus.NOT_FOUND),

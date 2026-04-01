@@ -11,11 +11,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
-import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteMonitorAction
@@ -39,13 +38,14 @@ import org.opensearch.commons.authuser.User
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.remote.metadata.client.GetDataObjectRequest
 import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.common.SdkClientUtils
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.time.Instant
 import java.util.Locale
-
 private val log = LogManager.getLogger(TransportExecuteMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
@@ -103,35 +103,44 @@ class TransportExecuteMonitorAction @Inject constructor(
             }
 
             if (execMonitorRequest.monitorId != null) {
-                val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX).id(execMonitorRequest.monitorId)
-                client.get(
-                    getRequest,
-                    object : ActionListener<GetResponse> {
-                        override fun onResponse(response: GetResponse) {
-                            if (!response.isExists) {
-                                actionListener.onFailure(
-                                    AlertingException.wrap(
-                                        OpenSearchStatusException("Can't find monitor with id: ${response.id}", RestStatus.NOT_FOUND)
+                val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+                val getRequest = GetDataObjectRequest.builder()
+                    .index(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                    .id(execMonitorRequest.monitorId)
+                    .tenantId(tenantId)
+                    .build()
+                sdkClient.getDataObjectAsync(getRequest).whenComplete { response, throwable ->
+                    if (throwable != null) {
+                        actionListener.onFailure(AlertingException.wrap(SdkClientUtils.unwrapAndConvertToException(throwable)))
+                        return@whenComplete
+                    }
+                    try {
+                        val getResponse = response.getResponse()
+                        if (getResponse == null || !getResponse.isExists) {
+                            actionListener.onFailure(
+                                AlertingException.wrap(
+                                    OpenSearchStatusException(
+                                        "Can't find monitor with id: ${execMonitorRequest.monitorId}",
+                                        RestStatus.NOT_FOUND
                                     )
                                 )
-                                return
-                            }
-                            if (!response.isSourceEmpty) {
-                                XContentHelper.createParser(
-                                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                                    response.sourceAsBytesRef, XContentType.JSON
-                                ).use { xcp ->
-                                    val monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
-                                    executeMonitor(monitor)
-                                }
+                            )
+                            return@whenComplete
+                        }
+                        if (!getResponse.isSourceEmpty) {
+                            XContentHelper.createParser(
+                                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                                getResponse.sourceAsBytesRef, XContentType.JSON
+                            ).use { xcp ->
+                                val monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+                                executeMonitor(monitor)
                             }
                         }
-
-                        override fun onFailure(t: Exception) {
-                            actionListener.onFailure(AlertingException.wrap(t))
-                        }
+                    } catch (e: Exception) {
+                        log.error("Failed to get monitor ${execMonitorRequest.monitorId} for execution", e)
+                        actionListener.onFailure(AlertingException.wrap(e))
                     }
-                )
+                }
             } else {
                 val monitor = when (user?.name.isNullOrEmpty()) {
                     true -> execMonitorRequest.monitor as Monitor
