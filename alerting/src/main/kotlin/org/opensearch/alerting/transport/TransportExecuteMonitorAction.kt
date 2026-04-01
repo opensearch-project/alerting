@@ -135,6 +135,15 @@ class TransportExecuteMonitorAction @Inject constructor(
                                 val monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
                                 executeMonitor(monitor)
                             }
+                        } else {
+                            actionListener.onFailure(
+                                AlertingException.wrap(
+                                    OpenSearchStatusException(
+                                        "Monitor source is empty for id: ${execMonitorRequest.monitorId}",
+                                        RestStatus.NOT_FOUND
+                                    )
+                                )
+                            )
                         }
                     } catch (e: Exception) {
                         log.error("Failed to get monitor ${execMonitorRequest.monitorId} for execution", e)
