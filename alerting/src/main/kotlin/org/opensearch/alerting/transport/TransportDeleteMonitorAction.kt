@@ -111,6 +111,9 @@ class TransportDeleteMonitorAction @Inject constructor(
                         AlertingException("Not allowed to delete this monitor!", RestStatus.FORBIDDEN, IllegalStateException())
                     )
                 }
+            } catch (t: OpenSearchStatusException) {
+                log.error("Failed to delete monitor $monitorId", t)
+                actionListener.onFailure(t)
             } catch (t: Exception) {
                 log.error("Failed to delete monitor $monitorId", t)
                 actionListener.onFailure(AlertingException.wrap(t))
@@ -137,9 +140,9 @@ class TransportDeleteMonitorAction @Inject constructor(
                 )
                 return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
             } catch (e: Exception) {
-                if (e is OpenSearchStatusException) throw e
+                if (e is OpenSearchStatusException && e.status() == RestStatus.NOT_FOUND) throw e
                 log.error("GetMonitor operation failed for $monitorId", e)
-                throw OpenSearchStatusException("Monitor with $monitorId is not found", RestStatus.NOT_FOUND, e)
+                throw OpenSearchStatusException("Monitor with $monitorId is not found", RestStatus.NOT_FOUND)
             }
         }
     }
