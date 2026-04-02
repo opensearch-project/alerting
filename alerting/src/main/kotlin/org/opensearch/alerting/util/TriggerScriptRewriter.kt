@@ -6,9 +6,9 @@
 package org.opensearch.alerting.util
 
 /**
- * Rewrites Painless trigger scripts for remote evaluation on the customer's cluster.
- * They are sent to the customer's cluster via a filter aggregation.
- * The script context on the customer's cluster uses `params` instead of `ctx`,
+ * Rewrites Painless trigger scripts for remote evaluation on the user's cluster.
+ * They are sent to the user's cluster via a filter aggregation.
+ * The script context on the user's cluster uses `params` instead of `ctx`,
  * so all references to `ctx.results[0]` must be replaced with `params.results_0`.
  */
 object TriggerScriptRewriter {

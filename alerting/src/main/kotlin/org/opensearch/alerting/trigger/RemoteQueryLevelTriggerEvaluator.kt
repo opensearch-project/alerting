@@ -21,7 +21,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.transport.client.Client
 
 /**
- * Evaluates query-level triggers remotely on the customer's cluster via filter aggregations.
+ * Evaluates query-level triggers remotely on the user's cluster via filter aggregations.
  *
  * This evaluator:
  * 1. Rewrites trigger scripts from `ctx.results[0]` to `params.results_0`
@@ -36,9 +36,9 @@ object RemoteQueryLevelTriggerEvaluator {
 
     /**
      * Evaluates all triggers for a query-level monitor by sending a filter-agg request
-     * to the customer's cluster.
+     * to the user's cluster.
      *
-     * @param client The client connected to the customer's cluster
+     * @param client The client connected to the user's cluster
      * @param indices The indices to target (same as the monitor's search input)
      * @param triggers The query-level triggers to evaluate
      * @param searchResponse The full search response from the monitor's query (Call 1)

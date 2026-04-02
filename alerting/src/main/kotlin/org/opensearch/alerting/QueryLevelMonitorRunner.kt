@@ -80,7 +80,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
 
         // When multi-tenant trigger eval is enabled, batch-evaluate all query-level triggers
-        // remotely on the customer's cluster instead of running Painless locally
+        // remotely on the user's cluster instead of running Painless locally
         val remoteTriggerResults = if (
             monitorCtx.multiTenantTriggerEvalEnabled &&
             Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.QUERY_LEVEL_MONITOR &&

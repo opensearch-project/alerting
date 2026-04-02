@@ -18,7 +18,7 @@ import java.time.temporal.ChronoUnit
 /**
  * Integration tests for query-level trigger evaluation with the multi-tenant trigger eval flag enabled.
  * These tests verify that trigger scripts are correctly evaluated remotely via filter aggregations
- * on the customer's cluster instead of locally via ScriptService.
+ * on the user's cluster instead of locally via ScriptService.
  */
 class RemoteQueryLevelTriggerIT : AlertingRestTestCase() {
 
