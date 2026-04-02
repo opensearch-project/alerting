@@ -19,9 +19,6 @@ import org.opensearch.action.admin.cluster.health.ClusterHealthAction
 import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.health.ClusterHealthResponse
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
-import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
-import org.opensearch.action.index.IndexRequest
 import org.opensearch.action.index.IndexResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
@@ -29,6 +26,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -43,6 +41,7 @@ import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.addUserBackendRolesFilter
+import org.opensearch.alerting.util.await
 import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.use
@@ -51,7 +50,6 @@ import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
-import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
@@ -75,10 +73,13 @@ import org.opensearch.core.common.io.stream.NamedWriteableRegistry
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
+import org.opensearch.core.xcontent.ToXContentObject
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
 import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
+import org.opensearch.remote.metadata.client.GetDataObjectRequest
+import org.opensearch.remote.metadata.client.PutDataObjectRequest
 import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -508,30 +509,33 @@ class TransportIndexMonitorAction @Inject constructor(
                 log.debug("Created monitor's backend roles: $rbacRoles")
             }
 
-            val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                .setRefreshPolicy(request.refreshPolicy)
-                .source(request.monitor.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                .setIfSeqNo(request.seqNo)
-                .setIfPrimaryTerm(request.primaryTerm)
-                .timeout(indexTimeout)
+            log.info("Creating new monitor: ${request.monitor.name}, type: ${request.monitor.monitorType}")
 
-            log.info(
-                "Creating new monitor: ${request.monitor.toXContentWithUser(
-                    jsonBuilder(),
-                    ToXContent.MapParams(mapOf("with_type" to "true"))
-                )}"
-            )
+            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+            val monitorObj = ToXContentObject { builder, params ->
+                request.monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
+            }
+            val putRequest = PutDataObjectRequest.builder()
+                .index(SCHEDULED_JOBS_INDEX)
+                .tenantId(tenantId)
+                .dataObject(monitorObj)
+                .build()
 
             try {
-                val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
-                val failureReasons = checkShardsFailure(indexResponse)
-                if (failureReasons != null) {
-                    log.info(failureReasons.toString())
+                val putResponse = sdkClient.putDataObjectAsync(putRequest).await()
+                if (putResponse.isFailed) {
                     actionListener.onFailure(
-                        AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), indexResponse.status()))
+                        AlertingException.wrap(
+                            OpenSearchStatusException(
+                                "Failed to create monitor: ${putResponse.cause()?.message}",
+                                putResponse.status() ?: RestStatus.INTERNAL_SERVER_ERROR
+                            )
+                        )
                     )
                     return
                 }
+                val indexResponse = putResponse.indexResponse()
+                    ?: throw OpenSearchStatusException("No index response from SDK", RestStatus.INTERNAL_SERVER_ERROR)
                 var metadata: MonitorMetadata?
                 try { // delete monitor if metadata creation fails, log the right error and re-throw the error to fail listener
                     request.monitor = request.monitor.copy(id = indexResponse.id)
@@ -611,10 +615,16 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         private suspend fun updateMonitor() {
-            val getRequest = GetRequest(SCHEDULED_JOBS_INDEX, request.monitorId)
+            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+            val getRequest = GetDataObjectRequest.builder()
+                .index(SCHEDULED_JOBS_INDEX)
+                .id(request.monitorId)
+                .tenantId(tenantId)
+                .build()
             try {
-                val getResponse: GetResponse = client.suspendUntil { client.get(getRequest, it) }
-                if (!getResponse.isExists) {
+                val response = sdkClient.getDataObjectAsync(getRequest).await()
+                val getResponse = response.getResponse()
+                if (getResponse == null || !getResponse.isExists) {
                     actionListener.onFailure(
                         AlertingException.wrap(
                             OpenSearchStatusException("Monitor with ${request.monitorId} is not found", RestStatus.NOT_FOUND)
@@ -680,30 +690,38 @@ class TransportIndexMonitorAction @Inject constructor(
             }
 
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
-            val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
-                .setRefreshPolicy(request.refreshPolicy)
-                .source(request.monitor.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true"))))
-                .id(request.monitorId)
-                .setIfSeqNo(request.seqNo)
-                .setIfPrimaryTerm(request.primaryTerm)
-                .timeout(indexTimeout)
 
-            log.info(
-                "Updating monitor, ${currentMonitor.id}, from: ${currentMonitor.toXContentWithUser(
-                    jsonBuilder(),
-                    ToXContent.MapParams(mapOf("with_type" to "true"))
-                )} \n to: ${request.monitor.toXContentWithUser(jsonBuilder(), ToXContent.MapParams(mapOf("with_type" to "true")))}"
-            )
+            log.info("Updating monitor, ${currentMonitor.id}")
+
+            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+            val monitorObj = ToXContentObject { builder, params ->
+                request.monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
+            }
+            val putRequest = PutDataObjectRequest.builder()
+                .index(SCHEDULED_JOBS_INDEX)
+                .id(request.monitorId)
+                .tenantId(tenantId)
+                .ifSeqNo(request.seqNo)
+                .ifPrimaryTerm(request.primaryTerm)
+                .overwriteIfExists(true)
+                .dataObject(monitorObj)
+                .build()
 
             try {
-                val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
-                val failureReasons = checkShardsFailure(indexResponse)
-                if (failureReasons != null) {
+                val putResponse = sdkClient.putDataObjectAsync(putRequest).await()
+                if (putResponse.isFailed) {
                     actionListener.onFailure(
-                        AlertingException.wrap(OpenSearchStatusException(failureReasons.toString(), indexResponse.status()))
+                        AlertingException.wrap(
+                            OpenSearchStatusException(
+                                "Failed to update monitor: ${putResponse.cause()?.message}",
+                                putResponse.status() ?: RestStatus.INTERNAL_SERVER_ERROR
+                            )
+                        )
                     )
                     return
                 }
+                val indexResponse = putResponse.indexResponse()
+                    ?: throw OpenSearchStatusException("No index response from SDK", RestStatus.INTERNAL_SERVER_ERROR)
                 var isDocLevelMonitorRestarted = false
                 // Force re-creation of last run context if monitor is of type standard doc-level/threat-intel
                 // And monitor is re-enabled
