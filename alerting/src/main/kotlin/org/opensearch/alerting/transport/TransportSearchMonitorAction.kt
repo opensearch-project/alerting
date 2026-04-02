@@ -15,6 +15,7 @@ import org.opensearch.action.search.SearchResponse.Clusters
 import org.opensearch.action.search.ShardSearchFailure
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use
@@ -37,17 +38,17 @@ import org.opensearch.index.query.ExistsQueryBuilder
 import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
+import org.opensearch.remote.metadata.common.SdkClientUtils
 import org.opensearch.search.SearchHits
 import org.opensearch.search.aggregations.InternalAggregations
 import org.opensearch.search.internal.InternalSearchResponse
 import org.opensearch.search.profile.SearchProfileShardResults
 import org.opensearch.search.suggest.Suggest
 import org.opensearch.tasks.Task
-import org.opensearch.transport.RemoteTransportException
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.util.Collections
-
 private val log = LogManager.getLogger(TransportSearchMonitorAction::class.java)
 
 class TransportSearchMonitorAction @Inject constructor(
@@ -139,34 +140,40 @@ class TransportSearchMonitorAction @Inject constructor(
 
     // Checks if the exception is caused by an IndexNotFoundException (directly or nested).
     private fun isIndexNotFoundException(e: Exception): Boolean {
-        if (e is IndexNotFoundException) return true
-        if (e is RemoteTransportException) {
-            val cause = e.cause
+        var cause: Throwable? = e
+        while (cause != null) {
             if (cause is IndexNotFoundException) return true
+            cause = cause.cause
         }
         return false
     }
 
     fun search(searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>) {
-        client.search(
-            searchRequest,
-            object : ActionListener<SearchResponse> {
-                override fun onResponse(response: SearchResponse) {
-                    actionListener.onResponse(response)
-                }
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        val sdkSearchRequest = SearchDataObjectRequest.builder()
+            .indices(*searchRequest.indices())
+            .tenantId(tenantId)
+            .searchSourceBuilder(searchRequest.source())
+            .build()
 
-                override fun onFailure(ex: Exception) {
-                    if (isIndexNotFoundException(ex)) {
-                        log.error("Index not found while searching monitor", ex)
-                        val emptyResponse = getEmptySearchResponse()
-                        actionListener.onResponse(emptyResponse)
-                    } else {
-                        log.error("Unexpected error while searching monitor", ex)
-                        actionListener.onFailure(AlertingException.wrap(ex))
-                    }
+        sdkClient.searchDataObjectAsync(sdkSearchRequest).whenComplete { response, throwable ->
+            if (throwable != null) {
+                val cause = SdkClientUtils.unwrapAndConvertToException(throwable)
+                if (isIndexNotFoundException(cause)) {
+                    actionListener.onResponse(getEmptySearchResponse())
+                } else {
+                    log.error("Unexpected error while searching monitor", cause)
+                    actionListener.onFailure(AlertingException.wrap(cause))
                 }
+                return@whenComplete
             }
-        )
+            val searchResponse = response.searchResponse()
+            if (searchResponse != null) {
+                actionListener.onResponse(searchResponse)
+            } else {
+                actionListener.onResponse(getEmptySearchResponse())
+            }
+        }
     }
 
     private fun addOwnerFieldIfNotExists(searchRequest: SearchRequest) {

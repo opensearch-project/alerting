@@ -11,12 +11,10 @@ import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionRequest
-import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
-import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
@@ -36,6 +34,7 @@ import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.remote.metadata.client.GetDataObjectRequest
 import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -102,6 +101,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                             IllegalStateException()
                         )
                     )
+                    return
                 } else if (canDelete) {
                     actionListener.onResponse(
                         DeleteMonitorService.deleteMonitor(monitor, refreshPolicy)
@@ -111,6 +111,9 @@ class TransportDeleteMonitorAction @Inject constructor(
                         AlertingException("Not allowed to delete this monitor!", RestStatus.FORBIDDEN, IllegalStateException())
                     )
                 }
+            } catch (t: OpenSearchStatusException) {
+                log.error("Failed to delete monitor $monitorId", t)
+                actionListener.onFailure(t)
             } catch (t: Exception) {
                 log.error("Failed to delete monitor $monitorId", t)
                 actionListener.onFailure(AlertingException.wrap(t))
@@ -118,21 +121,29 @@ class TransportDeleteMonitorAction @Inject constructor(
         }
 
         private suspend fun getMonitor(): Monitor {
-            val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
+            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+            val getRequest = GetDataObjectRequest.builder()
+                .index(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                .id(monitorId)
+                .tenantId(tenantId)
+                .build()
 
-            val getResponse: GetResponse = client.suspendUntil { get(getRequest, it) }
-            if (getResponse.isExists == false) {
-                actionListener.onFailure(
-                    AlertingException.wrap(
-                        OpenSearchStatusException("Monitor with $monitorId is not found", RestStatus.NOT_FOUND)
-                    )
+            try {
+                val response = sdkClient.getDataObject(getRequest)
+                val getResponse = response.getResponse()
+                if (getResponse == null || !getResponse.isExists) {
+                    throw OpenSearchStatusException("Monitor with $monitorId is not found", RestStatus.NOT_FOUND)
+                }
+                val xcp = XContentHelper.createParser(
+                    xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                    getResponse.sourceAsBytesRef, XContentType.JSON
                 )
+                return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+            } catch (e: Exception) {
+                if (e is OpenSearchStatusException && e.status() == RestStatus.NOT_FOUND) throw e
+                log.error("GetMonitor operation failed for $monitorId", e)
+                throw OpenSearchStatusException("Monitor with $monitorId is not found", RestStatus.NOT_FOUND)
             }
-            val xcp = XContentHelper.createParser(
-                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                getResponse.sourceAsBytesRef, XContentType.JSON
-            )
-            return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
         }
     }
 }
