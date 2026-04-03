@@ -259,6 +259,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             monitorCtx.totalNodesFanOut = it
         }
 
+        monitorCtx.multiTenantTriggerEvalEnabled = AlertingSettings.MULTI_TENANT_TRIGGER_EVAL_ENABLED.get(monitorCtx.settings)
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.MULTI_TENANT_TRIGGER_EVAL_ENABLED) {
+            monitorCtx.multiTenantTriggerEvalEnabled = it
+        }
+
         return this
     }
 
