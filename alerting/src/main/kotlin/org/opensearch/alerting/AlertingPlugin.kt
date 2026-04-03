@@ -466,7 +466,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.REMOTE_METADATA_STORE_TYPE,
             AlertingSettings.REMOTE_METADATA_ENDPOINT,
             AlertingSettings.REMOTE_METADATA_REGION,
-            AlertingSettings.REMOTE_METADATA_SERVICE_NAME
+            AlertingSettings.REMOTE_METADATA_SERVICE_NAME,
+            AlertingSettings.MULTI_TENANT_TRIGGER_EVAL_ENABLED
         )
     }
 
