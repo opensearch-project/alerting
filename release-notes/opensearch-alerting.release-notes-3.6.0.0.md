@@ -20,10 +20,12 @@ Compatible with OpenSearch and OpenSearch Dashboards version 3.6.0
 ### Infrastructure
 
 * Replace `Thread.sleep` with `OpenSearchTestCase.waitUntil` in integration tests for more reliable test execution ([#2041](https://github.com/opensearch-project/alerting/pull/2041))
-* Update Gradle wrapper from 9.2.0 to 9.4.0 ([#2040](https://github.com/opensearch-project/alerting/pull/2040))
-* Update shadow plugin usage to replace deprecated API ([#2022](https://github.com/opensearch-project/alerting/pull/2022))
 
 ### Maintenance
 
+* Change Gradle wrapper from 9.2.0 to 9.4.0 ([#2040](https://github.com/opensearch-project/alerting/pull/2040))
+* Update shadow plugin usage to replace deprecated API ([#2022](https://github.com/opensearch-project/alerting/pull/2022))
 * Remove experimental PPL alerting feature assets pending refactoring for a future release ([#2017](https://github.com/opensearch-project/alerting/pull/2017))
-* Revert SdkClient-related changes merged during code freeze; moved to feature branch for continued development ([#2057](https://github.com/opensearch-project/alerting/pull/2057))
+* Inject SdkClient into transport actions for SDK persistence support ([#2052](https://github.com/opensearch-project/alerting/pull/2052))
+* Integrate remote metadata SDK client with alerting plugin ([#2047](https://github.com/opensearch-project/alerting/pull/2047))
+* Revert SdkClient changes merged during code freeze ([#2057](https://github.com/opensearch-project/alerting/pull/2057))
