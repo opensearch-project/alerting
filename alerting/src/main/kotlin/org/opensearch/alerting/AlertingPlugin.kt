@@ -357,6 +357,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             xContentRegistry,
             settings
         )
+        MonitorMetadataService.sdkClient = sdkClient
 
         WorkflowMetadataService.initialize(
             client,
