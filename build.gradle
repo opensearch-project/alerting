@@ -90,6 +90,10 @@ task ktlint(type: JavaExec, group: "verification") {
     description = "Check Kotlin code style."
     mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
+    jvmArgs = [
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/java.util=ALL-UNNAMED"
+    ]
     args "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
     
     // Skip on JDK 25
@@ -102,6 +106,10 @@ task ktlintFormat(type: JavaExec, group: "formatting") {
     description = "Fix Kotlin code style deviations."
     mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
+    jvmArgs = [
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/java.util=ALL-UNNAMED"
+    ]
     args "-F", "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
     
     // Skip on JDK 25 until ktlint fully supports it
