@@ -23,7 +23,9 @@ import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.utils.getInvalidNameChars
+import org.opensearch.commons.utils.isValidId
 import org.opensearch.commons.utils.isValidName
+import org.opensearch.commons.utils.isValidQueryName
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentParser.Token
@@ -86,6 +88,14 @@ class RestIndexMonitorAction : BaseRestHandler() {
             throw AlertingException.wrap(IllegalArgumentException("Missing monitor ID"))
         }
 
+        // Check if the ID is valid
+        if (request.method() == PUT && !isValidId(id)) {
+            throw IllegalArgumentException(
+                "Invalid monitor ID [$id]. " +
+                    "Monitor ID should be alphanumeric string with +, /, _, or - characters only."
+            )
+        }
+
         // Validate request by parsing JSON to Monitor
         val xcp = request.contentParser()
         ensureExpectedToken(Token.START_OBJECT, xcp.nextToken(), xcp)
@@ -94,6 +104,14 @@ class RestIndexMonitorAction : BaseRestHandler() {
         val rbacRoles: List<String>?
         try {
             monitor = Monitor.parse(xcp, id).copy(lastUpdateTime = Instant.now())
+
+            // Validate if the monitor name is valid
+            if (!isValidName(monitor.name)) {
+                throw IllegalArgumentException(
+                    "Invalid monitor name [${monitor.name}]. " +
+                        "Monitor Name should be alphanumeric (4-50 chars) starting with letter or underscore."
+                )
+            }
 
             rbacRoles = request.contentParser().map()["rbac_roles"] as List<String>?
 
@@ -106,7 +124,22 @@ class RestIndexMonitorAction : BaseRestHandler() {
                     Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {
                         triggers.forEach {
                             if (it !is QueryLevelTrigger) {
-                                throw (IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for query level monitor"))
+                                throw (IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for query level monitor."))
+                            }
+                            if (!isValidName(it.name)) {
+                                throw IllegalArgumentException(
+                                    "Invalid trigger name [${it.name}]. " +
+                                        "Trigger Name should be alphanumeric (4-50 chars) starting with letter or underscore."
+                                )
+                            }
+                            it.actions.forEach { action ->
+                                val destinationId = action.destinationId
+                                if (!isValidId(destinationId)) {
+                                    throw IllegalArgumentException(
+                                        "Invalid destination ID [$destinationId]. " +
+                                            "Destination ID should be alphanumeric string with +, /, _, or - characters only."
+                                    )
+                                }
                             }
                         }
                     }
@@ -114,7 +147,22 @@ class RestIndexMonitorAction : BaseRestHandler() {
                     Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> {
                         triggers.forEach {
                             if (it !is BucketLevelTrigger) {
-                                throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for bucket level monitor")
+                                throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for bucket level monitor.")
+                            }
+                            if (!isValidName(it.name)) {
+                                throw IllegalArgumentException(
+                                    "Invalid trigger name [${it.name}]. " +
+                                        "Trigger Name should be alphanumeric (4-50 chars) starting with letter or underscore."
+                                )
+                            }
+                            it.actions.forEach { action ->
+                                val destinationId = action.destinationId
+                                if (!isValidId(destinationId)) {
+                                    throw IllegalArgumentException(
+                                        "Invalid destination ID [$destinationId]. " +
+                                            "Destination ID should be alphanumeric string with +, /, _, or - characters only."
+                                    )
+                                }
                             }
                         }
                     }
@@ -122,7 +170,22 @@ class RestIndexMonitorAction : BaseRestHandler() {
                     Monitor.MonitorType.CLUSTER_METRICS_MONITOR -> {
                         triggers.forEach {
                             if (it !is QueryLevelTrigger) {
-                                throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for cluster metrics monitor")
+                                throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for cluster metrics monitor.")
+                            }
+                            if (!isValidName(it.name)) {
+                                throw IllegalArgumentException(
+                                    "Invalid trigger name [${it.name}]. " +
+                                        "Trigger Name should be alphanumeric (4-50 chars) starting with letter or underscore."
+                                )
+                            }
+                            it.actions.forEach { action ->
+                                val destinationId = action.destinationId
+                                if (!isValidId(destinationId)) {
+                                    throw IllegalArgumentException(
+                                        "Invalid destination ID [$destinationId]. " +
+                                            "Destination ID should be alphanumeric string with +, /, _, or - characters only."
+                                    )
+                                }
                             }
                         }
                     }
@@ -131,7 +194,22 @@ class RestIndexMonitorAction : BaseRestHandler() {
                         validateDocLevelQueryName(monitor)
                         triggers.forEach {
                             if (it !is DocumentLevelTrigger) {
-                                throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for document level monitor")
+                                throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for document level monitor.")
+                            }
+                            if (!isValidName(it.name)) {
+                                throw IllegalArgumentException(
+                                    "Invalid trigger name [${it.name}]. " +
+                                        "Trigger Name should be alphanumeric (4-50 chars) starting with letter or underscore."
+                                )
+                            }
+                            it.actions.forEach { action ->
+                                val destinationId = action.destinationId
+                                if (!isValidId(destinationId)) {
+                                    throw IllegalArgumentException(
+                                        "Invalid destination ID [$destinationId]. " +
+                                            "Destination ID should be alphanumeric string with +, /, _, or - characters only."
+                                    )
+                                }
                             }
                         }
                     }
@@ -158,7 +236,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
     private fun validateDocLevelQueryName(monitor: Monitor) {
         monitor.inputs.filterIsInstance<DocLevelMonitorInput>().forEach { docLevelMonitorInput ->
             docLevelMonitorInput.queries.forEach { dlq ->
-                if (!isValidName(dlq.name)) {
+                if (!isValidQueryName(dlq.name)) {
                     throw IllegalArgumentException(
                         "Doc level query name may not start with [_, +, -], contain '..', or contain: " +
                             getInvalidNameChars().replace("\\", "")
