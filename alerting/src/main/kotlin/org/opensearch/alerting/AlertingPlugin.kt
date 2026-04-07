@@ -298,7 +298,21 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         val settings = environment.settings()
         val lockService = LockService(client, clusterService)
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
-        val alertService = AlertService(client, xContentRegistry, alertIndices)
+
+        val sdkClient: SdkClient = SdkClientFactory.createSdkClient(
+            client,
+            xContentRegistry,
+            mapOf(
+                REMOTE_METADATA_TYPE_KEY to REMOTE_METADATA_STORE_TYPE.get(settings),
+                REMOTE_METADATA_ENDPOINT_KEY to REMOTE_METADATA_ENDPOINT.get(settings),
+                REMOTE_METADATA_REGION_KEY to REMOTE_METADATA_REGION.get(settings),
+                REMOTE_METADATA_SERVICE_NAME_KEY to REMOTE_METADATA_SERVICE_NAME.get(settings),
+                TENANT_AWARE_KEY to MULTI_TENANCY_ENABLED.get(settings).toString()
+            ),
+            client.threadPool().executor(ThreadPool.Names.GENERIC)
+        )
+
+        val alertService = AlertService(client, xContentRegistry, alertIndices, sdkClient)
         val triggerService = TriggerService(scriptService)
         runner = MonitorRunnerService
             .registerClusterService(clusterService)
@@ -338,26 +352,13 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         this.threadPool = threadPool
         this.clusterService = clusterService
 
-        val sdkClient: SdkClient = SdkClientFactory.createSdkClient(
-            client,
-            xContentRegistry,
-            mapOf(
-                REMOTE_METADATA_TYPE_KEY to REMOTE_METADATA_STORE_TYPE.get(settings),
-                REMOTE_METADATA_ENDPOINT_KEY to REMOTE_METADATA_ENDPOINT.get(settings),
-                REMOTE_METADATA_REGION_KEY to REMOTE_METADATA_REGION.get(settings),
-                REMOTE_METADATA_SERVICE_NAME_KEY to REMOTE_METADATA_SERVICE_NAME.get(settings),
-                TENANT_AWARE_KEY to MULTI_TENANCY_ENABLED.get(settings).toString()
-            ),
-            client.threadPool().executor(ThreadPool.Names.GENERIC)
-        )
-
         MonitorMetadataService.initialize(
             client,
             clusterService,
             xContentRegistry,
-            settings
+            settings,
+            sdkClient
         )
-        MonitorMetadataService.sdkClient = sdkClient
 
         WorkflowMetadataService.initialize(
             client,
