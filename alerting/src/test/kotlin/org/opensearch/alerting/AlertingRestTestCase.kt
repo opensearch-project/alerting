@@ -1400,11 +1400,10 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response.asMap()
     }
 
-    fun RestClient.getSettings(): Map<String, Any> {
-        val response = this.makeRequest(
-            "GET",
-            "_cluster/settings?flat_settings=true"
-        )
+    fun RestClient.getSettings(includeDefaults: Boolean = false): Map<String, Any> {
+        var url = "_cluster/settings?flat_settings=true"
+        if (includeDefaults) url += "&include_defaults=true"
+        val response = this.makeRequest("GET", url)
         assertEquals(RestStatus.OK, response.restStatus())
         return response.asMap()
     }
