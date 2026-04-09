@@ -22,13 +22,13 @@ import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.test.ClusterServiceUtils
 import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-
 class AlertServiceTests : OpenSearchTestCase() {
 
     private lateinit var client: Client
@@ -67,7 +67,7 @@ class AlertServiceTests : OpenSearchTestCase() {
         clusterService = Mockito.spy(testClusterService)
 
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
-        alertService = AlertService(client, xContentRegistry, alertIndices)
+        alertService = AlertService(client, xContentRegistry, alertIndices, Mockito.mock(SdkClient::class.java))
     }
 
     fun `test getting categorized alerts for bucket-level monitor with no current alerts`() {

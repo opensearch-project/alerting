@@ -56,7 +56,7 @@ object MonitorMetadataService :
     private lateinit var xContentRegistry: NamedXContentRegistry
     private lateinit var clusterService: ClusterService
     private lateinit var settings: Settings
-    lateinit var sdkClient: SdkClient
+    private lateinit var sdkClient: SdkClient
 
     @Volatile
     private lateinit var indexTimeout: TimeValue
@@ -66,11 +66,13 @@ object MonitorMetadataService :
         clusterService: ClusterService,
         xContentRegistry: NamedXContentRegistry,
         settings: Settings,
+        sdkClient: SdkClient
     ) {
         this.clusterService = clusterService
         this.client = client
         this.xContentRegistry = xContentRegistry
         this.settings = settings
+        this.sdkClient = sdkClient
         this.indexTimeout = AlertingSettings.INDEX_TIMEOUT.get(settings)
         this.clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.INDEX_TIMEOUT) { indexTimeout = it }
     }
@@ -191,21 +193,12 @@ object MonitorMetadataService :
                 null
             }
         } catch (e: Exception) {
-            if (isIndexNotFoundException(e)) {
+            if (AlertingException.isIndexNotFoundException(e)) {
                 return null
             } else {
                 throw AlertingException.wrap(e)
             }
         }
-    }
-
-    private fun isIndexNotFoundException(e: Throwable): Boolean {
-        var cause: Throwable? = e
-        while (cause != null) {
-            if (cause.message?.contains("no such index") == true) return true
-            cause = cause.cause
-        }
-        return false
     }
 
     suspend fun recreateRunContext(metadata: MonitorMetadata, monitor: Monitor): MonitorMetadata {
