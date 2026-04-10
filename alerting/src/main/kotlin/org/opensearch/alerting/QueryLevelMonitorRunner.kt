@@ -6,9 +6,6 @@
 package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
-import org.json.JSONObject
-import org.opensearch.alerting.PPLUtils.capPPLQueryResultsSize
-import org.opensearch.alerting.PPLUtils.constructPPLQueryResultsMap
 import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
@@ -18,11 +15,11 @@ import org.opensearch.alerting.trigger.RemoteQueryLevelTriggerEvaluator
 import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.commons.alerting.model.Alert
-import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.PPLSQLInput
 import org.opensearch.commons.alerting.model.PPLSQLTrigger
+import org.opensearch.commons.alerting.model.PPLSQLTrigger.ConditionType
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.SearchInput
@@ -65,7 +62,26 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             logger.error("Error loading alerts for monitor: $id", e)
             return monitorResult.copy(error = e)
         }
-        if (!isADMonitor(monitor)) {
+
+        if (isADMonitor(monitor)) {
+            monitorResult = monitorResult.copy(
+                inputResults = monitorCtx.inputService!!.collectInputResultsForADMonitor(monitor, periodStart, periodEnd)
+            )
+        } else if (monitor.isPplSqlMonitor()) {
+            withClosableContext(
+                InjectorContextElement(
+                    monitor.id,
+                    monitorCtx.settings!!,
+                    monitorCtx.threadPool!!.threadContext,
+                    monitor.user?.roles,
+                    monitor.user
+                )
+            ) {
+                monitorResult = monitorResult.copy(
+                    inputResults = monitorCtx.inputService!!.collectInputResultsForPPLMonitor(monitor, monitorCtx, transportService)
+                )
+            }
+        } else {
             withClosableContext(
                 InjectorContextElement(
                     monitor.id,
@@ -75,26 +91,16 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                     monitor.user
                 )
             ) {
-                // If monitor is Query-level, proceed with collecting input results as usual.
-                // If monitor is PPLSQL Monitor, input results have to be collected during
-                // trigger execution because the PPL query run can be different per trigger.
-                // In the PPLSQL case, delay storing the input results until after trigger execution.
-                if (!monitor.isPplSqlMonitor()) {
-                    monitorResult = monitorResult.copy(
-                        inputResults = monitorCtx.inputService!!.collectInputResults(
-                            monitor,
-                            periodStart,
-                            periodEnd,
-                            null,
-                            workflowRunContext
-                        )
+                monitorResult = monitorResult.copy(
+                    inputResults = monitorCtx.inputService!!.collectInputResults(
+                        monitor,
+                        periodStart,
+                        periodEnd,
+                        null,
+                        workflowRunContext
                     )
-                }
+                )
             }
-        } else {
-            monitorResult = monitorResult.copy(
-                inputResults = monitorCtx.inputService!!.collectInputResultsForADMonitor(monitor, periodStart, periodEnd)
-            )
         }
 
         val updatedAlerts = mutableListOf<Alert>()
@@ -126,10 +132,6 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             alertsToExecuteActionsForIds,
             maxComments
         )
-
-        // if this is a PPL/SQL Monitor run, this will be populated with
-        // the query results for each trigger
-        val pplSqlQueryResults = mutableMapOf<String, Map<String, Any>>()
 
         for (trigger in monitor.triggers) {
             val currentAlert = currentAlerts[trigger]
@@ -163,14 +165,24 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                         else monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger as QueryLevelTrigger, triggerCtx)
                     }
                     Monitor.MonitorType.PPL_MONITOR -> {
-                        monitorCtx.triggerService!!.runPplSqlTrigger(
-                            monitor,
-                            trigger as PPLSQLTrigger,
-                            (monitor.inputs[0] as PPLSQLInput).query,
-                            pplSqlQueryResults,
-                            monitorCtx,
-                            transportService
-                        )
+                        val pplSqlTrigger = trigger as PPLSQLTrigger
+
+                        if (pplSqlTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) {
+                            // number of results trigger case
+                            monitorCtx.triggerService!!.runPplSqlNumResultsTrigger(
+                                pplSqlTrigger,
+                                monitorResult.inputResults.pplBaseQueryNumResults
+                            )
+                        } else {
+                            // custom condition trigger case
+                            monitorCtx.triggerService!!.runPplSqlCustomTrigger(
+                                monitor,
+                                pplSqlTrigger,
+                                (monitor.inputs[0] as PPLSQLInput).query,
+                                monitorCtx,
+                                transportService
+                            )
+                        }
                     }
                     else ->
                         throw IllegalArgumentException("Unsupported monitor type: ${monitor.monitorType}.")
@@ -179,17 +191,26 @@ object QueryLevelMonitorRunner : MonitorRunner() {
 
             triggerResults[trigger.id] = triggerResult
 
-            // the query results passed into notifications and alerts must be size-capped and reformatted
-            val sizeCappedFormattedPPLQueryResults = pplSqlQueryResults[trigger.id]?.let {
-                val sizeCappedRows = capPPLQueryResultsSize(
-                    JSONObject(it),
-                    monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_QUERY_RESULTS_MAX_SIZE)
-                )
-                constructPPLQueryResultsMap(sizeCappedRows.toMap())
+            // PPL Alerting:
+            // what query results get stored in the Alert and Notification depends on the trigger type.
+            // if number of results: evaluated on base query, so base query results are included.
+            // if custom: the custom trigger ran its own query (base query + custom condition), so that query's results are included
+            // trigger is not PPLSQLTrigger: this is a query-level monitor run, simply include an empty list
+            val pplQueryResultsToInclude = if (trigger is PPLSQLTrigger && trigger.conditionType == ConditionType.NUMBER_OF_RESULTS) {
+                monitorResult.inputResults.pplBaseQueryResults
+            } else if (trigger is PPLSQLTrigger && trigger.conditionType == ConditionType.CUSTOM) {
+                triggerResult.pplCustomQueryResults
+            } else {
+                listOf()
             }
 
+            // PPL Alerting:
+            // triggerCtx hasn't been populated yet with the correct PPL query results
+            // to include in the notification, so populate that here.
+            // if this is a query-level monitor run, triggerCtx.pplQueryResults simply
+            // stays an empty list
             val postRunTriggerCtx = triggerCtx.copy(
-                pplSqlQueryResult = sizeCappedFormattedPPLQueryResults
+                pplQueryResults = pplQueryResultsToInclude
             )
 
             if (monitorCtx.triggerService!!.isQueryLevelTriggerActionable(triggerCtx, triggerResult, workflowRunContext)) {
@@ -204,19 +225,9 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                 triggerResult,
                 monitorResult.alertError() ?: triggerResult.alertError(),
                 executionId,
-                workflowRunContext,
-                monitorCtx,
-                sizeCappedFormattedPPLQueryResults
+                workflowRunContext
             )
             if (updatedAlert != null) updatedAlerts += updatedAlert
-        }
-
-        // store input results after trigger runs, as each trigger could have
-        // run a different query
-        if (monitor.isPplSqlMonitor()) {
-            monitorResult = monitorResult.copy(
-                inputResults = InputRunResults(results = pplSqlQueryResults.values.toList())
-            )
         }
 
         // Don't save alerts if this is a test monitor

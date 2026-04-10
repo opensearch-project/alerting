@@ -2232,7 +2232,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test execute PPL monitor execution timeout generates error alert`() {
+    fun `test execute num results PPL monitor execution timeout generates error alert`() {
         // Create test index with PPL-compatible mappings
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
         indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
@@ -2251,6 +2251,48 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                     )
                 ),
                 query = "source = $TEST_INDEX_NAME | head 10"
+            )
+        )
+
+        // Set monitor execution timeout to 1 nanosecond to force a timeout
+        adminClient().updateSettings(AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION.key, TimeValue.timeValueNanos(1))
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+        assertEquals(monitor.name, output["monitor_name"])
+
+        // Verify execute response contains error
+        @Suppress("UNCHECKED_CAST")
+        for (triggerResult in output.objectMap("trigger_results").values) {
+            assertTrue("Missing trigger error message", (triggerResult?.get("error") as? String)?.isNotEmpty() == true)
+        }
+
+        // Verify ERROR alert was created
+        val alerts = searchAlerts(monitor)
+        assertEquals("Alert not saved", 1, alerts.size)
+        verifyAlert(alerts.single(), monitor, ERROR)
+    }
+
+    fun `test execute custom condition PPL monitor execution timeout generates error alert`() {
+        // Create test index with PPL-compatible mappings
+        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
+        indexDocFromSomeTimeAgo(2, MINUTES, "abc", 5)
+
+        // Create PPL monitor with NUMBER_OF_RESULTS trigger condition
+        val monitor = createRandomPPLMonitor(
+            randomPPLMonitor(
+                enabled = true,
+                schedule = IntervalSchedule(interval = 1, unit = MINUTES),
+                triggers = listOf(
+                    randomPPLTrigger(
+                        conditionType = PPLSQLTrigger.ConditionType.CUSTOM,
+                        customCondition = "eval result = max_num > 5",
+                        numResultsCondition = null,
+                        numResultsValue = null
+                    )
+                ),
+                query = "source = $TEST_INDEX_NAME | stats max(number) as max_num by abc"
             )
         )
 

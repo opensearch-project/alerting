@@ -10,6 +10,7 @@ import org.apache.logging.log4j.LogManager
 import org.json.JSONObject
 import org.opensearch.alerting.PPLUtils.appendCustomCondition
 import org.opensearch.alerting.PPLUtils.appendDataRowsLimit
+import org.opensearch.alerting.PPLUtils.capAndReformatPPLQueryResults
 import org.opensearch.alerting.PPLUtils.executePplQuery
 import org.opensearch.alerting.PPLUtils.findEvalResultVar
 import org.opensearch.alerting.PPLUtils.findEvalResultVarIdxInSchema
@@ -40,7 +41,6 @@ import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.PPLSQLTrigger
-import org.opensearch.commons.alerting.model.PPLSQLTrigger.ConditionType
 import org.opensearch.commons.alerting.model.PPLSQLTrigger.NumResultsCondition
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
@@ -251,31 +251,95 @@ class TriggerService(val scriptService: ScriptService) {
         return keyValuesList
     }
 
-    suspend fun runPplSqlTrigger(
+    fun runPplSqlNumResultsTrigger(
+        pplSqlTrigger: PPLSQLTrigger,
+        numResults: Long?
+    ): QueryLevelTriggerRunResult {
+
+        if (numResults == null) {
+            return QueryLevelTriggerRunResult(
+                pplSqlTrigger.name,
+                true,
+                IllegalStateException("Did not receive a number of results from PPL query execution: ${pplSqlTrigger.id}")
+            )
+        }
+
+        if (pplSqlTrigger.numResultsCondition == null) {
+            return QueryLevelTriggerRunResult(
+                pplSqlTrigger.name,
+                true,
+                IllegalStateException("No number of results condition found for trigger: ${pplSqlTrigger.id}")
+            )
+        }
+
+        if (pplSqlTrigger.numResultsValue == null) {
+            return QueryLevelTriggerRunResult(
+                pplSqlTrigger.name,
+                true,
+                IllegalStateException("No number of results value found for trigger: ${pplSqlTrigger.id}")
+            )
+        }
+
+        val numResultsCondition = pplSqlTrigger.numResultsCondition!!
+        val numResultsValue = pplSqlTrigger.numResultsValue!!
+
+        val triggered = when (numResultsCondition) {
+            NumResultsCondition.GREATER_THAN -> numResults > numResultsValue
+            NumResultsCondition.GREATER_THAN_EQUAL -> numResults >= numResultsValue
+            NumResultsCondition.LESS_THAN -> numResults < numResultsValue
+            NumResultsCondition.LESS_THAN_EQUAL -> numResults <= numResultsValue
+            NumResultsCondition.EQUAL -> numResults == numResultsValue
+            NumResultsCondition.NOT_EQUAL -> numResults != numResultsValue
+        }
+
+        logger.debug("Number of Results PPLTrigger ${pplSqlTrigger.name} with ID ${pplSqlTrigger.id} triggered: $triggered")
+
+        // unlike evaluating custom conditions, where we must include the query results because
+        // a custom condition executes its own PPL query, number of results trigger evaluation
+        // doesn't need to include query results because they're evaluated purely on the size
+        // of the results. the results themselves are already held in QueryLevelMonitorRunner.kt
+        // (the caller of this function), so passing the results here only to return them again
+        // inside the QueryLevelTriggerRunResult would be redundant
+        return QueryLevelTriggerRunResult(pplSqlTrigger.name, triggered, null)
+    }
+
+    suspend fun runPplSqlCustomTrigger(
         pplSqlMonitor: Monitor,
         pplSqlTrigger: PPLSQLTrigger,
         query: String,
-        pplSqlQueryResults: MutableMap<String, Map<String, Any>>,
         monitorCtx: MonitorRunnerExecutionContext,
         transportService: TransportService
     ): QueryLevelTriggerRunResult {
+
+        if (pplSqlTrigger.customCondition == null) {
+            return QueryLevelTriggerRunResult(
+                pplSqlTrigger.name,
+                true,
+                IllegalStateException("No custom condition found for trigger: ${pplSqlTrigger.id}")
+            )
+        }
+
         // TODO: change name to trigger max duration
         val monitorExecutionDuration = monitorCtx
             .clusterService!!
             .clusterSettings
             .get(AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION)
+        val queryResultsSizeLimit = monitorCtx
+            .clusterService!!
+            .clusterSettings
+            .get(AlertingSettings.ALERT_V2_QUERY_RESULTS_MAX_SIZE)
 
         var triggered: Boolean? = null
+        var customConditionQueryResults: List<Map<String, Any?>>? = null
 
         try {
             withTimeout(monitorExecutionDuration.millis) {
                 logger.debug("checking if custom condition is used and appending to base query")
-                // if trigger uses custom condition, append the custom condition to query, otherwise simply proceed
-                val queryToExecute = if (pplSqlTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
-                    query
-                } else { // custom condition trigger
-                    appendCustomCondition(query, pplSqlTrigger.customCondition!!)
-                }
+
+                val customCondition = pplSqlTrigger.customCondition!!
+
+                // append the custom condition to query
+                val queryToExecute = appendCustomCondition(query, customCondition)
 
                 // limit the number of PPL query result data rows returned
                 val dataRowsLimit = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS)
@@ -287,7 +351,7 @@ class TriggerService(val scriptService: ScriptService) {
                 // in the alert and notification must be added that results were excluded
                 // and an alert that should have been generated might not have been
 
-                logger.debug("executing the PPL query of monitor: ${pplSqlMonitor.id}")
+                logger.debug("executing the PPL query of monitor: ${pplSqlMonitor.id} with custom condition: $customCondition")
                 // execute the PPL query
                 val (queryResponseJson, timeTaken) = measureTimedValue {
                     withClosableContext(
@@ -309,55 +373,30 @@ class TriggerService(val scriptService: ScriptService) {
                 logger.debug("query results for trigger ${pplSqlTrigger.id}: $queryResponseJson")
                 logger.debug("time taken to execute query against sql/ppl plugin: $timeTaken")
 
-                // store the query results for Execute Monitor API response
-                // unlike the query results stored in alerts and notifications, which must be size capped
-                // (because they will be stored in the OpenSearch cluster or sent as notification) and must be based
-                // on only the query results that met the trigger condition (because alerts should generate
-                // on query results that met trigger condition, not those that didn't), the pplQueryResults
-                // here will be returned as part of the Execute Monitor API response. This will return the original,
-                // untouched set of query results, and whether this causes size exceed errors is deferred
-                // to HTTP's response size limits
-                pplSqlQueryResults[pplSqlTrigger.id] = queryResponseJson.toMap()
+                // determine if the custom trigger condition was met
+                triggered = evaluateCustomTrigger(queryResponseJson, pplSqlTrigger.customCondition!!)
 
-                // determine if the trigger condition has been met
-                triggered = if (pplSqlTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) { // number of results trigger
-                    evaluateNumResultsTrigger(
-                        queryResponseJson,
-                        pplSqlTrigger.numResultsCondition!!,
-                        pplSqlTrigger.numResultsValue!!
-                    )
-                } else { // custom condition trigger
-                    evaluateCustomTrigger(queryResponseJson, pplSqlTrigger.customCondition!!)
-                }
+                // cap and reformat the results to be included in trigger run result
+                customConditionQueryResults = capAndReformatPPLQueryResults(queryResponseJson, queryResultsSizeLimit)
 
-                logger.debug("PPLTrigger ${pplSqlTrigger.name} with ID ${pplSqlTrigger.id} triggered: $triggered")
+                logger.debug("Custom PPLTrigger ${pplSqlTrigger.name} with ID ${pplSqlTrigger.id} triggered: $triggered")
             }
 
-            return QueryLevelTriggerRunResult(pplSqlTrigger.name, triggered!!, null)
+            return QueryLevelTriggerRunResult(
+                pplSqlTrigger.name,
+                triggered!!,
+                null,
+                mutableMapOf(),
+                customConditionQueryResults!!
+            )
         } catch (e: Exception) {
             logger.error(
-                "failed to run PPL Trigger ${pplSqlTrigger.name} (id: ${pplSqlTrigger.id} " +
+                "failed to run PPL Custom Trigger ${pplSqlTrigger.name} (id: ${pplSqlTrigger.id} " +
                     "from PPL Monitor ${pplSqlMonitor.name} (id: ${pplSqlMonitor.id}",
                 e
             )
 
             return QueryLevelTriggerRunResult(pplSqlTrigger.name, true, e)
-        }
-    }
-
-    private fun evaluateNumResultsTrigger(
-        pplQueryResponse: JSONObject,
-        numResultsCondition: NumResultsCondition,
-        numResultsValue: Long
-    ): Boolean {
-        val numResults = pplQueryResponse.getLong("total")
-        return when (numResultsCondition) {
-            NumResultsCondition.GREATER_THAN -> numResults > numResultsValue
-            NumResultsCondition.GREATER_THAN_EQUAL -> numResults >= numResultsValue
-            NumResultsCondition.LESS_THAN -> numResults < numResultsValue
-            NumResultsCondition.LESS_THAN_EQUAL -> numResults <= numResultsValue
-            NumResultsCondition.EQUAL -> numResults == numResultsValue
-            NumResultsCondition.NOT_EQUAL -> numResults != numResultsValue
         }
     }
 

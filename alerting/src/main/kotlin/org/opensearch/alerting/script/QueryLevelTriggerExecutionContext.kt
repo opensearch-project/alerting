@@ -19,12 +19,12 @@ data class QueryLevelTriggerExecutionContext(
     override val monitor: Monitor,
     val trigger: Trigger,
     override val results: List<Map<String, Any>>,
+    val pplQueryResults: List<Map<String, Any?>>, // each list element is a result row
     override val periodStart: Instant,
     override val periodEnd: Instant,
     val alert: AlertContext? = null,
     override val error: Exception? = null,
     override val clusterSettings: ClusterSettings,
-    val pplSqlQueryResult: List<Map<String, Any?>>? = null, // each list element is a result row
 ) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error, clusterSettings) {
 
     init {
@@ -44,12 +44,13 @@ data class QueryLevelTriggerExecutionContext(
         monitor,
         trigger,
         monitorRunResult.inputResults.results,
+        // PPL Alerting: this empty list is overridden post PPL Trigger execution
+        listOf(),
         monitorRunResult.periodStart,
         monitorRunResult.periodEnd,
         alertContext,
         monitorRunResult.scriptContextError(trigger),
-        clusterSettings,
-        null
+        clusterSettings
     )
 
     /**
@@ -60,7 +61,7 @@ data class QueryLevelTriggerExecutionContext(
         val tempArg = super.asTemplateArg().toMutableMap()
         tempArg["trigger"] = trigger.asTemplateArg()
         tempArg["alert"] = alert?.asTemplateArg() // map "alert" templateArg field to AlertContext wrapper instead of Alert object
-        tempArg["ppl_query_results"] = pplSqlQueryResult
+        tempArg["ppl_query_results"] = pplQueryResults
         return tempArg
     }
 }

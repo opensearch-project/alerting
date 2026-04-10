@@ -153,9 +153,7 @@ class AlertService(
         result: QueryLevelTriggerRunResult,
         alertError: AlertError?,
         executionId: String,
-        workflorwRunContext: WorkflowRunContext?,
-        monitorCtx: MonitorRunnerExecutionContext,
-        pplSqlQueryResult: List<Map<String, Any?>>?
+        workflorwRunContext: WorkflowRunContext?
     ): Alert? {
         val currentTime = Instant.now()
         val currentAlert = ctx.alert?.alert
@@ -207,7 +205,7 @@ class AlertService(
 
         // populate PPL Monitor specific fields
         val query = if (ctx.monitor.isPplSqlMonitor()) (ctx.monitor.inputs[0] as PPLSQLInput).query else null
-        val queryResults = if (ctx.monitor.isPplSqlMonitor()) pplSqlQueryResult.orEmpty() else emptyList()
+        val queryResults = if (ctx.monitor.isPplSqlMonitor()) ctx.pplQueryResults else emptyList()
 
         // Merge the alert's error message to the current alert's history
         val updatedHistory = currentAlert?.errorHistory.update(alertError)

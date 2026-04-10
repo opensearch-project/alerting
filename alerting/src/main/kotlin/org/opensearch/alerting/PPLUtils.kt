@@ -191,6 +191,12 @@ object PPLUtils {
         return evalResultVarIdx
     }
 
+    fun capAndReformatPPLQueryResults(rawQueryResults: JSONObject, maxSize: Long): List<Map<String, Any?>> {
+        val cappedQueryResults = capPPLQueryResultsSize(rawQueryResults, maxSize).toMap()
+        val reformattedQueryResults = constructPPLQueryResultsMap(cappedQueryResults)
+        return reformattedQueryResults
+    }
+
     /**
      * Caps the size of PPL query results to prevent memory issues and oversized alert payloads.
      *
@@ -236,7 +242,6 @@ object PPLUtils {
         val limitExceedMessageQueryResults = JSONObject()
 
         val schema = JSONArray().put(JSONObject(mapOf("name" to "message", "type" to "string")))
-//        val schema = JSONArray(pplQueryResults.getJSONArray("schema").toList())
         val datarows = JSONArray().put(JSONArray(listOf(PPL_RESULTS_SIZE_EXCEEDED_MESSAGE)))
 
         limitExceedMessageQueryResults.put("schema", schema)
