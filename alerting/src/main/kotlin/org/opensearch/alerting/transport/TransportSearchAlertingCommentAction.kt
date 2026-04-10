@@ -15,6 +15,7 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -40,12 +41,14 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
+import org.opensearch.remote.metadata.common.SdkClientUtils
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.io.IOException
-
 private val log = LogManager.getLogger(TransportSearchAlertingCommentAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
@@ -55,7 +58,8 @@ class TransportSearchAlertingCommentAction @Inject constructor(
     val client: Client,
     clusterService: ClusterService,
     actionFilters: ActionFilters,
-    val namedWriteableRegistry: NamedWriteableRegistry
+    val namedWriteableRegistry: NamedWriteableRegistry,
+    val sdkClient: SdkClient
 ) : HandledTransportAction<ActionRequest, SearchResponse>(
     AlertingActions.SEARCH_COMMENTS_ACTION_NAME, transportService, actionFilters, ::SearchRequest
 ),
@@ -135,18 +139,29 @@ class TransportSearchAlertingCommentAction @Inject constructor(
     }
 
     fun search(searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>) {
-        client.search(
-            searchRequest,
-            object : ActionListener<SearchResponse> {
-                override fun onResponse(response: SearchResponse) {
-                    actionListener.onResponse(response)
-                }
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        val sdkSearchRequest = SearchDataObjectRequest.builder()
+            .indices(*searchRequest.indices())
+            .tenantId(tenantId)
+            .searchSourceBuilder(searchRequest.source())
+            .build()
 
-                override fun onFailure(t: Exception) {
-                    actionListener.onFailure(AlertingException.wrap(t))
-                }
+        sdkClient.searchDataObjectAsync(sdkSearchRequest).whenComplete { response, throwable ->
+            if (throwable != null) {
+                actionListener.onFailure(AlertingException.wrap(SdkClientUtils.unwrapAndConvertToException(throwable)))
+                return@whenComplete
             }
-        )
+            val searchResponse = response.searchResponse()
+            if (searchResponse != null) {
+                actionListener.onResponse(searchResponse)
+            } else {
+                actionListener.onFailure(
+                    AlertingException.wrap(
+                        OpenSearchStatusException("Failed to search comments", RestStatus.INTERNAL_SERVER_ERROR)
+                    )
+                )
+            }
+        }
     }
 
     // retrieve the IDs of all Alerts after filtering by current User's

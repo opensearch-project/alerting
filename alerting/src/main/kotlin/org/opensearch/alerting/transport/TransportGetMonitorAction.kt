@@ -12,12 +12,11 @@ import org.apache.logging.log4j.LogManager
 import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionRequest
-import org.opensearch.action.get.GetRequest
-import org.opensearch.action.get.GetResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
@@ -43,9 +42,11 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.query.QueryBuilders
+import org.opensearch.remote.metadata.client.GetDataObjectRequest
+import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.common.SdkClientUtils
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
-import org.opensearch.transport.RemoteTransportException
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 
@@ -59,6 +60,7 @@ class TransportGetMonitorAction @Inject constructor(
     val xContentRegistry: NamedXContentRegistry,
     val clusterService: ClusterService,
     settings: Settings,
+    val sdkClient: SdkClient,
 ) : HandledTransportAction<ActionRequest, GetMonitorResponse>(
     AlertingActions.GET_MONITOR_ACTION_NAME,
     transportService,
@@ -82,102 +84,78 @@ class TransportGetMonitorAction @Inject constructor(
 
         val user = readUserFromThreadContext(client)
 
-        val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, transformedRequest.monitorId)
-            .version(transformedRequest.version)
-            .fetchSourceContext(transformedRequest.srcContext)
-
         if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
 
-        /*
-         * Remove security context before you call elasticsearch api's. By this time, permissions required
-         * to call this api are validated.
-         * Once system-indices [https://github.com/opendistro-for-elasticsearch/security/issues/666] is done, we
-         * might further improve this logic. Also change try to kotlin-use for auto-closable.
-         */
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        val getRequest = GetDataObjectRequest.builder()
+            .index(ScheduledJob.SCHEDULED_JOBS_INDEX)
+            .id(transformedRequest.monitorId)
+            .tenantId(tenantId)
+            .fetchSourceContext(transformedRequest.srcContext)
+            .build()
+
         client.threadPool().threadContext.stashContext().use {
-            client.get(
-                getRequest,
-                object : ActionListener<GetResponse> {
-                    override fun onResponse(response: GetResponse) {
-                        if (!response.isExists) {
-                            actionListener.onFailure(
-                                AlertingException.wrap(OpenSearchStatusException("Monitor not found.", RestStatus.NOT_FOUND))
+            sdkClient.getDataObjectAsync(getRequest).whenComplete { response, throwable ->
+                if (throwable != null) {
+                    val cause = SdkClientUtils.unwrapAndConvertToException(throwable)
+                    if (isIndexNotFoundException(cause)) {
+                        actionListener.onFailure(
+                            AlertingException.wrap(
+                                OpenSearchStatusException("Monitor not found.", RestStatus.NOT_FOUND, cause)
                             )
-                            return
-                        }
-
-                        var monitor: Monitor? = null
-                        if (!response.isSourceEmpty) {
-                            XContentHelper.createParser(
-                                xContentRegistry,
-                                LoggingDeprecationHandler.INSTANCE,
-                                response.sourceAsBytesRef,
-                                XContentType.JSON
-                            ).use { xcp ->
-                                monitor = ScheduledJob.parse(xcp, response.id, response.version) as Monitor
-
-                                // security is enabled and filterby is enabled
-                                if (!checkUserPermissionsWithResource(
-                                        user,
-                                        monitor?.user,
-                                        actionListener,
-                                        "monitor",
-                                        transformedRequest.monitorId
-                                    )
-                                ) {
-                                    return
-                                }
-                            }
-                        }
-                        try {
-                            scope.launch {
-                                val associatedCompositeMonitors = getAssociatedWorkflows(response.id)
-                                actionListener.onResponse(
-                                    GetMonitorResponse(
-                                        response.id,
-                                        response.version,
-                                        response.seqNo,
-                                        response.primaryTerm,
-                                        monitor,
-                                        associatedCompositeMonitors
-                                    )
-                                )
-                            }
-                        } catch (e: Exception) {
-                            log.error("Failed to get associate workflows in get monitor action", e)
-                        }
+                        )
+                    } else {
+                        actionListener.onFailure(AlertingException.wrap(cause))
                     }
-
-                    override fun onFailure(ex: Exception) {
-                        if (isIndexNotFoundException(ex)) {
-                            log.error("Index not found while getting monitor", ex)
-                            actionListener.onFailure(
-                                AlertingException.wrap(
-                                    OpenSearchStatusException("Monitor not found. Backing index is missing.", RestStatus.NOT_FOUND, ex)
-                                )
-                            )
-                        } else {
-                            log.error("Unexpected error while getting monitor", ex)
-                            actionListener.onFailure(AlertingException.wrap(ex))
-                        }
-                    }
+                    return@whenComplete
                 }
-            )
+                try {
+                    val getResponse = response.getResponse()
+                    if (getResponse == null || !getResponse.isExists) {
+                        actionListener.onFailure(
+                            AlertingException.wrap(OpenSearchStatusException("Monitor not found.", RestStatus.NOT_FOUND))
+                        )
+                        return@whenComplete
+                    }
+                    var monitor: Monitor? = null
+                    if (!getResponse.isSourceEmpty) {
+                        XContentHelper.createParser(
+                            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                            getResponse.sourceAsBytesRef, XContentType.JSON
+                        ).use { xcp ->
+                            monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+                        }
+                    }
+                    if (!checkUserPermissionsWithResource(user, monitor?.user, actionListener, "monitor", transformedRequest.monitorId)) {
+                        return@whenComplete
+                    }
+                    scope.launch {
+                        val associatedCompositeMonitors = getAssociatedWorkflows(getResponse.id)
+                        actionListener.onResponse(
+                            GetMonitorResponse(
+                                getResponse.id, getResponse.version, getResponse.seqNo, getResponse.primaryTerm,
+                                monitor, associatedCompositeMonitors
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    log.error("Failed to parse monitor from SDK response", e)
+                    actionListener.onFailure(AlertingException.wrap(e))
+                }
+            }
         }
     }
 
     // Checks if the exception is caused by an IndexNotFoundException (directly or nested).
     private fun isIndexNotFoundException(e: Exception): Boolean {
-        if (e is IndexNotFoundException) {
-            return true
-        }
-        if (e is RemoteTransportException) {
-            val cause = e.cause
+        var cause: Throwable? = e
+        while (cause != null) {
             if (cause is IndexNotFoundException) {
                 return true
             }
+            cause = cause.cause
         }
         return false
     }
