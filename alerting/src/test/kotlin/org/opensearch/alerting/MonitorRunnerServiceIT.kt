@@ -2287,7 +2287,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 triggers = listOf(
                     randomPPLTrigger(
                         conditionType = PPLSQLTrigger.ConditionType.CUSTOM,
-                        customCondition = "eval result = max_num > 5",
+                        customCondition = "where max_num > 5",
                         numResultsCondition = null,
                         numResultsValue = null
                     )
@@ -2489,7 +2489,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 triggers = listOf(
                     randomPPLTrigger(
                         conditionType = PPLSQLTrigger.ConditionType.CUSTOM,
-                        customCondition = "eval result = max_num > 5",
+                        customCondition = "where max_num > 5",
                         numResultsCondition = null,
                         numResultsValue = null
                     )
@@ -2520,43 +2520,31 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals("source = $TEST_INDEX_NAME | stats max(number) as max_num by abc", activeAlert.pplQuery)
         assertTrue("PPL query results should not be empty", activeAlert.pplQueryResults.isNotEmpty())
 
-        // Verify the query results are in the new transformed format (list of maps)
-        assertEquals("Should have 3 aggregation result rows", 3, activeAlert.pplQueryResults.size)
+        // Verify the query results are in the new transformed format (list of maps),
+        // and only have the 2 buckets that met the custom condition
+        assertEquals("Should have 2 aggregation result rows", 2, activeAlert.pplQueryResults.size)
 
         // Convert results to a map of group name -> result row for easier validation
         val groupResults = activeAlert.pplQueryResults.associateBy { it["abc"] as String }
 
         // Verify all expected groups are present
-        assertTrue("Should contain group 'abc'", groupResults.containsKey("abc"))
         assertTrue("Should contain group 'def'", groupResults.containsKey("def"))
         assertTrue("Should contain group 'ghi'", groupResults.containsKey("ghi"))
 
         // Verify each result row has the expected structure and values
-        val abcResult = groupResults["abc"]!!
-        assertTrue("abc result should contain 'max_num' field", abcResult.containsKey("max_num"))
-        assertTrue("abc result should contain 'abc' field", abcResult.containsKey("abc"))
-        assertTrue("abc result should contain 'result' field", abcResult.containsKey("result"))
-        assertEquals("Group 'abc' max should be 3", 3, (abcResult["max_num"] as Number).toInt())
-        assertEquals("Group 'abc' field should be 'abc'", "abc", abcResult["abc"])
-        assertEquals("Group 'abc' eval result should be false (3 > 5 is false)", false, abcResult["result"])
-
         val defResult = groupResults["def"]!!
         assertTrue("def result should contain 'max_num' field", defResult.containsKey("max_num"))
         assertTrue("def result should contain 'abc' field", defResult.containsKey("abc"))
-        assertTrue("def result should contain 'result' field", defResult.containsKey("result"))
         assertEquals("Group 'def' max should be 6", 6, (defResult["max_num"] as Number).toInt())
-        assertEquals("Group 'def' field should be 'def'", "def", defResult["abc"])
-        assertEquals("Group 'def' eval result should be true (6 > 5 is true)", true, defResult["result"])
+        assertEquals("Group 'def' abc field should be 'def'", "def", defResult["abc"])
 
         val ghiResult = groupResults["ghi"]!!
         assertTrue("ghi result should contain 'max_num' field", ghiResult.containsKey("max_num"))
         assertTrue("ghi result should contain 'abc' field", ghiResult.containsKey("abc"))
-        assertTrue("ghi result should contain 'result' field", ghiResult.containsKey("result"))
         assertEquals("Group 'ghi' max should be 9", 9, (ghiResult["max_num"] as Number).toInt())
-        assertEquals("Group 'ghi' field should be 'ghi'", "ghi", ghiResult["abc"])
-        assertEquals("Group 'ghi' eval result should be true (9 > 5 is true)", true, ghiResult["result"])
+        assertEquals("Group 'ghi' abc field should be 'ghi'", "ghi", ghiResult["abc"])
 
-        // Custom condition "eval result = max_num > 5" should evaluate to true for def (6 > 5) and ghi (9 > 5)
+        // Custom condition "where max_num > 5" should evaluate to true for def (6 > 5) and ghi (9 > 5)
         // This caused the trigger to fire and create an ACTIVE alert
 
         // Delete documents from "def" and "ghi" groups to make condition no longer true

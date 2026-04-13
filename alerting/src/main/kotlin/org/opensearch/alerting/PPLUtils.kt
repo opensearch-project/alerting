@@ -15,12 +15,14 @@ import org.opensearch.transport.TransportService
 
 object PPLUtils {
 
-    // TODO: these are in-house PPL query parsers, find a PPL plugin dependency that does this for us
-    /* Regular Expressions */
-    // captures the name of the result variable in a PPL monitor's custom condition
-    // e.g. custom condition: `eval apple = avg_latency > 100`
-    // captures: "apple"
-    private val evalResultVarRegex = """^(?!.*\|)\s*(?i:eval)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=""".toRegex()
+//    // TODO: these are in-house PPL query parsers, find a PPL plugin dependency that does this for us
+//    /* Regular Expressions */
+//    // captures the name of the result variable in a PPL monitor's custom condition
+//    // e.g. custom condition: `eval apple = avg_latency > 100`
+//    // captures: "apple"
+//    private val evalResultVarRegex = """^(?!.*\|)\s*(?i:eval)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=""".toRegex()
+
+    private val customConditionValidationRegex = """^\s*where\s+.+""".toRegex()
 
     const val PPL_RESULTS_SIZE_EXCEEDED_MESSAGE = "The PPL Query results were too large and thus excluded."
 
@@ -73,6 +75,10 @@ object PPLUtils {
         return "$query | head $maxDataRows"
     }
 
+    fun customConditionIsValid(customCondition: String): Boolean {
+        return customCondition.matches(customConditionValidationRegex)
+    }
+
     /**
      * Executes a PPL query and returns the response as a parsable JSONObject.
      *
@@ -80,7 +86,9 @@ object PPLUtils {
      * and parses the response into a structured JSON format suitable for trigger evaluation
      *
      * @param query The PPL query string to execute
-     * @param client The NodeClient used to communicate with the PPL plugin
+     * @param explain true if the query should just be explained, false if the query should be executed
+     * @param localNode The node within which the request will be serviced
+     * @param transportService The transport service used to run the request
      * @return A JSONObject containing the query execution results
      *
      * @throws Exception if the query execution fails or the response cannot be parsed as JSON
@@ -90,14 +98,21 @@ object PPLUtils {
      */
     suspend fun executePplQuery(
         query: String,
+        explain: Boolean,
         localNode: DiscoveryNode,
         transportService: TransportService
     ): JSONObject {
+        val path = if (explain) {
+            "/_plugins/_ppl/_explain"
+        } else {
+            "/_plugins/_ppl"
+        }
+
         // call PPL plugin to execute query
         val transportPplQueryRequest = TransportPPLQueryRequest(
             query,
             JSONObject(mapOf("query" to query)),
-            null // null path falls back to a default path internal to SQL/PPL Plugin
+            path
         )
 
         val transportPplQueryResponse = PPLPluginInterface.suspendUntil {
@@ -112,83 +127,6 @@ object PPLUtils {
         val queryResponseJson = JSONObject(transportPplQueryResponse.result)
 
         return queryResponseJson
-    }
-
-    /**
-     * Searches a custom condition eval statement for the name of the eval result variable.
-     *
-     * Parses a PPL eval expression to extract the variable name being assigned. The eval
-     * statement must follow the format: `eval <variable_name> = <expression>`. This variable
-     * name is needed to reference the evaluation result in subsequent trigger condition checks.
-     *
-     * @param customCondition The PPL custom condition string containing an eval statement (e.g. eval result = avg > 3)
-     * @return The name of the eval result variable
-     * @throws IllegalArgumentException if no valid eval statement is found or the syntax is invalid
-     *
-     * @example
-     * ```
-     * val condition = "eval error_rate = errors / total"
-     * val varName = findEvalResultVar(condition)
-     * // Returns: "error_rate"
-     * ```
-     *
-     * @note A precheck of the base query + custom condition is assumed to have been done already.
-     *       The function thus expects the PPL keyword "eval" followed by whitespace. Without the
-     *       whitespace (e.g., "evalresult"), the PPL plugin would have thrown a syntax error
-     *       during upstream validations
-     * @note Variable names must follow standard identifier rules: start with a letter or underscore,
-     *       followed by letters, digits, or underscores (matching `[a-zA-Z_][a-zA-Z0-9_]*`).
-     *
-     * TODO: Replace this in-house parser with a PPL plugin dependency that provides proper
-     *       query parsing functionality.
-     */
-    fun findEvalResultVar(customCondition: String): String {
-        // TODO: these are in-house PPL query parsers, find a PPL plugin dependency that does this for us
-        val evalResultVar = evalResultVarRegex.find(customCondition)?.groupValues?.get(1)
-            ?: throw IllegalArgumentException("Given custom condition is invalid, could not find eval result variable")
-        return evalResultVar
-    }
-
-    /**
-     * Finds the index of the eval result variable in the PPL query response schema.
-     *
-     * Searches through the schema array in the PPL query response to locate the column
-     * corresponding to the eval result variable. This index is used to extract the
-     * eval result values from the datarows in the query response.
-     *
-     * @param customConditionQueryResponse The JSONObject containing the PPL query response
-     *                                     with "schema" and "datarows" fields
-     * @param evalResultVarName The name of the eval result variable to locate in the schema
-     * @return The zero-based index of the eval result variable in the schema array
-     * @throws IllegalStateException if the eval result variable is not found in the schema
-     *
-     * @note The eval result variable should always be present in the schema if the query
-     *       executed successfully. If not found, this indicates an unexpected state.
-     * @note The query response schema is assumed to follow PPL plugin Execute API response schema
-     */
-    fun findEvalResultVarIdxInSchema(customConditionQueryResponse: JSONObject, evalResultVarName: String): Int {
-        // find the index eval statement result variable in the PPL query response schema
-        val schemaList = customConditionQueryResponse.getJSONArray("schema")
-        var evalResultVarIdx = -1
-        for (i in 0 until schemaList.length()) {
-            val schemaObj = schemaList.getJSONObject(i)
-            val columnName = schemaObj.getString("name")
-
-            if (columnName == evalResultVarName) {
-                evalResultVarIdx = i
-                break
-            }
-        }
-
-        // eval statement result variable should always be found
-        if (evalResultVarIdx == -1) {
-            throw IllegalStateException(
-                "Expected to find eval statement results variable \"$evalResultVarName\" in results " +
-                    "of PPL query with custom condition, but did not."
-            )
-        }
-
-        return evalResultVarIdx
     }
 
     fun capAndReformatPPLQueryResults(rawQueryResults: JSONObject, maxSize: Long): List<Map<String, Any?>> {

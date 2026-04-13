@@ -266,7 +266,7 @@ class InputService(
         }
     }
 
-    // for PPL Monitors, the base PPL query is run once
+    // for PPL Monitor execution, the base PPL query is run once
     // for number_of_results PPL triggers
     private suspend fun runPPLBaseQuery(
         pplSqlMonitor: Monitor,
@@ -292,6 +292,7 @@ class InputService(
             val (queryResponseJsonReceived, timeTaken) = measureTimedValue {
                 executePplQuery(
                     limitedQueryToExecute,
+                    false,
                     monitorCtx.clusterService!!.state().nodes.localNode,
                     transportService
                 )

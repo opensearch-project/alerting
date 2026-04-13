@@ -1773,41 +1773,12 @@ class MonitorRestApiIT : AlertingRestTestCase() {
                     triggers = listOf(
                         randomPPLTrigger(
                             conditionType = ConditionType.CUSTOM,
-                            customCondition = "not a valid PPL custom condition",
+                            customCondition = "eval result = 3 > 1",
                             numResultsCondition = null,
                             numResultsValue = null
                         )
                     ),
                     query = "source = $TEST_INDEX_NAME | head 10"
-                )
-            )
-            fail("Expected request to fail with BAD_REQUEST but it succeeded")
-        } catch (e: ResponseException) {
-            assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
-        }
-
-        // ensure no monitor was created
-        ensureNumMonitors(0)
-    }
-
-    fun `test create ppl monitor with custom condition that evals to num not bool fails`() {
-        createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
-        indexDocFromSomeTimeAgo(1, MINUTES, "abc", 1)
-        indexDocFromSomeTimeAgo(2, MINUTES, "abc", 2)
-
-        // ensure the request fails
-        try {
-            createRandomPPLMonitor(
-                randomPPLMonitor(
-                    triggers = listOf(
-                        randomPPLTrigger(
-                            conditionType = ConditionType.CUSTOM,
-                            customCondition = "eval something = sum * 2",
-                            numResultsCondition = null,
-                            numResultsValue = null
-                        )
-                    ),
-                    query = "source = $TEST_INDEX_NAME | stats sum(number) as sum by abc"
                 )
             )
             fail("Expected request to fail with BAD_REQUEST but it succeeded")

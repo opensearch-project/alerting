@@ -32,9 +32,8 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.PPLUtils.appendCustomCondition
 import org.opensearch.alerting.PPLUtils.appendDataRowsLimit
+import org.opensearch.alerting.PPLUtils.customConditionIsValid
 import org.opensearch.alerting.PPLUtils.executePplQuery
-import org.opensearch.alerting.PPLUtils.findEvalResultVar
-import org.opensearch.alerting.PPLUtils.findEvalResultVarIdxInSchema
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.service.DeleteMonitorService
@@ -284,7 +283,7 @@ class TransportIndexMonitorAction @Inject constructor(
         user: User?
     ) {
         // declare upfront the validation listener that will move on to the next phase
-        // of monitor indexing after validations are complete
+        // of monitor indexing after PPL validations are complete
         val validationListener = object : ActionListener<Unit> { // validationListener
             override fun onResponse(response: Unit) {
                 // user permissions to indices have already been checked if we made it to the onResponse(),
@@ -350,10 +349,10 @@ class TransportIndexMonitorAction @Inject constructor(
 
             val limitedQueryToExecute = appendDataRowsLimit(query, maxQueryResults)
 
-            // now run the base query as is.
+            // now PPL explain the base query as is.
             // if there are any PPL syntax, index not found, insufficient index permissions, or other errors,
             // this will throw an exception from the SQL/PPL plugin
-            executePplQuery(limitedQueryToExecute, clusterService.state().nodes.localNode, transportService)
+            executePplQuery(limitedQueryToExecute, true, clusterService.state().nodes.localNode, transportService)
 
             // scan all the triggers with custom conditions, and ensure each query constructed
             // from the base query + custom condition is valid
@@ -364,38 +363,28 @@ class TransportIndexMonitorAction @Inject constructor(
                     continue
                 }
 
-                val evalResultVar = findEvalResultVar(pplTrigger.customCondition!!)
+                val customCondition = pplTrigger.customCondition!!
 
-                val queryWithCustomCondition = appendCustomCondition(query, pplTrigger.customCondition!!)
-                val limitedQueryWithCustomCondition = appendDataRowsLimit(queryWithCustomCondition, maxQueryResults)
-
-                // if the custom condition is invalid, this will throw an exception
-                // from the SQL/PPL plugin
-                val executePplQueryResponse = executePplQuery(
-                    limitedQueryWithCustomCondition,
-                    clusterService.state().nodes.localNode,
-                    transportService
-                )
-
-                val evalResultVarIdx = findEvalResultVarIdxInSchema(executePplQueryResponse, evalResultVar)
-
-                val resultVarType = executePplQueryResponse
-                    .getJSONArray("schema")
-                    .getJSONObject(evalResultVarIdx)
-                    .getString("type")
-
-                // custom conditions must evaluate to a boolean result, otherwise it's invalid
-                if (resultVarType != "boolean") {
+                // validate the custom condition is a where statement and
+                // not some other valid PPL statement
+                if (!customConditionIsValid(customCondition)) {
                     validationListener.onFailure(
                         AlertingException.wrap(
                             IllegalArgumentException(
-                                "Custom condition in trigger ${pplTrigger.name} is invalid because it does not " +
-                                    "evaluate to a boolean, but instead to type: $resultVarType"
+                                "Custom condition for trigger ${trigger.id} is invalid, " +
+                                    "custom condition must be a valid PPL where statement."
                             )
                         )
                     )
                     return false
                 }
+
+                val queryWithCustomCondition = appendCustomCondition(query, customCondition)
+                val limitedQueryWithCustomCondition = appendDataRowsLimit(queryWithCustomCondition, maxQueryResults)
+
+                // if the custom condition is invalid, this will throw an exception
+                // from the SQL/PPL plugin
+                executePplQuery(limitedQueryWithCustomCondition, true, clusterService.state().nodes.localNode, transportService)
             }
         } catch (e: Exception) {
             validationListener.onFailure(
@@ -410,7 +399,6 @@ class TransportIndexMonitorAction @Inject constructor(
     }
 
     private fun validatePplSqlMonitor(pplSqlMonitor: Monitor, validationListener: ActionListener<Unit>): Boolean {
-        // ensure the trigger throttle and expire durations are valid
         pplSqlMonitor.triggers.forEach { trigger ->
             val pplTrigger = trigger as PPLSQLTrigger
 

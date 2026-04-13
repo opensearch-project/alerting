@@ -7,13 +7,10 @@ package org.opensearch.alerting
 
 import kotlinx.coroutines.withTimeout
 import org.apache.logging.log4j.LogManager
-import org.json.JSONObject
 import org.opensearch.alerting.PPLUtils.appendCustomCondition
 import org.opensearch.alerting.PPLUtils.appendDataRowsLimit
 import org.opensearch.alerting.PPLUtils.capAndReformatPPLQueryResults
 import org.opensearch.alerting.PPLUtils.executePplQuery
-import org.opensearch.alerting.PPLUtils.findEvalResultVar
-import org.opensearch.alerting.PPLUtils.findEvalResultVarIdxInSchema
 import org.opensearch.alerting.chainedAlertCondition.parsers.ChainedAlertExpressionParser
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
@@ -365,6 +362,7 @@ class TriggerService(val scriptService: ScriptService) {
                     ) {
                         executePplQuery(
                             limitedQueryToExecute,
+                            false,
                             monitorCtx.clusterService!!.state().nodes.localNode,
                             transportService
                         )
@@ -373,8 +371,12 @@ class TriggerService(val scriptService: ScriptService) {
                 logger.debug("query results for trigger ${pplSqlTrigger.id}: $queryResponseJson")
                 logger.debug("time taken to execute query against sql/ppl plugin: $timeTaken")
 
-                // determine if the custom trigger condition was met
-                triggered = evaluateCustomTrigger(queryResponseJson, pplSqlTrigger.customCondition!!)
+                // val numPplResults = basePplQueryResults.getLong("total")
+
+                // the custom condition query returns all buckets that met the custom condition,
+                // so if there are any results at all, the custom condition was met for at least one bukcet,
+                // this trigger has triggered.
+                triggered = queryResponseJson.getLong("total") > 0
 
                 // cap and reformat the results to be included in trigger run result
                 customConditionQueryResults = capAndReformatPPLQueryResults(queryResponseJson, queryResultsSizeLimit)
@@ -398,24 +400,5 @@ class TriggerService(val scriptService: ScriptService) {
 
             return QueryLevelTriggerRunResult(pplSqlTrigger.name, true, e)
         }
-    }
-
-    private fun evaluateCustomTrigger(pplQueryResponse: JSONObject, customCondition: String): Boolean {
-        // find the name of the eval result variable defined in custom condition
-        val evalResultVarName = findEvalResultVar(customCondition)
-
-        // find the index eval statement result variable in the PPL query response schema
-        val evalResultVarIdx = findEvalResultVarIdxInSchema(pplQueryResponse, evalResultVarName)
-
-        val dataRowList = pplQueryResponse.getJSONArray("datarows")
-        for (i in 0 until dataRowList.length()) {
-            val dataRow = dataRowList.getJSONArray(i)
-            val evalResult = dataRow.getBoolean(evalResultVarIdx)
-            if (evalResult) {
-                return true
-            }
-        }
-
-        return false
     }
 }
