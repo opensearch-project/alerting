@@ -31,6 +31,7 @@ import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.service.DeleteMonitorService
+import org.opensearch.alerting.service.ExternalSchedulerService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
@@ -40,6 +41,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEO
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.MonitorPayloadBuilder
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.await
 import org.opensearch.alerting.util.getRoleFilterEnabled
@@ -580,6 +582,15 @@ class TransportIndexMonitorAction @Inject constructor(
                     throw t
                 }
 
+                // OSSA-606: Create EB schedule for monitor execution (OASIS path)
+                try {
+                    createExternalSchedule(request.monitor, tenantId)
+                } catch (t: Exception) {
+                    log.error("Failed to create EB schedule for monitor ${indexResponse.id}. Rolling back.", t)
+                    cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
+                    throw t
+                }
+
                 actionListener.onResponse(
                     IndexMonitorResponse(
                         indexResponse.id, indexResponse.version, indexResponse.seqNo,
@@ -776,6 +787,14 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                     MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
                 }
+                // OSSA-606: Update EB schedule with latest monitor config (OASIS path)
+                try {
+                    updateExternalSchedule(request.monitor, tenantId)
+                } catch (t: Exception) {
+                    log.error("Failed to update EB schedule for monitor ${request.monitorId}", t)
+                    // Update flow: EB failure is non-fatal — monitor metadata is already persisted.
+                    // The schedule will be reconciled on next update or by auditor.
+                }
                 actionListener.onResponse(
                     IndexMonitorResponse(
                         indexResponse.id, indexResponse.version, indexResponse.seqNo,
@@ -797,6 +816,62 @@ class TransportIndexMonitorAction @Inject constructor(
                 return failureReasons.toString()
             }
             return null
+        }
+
+        /**
+         * Reads EB cell info from ThreadContext and creates an external schedule.
+         * No-op when OASIS ActionFilter is not present (open-source standalone mode).
+         */
+        private fun createExternalSchedule(monitor: Monitor, tenantId: String?) {
+            val threadContext = client.threadPool().threadContext
+            val ebCellAccountId = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_ACCOUNT_ID_KEY) ?: return
+            val ebCellRegion = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_REGION_KEY) ?: return
+            val queueArn = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_QUEUE_ARN_KEY) ?: return
+            val roleArn = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_ROLE_ARN_KEY) ?: return
+
+            val targetInput = MonitorPayloadBuilder.buildTargetInput(
+                monitor = monitor,
+                appId = threadContext.getHeader("x-app-id")
+                    ?: throw OpenSearchStatusException("x-app-id header missing", RestStatus.BAD_REQUEST),
+                tenantId = tenantId
+                    ?: throw OpenSearchStatusException("Tenant ID missing", RestStatus.BAD_REQUEST),
+                workspaceId = threadContext.getHeader("x-workspace-id")
+                    ?: throw OpenSearchStatusException("x-workspace-id header missing", RestStatus.BAD_REQUEST),
+                collectionEndpoint = threadContext.getHeader("x-collection-endpoint")
+                    ?: throw OpenSearchStatusException("x-collection-endpoint header missing", RestStatus.BAD_REQUEST)
+            )
+
+            ExternalSchedulerService.createSchedule(
+                monitor, ebCellAccountId, ebCellRegion, queueArn, roleArn, targetInput
+            )
+        }
+
+        /**
+         * Reads EB cell info from ThreadContext and updates the external schedule.
+         * Per LLD 6.2: always refreshes Target.Input with latest monitor config.
+         */
+        private fun updateExternalSchedule(monitor: Monitor, tenantId: String?) {
+            val threadContext = client.threadPool().threadContext
+            val ebCellAccountId = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_ACCOUNT_ID_KEY) ?: return
+            val ebCellRegion = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_REGION_KEY) ?: return
+            val queueArn = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_QUEUE_ARN_KEY) ?: return
+            val roleArn = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_ROLE_ARN_KEY) ?: return
+
+            val targetInput = MonitorPayloadBuilder.buildTargetInput(
+                monitor = monitor,
+                appId = threadContext.getHeader("x-app-id")
+                    ?: throw OpenSearchStatusException("x-app-id header missing", RestStatus.BAD_REQUEST),
+                tenantId = tenantId
+                    ?: throw OpenSearchStatusException("Tenant ID missing", RestStatus.BAD_REQUEST),
+                workspaceId = threadContext.getHeader("x-workspace-id")
+                    ?: throw OpenSearchStatusException("x-workspace-id header missing", RestStatus.BAD_REQUEST),
+                collectionEndpoint = threadContext.getHeader("x-collection-endpoint")
+                    ?: throw OpenSearchStatusException("x-collection-endpoint header missing", RestStatus.BAD_REQUEST)
+            )
+
+            ExternalSchedulerService.updateSchedule(
+                monitor, ebCellAccountId, ebCellRegion, queueArn, roleArn, targetInput
+            )
         }
     }
 }

@@ -16,6 +16,7 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.service.DeleteMonitorService
+import org.opensearch.alerting.service.ExternalSchedulerService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -103,6 +104,15 @@ class TransportDeleteMonitorAction @Inject constructor(
                     )
                     return
                 } else if (canDelete) {
+                    // OSSA-606: Write EB cell info to ThreadContext so OASIS post-filter
+                    // can read ebCellAccountId to decrement scheduleCount (LLD 6.3).
+                    writeEbCellToThreadContext(monitor)
+
+                    // Delete EB schedule FIRST — if this fails, the monitor record is
+                    // preserved so the schedule can be retried. Deleting the monitor
+                    // first would orphan the EB schedule with no record to reconcile.
+                    deleteExternalSchedule(monitor)
+
                     actionListener.onResponse(
                         DeleteMonitorService.deleteMonitor(monitor, refreshPolicy)
                     )
@@ -118,6 +128,35 @@ class TransportDeleteMonitorAction @Inject constructor(
                 log.error("Failed to delete monitor $monitorId", t)
                 actionListener.onFailure(AlertingException.wrap(t))
             }
+        }
+
+        /**
+         * Writes EB cell info to ThreadContext so the OASIS post-filter can
+         * read it to decrement scheduleCount in DDB (LLD 6.3).
+         */
+        private fun writeEbCellToThreadContext(monitor: Monitor) {
+            // TODO OSSA-608: extract ebCellAccountId from monitor metadata once
+            // Neo DS alerting metadata fields are available. For now, the OASIS
+            // pre-filter already populates ThreadContext during cell selection.
+            val threadContext = client.threadPool().threadContext
+            val ebCellAccountId = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_ACCOUNT_ID_KEY)
+            if (ebCellAccountId != null) {
+                log.debug("EB cell account $ebCellAccountId in ThreadContext for OASIS post-filter")
+            }
+        }
+
+        /**
+         * Deletes the EB schedule BEFORE deleting the monitor from Neo DS.
+         * Fails the request if cleanup cannot complete — preserving the monitor
+         * record so the schedule deletion can be retried.
+         */
+        private fun deleteExternalSchedule(monitor: Monitor) {
+            val threadContext = client.threadPool().threadContext
+            val ebCellAccountId = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_ACCOUNT_ID_KEY) ?: return
+            val ebCellRegion = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_REGION_KEY) ?: return
+            val roleArn = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_ROLE_ARN_KEY) ?: return
+
+            ExternalSchedulerService.deleteSchedule(monitor.id, ebCellAccountId, ebCellRegion, roleArn)
         }
 
         private suspend fun getMonitor(): Monitor {
