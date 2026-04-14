@@ -371,7 +371,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     validationListener.onFailure(
                         AlertingException.wrap(
                             IllegalArgumentException(
-                                "Custom condition for trigger ${trigger.id} is invalid, " +
+                                "Custom condition for trigger ${trigger.name} is invalid, " +
                                     "custom condition must be a valid PPL where statement."
                             )
                         )

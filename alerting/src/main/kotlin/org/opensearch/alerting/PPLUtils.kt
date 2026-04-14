@@ -82,7 +82,7 @@ object PPLUtils {
     /**
      * Executes a PPL query and returns the response as a parsable JSONObject.
      *
-     * This method calls the PPL Plugin's Execute API via the transport layer to execute the provided query
+     * This method calls the PPL Plugin's Execute or Explain API via the transport layer to execute the provided query
      * and parses the response into a structured JSON format suitable for trigger evaluation
      *
      * @param query The PPL query string to execute
