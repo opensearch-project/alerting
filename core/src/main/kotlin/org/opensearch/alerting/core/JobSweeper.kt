@@ -25,6 +25,7 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.lifecycle.LifecycleListener
 import org.opensearch.common.logging.Loggers
 import org.opensearch.common.lucene.uid.Versions
+import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.util.concurrent.OpenSearchExecutors
@@ -76,7 +77,8 @@ class JobSweeper(
     private val threadPool: ThreadPool,
     private val xContentRegistry: NamedXContentRegistry,
     private val scheduler: JobScheduler,
-    private val sweepableJobTypes: List<String>
+    private val sweepableJobTypes: List<String>,
+    private val multiTenancyEnabledSetting: Setting<Boolean>
 ) : ClusterStateListener, IndexingOperationListener, LifecycleListener() {
     private val logger = LogManager.getLogger(javaClass)
 
@@ -95,6 +97,7 @@ class JobSweeper(
     @Volatile private var sweepBackoffMillis = SWEEP_BACKOFF_MILLIS.get(settings)
     @Volatile private var sweepBackoffRetryCount = SWEEP_BACKOFF_RETRY_COUNT.get(settings)
     @Volatile private var sweepSearchBackoff = BackoffPolicy.exponentialBackoff(sweepBackoffMillis, sweepBackoffRetryCount)
+    @Volatile private var multiTenancyEnabled = multiTenancyEnabledSetting.get(settings)
 
     init {
         clusterService.addListener(this)
@@ -119,6 +122,8 @@ class JobSweeper(
         }
         clusterService.clusterSettings.addSettingsUpdateConsumer(SWEEP_PAGE_SIZE) { sweepPageSize = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
+        // Note: multiTenancyEnabledSetting is NodeScope and Final and immutable after node startup. Should this
+        // setting become Dynamic in future, register an update consumer here to toggle the sweeper via disable()/enable()
     }
 
     override fun afterStart() {
@@ -202,6 +207,7 @@ class JobSweeper(
     }
 
     fun enable() {
+        if (multiTenancyEnabled) return
         // initialize background sweep
         initBackgroundSweep()
         // set sweeperEnabled flag to true to make the listeners aware of this setting
@@ -221,6 +227,7 @@ class JobSweeper(
     public fun isSweepingEnabled(): Boolean {
         // Although it is a single link check, keeping it as a separate function, so we
         // can abstract out logic of finding out whether to proceed or not
+        if (multiTenancyEnabled) return false
         return sweeperEnabled == true
     }
 
