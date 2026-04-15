@@ -137,12 +137,17 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 // in the final output of monitorResult which occurs when all pages have been exhausted.
                 // If it's favorable to return the last page, will need to check how to accomplish that with multiple aggregation paths
                 // with different page counts.
+                //
+                // When the flag is on, bucket-level monitors are limited to 1 trigger. The standard
+                // bucket_selector is injected directly into the query so a single search call performs
+                // both data collection and trigger evaluation — no separate per-trigger queries needed.
                 val inputResults = monitorCtx.inputService!!.collectInputResults(
                     monitor,
                     periodStart,
                     periodEnd,
                     monitorResult.inputResults,
-                    workflowRunContext
+                    workflowRunContext,
+                    useStandardBucketSelector = monitorCtx.multiTenantTriggerEvalEnabled
                 )
                 if (firstIteration) {
                     firstPageOfInputResults = inputResults
@@ -154,14 +159,23 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             for (trigger in monitor.triggers) {
                 // The currentAlerts map is formed by iterating over the Monitor's Triggers as keys so null should not be returned here
                 val currentAlertsForTrigger = currentAlerts[trigger]!!
-                val triggerCtx = BucketLevelTriggerExecutionContext(
-                    monitor,
-                    trigger as BucketLevelTrigger,
-                    monitorResult,
-                    clusterSettings = monitorCtx.clusterService!!.clusterSettings
-                )
+                val triggerCtx = if (monitorCtx.multiTenantTriggerEvalEnabled) {
+                    BucketLevelTriggerExecutionContext(
+                        monitor, trigger as BucketLevelTrigger, monitorResult,
+                        clusterSettings = monitorCtx.clusterService!!.clusterSettings
+                    )
+                } else {
+                    BucketLevelTriggerExecutionContext(
+                        monitor, trigger as BucketLevelTrigger, monitorResult,
+                        clusterSettings = monitorCtx.clusterService!!.clusterSettings
+                    )
+                }
                 triggerContexts[trigger.id] = triggerCtx
-                val triggerResult = monitorCtx.triggerService!!.runBucketLevelTrigger(monitor, trigger, triggerCtx)
+                val triggerResult = if (monitorCtx.multiTenantTriggerEvalEnabled) {
+                    monitorCtx.triggerService!!.runBucketLevelTriggerFromFilteredResponse(monitor, trigger, triggerCtx)
+                } else {
+                    monitorCtx.triggerService!!.runBucketLevelTrigger(monitor, trigger, triggerCtx)
+                }
                 triggerResults[trigger.id] = triggerResult.getCombinedTriggerRunResult(triggerResults[trigger.id])
 
                 /*

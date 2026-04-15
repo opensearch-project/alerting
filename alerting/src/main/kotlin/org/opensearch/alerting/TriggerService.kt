@@ -12,6 +12,7 @@ import org.opensearch.alerting.script.ChainedAlertTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.triggercondition.parsers.TriggerExpressionParser
+import org.opensearch.alerting.util.BucketKeyFilter
 import org.opensearch.alerting.util.CrossClusterMonitorUtils
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.cluster.service.ClusterService
@@ -178,6 +179,35 @@ class TriggerService(val scriptService: ScriptService) {
                 error = e,
                 associatedAlertIds = emptySet()
             )
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun runBucketLevelTriggerFromFilteredResponse(
+        monitor: Monitor,
+        trigger: BucketLevelTrigger,
+        ctx: BucketLevelTriggerExecutionContext
+    ): BucketLevelTriggerRunResult {
+        return try {
+            val parentBucketPath = trigger.bucketSelector.parentBucketPath
+            val aggregationPath = AggregationPath.parse(parentBucketPath)
+            var parentAgg = (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
+            aggregationPath.pathElementsAsStringList.forEach { subAgg ->
+                parentAgg = (parentAgg[subAgg] as HashMap<*, *>)
+            }
+            val buckets = parentAgg[Aggregation.CommonFields.BUCKETS.preferredName] as List<*>
+            val selectedBuckets = mutableMapOf<String, AggregationResultBucket>()
+            for (bucket in buckets) {
+                val bucketDict = bucket as Map<String, Any>
+                val bucketKeyValuesList = getBucketKeyValuesList(bucketDict)
+                val aggResultBucket = AggregationResultBucket(parentBucketPath, bucketKeyValuesList, bucketDict)
+                selectedBuckets[aggResultBucket.getBucketKeysHash()] = aggResultBucket
+            }
+            val filteredBuckets = BucketKeyFilter.filterBuckets(selectedBuckets, trigger.bucketSelector.filter)
+            BucketLevelTriggerRunResult(trigger.name, null, filteredBuckets)
+        } catch (e: Exception) {
+            logger.info("Error running trigger [${trigger.id}] for monitor [${monitor.id}]", e)
+            BucketLevelTriggerRunResult(trigger.name, e, emptyMap())
         }
     }
 

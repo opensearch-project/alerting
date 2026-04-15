@@ -8,4 +8,4 @@ build/
 out/
 .project
 .settings
-.vscode
+.vscode.agents/

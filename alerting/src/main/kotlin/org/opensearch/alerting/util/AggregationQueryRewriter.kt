@@ -41,12 +41,15 @@ class AggregationQueryRewriter {
             query: SearchSourceBuilder,
             prevResult: InputRunResults?,
             triggers: List<Trigger>,
-            returnSampleDocs: Boolean = false
+            returnSampleDocs: Boolean = false,
+            skipBucketSelectorInjection: Boolean = false
         ): SearchSourceBuilder {
             triggers.forEach { trigger ->
                 if (trigger is BucketLevelTrigger) {
                     // add bucket selector pipeline aggregation for each trigger in query
-                    query.aggregation(trigger.bucketSelector)
+                    if (!skipBucketSelectorInjection) {
+                        query.aggregation(trigger.bucketSelector)
+                    }
 
                     // if this request is processing the subsequent pages of input query result, then add after key
                     if (prevResult?.aggTriggersAfterKey?.get(trigger.id) != null) {
