@@ -320,11 +320,11 @@ class TriggerService(val scriptService: ScriptService) {
         val monitorExecutionDuration = monitorCtx
             .clusterService!!
             .clusterSettings
-            .get(AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION)
+            .get(AlertingSettings.PPL_MONITOR_EXECUTION_MAX_DURATION)
         val queryResultsSizeLimit = monitorCtx
             .clusterService!!
             .clusterSettings
-            .get(AlertingSettings.ALERT_V2_QUERY_RESULTS_MAX_SIZE)
+            .get(AlertingSettings.PPL_QUERY_RESULTS_MAX_SIZE)
 
         var triggered: Boolean? = null
         var customConditionQueryResults: List<Map<String, Any?>>? = null
@@ -339,7 +339,7 @@ class TriggerService(val scriptService: ScriptService) {
                 val queryToExecute = appendCustomCondition(query, customCondition)
 
                 // limit the number of PPL query result data rows returned
-                val dataRowsLimit = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS)
+                val dataRowsLimit = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.PPL_QUERY_RESULTS_MAX_DATAROWS)
                 val limitedQueryToExecute = appendDataRowsLimit(queryToExecute, dataRowsLimit)
 
                 // TODO: after getting ppl query results, see if the number of results

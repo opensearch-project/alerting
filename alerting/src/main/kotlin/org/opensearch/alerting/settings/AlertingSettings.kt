@@ -309,14 +309,14 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val ALERT_V2_MONITOR_EXECUTION_MAX_DURATION = Setting.positiveTimeSetting(
-            "plugins.alerting.v2.alert_monitor_execution_max_duration",
+        val PPL_MONITOR_EXECUTION_MAX_DURATION = Setting.positiveTimeSetting(
+            "plugins.alerting.ppl_monitor_max_execution_duration",
             TimeValue(1, TimeUnit.MINUTES),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        val ALERTING_V2_MAX_QUERY_LENGTH = Setting.longSetting(
-            "plugins.alerting.v2.monitor.max_query_length",
+        val PPL_MAX_QUERY_LENGTH = Setting.longSetting(
+            "plugins.alerting.ppl_monitor_max_query_length",
             2000L,
             0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
@@ -324,30 +324,30 @@ class AlertingSettings {
 
         // max data rows to retrieve when executing PPL query against
         // SQL/PPL plugin during monitor execution
-        val ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS = Setting.longSetting(
-            "plugins.alerting.v2.query_results_max_datarows",
+        val PPL_QUERY_RESULTS_MAX_DATAROWS = Setting.longSetting(
+            "plugins.alerting.ppl_query_results_max_datarows",
             10000L,
             1L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         // max size of query results to store in alerts and notifications
-        val ALERT_V2_QUERY_RESULTS_MAX_SIZE = Setting.longSetting(
-            "plugins.alerting.v2.query_results_max_size",
+        val PPL_QUERY_RESULTS_MAX_SIZE = Setting.longSetting(
+            "plugins.alerting.ppl_query_results_max_size",
             3000L,
             0L,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH = Setting.intSetting(
-            "plugins.alerting.v2.notification_subject_source_max_length",
+            "plugins.alerting.notification_subject_source_max_length",
             1000,
             100,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         val NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH = Setting.intSetting(
-            "plugins.alerting.v2.notification_message_source_max_length",
+            "plugins.alerting.notification_message_source_max_length",
             3000,
             1000,
             Setting.Property.NodeScope, Setting.Property.Dynamic

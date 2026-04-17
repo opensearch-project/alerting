@@ -252,7 +252,7 @@ class InputService(
             // here to populate the final customer facing response of monitor execution
             val cappedPPLBaseQueryResults = capAndReformatPPLQueryResults(
                 basePplQueryResults,
-                monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERT_V2_QUERY_RESULTS_MAX_SIZE)
+                monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.PPL_QUERY_RESULTS_MAX_SIZE)
             )
 
             InputRunResults(emptyList(), null, null, cappedPPLBaseQueryResults, numPplResults)
@@ -279,13 +279,13 @@ class InputService(
         val monitorExecutionDuration = monitorCtx
             .clusterService!!
             .clusterSettings
-            .get(AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION)
+            .get(AlertingSettings.PPL_MONITOR_EXECUTION_MAX_DURATION)
 
         var queryResponseJson: JSONObject? = null
 
         withTimeout(monitorExecutionDuration.millis) {
             // limit the number of PPL query result data rows returned
-            val dataRowsLimit = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS)
+            val dataRowsLimit = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.PPL_QUERY_RESULTS_MAX_DATAROWS)
             val limitedQueryToExecute = appendDataRowsLimit(baseQuery, dataRowsLimit)
 
             logger.debug("executing the base PPL query of monitor: ${pplSqlMonitor.id}")

@@ -304,7 +304,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         val settings = environment.settings()
         val lockService = LockService(client, clusterService)
         alertIndices = AlertIndices(settings, client, threadPool, clusterService)
-        alertV2Indices = AlertV2Indices(settings, client, threadPool, clusterService)
 
         val sdkClient: SdkClient = SdkClientFactory.createSdkClient(
             client,
@@ -476,15 +475,10 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.REMOTE_METADATA_REGION,
             AlertingSettings.REMOTE_METADATA_SERVICE_NAME,
             AlertingSettings.MULTI_TENANT_TRIGGER_EVAL_ENABLED,
-            AlertingSettings.ALERT_V2_HISTORY_ENABLED,
-            AlertingSettings.ALERT_V2_HISTORY_ROLLOVER_PERIOD,
-            AlertingSettings.ALERT_V2_HISTORY_INDEX_MAX_AGE,
-            AlertingSettings.ALERT_V2_HISTORY_MAX_DOCS,
-            AlertingSettings.ALERT_V2_HISTORY_RETENTION_PERIOD,
-            AlertingSettings.ALERT_V2_MONITOR_EXECUTION_MAX_DURATION,
-            AlertingSettings.ALERTING_V2_MAX_QUERY_LENGTH,
-            AlertingSettings.ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS,
-            AlertingSettings.ALERT_V2_QUERY_RESULTS_MAX_SIZE,
+            AlertingSettings.PPL_MONITOR_EXECUTION_MAX_DURATION,
+            AlertingSettings.PPL_MAX_QUERY_LENGTH,
+            AlertingSettings.PPL_QUERY_RESULTS_MAX_DATAROWS,
+            AlertingSettings.PPL_QUERY_RESULTS_MAX_SIZE,
             AlertingSettings.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH,
             AlertingSettings.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH,
         )

@@ -43,9 +43,9 @@ import org.opensearch.alerting.randomThrottle
 import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH
+import org.opensearch.alerting.settings.AlertingSettings.Companion.PPL_MAX_QUERY_LENGTH
 import org.opensearch.alerting.toJsonString
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.ResponseException
@@ -1747,7 +1747,7 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     fun `test create ppl monitor with query that's too long fails`() {
-        adminClient().updateSettings(ALERTING_V2_MAX_QUERY_LENGTH.key, 1)
+        adminClient().updateSettings(PPL_MAX_QUERY_LENGTH.key, 1)
 
         // ensure the request fails
         try {

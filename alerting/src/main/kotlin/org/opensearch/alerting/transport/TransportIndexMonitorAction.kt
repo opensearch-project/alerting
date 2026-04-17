@@ -39,13 +39,13 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_MAX_QUERY_LENGTH
-import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTION_THROTTLE_VALUE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_TRIGGERS_PER_MONITOR
 import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH
+import org.opensearch.alerting.settings.AlertingSettings.Companion.PPL_MAX_QUERY_LENGTH
+import org.opensearch.alerting.settings.AlertingSettings.Companion.PPL_QUERY_RESULTS_MAX_DATAROWS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.DocLevelMonitorQueries
@@ -131,8 +131,8 @@ class TransportIndexMonitorAction @Inject constructor(
     @Volatile private var allowList = ALLOW_LIST.get(settings)
 
     // PPL Alerting related settings
-    @Volatile private var maxQueryLength = ALERTING_V2_MAX_QUERY_LENGTH.get(settings)
-    @Volatile private var maxQueryResults = ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS.get(settings)
+    @Volatile private var maxQueryLength = PPL_MAX_QUERY_LENGTH.get(settings)
+    @Volatile private var maxQueryResults = PPL_QUERY_RESULTS_MAX_DATAROWS.get(settings)
     @Volatile private var notificationSubjectMaxLength = NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH.get(settings)
     @Volatile private var notificationMessageMaxLength = NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH.get(settings)
 
@@ -146,8 +146,8 @@ class TransportIndexMonitorAction @Inject constructor(
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTION_THROTTLE_VALUE) { maxActionThrottle = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
 
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_MAX_QUERY_LENGTH) { maxQueryLength = it }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS) { maxQueryResults = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(PPL_MAX_QUERY_LENGTH) { maxQueryLength = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(PPL_QUERY_RESULTS_MAX_DATAROWS) { maxQueryResults = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH) {
             notificationSubjectMaxLength = it
         }
@@ -313,7 +313,7 @@ class TransportIndexMonitorAction @Inject constructor(
         // initiate the PPL monitor and PPL query validations
         client.threadPool().threadContext.stashContext().use {
             scope.launch {
-                val singleThreadContext = newSingleThreadContext("IndexMonitorV2ActionThread")
+                val singleThreadContext = newSingleThreadContext("IndexPPLMonitorActionThread")
                 withContext(singleThreadContext) {
                     it.restore()
 
@@ -409,9 +409,9 @@ class TransportIndexMonitorAction @Inject constructor(
                     AlertingException.wrap(
                         IllegalArgumentException(
                             "Trigger ${trigger.id} checks for number of results threshold of ${trigger.numResultsValue}, " +
-                                "but Alerting V2 is configured only to retrieve $maxQueryResults query results maximum. " +
+                                "but PPL Alerting is configured only to retrieve $maxQueryResults query results maximum. " +
                                 "Please lower the number of results value to one below this maximum value, or adjust the cluster " +
-                                "setting: $ALERTING_V2_QUERY_RESULTS_MAX_DATAROWS.key}"
+                                "setting: $PPL_QUERY_RESULTS_MAX_DATAROWS.key}"
                         )
                     )
                 )
