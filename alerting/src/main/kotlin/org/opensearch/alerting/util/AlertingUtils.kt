@@ -88,6 +88,12 @@ fun Monitor.isQueryLevelMonitor(): Boolean =
     this.isMonitorOfStandardType() &&
         Monitor.MonitorType.valueOf(this.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.QUERY_LEVEL_MONITOR
 
+fun Monitor.isUnsupportedMultiTenantMonitorType(): Boolean {
+    if (!this.isMonitorOfStandardType()) return false
+    val type = Monitor.MonitorType.valueOf(this.monitorType.uppercase(Locale.ROOT))
+    return type == Monitor.MonitorType.DOC_LEVEL_MONITOR || type == Monitor.MonitorType.CLUSTER_METRICS_MONITOR
+}
+
 /**
  * Since buckets can have multi-value keys, this converts the bucket key values to a string that can be used
  * as the key for a HashMap to easily retrieve [AggregationResultBucket] based on the bucket key values.

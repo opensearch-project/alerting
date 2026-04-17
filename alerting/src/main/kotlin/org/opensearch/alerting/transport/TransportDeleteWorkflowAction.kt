@@ -84,11 +84,22 @@ class TransportDeleteWorkflowAction @Inject constructor(
 
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
+    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+
     init {
         listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<DeleteWorkflowResponse>) {
+        if (multiTenancyEnabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException("Workflow operations are not allowed when multi-tenancy is enabled.", RestStatus.METHOD_NOT_ALLOWED)
+                )
+            )
+            return
+        }
+
         val transformedRequest = request as? DeleteWorkflowRequest
             ?: recreateObject(request) { DeleteWorkflowRequest(it) }
 

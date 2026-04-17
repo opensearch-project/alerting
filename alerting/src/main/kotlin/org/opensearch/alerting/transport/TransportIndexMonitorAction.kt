@@ -44,6 +44,7 @@ import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.await
 import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.util.isADMonitor
+import org.opensearch.alerting.util.isUnsupportedMultiTenantMonitorType
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -117,6 +118,8 @@ class TransportIndexMonitorAction @Inject constructor(
     @Volatile private var allowList = ALLOW_LIST.get(settings)
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
+    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_MAX_MONITORS) { maxMonitors = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_TRIGGERS_PER_MONITOR) { maxTriggersPerMonitor = it }
@@ -132,6 +135,18 @@ class TransportIndexMonitorAction @Inject constructor(
             ?: recreateObject(request, namedWriteableRegistry) {
                 IndexMonitorRequest(it)
             }
+
+        if (multiTenancyEnabled && transformedRequest.monitor.isUnsupportedMultiTenantMonitorType()) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "${transformedRequest.monitor.monitorType} monitors are not allowed when multi-tenancy is enabled.",
+                        RestStatus.METHOD_NOT_ALLOWED
+                    )
+                )
+            )
+            return
+        }
 
         val user = readUserFromThreadContext(client)
 
