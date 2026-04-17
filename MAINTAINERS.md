@@ -10,16 +10,17 @@ This document contains a list of maintainers in this repo. See [opensearch-proje
 | Bowen Lan             | [bowenlan-amzn](https://github.com/bowenlan-amzn) | Amazon      |
 | Saurabh Singh         | [getsaurabh02](https://github.com/getsaurabh02)   | Amazon      |
 | Rishabh Maurya        | [rishabhmaurya](https://github.com/rishabhmaurya) | Amazon      |
-| Subhobrata DEY        | [sbcd90](https://github.com/sbcd90)               | Amazon      |
 | Surya Sashank Nistala | [eirsep](https://github.com/eirsep)               | Amazon      |
 | Thomas Hurney         | [AWSHurneyt](https://github.com/AWSHurneyt)       | Amazon      |
-| Praveen Sameneni  | [praveensameneni](https://github.com/praveensameneni) | Amazon      |
 | Chase Engelbrecht     | [engechas](https://github.com/engechas)           | Amazon      |
 | Riya Saxena           | [riysaxen-amzn](https://github.com/riysaxen-amzn) | Amazon      |
-| Joanne Wang           | [jowg-amazon](https://github.com/jowg-amazon)     | Amazon      |
 | Amardeepsingh Siglani | [amsiglan](https://github.com/amsiglan)           | Amazon      | 
 | Megha Goyal           | [goyamegh](https://github.com/goyamegh)           | Amazon      |
 | Dennis Toepker        | [toepkerd](https://github.com/toepkerd)           | Amazon      |
+| Sai Vikhyath          | [vikhy-aws](https://github.com/vikhy-aws)         | Amazon      |
+| Manaswini Ragamouni   | [manaswini1920](https://github.com/manaswini1920) | Amazon      |
+| Nishtha Mehrotra            | [nishtham-amazon](https://github.com/nishtham-amazon) | Amazon   |
+| Kash Kondaka         | [KashKondaka](https://github.com/KashKondaka)     | Amazon      |
 
 ## Emeritus
 
@@ -28,3 +29,6 @@ This document contains a list of maintainers in this repo. See [opensearch-proje
 | Sriram Kosuri     | [skkosuri-amzn](https://github.com/skkosuri-amzn)     | Amazon      |
 | Tianli Feng       | [tlfeng](https://github.com/tlfeng)                   | Amazon      |
 | Mohammad Qureshi      | [qreshi](https://github.com/qreshi)               | Amazon      |
+| Subhobrata DEY        | [sbcd90](https://github.com/sbcd90)               | Amazon      |
+| Praveen Sameneni  | [praveensameneni](https://github.com/praveensameneni) | Amazon      |
+| Joanne Wang           | [jowg-amazon](https://github.com/jowg-amazon)     | Amazon      |
