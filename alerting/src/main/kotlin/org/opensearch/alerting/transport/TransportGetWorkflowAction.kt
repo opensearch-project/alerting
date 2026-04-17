@@ -59,7 +59,10 @@ class TransportGetWorkflowAction @Inject constructor(
         if (multiTenancyEnabled) {
             actionListener.onFailure(
                 AlertingException.wrap(
-                    OpenSearchStatusException("Workflow operations are not allowed when multi-tenancy is enabled.", RestStatus.METHOD_NOT_ALLOWED)
+                    OpenSearchStatusException(
+                        "Workflow operations are not allowed when multi-tenancy is enabled.",
+                        RestStatus.METHOD_NOT_ALLOWED
+                    )
                 )
             )
             return
