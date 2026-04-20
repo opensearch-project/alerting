@@ -582,7 +582,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     throw t
                 }
 
-                // OSSA-606: Create EB schedule for monitor execution (OASIS path)
+                // Create external schedule for monitor execution
                 try {
                     createExternalSchedule(request.monitor, tenantId)
                 } catch (t: Exception) {
@@ -787,13 +787,12 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                     MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
                 }
-                // OSSA-606: Update EB schedule with latest monitor config (OASIS path)
+                // Update external schedule with latest monitor config
                 try {
                     updateExternalSchedule(request.monitor, tenantId)
                 } catch (t: Exception) {
                     log.error("Failed to update EB schedule for monitor ${request.monitorId}", t)
                     // Update flow: EB failure is non-fatal — monitor metadata is already persisted.
-                    // The schedule will be reconciled on next update or by auditor.
                 }
                 actionListener.onResponse(
                     IndexMonitorResponse(
@@ -819,48 +818,42 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         /**
-         * Reads EB cell info from ThreadContext and creates an external schedule.
-         * No-op when OASIS ActionFilter is not present (open-source standalone mode).
+         * Reads scheduler routing info from ThreadContext and creates an external schedule.
+         * No-op when the external scheduler is not configured.
          */
         private fun createExternalSchedule(monitor: Monitor, tenantId: String?) {
             val threadContext = client.threadPool().threadContext
-            val ebCellAccountId = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_ACCOUNT_ID_KEY) ?: return
-            val ebCellRegion = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_REGION_KEY) ?: return
-            val queueArn = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_QUEUE_ARN_KEY) ?: return
-            val roleArn = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_ROLE_ARN_KEY) ?: return
+            val schedulerAccountId = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY) ?: return
+            val queueArn = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_QUEUE_ARN_KEY) ?: return
+            val roleArn = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ROLE_ARN_KEY) ?: return
 
-            // Routing context (appId, workspaceId, ebCellAccountId) is carried on monitor.metadata,
-            // populated upstream by the OASIS ActionFilter from request headers.
             val targetInput = SchedulePayloadBuilder.buildTargetInput(
                 monitor = monitor,
                 jobStartTimePlaceholder = "<aws.scheduler.scheduled-time>"
             )
 
             ExternalSchedulerService.createSchedule(
-                monitor, ebCellAccountId, ebCellRegion, queueArn, roleArn, targetInput
+                monitor, schedulerAccountId, queueArn, roleArn, targetInput
             )
         }
 
         /**
-         * Reads EB cell info from ThreadContext and updates the external schedule.
-         * Per LLD 6.2: always refreshes Target.Input with latest monitor config.
+         * Reads scheduler routing info from ThreadContext and updates the external schedule.
+         * Always refreshes Target.Input with the latest monitor config.
          */
         private fun updateExternalSchedule(monitor: Monitor, tenantId: String?) {
             val threadContext = client.threadPool().threadContext
-            val ebCellAccountId = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_ACCOUNT_ID_KEY) ?: return
-            val ebCellRegion = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_REGION_KEY) ?: return
-            val queueArn = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_QUEUE_ARN_KEY) ?: return
-            val roleArn = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_ROLE_ARN_KEY) ?: return
+            val schedulerAccountId = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY) ?: return
+            val queueArn = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_QUEUE_ARN_KEY) ?: return
+            val roleArn = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ROLE_ARN_KEY) ?: return
 
-            // Routing context (appId, workspaceId, ebCellAccountId) is carried on monitor.metadata,
-            // populated upstream by the OASIS ActionFilter from request headers.
             val targetInput = SchedulePayloadBuilder.buildTargetInput(
                 monitor = monitor,
                 jobStartTimePlaceholder = "<aws.scheduler.scheduled-time>"
             )
 
             ExternalSchedulerService.updateSchedule(
-                monitor, ebCellAccountId, ebCellRegion, queueArn, roleArn, targetInput
+                monitor, schedulerAccountId, queueArn, roleArn, targetInput
             )
         }
     }

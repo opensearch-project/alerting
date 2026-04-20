@@ -11,22 +11,19 @@ import org.opensearch.commons.alerting.model.Monitor
 import java.time.ZoneId
 
 /**
- * Manages external EventBridge schedules for OASIS monitor execution.
+ * Manages external EventBridge schedules for monitor execution.
  *
  * Called from TransportIndexMonitorAction (create/update) and
  * TransportDeleteMonitorAction (delete) during monitor CRUD.
- *
- * AWS SDK SchedulerClient calls will be wired in OSSA-608.
  */
 object ExternalSchedulerService {
 
     private val log = LogManager.getLogger(ExternalSchedulerService::class.java)
 
     const val SCHEDULE_NAME_PREFIX = "monitor-"
-    const val EB_CELL_ACCOUNT_ID_KEY = "oasis.eb_cell_account_id"
-    const val EB_CELL_REGION_KEY = "oasis.eb_cell_region"
-    const val EB_CELL_QUEUE_ARN_KEY = "oasis.eb_cell_queue_arn"
-    const val EB_CELL_ROLE_ARN_KEY = "oasis.eb_cell_role_arn"
+    const val SCHEDULER_ACCOUNT_ID_KEY = "scheduler.account_id"
+    const val SCHEDULER_QUEUE_ARN_KEY = "scheduler.queue_arn"
+    const val SCHEDULER_ROLE_ARN_KEY = "scheduler.role_arn"
 
     fun scheduleName(monitorId: String): String = "$SCHEDULE_NAME_PREFIX$monitorId"
 
@@ -35,8 +32,7 @@ object ExternalSchedulerService {
      */
     fun createSchedule(
         monitor: Monitor,
-        ebCellAccountId: String,
-        ebCellRegion: String,
+        schedulerAccountId: String,
         queueArn: String,
         crossAccountRoleArn: String,
         targetInput: String
@@ -50,11 +46,10 @@ object ExternalSchedulerService {
             targetRoleArn = crossAccountRoleArn,
             targetInput = targetInput,
             enabled = monitor.enabled,
-            ebCellAccountId = ebCellAccountId,
-            ebCellRegion = ebCellRegion
+            schedulerAccountId = schedulerAccountId
         )
-        log.info("Creating EB schedule ${request.name} in cell $ebCellAccountId")
-        // TODO OSSA-608: SchedulerClient.createSchedule() with AssumeRole into EB cell account
+        log.info("Creating EB schedule ${request.name} in account $schedulerAccountId")
+        // TODO: SchedulerClient.createSchedule() with AssumeRole into scheduler account
     }
 
     /**
@@ -62,8 +57,7 @@ object ExternalSchedulerService {
      */
     fun updateSchedule(
         monitor: Monitor,
-        ebCellAccountId: String,
-        ebCellRegion: String,
+        schedulerAccountId: String,
         queueArn: String,
         crossAccountRoleArn: String,
         targetInput: String
@@ -77,11 +71,10 @@ object ExternalSchedulerService {
             targetRoleArn = crossAccountRoleArn,
             targetInput = targetInput,
             enabled = monitor.enabled,
-            ebCellAccountId = ebCellAccountId,
-            ebCellRegion = ebCellRegion
+            schedulerAccountId = schedulerAccountId
         )
-        log.info("Updating EB schedule ${request.name} in cell $ebCellAccountId")
-        // TODO OSSA-608: SchedulerClient.updateSchedule() with AssumeRole into EB cell account
+        log.info("Updating EB schedule ${request.name} in account $schedulerAccountId")
+        // TODO: SchedulerClient.updateSchedule() with AssumeRole into scheduler account
     }
 
     /**
@@ -89,12 +82,11 @@ object ExternalSchedulerService {
      */
     fun deleteSchedule(
         monitorId: String,
-        ebCellAccountId: String,
-        ebCellRegion: String,
+        schedulerAccountId: String,
         crossAccountRoleArn: String
     ) {
-        log.info("Deleting EB schedule ${scheduleName(monitorId)} from cell $ebCellAccountId")
-        // TODO OSSA-608: SchedulerClient.deleteSchedule() with AssumeRole into EB cell account
+        log.info("Deleting EB schedule ${scheduleName(monitorId)} from account $schedulerAccountId")
+        // TODO: SchedulerClient.deleteSchedule() with AssumeRole into scheduler account
     }
 
     /**
@@ -108,7 +100,6 @@ object ExternalSchedulerService {
         val targetRoleArn: String,
         val targetInput: String,
         val enabled: Boolean,
-        val ebCellAccountId: String,
-        val ebCellRegion: String
+        val schedulerAccountId: String
     )
 }

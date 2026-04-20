@@ -45,9 +45,9 @@ class ExternalSchedulerServiceTests {
 
     @Test
     fun `createSchedule does not throw`() {
-        // Verifies no exception — SDK calls are TODO stubs for OSSA-608
+        // Verifies no exception — SDK calls are TODO stubs
         ExternalSchedulerService.createSchedule(
-            testMonitor(), "111111111111", "us-east-1",
+            testMonitor(), "111111111111",
             "arn:aws:sqs:us-east-1:111:queue", "arn:aws:iam::111:role/test", "{}"
         )
     }
@@ -55,7 +55,7 @@ class ExternalSchedulerServiceTests {
     @Test
     fun `updateSchedule does not throw`() {
         ExternalSchedulerService.updateSchedule(
-            testMonitor(), "222222222222", "us-west-2",
+            testMonitor(), "222222222222",
             "arn:aws:sqs:us-west-2:222:queue", "arn:aws:iam::222:role/test", "{}"
         )
     }
@@ -64,10 +64,9 @@ class ExternalSchedulerServiceTests {
     fun `deleteSchedule accepts all required params`() {
         val monitorId = "mon-3"
         val account = "333333333333"
-        val region = "eu-west-1"
         val roleArn = "arn:aws:iam::333:role/eb-role"
-        // Verifies no exception — SDK calls are TODO stubs for OSSA-608
-        ExternalSchedulerService.deleteSchedule(monitorId, account, region, roleArn)
+        // Verifies no exception — SDK calls are TODO stubs
+        ExternalSchedulerService.deleteSchedule(monitorId, account, roleArn)
     }
 
     @Test
@@ -82,13 +81,11 @@ class ExternalSchedulerServiceTests {
             targetRoleArn = "arn:aws:iam::222:role/eb-role",
             targetInput = "{\"monitorConfig\":\"test\"}",
             enabled = true,
-            ebCellAccountId = "222222222222",
-            ebCellRegion = "us-west-2"
+            schedulerAccountId = "222222222222"
         )
         assertEquals("monitor-mon-1", req.name)
         assertEquals("rate(10 minutes)", req.scheduleExpression)
-        assertEquals("222222222222", req.ebCellAccountId)
-        assertEquals("us-west-2", req.ebCellRegion)
+        assertEquals("222222222222", req.schedulerAccountId)
         assertEquals("arn:aws:iam::222:role/eb-role", req.targetRoleArn)
         assertEquals("arn:aws:sqs:us-west-2:222:AlertingJobQueue", req.targetArn)
         assertEquals("{\"monitorConfig\":\"test\"}", req.targetInput)
