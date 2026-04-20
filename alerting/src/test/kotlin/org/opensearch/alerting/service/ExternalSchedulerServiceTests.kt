@@ -8,7 +8,7 @@ package org.opensearch.alerting.service
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.opensearch.alerting.service.ExternalSchedulerService.ScheduleRequest
-import org.opensearch.alerting.util.ScheduleTranslator
+import org.opensearch.commons.alerting.util.ScheduleTranslator
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput

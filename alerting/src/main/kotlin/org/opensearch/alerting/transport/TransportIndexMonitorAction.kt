@@ -41,7 +41,6 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEO
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
-import org.opensearch.alerting.util.MonitorPayloadBuilder
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.await
 import org.opensearch.alerting.util.getRoleFilterEnabled
@@ -68,6 +67,7 @@ import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonitorInput
 import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonitorInput.Companion.REMOTE_DOC_LEVEL_MONITOR_INPUT_FIELD
 import org.opensearch.commons.alerting.util.AlertingException
+import org.opensearch.commons.alerting.util.SchedulePayloadBuilder
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
@@ -829,16 +829,11 @@ class TransportIndexMonitorAction @Inject constructor(
             val queueArn = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_QUEUE_ARN_KEY) ?: return
             val roleArn = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_ROLE_ARN_KEY) ?: return
 
-            val targetInput = MonitorPayloadBuilder.buildTargetInput(
+            // Routing context (appId, workspaceId, ebCellAccountId) is carried on monitor.metadata,
+            // populated upstream by the OASIS ActionFilter from request headers.
+            val targetInput = SchedulePayloadBuilder.buildTargetInput(
                 monitor = monitor,
-                appId = threadContext.getHeader("x-app-id")
-                    ?: throw OpenSearchStatusException("x-app-id header missing", RestStatus.BAD_REQUEST),
-                tenantId = tenantId
-                    ?: throw OpenSearchStatusException("Tenant ID missing", RestStatus.BAD_REQUEST),
-                workspaceId = threadContext.getHeader("x-workspace-id")
-                    ?: throw OpenSearchStatusException("x-workspace-id header missing", RestStatus.BAD_REQUEST),
-                collectionEndpoint = threadContext.getHeader("x-collection-endpoint")
-                    ?: throw OpenSearchStatusException("x-collection-endpoint header missing", RestStatus.BAD_REQUEST)
+                jobStartTimePlaceholder = "<aws.scheduler.scheduled-time>"
             )
 
             ExternalSchedulerService.createSchedule(
@@ -857,16 +852,11 @@ class TransportIndexMonitorAction @Inject constructor(
             val queueArn = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_QUEUE_ARN_KEY) ?: return
             val roleArn = threadContext.getTransient<String>(ExternalSchedulerService.EB_CELL_ROLE_ARN_KEY) ?: return
 
-            val targetInput = MonitorPayloadBuilder.buildTargetInput(
+            // Routing context (appId, workspaceId, ebCellAccountId) is carried on monitor.metadata,
+            // populated upstream by the OASIS ActionFilter from request headers.
+            val targetInput = SchedulePayloadBuilder.buildTargetInput(
                 monitor = monitor,
-                appId = threadContext.getHeader("x-app-id")
-                    ?: throw OpenSearchStatusException("x-app-id header missing", RestStatus.BAD_REQUEST),
-                tenantId = tenantId
-                    ?: throw OpenSearchStatusException("Tenant ID missing", RestStatus.BAD_REQUEST),
-                workspaceId = threadContext.getHeader("x-workspace-id")
-                    ?: throw OpenSearchStatusException("x-workspace-id header missing", RestStatus.BAD_REQUEST),
-                collectionEndpoint = threadContext.getHeader("x-collection-endpoint")
-                    ?: throw OpenSearchStatusException("x-collection-endpoint header missing", RestStatus.BAD_REQUEST)
+                jobStartTimePlaceholder = "<aws.scheduler.scheduled-time>"
             )
 
             ExternalSchedulerService.updateSchedule(

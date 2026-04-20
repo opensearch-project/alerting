@@ -6,7 +6,7 @@
 package org.opensearch.alerting.service
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.alerting.util.ScheduleTranslator
+import org.opensearch.commons.alerting.util.ScheduleTranslator
 import org.opensearch.commons.alerting.model.Monitor
 import java.time.ZoneId
 
