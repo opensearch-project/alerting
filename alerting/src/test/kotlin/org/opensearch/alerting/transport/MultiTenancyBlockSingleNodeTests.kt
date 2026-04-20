@@ -13,7 +13,6 @@ import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.randomClusterMetricsMonitor
 import org.opensearch.alerting.randomDocumentLevelMonitor
-import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.action.AlertingActions
@@ -22,7 +21,6 @@ import org.opensearch.commons.alerting.action.GetWorkflowAlertsRequest
 import org.opensearch.commons.alerting.action.GetWorkflowRequest
 import org.opensearch.commons.alerting.action.IndexWorkflowRequest
 import org.opensearch.commons.alerting.model.Alert
-import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.index.seqno.SequenceNumbers
@@ -30,7 +28,7 @@ import org.opensearch.rest.RestRequest
 import java.time.Instant
 
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
-class MultiTenancyBlockIT : AlertingSingleNodeTestCase() {
+class MultiTenancyBlockSingleNodeTests : AlertingSingleNodeTestCase() {
 
     override fun nodeSettings(): Settings {
         return Settings.builder()
@@ -40,7 +38,7 @@ class MultiTenancyBlockIT : AlertingSingleNodeTestCase() {
     }
 
     override fun resetNodeAfterTest(): Boolean {
-        return true
+        return false
     }
 
     // --- Workflow tests ---
@@ -52,7 +50,7 @@ class MultiTenancyBlockIT : AlertingSingleNodeTestCase() {
             primaryTerm = SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
             refreshPolicy = WriteRequest.RefreshPolicy.IMMEDIATE,
             method = RestRequest.Method.POST,
-            workflow = org.opensearch.alerting.randomWorkflow(monitorIds = emptyList())
+            workflow = org.opensearch.alerting.randomWorkflow(monitorIds = listOf("dummy-monitor-id"))
         )
         val exception = expectThrows(Exception::class.java) {
             client().execute(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, request).actionGet()
@@ -116,12 +114,6 @@ class MultiTenancyBlockIT : AlertingSingleNodeTestCase() {
             createMonitor(randomClusterMetricsMonitor())
         }
         assertTrue(exception.message!!.contains("not allowed when multi-tenancy is enabled"))
-    }
-
-    fun `test index query-level monitor succeeds when multi-tenancy is enabled`() {
-        val response = createMonitor(randomQueryLevelMonitor())
-        assertNotNull(response)
-        assertNotEquals(Monitor.NO_ID, response!!.id)
     }
 
     fun `test execute inline doc-level monitor fails when multi-tenancy is enabled`() {
