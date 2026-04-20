@@ -18,6 +18,7 @@ import org.opensearch.alerting.action.ExecuteWorkflowResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
@@ -67,6 +68,9 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
     private lateinit var clusterService: ClusterService
     private lateinit var threadPool: ThreadPool
     private lateinit var threadContext: ThreadContext
+    private lateinit var scheduledJobIndices: ScheduledJobIndices
+    private lateinit var lockService: LockService
+    private lateinit var docLevelMonitorQueries: DocLevelMonitorQueries
 
     private val multiTenancySettings: Settings = Settings.builder()
         .put("plugins.alerting.multi_tenancy_enabled", true)
@@ -90,8 +94,20 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
         settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
         settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
         settingSet.add(AlertingSettings.ALERT_HISTORY_ENABLED)
+        settingSet.add(AlertingSettings.ALERTING_MAX_MONITORS)
+        settingSet.add(AlertingSettings.MAX_TRIGGERS_PER_MONITOR)
+        settingSet.add(AlertingSettings.REQUEST_TIMEOUT)
+        settingSet.add(AlertingSettings.INDEX_TIMEOUT)
+        settingSet.add(AlertingSettings.MAX_ACTION_THROTTLE_VALUE)
+        settingSet.add(DestinationSettings.ALLOW_LIST)
         val clusterSettings = ClusterSettings(multiTenancySettings, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
+
+        val adminClient = Mockito.mock(org.opensearch.transport.client.AdminClient::class.java)
+        whenever(client.admin()).thenReturn(adminClient)
+        scheduledJobIndices = ScheduledJobIndices(adminClient, clusterService)
+        lockService = LockService(client, clusterService)
+        docLevelMonitorQueries = DocLevelMonitorQueries(client, clusterService)
     }
 
     // --- Workflow action tests ---
@@ -112,11 +128,18 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
     fun `test index workflow blocked when multi-tenancy enabled`() {
         val action = TransportIndexWorkflowAction(
             transportService, client, actionFilters,
-            Mockito.mock(ScheduledJobIndices::class.java),
+            scheduledJobIndices,
             clusterService, multiTenancySettings, xContentRegistry,
             Mockito.mock(NamedWriteableRegistry::class.java)
         )
-        val request = Mockito.mock(IndexWorkflowRequest::class.java)
+        val request = IndexWorkflowRequest(
+            workflowId = "test-id",
+            seqNo = SequenceNumbers.UNASSIGNED_SEQ_NO,
+            primaryTerm = SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
+            refreshPolicy = org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE,
+            method = RestRequest.Method.POST,
+            workflow = org.opensearch.alerting.randomWorkflow(monitorIds = listOf("dummy-id"))
+        )
         @Suppress("UNCHECKED_CAST")
         val listener = Mockito.mock(ActionListener::class.java) as ActionListener<IndexWorkflowResponse>
 
@@ -129,7 +152,7 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
         val action = TransportDeleteWorkflowAction(
             transportService, client, actionFilters, clusterService,
             multiTenancySettings, xContentRegistry,
-            Mockito.mock(LockService::class.java)
+            lockService
         )
         val request = DeleteWorkflowRequest("test-id", false)
         @Suppress("UNCHECKED_CAST")
@@ -143,7 +166,7 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
     fun `test execute workflow blocked when multi-tenancy enabled`() {
         val action = TransportExecuteWorkflowAction(
             transportService, client,
-            Mockito.mock(MonitorRunnerService::class.java),
+            MonitorRunnerService,
             actionFilters, xContentRegistry, multiTenancySettings
         )
         val request = ExecuteWorkflowRequest(true, TimeValue(Instant.now().toEpochMilli()), "test-id", null)
@@ -185,8 +208,8 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
     fun `test index doc-level monitor blocked when multi-tenancy enabled`() {
         val action = TransportIndexMonitorAction(
             transportService, client, actionFilters,
-            Mockito.mock(ScheduledJobIndices::class.java),
-            Mockito.mock(DocLevelMonitorQueries::class.java),
+            scheduledJobIndices,
+            docLevelMonitorQueries,
             clusterService, multiTenancySettings, xContentRegistry,
             Mockito.mock(NamedWriteableRegistry::class.java),
             Mockito.mock(SdkClient::class.java)
@@ -213,8 +236,8 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
     fun `test index cluster-metrics monitor blocked when multi-tenancy enabled`() {
         val action = TransportIndexMonitorAction(
             transportService, client, actionFilters,
-            Mockito.mock(ScheduledJobIndices::class.java),
-            Mockito.mock(DocLevelMonitorQueries::class.java),
+            scheduledJobIndices,
+            docLevelMonitorQueries,
             clusterService, multiTenancySettings, xContentRegistry,
             Mockito.mock(NamedWriteableRegistry::class.java),
             Mockito.mock(SdkClient::class.java)
@@ -241,8 +264,8 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
     fun `test index query-level monitor allowed when multi-tenancy enabled`() {
         val action = TransportIndexMonitorAction(
             transportService, client, actionFilters,
-            Mockito.mock(ScheduledJobIndices::class.java),
-            Mockito.mock(DocLevelMonitorQueries::class.java),
+            scheduledJobIndices,
+            docLevelMonitorQueries,
             clusterService, multiTenancySettings, xContentRegistry,
             Mockito.mock(NamedWriteableRegistry::class.java),
             Mockito.mock(SdkClient::class.java)
@@ -275,9 +298,9 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
     fun `test execute inline doc-level monitor blocked when multi-tenancy enabled`() {
         val action = TransportExecuteMonitorAction(
             transportService, client, clusterService,
-            Mockito.mock(MonitorRunnerService::class.java),
+            MonitorRunnerService,
             actionFilters, xContentRegistry,
-            Mockito.mock(DocLevelMonitorQueries::class.java),
+            docLevelMonitorQueries,
             multiTenancySettings, Mockito.mock(SdkClient::class.java)
         )
         val monitor = Monitor(
@@ -301,19 +324,22 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
     private fun assertMethodNotAllowed(listener: ActionListener<*>) {
         val captor = org.mockito.ArgumentCaptor.forClass(Exception::class.java)
         verify(listener).onFailure(captor.capture())
-        val cause = (captor.value as? org.opensearch.commons.alerting.util.AlertingException)?.cause
-            ?: captor.value
-        assertTrue(cause is OpenSearchStatusException)
-        assertEquals(RestStatus.METHOD_NOT_ALLOWED, (cause as OpenSearchStatusException).status())
+        val exception = captor.value
+        assertTrue(exception is org.opensearch.commons.alerting.util.AlertingException)
+        assertEquals(
+            RestStatus.METHOD_NOT_ALLOWED,
+            (exception as org.opensearch.commons.alerting.util.AlertingException).status()
+        )
     }
 
     private fun invokeDoExecute(action: Any, request: Any, listener: ActionListener<*>) {
-        val method = action.javaClass.getDeclaredMethod(
-            "doExecute",
-            org.opensearch.tasks.Task::class.java,
-            org.opensearch.action.ActionRequest::class.java,
-            ActionListener::class.java
-        )
+        val methods = action.javaClass.declaredMethods.filter { it.name == "doExecute" }
+        // Prefer the typed override; fall back to ActionRequest-based if only one exists
+        val method = if (methods.size > 1) {
+            methods.first { it.parameterTypes[1] != org.opensearch.action.ActionRequest::class.java }
+        } else {
+            methods.first()
+        }
         method.isAccessible = true
         method.invoke(action, Mockito.mock(org.opensearch.tasks.Task::class.java), request, listener)
     }
