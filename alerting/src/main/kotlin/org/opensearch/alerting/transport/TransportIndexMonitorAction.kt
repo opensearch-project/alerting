@@ -32,6 +32,7 @@ import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.service.ExternalSchedulerService
+import org.opensearch.alerting.service.SchedulerRoutingResolver
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
@@ -841,48 +842,38 @@ class TransportIndexMonitorAction @Inject constructor(
          * No-op when required settings are blank.
          */
         private fun createExternalSchedule(monitor: Monitor, tenantId: String?) {
-            val accountId = resolveSchedulerAccountId() ?: return
-            val queueArn = externalSchedulerQueueArn.takeIf { it.isNotBlank() } ?: return
-            val roleArn = externalSchedulerRoleArn.takeIf { it.isNotBlank() } ?: return
-
+            val routing = resolveRouting() ?: return
             val targetInput = SchedulePayloadBuilder.buildTargetInput(
                 monitor = monitor,
                 jobStartTimePlaceholder = "<aws.scheduler.scheduled-time>"
             )
-
             ExternalSchedulerService.createSchedule(
-                monitor, accountId, queueArn, roleArn, targetInput
+                monitor, routing.accountId, routing.queueArn, routing.roleArn, targetInput
             )
         }
 
         /**
-         * Reads scheduler routing info from ThreadContext and updates the external schedule.
-         * Always refreshes Target.Input with the latest monitor config.
+         * Reads scheduler routing info from plugin settings (with optional ThreadContext
+         * override for account id) and updates the external schedule. Always refreshes
+         * Target.Input with the latest monitor config.
          */
         private fun updateExternalSchedule(monitor: Monitor, tenantId: String?) {
-            val accountId = resolveSchedulerAccountId() ?: return
-            val queueArn = externalSchedulerQueueArn.takeIf { it.isNotBlank() } ?: return
-            val roleArn = externalSchedulerRoleArn.takeIf { it.isNotBlank() } ?: return
-
+            val routing = resolveRouting() ?: return
             val targetInput = SchedulePayloadBuilder.buildTargetInput(
                 monitor = monitor,
                 jobStartTimePlaceholder = "<aws.scheduler.scheduled-time>"
             )
-
             ExternalSchedulerService.updateSchedule(
-                monitor, accountId, queueArn, roleArn, targetInput
+                monitor, routing.accountId, routing.queueArn, routing.roleArn, targetInput
             )
         }
 
-        /**
-         * Resolves the scheduler account id: ThreadContext override wins over plugin setting.
-         * Returns null when neither is set.
-         */
-        private fun resolveSchedulerAccountId(): String? {
-            val override = client.threadPool().threadContext
+        private fun resolveRouting(): SchedulerRoutingResolver.Routing? = SchedulerRoutingResolver.resolve(
+            settingsAccountId = externalSchedulerAccountId,
+            settingsQueueArn = externalSchedulerQueueArn,
+            settingsRoleArn = externalSchedulerRoleArn,
+            threadContextAccountIdOverride = client.threadPool().threadContext
                 .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
-            if (!override.isNullOrBlank()) return override
-            return externalSchedulerAccountId.takeIf { it.isNotBlank() }
-        }
+        )
     }
 }

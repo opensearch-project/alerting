@@ -17,6 +17,7 @@ import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.service.ExternalSchedulerService
+import org.opensearch.alerting.service.SchedulerRoutingResolver
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -156,21 +157,14 @@ class TransportDeleteMonitorAction @Inject constructor(
          * record so the schedule deletion can be retried.
          */
         private fun deleteExternalSchedule(monitor: Monitor) {
-            val accountId = resolveSchedulerAccountId() ?: return
-            val roleArn = externalSchedulerRoleArn.takeIf { it.isNotBlank() } ?: return
+            val routing = SchedulerRoutingResolver.resolveForDelete(
+                settingsAccountId = externalSchedulerAccountId,
+                settingsRoleArn = externalSchedulerRoleArn,
+                threadContextAccountIdOverride = client.threadPool().threadContext
+                    .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
+            ) ?: return
 
-            ExternalSchedulerService.deleteSchedule(monitor.id, accountId, roleArn)
-        }
-
-        /**
-         * Resolves the scheduler account id: ThreadContext override wins over plugin setting.
-         * Returns null when neither is set.
-         */
-        private fun resolveSchedulerAccountId(): String? {
-            val override = client.threadPool().threadContext
-                .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
-            if (!override.isNullOrBlank()) return override
-            return externalSchedulerAccountId.takeIf { it.isNotBlank() }
+            ExternalSchedulerService.deleteSchedule(monitor.id, routing.accountId, routing.roleArn)
         }
 
         private suspend fun getMonitor(): Monitor {
