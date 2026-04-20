@@ -38,7 +38,7 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.PPLSQLInput
+import org.opensearch.commons.alerting.model.PPLInput
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.TriggerAfterKey
 import org.opensearch.commons.alerting.model.WorkflowRunContext
@@ -236,7 +236,7 @@ class InputService(
             // for those triggers, not the contents themselves
             val basePplQueryResults = runPPLBaseQuery(
                 monitor,
-                (monitor.inputs[0] as PPLSQLInput).query,
+                (monitor.inputs[0] as PPLInput).query,
                 monitorCtx,
                 transportService
             )
@@ -269,7 +269,7 @@ class InputService(
     // for PPL Monitor execution, the base PPL query is run once
     // for number_of_results PPL triggers
     private suspend fun runPPLBaseQuery(
-        pplSqlMonitor: Monitor,
+        pplMonitor: Monitor,
         baseQuery: String,
         monitorCtx: MonitorRunnerExecutionContext,
         transportService: TransportService
@@ -288,7 +288,7 @@ class InputService(
             val dataRowsLimit = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.PPL_QUERY_RESULTS_MAX_DATAROWS)
             val limitedQueryToExecute = appendDataRowsLimit(baseQuery, dataRowsLimit)
 
-            logger.debug("executing the base PPL query of monitor: ${pplSqlMonitor.id}")
+            logger.debug("executing the base PPL query of monitor: ${pplMonitor.id}")
             val (queryResponseJsonReceived, timeTaken) = measureTimedValue {
                 executePplQuery(
                     limitedQueryToExecute,

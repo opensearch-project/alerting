@@ -72,7 +72,7 @@ import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.IndexPatternUtils
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
-import org.opensearch.commons.alerting.util.isPplSqlMonitor
+import org.opensearch.commons.alerting.util.isPPLMonitor
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -469,9 +469,9 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 "Executing scheduled monitor - id: ${monitor.id}, type: ${monitor.monitorType}, periodStart: $periodStart, " +
                     "periodEnd: $periodEnd, dryrun: $dryrun, executionId: $executionId"
             )
-            val runResult = if (monitor.isPplSqlMonitor()) {
-                // PPL/SQL Monitor runs with QueryLevelMonitorRunner
-                // as PPL/SQL Monitors are ultimately query-based
+            val runResult = if (monitor.isPPLMonitor()) {
+                // PPL Monitor runs with QueryLevelMonitorRunner
+                // as PPL Monitors are ultimately query-based
                 QueryLevelMonitorRunner.runMonitor(
                     monitor,
                     monitorCtx,

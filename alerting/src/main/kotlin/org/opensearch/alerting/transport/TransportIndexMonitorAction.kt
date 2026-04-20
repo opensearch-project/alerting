@@ -70,8 +70,8 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput.Companion.DOC_
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Monitor.MonitorType
 import org.opensearch.commons.alerting.model.MonitorMetadata
-import org.opensearch.commons.alerting.model.PPLSQLInput
-import org.opensearch.commons.alerting.model.PPLSQLTrigger
+import org.opensearch.commons.alerting.model.PPLInput
+import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.SearchInput
@@ -208,7 +208,7 @@ class TransportIndexMonitorAction @Inject constructor(
             // check if user has access to any anomaly detector for AD monitor
             checkAnomalyDetectorAndExecute(client, actionListener, transformedRequest, user)
         } else if (transformedRequest.monitor.monitorType == MonitorType.PPL_MONITOR.value) {
-            checkPplSqlQueryAndExecute(actionListener, transformedRequest, user)
+            checkPPLQueryAndExecute(actionListener, transformedRequest, user)
         } else {
             checkIndicesAndExecute(client, actionListener, transformedRequest, user)
         }
@@ -277,7 +277,7 @@ class TransportIndexMonitorAction @Inject constructor(
         )
     }
 
-    private fun checkPplSqlQueryAndExecute(
+    private fun checkPPLQueryAndExecute(
         actionListener: ActionListener<IndexMonitorResponse>,
         indexMonitorRequest: IndexMonitorRequest,
         user: User?
@@ -293,12 +293,12 @@ class TransportIndexMonitorAction @Inject constructor(
                 // roles can be matched and checked downstream
                 // roles can be matched and checked downstream
                 client.threadPool().threadContext.stashContext().use {
-                    val pplSqlMonitor = indexMonitorRequest.monitor
+                    val pplMonitor = indexMonitorRequest.monitor
                     if (user == null) {
-                        indexMonitorRequest.monitor = pplSqlMonitor
+                        indexMonitorRequest.monitor = pplMonitor
                             .copy(user = User("", listOf(), listOf(), mapOf()))
                     } else {
-                        indexMonitorRequest.monitor = pplSqlMonitor
+                        indexMonitorRequest.monitor = pplMonitor
                             .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttributes))
                     }
                     IndexMonitorHandler(client, actionListener, indexMonitorRequest, user).resolveUserAndStart()
@@ -317,18 +317,18 @@ class TransportIndexMonitorAction @Inject constructor(
                 withContext(singleThreadContext) {
                     it.restore()
 
-                    val pplSqlMonitor = indexMonitorRequest.monitor
+                    val pplMonitor = indexMonitorRequest.monitor
 
                     // validate the PPL query syntax and that user has permissions to
                     // the indices being queried
-                    val pplQueryValid = validatePplSqlQuery(pplSqlMonitor, validationListener)
+                    val pplQueryValid = validatePPLQuery(pplMonitor, validationListener)
                     if (!pplQueryValid) {
                         return@withContext
                     }
 
-                    // run basic validations against the PPL/SQL Monitor
-                    val pplSqlMonitorValid = validatePplSqlMonitor(pplSqlMonitor, validationListener)
-                    if (!pplSqlMonitorValid) {
+                    // run basic validations against the PPL Monitor
+                    val pplMonitorValid = validatePPLMonitor(pplMonitor, validationListener)
+                    if (!pplMonitorValid) {
                         return@withContext
                     }
 
@@ -338,14 +338,14 @@ class TransportIndexMonitorAction @Inject constructor(
         }
     }
 
-    private suspend fun validatePplSqlQuery(
-        pplSqlMonitor: Monitor,
+    private suspend fun validatePPLQuery(
+        pplMonitor: Monitor,
         validationListener: ActionListener<Unit>
     ): Boolean {
         // first attempt to run the monitor query and all possible
         // extensions of it (from custom conditions)
         try {
-            val query = (pplSqlMonitor.inputs[0] as PPLSQLInput).query
+            val query = (pplMonitor.inputs[0] as PPLInput).query
 
             val limitedQueryToExecute = appendDataRowsLimit(query, maxQueryResults)
 
@@ -356,10 +356,10 @@ class TransportIndexMonitorAction @Inject constructor(
 
             // scan all the triggers with custom conditions, and ensure each query constructed
             // from the base query + custom condition is valid
-            for (trigger in pplSqlMonitor.triggers) {
-                val pplTrigger = trigger as PPLSQLTrigger
+            for (trigger in pplMonitor.triggers) {
+                val pplTrigger = trigger as PPLTrigger
 
-                if (pplTrigger.conditionType != PPLSQLTrigger.ConditionType.CUSTOM) {
+                if (pplTrigger.conditionType != PPLTrigger.ConditionType.CUSTOM) {
                     continue
                 }
 
@@ -398,11 +398,11 @@ class TransportIndexMonitorAction @Inject constructor(
         return true
     }
 
-    private fun validatePplSqlMonitor(pplSqlMonitor: Monitor, validationListener: ActionListener<Unit>): Boolean {
-        pplSqlMonitor.triggers.forEach { trigger ->
-            val pplTrigger = trigger as PPLSQLTrigger
+    private fun validatePPLMonitor(pplMonitor: Monitor, validationListener: ActionListener<Unit>): Boolean {
+        pplMonitor.triggers.forEach { trigger ->
+            val pplTrigger = trigger as PPLTrigger
 
-            if (pplTrigger.conditionType == PPLSQLTrigger.ConditionType.NUMBER_OF_RESULTS &&
+            if (pplTrigger.conditionType == PPLTrigger.ConditionType.NUMBER_OF_RESULTS &&
                 pplTrigger.numResultsValue!! > maxQueryResults
             ) {
                 validationListener.onFailure(
@@ -443,7 +443,7 @@ class TransportIndexMonitorAction @Inject constructor(
             }
         }
 
-        val query = (pplSqlMonitor.inputs[0] as PPLSQLInput).query
+        val query = (pplMonitor.inputs[0] as PPLInput).query
 
         // ensure the query length doesn't exceed the limit
         if (query.length > maxQueryLength) {

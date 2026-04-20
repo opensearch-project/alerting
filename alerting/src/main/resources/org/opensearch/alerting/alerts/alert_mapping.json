@@ -178,10 +178,10 @@
         }
       }
     },
-    "ppl_query": {
+    "query": {
       "type": "text"
     },
-    "ppl_query_results":  {
+    "query_results":  {
       "type": "nested",
       "dynamic": true
     }

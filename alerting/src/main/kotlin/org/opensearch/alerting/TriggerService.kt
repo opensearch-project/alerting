@@ -37,8 +37,8 @@ import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.DocumentLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.PPLSQLTrigger
-import org.opensearch.commons.alerting.model.PPLSQLTrigger.NumResultsCondition
+import org.opensearch.commons.alerting.model.PPLTrigger
+import org.opensearch.commons.alerting.model.PPLTrigger.NumResultsCondition
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Workflow
@@ -248,37 +248,37 @@ class TriggerService(val scriptService: ScriptService) {
         return keyValuesList
     }
 
-    fun runPplSqlNumResultsTrigger(
-        pplSqlTrigger: PPLSQLTrigger,
+    fun runPplNumResultsTrigger(
+        pplTrigger: PPLTrigger,
         numResults: Long?
     ): QueryLevelTriggerRunResult {
 
         if (numResults == null) {
             return QueryLevelTriggerRunResult(
-                pplSqlTrigger.name,
+                pplTrigger.name,
                 true,
-                IllegalStateException("Did not receive a number of results from PPL query execution: ${pplSqlTrigger.id}")
+                IllegalStateException("Did not receive a number of results from PPL query execution: ${pplTrigger.id}")
             )
         }
 
-        if (pplSqlTrigger.numResultsCondition == null) {
+        if (pplTrigger.numResultsCondition == null) {
             return QueryLevelTriggerRunResult(
-                pplSqlTrigger.name,
+                pplTrigger.name,
                 true,
-                IllegalStateException("No number of results condition found for trigger: ${pplSqlTrigger.id}")
+                IllegalStateException("No number of results condition found for trigger: ${pplTrigger.id}")
             )
         }
 
-        if (pplSqlTrigger.numResultsValue == null) {
+        if (pplTrigger.numResultsValue == null) {
             return QueryLevelTriggerRunResult(
-                pplSqlTrigger.name,
+                pplTrigger.name,
                 true,
-                IllegalStateException("No number of results value found for trigger: ${pplSqlTrigger.id}")
+                IllegalStateException("No number of results value found for trigger: ${pplTrigger.id}")
             )
         }
 
-        val numResultsCondition = pplSqlTrigger.numResultsCondition!!
-        val numResultsValue = pplSqlTrigger.numResultsValue!!
+        val numResultsCondition = pplTrigger.numResultsCondition!!
+        val numResultsValue = pplTrigger.numResultsValue!!
 
         val triggered = when (numResultsCondition) {
             NumResultsCondition.GREATER_THAN -> numResults > numResultsValue
@@ -289,7 +289,7 @@ class TriggerService(val scriptService: ScriptService) {
             NumResultsCondition.NOT_EQUAL -> numResults != numResultsValue
         }
 
-        logger.debug("Number of Results PPLTrigger ${pplSqlTrigger.name} with ID ${pplSqlTrigger.id} triggered: $triggered")
+        logger.debug("Number of Results PPLTrigger ${pplTrigger.name} with ID ${pplTrigger.id} triggered: $triggered")
 
         // unlike evaluating custom conditions, where we must include the query results because
         // a custom condition executes its own PPL query, number of results trigger evaluation
@@ -297,22 +297,22 @@ class TriggerService(val scriptService: ScriptService) {
         // of the results. the results themselves are already held in QueryLevelMonitorRunner.kt
         // (the caller of this function), so passing the results here only to return them again
         // inside the QueryLevelTriggerRunResult would be redundant
-        return QueryLevelTriggerRunResult(pplSqlTrigger.name, triggered, null)
+        return QueryLevelTriggerRunResult(pplTrigger.name, triggered, null)
     }
 
-    suspend fun runPplSqlCustomTrigger(
-        pplSqlMonitor: Monitor,
-        pplSqlTrigger: PPLSQLTrigger,
+    suspend fun runPplCustomTrigger(
+        pplMonitor: Monitor,
+        pplTrigger: PPLTrigger,
         query: String,
         monitorCtx: MonitorRunnerExecutionContext,
         transportService: TransportService
     ): QueryLevelTriggerRunResult {
 
-        if (pplSqlTrigger.customCondition == null) {
+        if (pplTrigger.customCondition == null) {
             return QueryLevelTriggerRunResult(
-                pplSqlTrigger.name,
+                pplTrigger.name,
                 true,
-                IllegalStateException("No custom condition found for trigger: ${pplSqlTrigger.id}")
+                IllegalStateException("No custom condition found for trigger: ${pplTrigger.id}")
             )
         }
 
@@ -333,7 +333,7 @@ class TriggerService(val scriptService: ScriptService) {
             withTimeout(monitorExecutionDuration.millis) {
                 logger.debug("checking if custom condition is used and appending to base query")
 
-                val customCondition = pplSqlTrigger.customCondition!!
+                val customCondition = pplTrigger.customCondition!!
 
                 // append the custom condition to query
                 val queryToExecute = appendCustomCondition(query, customCondition)
@@ -348,16 +348,16 @@ class TriggerService(val scriptService: ScriptService) {
                 // in the alert and notification must be added that results were excluded
                 // and an alert that should have been generated might not have been
 
-                logger.debug("executing the PPL query of monitor: ${pplSqlMonitor.id} with custom condition: $customCondition")
+                logger.debug("executing the PPL query of monitor: ${pplMonitor.id} with custom condition: $customCondition")
                 // execute the PPL query
                 val (queryResponseJson, timeTaken) = measureTimedValue {
                     withClosableContext(
                         InjectorContextElement(
-                            pplSqlMonitor.id,
+                            pplMonitor.id,
                             monitorCtx.settings!!,
                             monitorCtx.threadPool!!.threadContext,
-                            pplSqlMonitor.user?.roles,
-                            pplSqlMonitor.user
+                            pplMonitor.user?.roles,
+                            pplMonitor.user
                         )
                     ) {
                         executePplQuery(
@@ -368,7 +368,7 @@ class TriggerService(val scriptService: ScriptService) {
                         )
                     }
                 }
-                logger.debug("query results for trigger ${pplSqlTrigger.id}: $queryResponseJson")
+                logger.debug("query results for trigger ${pplTrigger.id}: $queryResponseJson")
                 logger.debug("time taken to execute query against sql/ppl plugin: $timeTaken")
 
                 // val numPplResults = basePplQueryResults.getLong("total")
@@ -381,11 +381,11 @@ class TriggerService(val scriptService: ScriptService) {
                 // cap and reformat the results to be included in trigger run result
                 customConditionQueryResults = capAndReformatPPLQueryResults(queryResponseJson, queryResultsSizeLimit)
 
-                logger.debug("Custom PPLTrigger ${pplSqlTrigger.name} with ID ${pplSqlTrigger.id} triggered: $triggered")
+                logger.debug("Custom PPLTrigger ${pplTrigger.name} with ID ${pplTrigger.id} triggered: $triggered")
             }
 
             return QueryLevelTriggerRunResult(
-                pplSqlTrigger.name,
+                pplTrigger.name,
                 triggered!!,
                 null,
                 mutableMapOf(),
@@ -393,12 +393,12 @@ class TriggerService(val scriptService: ScriptService) {
             )
         } catch (e: Exception) {
             logger.error(
-                "failed to run PPL Custom Trigger ${pplSqlTrigger.name} (id: ${pplSqlTrigger.id} " +
-                    "from PPL Monitor ${pplSqlMonitor.name} (id: ${pplSqlMonitor.id}",
+                "failed to run PPL Custom Trigger ${pplTrigger.name} (id: ${pplTrigger.id} " +
+                    "from PPL Monitor ${pplMonitor.name} (id: ${pplMonitor.id}",
                 e
             )
 
-            return QueryLevelTriggerRunResult(pplSqlTrigger.name, true, e)
+            return QueryLevelTriggerRunResult(pplTrigger.name, true, e)
         }
     }
 }

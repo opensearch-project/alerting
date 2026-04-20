@@ -17,14 +17,14 @@ import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
-import org.opensearch.commons.alerting.model.PPLSQLInput
-import org.opensearch.commons.alerting.model.PPLSQLTrigger
-import org.opensearch.commons.alerting.model.PPLSQLTrigger.ConditionType
+import org.opensearch.commons.alerting.model.PPLInput
+import org.opensearch.commons.alerting.model.PPLTrigger
+import org.opensearch.commons.alerting.model.PPLTrigger.ConditionType
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.WorkflowRunContext
-import org.opensearch.commons.alerting.util.isPplSqlMonitor
+import org.opensearch.commons.alerting.util.isPPLMonitor
 import org.opensearch.transport.TransportService
 import java.time.Instant
 import java.util.Locale
@@ -67,7 +67,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             monitorResult = monitorResult.copy(
                 inputResults = monitorCtx.inputService!!.collectInputResultsForADMonitor(monitor, periodStart, periodEnd)
             )
-        } else if (monitor.isPplSqlMonitor()) {
+        } else if (monitor.isPPLMonitor()) {
             withClosableContext(
                 InjectorContextElement(
                     monitor.id,
@@ -165,20 +165,20 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                         else monitorCtx.triggerService!!.runQueryLevelTrigger(monitor, trigger as QueryLevelTrigger, triggerCtx)
                     }
                     Monitor.MonitorType.PPL_MONITOR -> {
-                        val pplSqlTrigger = trigger as PPLSQLTrigger
+                        val pplTrigger = trigger as PPLTrigger
 
-                        if (pplSqlTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) {
+                        if (pplTrigger.conditionType == ConditionType.NUMBER_OF_RESULTS) {
                             // number of results trigger case
-                            monitorCtx.triggerService!!.runPplSqlNumResultsTrigger(
-                                pplSqlTrigger,
+                            monitorCtx.triggerService!!.runPplNumResultsTrigger(
+                                pplTrigger,
                                 monitorResult.inputResults.pplBaseQueryNumResults
                             )
                         } else {
                             // custom condition trigger case
-                            monitorCtx.triggerService!!.runPplSqlCustomTrigger(
+                            monitorCtx.triggerService!!.runPplCustomTrigger(
                                 monitor,
-                                pplSqlTrigger,
-                                (monitor.inputs[0] as PPLSQLInput).query,
+                                pplTrigger,
+                                (monitor.inputs[0] as PPLInput).query,
                                 monitorCtx,
                                 transportService
                             )
@@ -195,10 +195,10 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             // what query results get stored in the Alert and Notification depends on the trigger type.
             // if number of results: evaluated on base query, so base query results are included.
             // if custom: the custom trigger ran its own query (base query + custom condition), so that query's results are included
-            // trigger is not PPLSQLTrigger: this is a query-level monitor run, simply include an empty list
-            val pplQueryResultsToInclude = if (trigger is PPLSQLTrigger && trigger.conditionType == ConditionType.NUMBER_OF_RESULTS) {
+            // trigger is not PPLTrigger: this is a query-level monitor run, simply include an empty list
+            val pplQueryResultsToInclude = if (trigger is PPLTrigger && trigger.conditionType == ConditionType.NUMBER_OF_RESULTS) {
                 monitorResult.inputResults.pplBaseQueryResults
-            } else if (trigger is PPLSQLTrigger && trigger.conditionType == ConditionType.CUSTOM) {
+            } else if (trigger is PPLTrigger && trigger.conditionType == ConditionType.CUSTOM) {
                 triggerResult.pplCustomQueryResults
             } else {
                 listOf()

@@ -108,8 +108,8 @@ import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.PPLSQLInput
-import org.opensearch.commons.alerting.model.PPLSQLTrigger
+import org.opensearch.commons.alerting.model.PPLInput
+import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
@@ -275,14 +275,14 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             Monitor.XCONTENT_REGISTRY,
             SearchInput.XCONTENT_REGISTRY,
             DocLevelMonitorInput.XCONTENT_REGISTRY,
-            PPLSQLInput.XCONTENT_REGISTRY,
+            PPLInput.XCONTENT_REGISTRY,
             QueryLevelTrigger.XCONTENT_REGISTRY,
             BucketLevelTrigger.XCONTENT_REGISTRY,
             ClusterMetricsInput.XCONTENT_REGISTRY,
             DocumentLevelTrigger.XCONTENT_REGISTRY,
             ChainedAlertTrigger.XCONTENT_REGISTRY,
             RemoteMonitorTrigger.XCONTENT_REGISTRY,
-            PPLSQLTrigger.XCONTENT_REGISTRY,
+            PPLTrigger.XCONTENT_REGISTRY,
             Workflow.XCONTENT_REGISTRY
         )
     }

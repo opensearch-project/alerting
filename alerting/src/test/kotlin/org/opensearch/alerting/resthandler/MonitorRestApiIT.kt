@@ -60,7 +60,7 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.PPLSQLTrigger.ConditionType
+import org.opensearch.commons.alerting.model.PPLTrigger.ConditionType
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
@@ -82,7 +82,6 @@ import org.opensearch.test.rest.OpenSearchRestTestCase
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
-import java.time.temporal.ChronoUnit.MINUTES
 import java.util.concurrent.TimeUnit
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")

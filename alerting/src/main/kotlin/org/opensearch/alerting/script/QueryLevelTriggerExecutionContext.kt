@@ -9,7 +9,7 @@ import org.opensearch.alerting.model.AlertContext
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
-import org.opensearch.commons.alerting.model.PPLSQLTrigger
+import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Trigger
@@ -28,9 +28,9 @@ data class QueryLevelTriggerExecutionContext(
 ) : TriggerExecutionContext(monitor, results, periodStart, periodEnd, error, clusterSettings) {
 
     init {
-        require(trigger is QueryLevelTrigger || trigger is PPLSQLTrigger) {
+        require(trigger is QueryLevelTrigger || trigger is PPLTrigger) {
             "QueryLevelTriggerExecutionContext must only store Triggers for per-query style monitoring, " +
-                "like QueryLevelTrigger or PPLSQLTrigger"
+                "like QueryLevelTrigger or PPLTrigger"
         }
     }
 

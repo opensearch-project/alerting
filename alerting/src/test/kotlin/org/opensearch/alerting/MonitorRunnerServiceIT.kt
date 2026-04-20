@@ -34,7 +34,7 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.PPLSQLTrigger
+import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.AlertCategory
@@ -2244,8 +2244,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
                 triggers = listOf(
                     randomPPLTrigger(
-                        conditionType = PPLSQLTrigger.ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = PPLSQLTrigger.NumResultsCondition.GREATER_THAN,
+                        conditionType = PPLTrigger.ConditionType.NUMBER_OF_RESULTS,
+                        numResultsCondition = PPLTrigger.NumResultsCondition.GREATER_THAN,
                         numResultsValue = 0L,
                         customCondition = null
                     )
@@ -2286,7 +2286,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
                 triggers = listOf(
                     randomPPLTrigger(
-                        conditionType = PPLSQLTrigger.ConditionType.CUSTOM,
+                        conditionType = PPLTrigger.ConditionType.CUSTOM,
                         customCondition = "where max_num > 5",
                         numResultsCondition = null,
                         numResultsValue = null
@@ -2328,8 +2328,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
                 triggers = listOf(
                     randomPPLTrigger(
-                        conditionType = PPLSQLTrigger.ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = PPLSQLTrigger.NumResultsCondition.GREATER_THAN,
+                        conditionType = PPLTrigger.ConditionType.NUMBER_OF_RESULTS,
+                        numResultsCondition = PPLTrigger.NumResultsCondition.GREATER_THAN,
                         numResultsValue = 0L,
                         customCondition = null
                     )
@@ -2352,10 +2352,10 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals(monitor.triggers[0].id, alert.triggerId)
 
         // Verify ppl_query_results contains the size exceeded message
-        assertNotNull(alert.pplQueryResults)
-        assertEquals(1, alert.pplQueryResults.size)
+        assertNotNull(alert.queryResults)
+        assertEquals(1, alert.queryResults.size)
 
-        val firstResultRow = alert.pplQueryResults[0]
+        val firstResultRow = alert.queryResults[0]
         assertTrue(firstResultRow.containsKey("message"))
         assertEquals(PPL_RESULTS_SIZE_EXCEEDED_MESSAGE, firstResultRow["message"])
     }
@@ -2373,8 +2373,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
                 triggers = listOf(
                     randomPPLTrigger(
-                        conditionType = PPLSQLTrigger.ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = PPLSQLTrigger.NumResultsCondition.GREATER_THAN,
+                        conditionType = PPLTrigger.ConditionType.NUMBER_OF_RESULTS,
+                        numResultsCondition = PPLTrigger.NumResultsCondition.GREATER_THAN,
                         numResultsValue = 0L,
                         customCondition = null
                     )
@@ -2403,15 +2403,15 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         verifyAlert(activeAlert, monitor, ACTIVE)
 
         // Verify alert contains PPL query and results
-        assertNotNull("PPL query should be stored in alert", activeAlert.pplQuery)
-        assertEquals("source = $TEST_INDEX_NAME | head 10", activeAlert.pplQuery)
-        assertTrue("PPL query results should not be empty", activeAlert.pplQueryResults.isNotEmpty())
+        assertNotNull("PPL query should be stored in alert", activeAlert.query)
+        assertEquals("source = $TEST_INDEX_NAME | head 10", activeAlert.query)
+        assertTrue("PPL query results should not be empty", activeAlert.queryResults.isNotEmpty())
 
         // Verify the query results are in the new transformed format (list of maps)
-        assertEquals("Should have exactly 1 result row from the indexed document", 1, activeAlert.pplQueryResults.size)
+        assertEquals("Should have exactly 1 result row from the indexed document", 1, activeAlert.queryResults.size)
 
         // Get the first (and only) result row
-        val resultRow = activeAlert.pplQueryResults[0]
+        val resultRow = activeAlert.queryResults[0]
 
         // Verify the result row contains the expected fields from the indexed document
         assertTrue("Result should contain 'timestamp' field", resultRow.containsKey("timestamp"))
@@ -2488,7 +2488,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
                 triggers = listOf(
                     randomPPLTrigger(
-                        conditionType = PPLSQLTrigger.ConditionType.CUSTOM,
+                        conditionType = PPLTrigger.ConditionType.CUSTOM,
                         customCondition = "where max_num > 5",
                         numResultsCondition = null,
                         numResultsValue = null
@@ -2516,16 +2516,16 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         verifyAlert(activeAlert, monitor, ACTIVE)
 
         // Verify alert contains PPL query and aggregated results
-        assertNotNull("PPL query should be stored in alert", activeAlert.pplQuery)
-        assertEquals("source = $TEST_INDEX_NAME | stats max(number) as max_num by abc", activeAlert.pplQuery)
-        assertTrue("PPL query results should not be empty", activeAlert.pplQueryResults.isNotEmpty())
+        assertNotNull("PPL query should be stored in alert", activeAlert.query)
+        assertEquals("source = $TEST_INDEX_NAME | stats max(number) as max_num by abc", activeAlert.query)
+        assertTrue("PPL query results should not be empty", activeAlert.queryResults.isNotEmpty())
 
         // Verify the query results are in the new transformed format (list of maps),
         // and only have the 2 buckets that met the custom condition
-        assertEquals("Should have 2 aggregation result rows", 2, activeAlert.pplQueryResults.size)
+        assertEquals("Should have 2 aggregation result rows", 2, activeAlert.queryResults.size)
 
         // Convert results to a map of group name -> result row for easier validation
-        val groupResults = activeAlert.pplQueryResults.associateBy { it["abc"] as String }
+        val groupResults = activeAlert.queryResults.associateBy { it["abc"] as String }
 
         // Verify all expected groups are present
         assertTrue("Should contain group 'def'", groupResults.containsKey("def"))
@@ -2613,8 +2613,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
                 triggers = listOf(
                     randomPPLTrigger(
-                        conditionType = PPLSQLTrigger.ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = PPLSQLTrigger.NumResultsCondition.GREATER_THAN,
+                        conditionType = PPLTrigger.ConditionType.NUMBER_OF_RESULTS,
+                        numResultsCondition = PPLTrigger.NumResultsCondition.GREATER_THAN,
                         numResultsValue = 0L,
                         customCondition = null
                     )
@@ -2638,15 +2638,15 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         verifyAlert(firstAlert, monitor, ACTIVE)
 
         // Verify alert contains PPL query and results with 1 document
-        assertNotNull("PPL query should be stored in alert", firstAlert.pplQuery)
-        assertEquals("source = $TEST_INDEX_NAME | head 10", firstAlert.pplQuery)
-        assertTrue("PPL query results should not be empty", firstAlert.pplQueryResults.isNotEmpty())
+        assertNotNull("PPL query should be stored in alert", firstAlert.query)
+        assertEquals("source = $TEST_INDEX_NAME | head 10", firstAlert.query)
+        assertTrue("PPL query results should not be empty", firstAlert.queryResults.isNotEmpty())
 
         // Verify the query results are in the new transformed format (list of maps)
-        assertEquals("Should have 1 result row from the first indexed document", 1, firstAlert.pplQueryResults.size)
+        assertEquals("Should have 1 result row from the first indexed document", 1, firstAlert.queryResults.size)
 
         // Get the first result row and verify it has the expected structure
-        val firstResultRow = firstAlert.pplQueryResults[0]
+        val firstResultRow = firstAlert.queryResults[0]
         assertTrue("Result should contain 'timestamp' field", firstResultRow.containsKey("timestamp"))
         assertTrue("Result should contain 'abc' field", firstResultRow.containsKey("abc"))
         assertTrue("Result should contain 'number' field", firstResultRow.containsKey("number"))
@@ -2675,26 +2675,26 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         assertEquals("Alert ID should be the same", firstAlert.id, updatedAlert.id)
 
         // Verify the alert's query results have been updated to include both documents
-        assertNotNull("PPL query should still be stored in alert", updatedAlert.pplQuery)
-        assertTrue("PPL query results should not be empty", updatedAlert.pplQueryResults.isNotEmpty())
+        assertNotNull("PPL query should still be stored in alert", updatedAlert.query)
+        assertTrue("PPL query results should not be empty", updatedAlert.queryResults.isNotEmpty())
 
         // Verify the query results now contain 2 rows (updated from previous 1 row)
-        assertEquals("Should now have 2 result rows from both indexed documents", 2, updatedAlert.pplQueryResults.size)
+        assertEquals("Should now have 2 result rows from both indexed documents", 2, updatedAlert.queryResults.size)
 
         // Verify both result rows have the expected structure
-        updatedAlert.pplQueryResults.forEach { row ->
+        updatedAlert.queryResults.forEach { row ->
             assertTrue("Each result row should contain 'timestamp' field", row.containsKey("timestamp"))
             assertTrue("Each result row should contain 'abc' field", row.containsKey("abc"))
             assertTrue("Each result row should contain 'number' field", row.containsKey("number"))
         }
 
         // Verify we can find both documents in the results by their unique 'abc' values
-        val abcValues = updatedAlert.pplQueryResults.map { it["abc"] }.toSet()
+        val abcValues = updatedAlert.queryResults.map { it["abc"] }.toSet()
         assertTrue("Results should contain first document with abc='test-value'", abcValues.contains("test-value"))
         assertTrue("Results should contain second document with abc='test-value-2'", abcValues.contains("test-value-2"))
 
         // Verify we can find both documents by their number values
-        val numberValues = updatedAlert.pplQueryResults.map { (it["number"] as Number).toInt() }.toSet()
+        val numberValues = updatedAlert.queryResults.map { (it["number"] as Number).toInt() }.toSet()
         assertTrue("Results should contain first document with number=5", numberValues.contains(5))
         assertTrue("Results should contain second document with number=10", numberValues.contains(10))
 
@@ -2754,8 +2754,8 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
                 schedule = IntervalSchedule(interval = 1, unit = MINUTES),
                 triggers = listOf(
                     randomPPLTrigger(
-                        conditionType = PPLSQLTrigger.ConditionType.NUMBER_OF_RESULTS,
-                        numResultsCondition = PPLSQLTrigger.NumResultsCondition.GREATER_THAN,
+                        conditionType = PPLTrigger.ConditionType.NUMBER_OF_RESULTS,
+                        numResultsCondition = PPLTrigger.NumResultsCondition.GREATER_THAN,
                         numResultsValue = 0L,
                         customCondition = null,
                         actions = listOf(action)

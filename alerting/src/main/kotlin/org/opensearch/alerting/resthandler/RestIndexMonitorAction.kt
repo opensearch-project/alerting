@@ -18,7 +18,7 @@ import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
-import org.opensearch.commons.alerting.model.PPLSQLTrigger
+import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
@@ -139,7 +139,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
 
                     Monitor.MonitorType.PPL_MONITOR -> {
                         triggers.forEach {
-                            if (it !is PPLSQLTrigger) {
+                            if (it !is PPLTrigger) {
                                 throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for PPL monitor")
                             }
                         }
