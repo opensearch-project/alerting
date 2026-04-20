@@ -18,8 +18,10 @@ import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use
 import org.opensearch.common.inject.Inject
+import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
@@ -43,15 +45,31 @@ class TransportExecuteWorkflowAction @Inject constructor(
     private val client: Client,
     private val runner: MonitorRunnerService,
     actionFilters: ActionFilters,
-    val xContentRegistry: NamedXContentRegistry
+    val xContentRegistry: NamedXContentRegistry,
+    val settings: Settings,
 ) : HandledTransportAction<ExecuteWorkflowRequest, ExecuteWorkflowResponse>(
     ExecuteWorkflowAction.NAME, transportService, actionFilters, ::ExecuteWorkflowRequest
 ) {
+
+    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+
     override fun doExecute(
         task: Task,
         execWorkflowRequest: ExecuteWorkflowRequest,
         actionListener: ActionListener<ExecuteWorkflowResponse>,
     ) {
+        if (multiTenancyEnabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Workflow operations are not allowed when multi-tenancy is enabled.",
+                        RestStatus.METHOD_NOT_ALLOWED
+                    )
+                )
+            )
+            return
+        }
+
         val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
         log.debug("User and roles string from thread context: $userStr")
         val user: User? = User.parse(userStr)

@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
+import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
@@ -75,6 +76,8 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
     @Volatile
     private var isAlertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
 
+    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_ENABLED) { isAlertHistoryEnabled = it }
         listenFilterBySettingChange(clusterService)
@@ -85,6 +88,18 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
         request: ActionRequest,
         actionListener: ActionListener<GetWorkflowAlertsResponse>,
     ) {
+        if (multiTenancyEnabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Workflow operations are not allowed when multi-tenancy is enabled.",
+                        RestStatus.METHOD_NOT_ALLOWED
+                    )
+                )
+            )
+            return
+        }
+
         val getWorkflowAlertsRequest = request as? GetWorkflowAlertsRequest
             ?: recreateObject(request) { GetWorkflowAlertsRequest(it) }
         val user = readUserFromThreadContext(client)

@@ -123,6 +123,8 @@ class TransportIndexWorkflowAction @Inject constructor(
     @Volatile
     override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
+    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_MAX_MONITORS) { maxMonitors = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_TRIGGERS_PER_MONITOR) { maxTriggersPerMonitor = it }
@@ -134,6 +136,18 @@ class TransportIndexWorkflowAction @Inject constructor(
     }
 
     override fun doExecute(task: Task, request: ActionRequest, actionListener: ActionListener<IndexWorkflowResponse>) {
+        if (multiTenancyEnabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Workflow operations are not allowed when multi-tenancy is enabled.",
+                        RestStatus.METHOD_NOT_ALLOWED
+                    )
+                )
+            )
+            return
+        }
+
         val transformedRequest = request as? IndexWorkflowRequest
             ?: recreateObject(request, namedWriteableRegistry) {
                 IndexWorkflowRequest(it)
