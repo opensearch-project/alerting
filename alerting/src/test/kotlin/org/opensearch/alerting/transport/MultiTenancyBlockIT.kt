@@ -39,6 +39,10 @@ class MultiTenancyBlockIT : AlertingSingleNodeTestCase() {
             .build()
     }
 
+    override fun resetNodeAfterTest(): Boolean {
+        return true
+    }
+
     // --- Workflow tests ---
 
     fun `test index workflow fails when multi-tenancy is enabled`() {
