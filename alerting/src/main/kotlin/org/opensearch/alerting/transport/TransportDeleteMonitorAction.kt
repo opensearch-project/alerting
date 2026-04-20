@@ -59,10 +59,18 @@ class TransportDeleteMonitorAction @Inject constructor(
 
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
     @Volatile private var externalSchedulerEnabled = AlertingSettings.EXTERNAL_SCHEDULER_ENABLED.get(settings)
+    @Volatile private var externalSchedulerAccountId = AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID.get(settings)
+    @Volatile private var externalSchedulerRoleArn = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED) {
             externalSchedulerEnabled = it
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID) {
+            externalSchedulerAccountId = it
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN) {
+            externalSchedulerRoleArn = it
         }
         listenFilterBySettingChange(clusterService)
     }
@@ -148,11 +156,21 @@ class TransportDeleteMonitorAction @Inject constructor(
          * record so the schedule deletion can be retried.
          */
         private fun deleteExternalSchedule(monitor: Monitor) {
-            val threadContext = client.threadPool().threadContext
-            val schedulerAccountId = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY) ?: return
-            val roleArn = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ROLE_ARN_KEY) ?: return
+            val accountId = resolveSchedulerAccountId() ?: return
+            val roleArn = externalSchedulerRoleArn.takeIf { it.isNotBlank() } ?: return
 
-            ExternalSchedulerService.deleteSchedule(monitor.id, schedulerAccountId, roleArn)
+            ExternalSchedulerService.deleteSchedule(monitor.id, accountId, roleArn)
+        }
+
+        /**
+         * Resolves the scheduler account id: ThreadContext override wins over plugin setting.
+         * Returns null when neither is set.
+         */
+        private fun resolveSchedulerAccountId(): String? {
+            val override = client.threadPool().threadContext
+                .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
+            if (!override.isNullOrBlank()) return override
+            return externalSchedulerAccountId.takeIf { it.isNotBlank() }
         }
 
         private suspend fun getMonitor(): Monitor {

@@ -133,6 +133,15 @@ class TransportIndexMonitorAction @Inject constructor(
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED) {
             externalSchedulerEnabled = it
         }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID) {
+            externalSchedulerAccountId = it
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_QUEUE_ARN) {
+            externalSchedulerQueueArn = it
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN) {
+            externalSchedulerRoleArn = it
+        }
         listenFilterBySettingChange(clusterService)
     }
 
@@ -827,14 +836,14 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         /**
-         * Reads scheduler routing info from ThreadContext and creates an external schedule.
-         * No-op when the external scheduler is not configured.
+         * Reads scheduler routing info from plugin settings (with optional ThreadContext
+         * override for account id) and creates an external schedule.
+         * No-op when required settings are blank.
          */
         private fun createExternalSchedule(monitor: Monitor, tenantId: String?) {
-            val threadContext = client.threadPool().threadContext
-            val schedulerAccountId = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY) ?: return
-            val queueArn = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_QUEUE_ARN_KEY) ?: return
-            val roleArn = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ROLE_ARN_KEY) ?: return
+            val accountId = resolveSchedulerAccountId() ?: return
+            val queueArn = externalSchedulerQueueArn.takeIf { it.isNotBlank() } ?: return
+            val roleArn = externalSchedulerRoleArn.takeIf { it.isNotBlank() } ?: return
 
             val targetInput = SchedulePayloadBuilder.buildTargetInput(
                 monitor = monitor,
@@ -842,7 +851,7 @@ class TransportIndexMonitorAction @Inject constructor(
             )
 
             ExternalSchedulerService.createSchedule(
-                monitor, schedulerAccountId, queueArn, roleArn, targetInput
+                monitor, accountId, queueArn, roleArn, targetInput
             )
         }
 
@@ -851,10 +860,9 @@ class TransportIndexMonitorAction @Inject constructor(
          * Always refreshes Target.Input with the latest monitor config.
          */
         private fun updateExternalSchedule(monitor: Monitor, tenantId: String?) {
-            val threadContext = client.threadPool().threadContext
-            val schedulerAccountId = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY) ?: return
-            val queueArn = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_QUEUE_ARN_KEY) ?: return
-            val roleArn = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ROLE_ARN_KEY) ?: return
+            val accountId = resolveSchedulerAccountId() ?: return
+            val queueArn = externalSchedulerQueueArn.takeIf { it.isNotBlank() } ?: return
+            val roleArn = externalSchedulerRoleArn.takeIf { it.isNotBlank() } ?: return
 
             val targetInput = SchedulePayloadBuilder.buildTargetInput(
                 monitor = monitor,
@@ -862,8 +870,19 @@ class TransportIndexMonitorAction @Inject constructor(
             )
 
             ExternalSchedulerService.updateSchedule(
-                monitor, schedulerAccountId, queueArn, roleArn, targetInput
+                monitor, accountId, queueArn, roleArn, targetInput
             )
+        }
+
+        /**
+         * Resolves the scheduler account id: ThreadContext override wins over plugin setting.
+         * Returns null when neither is set.
+         */
+        private fun resolveSchedulerAccountId(): String? {
+            val override = client.threadPool().threadContext
+                .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
+            if (!override.isNullOrBlank()) return override
+            return externalSchedulerAccountId.takeIf { it.isNotBlank() }
         }
     }
 }

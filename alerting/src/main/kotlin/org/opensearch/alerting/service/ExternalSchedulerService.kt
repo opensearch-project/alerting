@@ -20,9 +20,13 @@ object ExternalSchedulerService {
     private val log = LogManager.getLogger(ExternalSchedulerService::class.java)
 
     const val SCHEDULE_NAME_PREFIX = "monitor-"
+
+    /**
+     * Transient ThreadContext key used to override the default `account_id` plugin setting
+     * on a per-request basis. Other routing fields (queue_arn, role_arn) come from plugin
+     * settings only and are not overridable via ThreadContext.
+     */
     const val SCHEDULER_ACCOUNT_ID_KEY = "scheduler.account_id"
-    const val SCHEDULER_QUEUE_ARN_KEY = "scheduler.queue_arn"
-    const val SCHEDULER_ROLE_ARN_KEY = "scheduler.role_arn"
 
     fun scheduleName(monitorId: String): String = "$SCHEDULE_NAME_PREFIX$monitorId"
 
