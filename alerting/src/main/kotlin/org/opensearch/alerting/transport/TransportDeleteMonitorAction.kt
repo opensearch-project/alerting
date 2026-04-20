@@ -135,9 +135,7 @@ class TransportDeleteMonitorAction @Inject constructor(
         private fun logSchedulerContext(monitor: Monitor) {
             val threadContext = client.threadPool().threadContext
             val schedulerAccountId = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
-            if (schedulerAccountId != null) {
-                log.debug("Scheduler account $schedulerAccountId in ThreadContext for monitor ${monitor.id}")
-            }
+            log.debug("Scheduler account for monitor ${monitor.id}: $schedulerAccountId")
         }
 
         /**

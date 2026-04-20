@@ -7,8 +7,6 @@ package org.opensearch.alerting.service
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import org.opensearch.alerting.service.ExternalSchedulerService.ScheduleRequest
-import org.opensearch.commons.alerting.util.ScheduleTranslator
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
@@ -62,33 +60,7 @@ class ExternalSchedulerServiceTests {
 
     @Test
     fun `deleteSchedule accepts all required params`() {
-        val monitorId = "mon-3"
-        val account = "333333333333"
-        val roleArn = "arn:aws:iam::333:role/eb-role"
         // Verifies no exception — SDK calls are TODO stubs
-        ExternalSchedulerService.deleteSchedule(monitorId, account, roleArn)
-    }
-
-    @Test
-    fun `ScheduleRequest captures all fields`() {
-        val monitor = testMonitor(interval = 10)
-        val (expr, tz) = ScheduleTranslator.toEventBridgeExpression(monitor.schedule)
-        val req = ScheduleRequest(
-            name = ExternalSchedulerService.scheduleName("mon-1"),
-            scheduleExpression = expr,
-            timezone = tz,
-            targetArn = "arn:aws:sqs:us-west-2:222:AlertingJobQueue",
-            targetRoleArn = "arn:aws:iam::222:role/eb-role",
-            targetInput = "{\"monitorConfig\":\"test\"}",
-            enabled = true,
-            schedulerAccountId = "222222222222"
-        )
-        assertEquals("monitor-mon-1", req.name)
-        assertEquals("rate(10 minutes)", req.scheduleExpression)
-        assertEquals("222222222222", req.schedulerAccountId)
-        assertEquals("arn:aws:iam::222:role/eb-role", req.targetRoleArn)
-        assertEquals("arn:aws:sqs:us-west-2:222:AlertingJobQueue", req.targetArn)
-        assertEquals("{\"monitorConfig\":\"test\"}", req.targetInput)
-        assertEquals(true, req.enabled)
+        ExternalSchedulerService.deleteSchedule("mon-3", "333333333333", "arn:aws:iam::333:role/eb-role")
     }
 }

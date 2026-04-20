@@ -792,7 +792,8 @@ class TransportIndexMonitorAction @Inject constructor(
                     updateExternalSchedule(request.monitor, tenantId)
                 } catch (t: Exception) {
                     log.error("Failed to update EB schedule for monitor ${request.monitorId}", t)
-                    // Update flow: EB failure is non-fatal — monitor metadata is already persisted.
+                    actionListener.onFailure(AlertingException.wrap(t))
+                    return
                 }
                 actionListener.onResponse(
                     IndexMonitorResponse(

@@ -6,9 +6,8 @@
 package org.opensearch.alerting.service
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.commons.alerting.util.ScheduleTranslator
 import org.opensearch.commons.alerting.model.Monitor
-import java.time.ZoneId
+import org.opensearch.commons.alerting.util.ScheduleTranslator
 
 /**
  * Manages external EventBridge schedules for monitor execution.
@@ -38,17 +37,11 @@ object ExternalSchedulerService {
         targetInput: String
     ) {
         val (scheduleExpression, timezone) = ScheduleTranslator.toEventBridgeExpression(monitor.schedule)
-        val request = ScheduleRequest(
-            name = scheduleName(monitor.id),
-            scheduleExpression = scheduleExpression,
-            timezone = timezone,
-            targetArn = queueArn,
-            targetRoleArn = crossAccountRoleArn,
-            targetInput = targetInput,
-            enabled = monitor.enabled,
-            schedulerAccountId = schedulerAccountId
+        log.info(
+            "Creating EB schedule ${scheduleName(monitor.id)} in account $schedulerAccountId " +
+                "expr=$scheduleExpression tz=$timezone enabled=${monitor.enabled} " +
+                "queue=$queueArn role=$crossAccountRoleArn inputBytes=${targetInput.length}"
         )
-        log.info("Creating EB schedule ${request.name} in account $schedulerAccountId")
         // TODO: SchedulerClient.createSchedule() with AssumeRole into scheduler account
     }
 
@@ -63,17 +56,11 @@ object ExternalSchedulerService {
         targetInput: String
     ) {
         val (scheduleExpression, timezone) = ScheduleTranslator.toEventBridgeExpression(monitor.schedule)
-        val request = ScheduleRequest(
-            name = scheduleName(monitor.id),
-            scheduleExpression = scheduleExpression,
-            timezone = timezone,
-            targetArn = queueArn,
-            targetRoleArn = crossAccountRoleArn,
-            targetInput = targetInput,
-            enabled = monitor.enabled,
-            schedulerAccountId = schedulerAccountId
+        log.info(
+            "Updating EB schedule ${scheduleName(monitor.id)} in account $schedulerAccountId " +
+                "expr=$scheduleExpression tz=$timezone enabled=${monitor.enabled} " +
+                "queue=$queueArn role=$crossAccountRoleArn inputBytes=${targetInput.length}"
         )
-        log.info("Updating EB schedule ${request.name} in account $schedulerAccountId")
         // TODO: SchedulerClient.updateSchedule() with AssumeRole into scheduler account
     }
 
@@ -85,21 +72,7 @@ object ExternalSchedulerService {
         schedulerAccountId: String,
         crossAccountRoleArn: String
     ) {
-        log.info("Deleting EB schedule ${scheduleName(monitorId)} from account $schedulerAccountId")
+        log.info("Deleting EB schedule ${scheduleName(monitorId)} from account $schedulerAccountId role=$crossAccountRoleArn")
         // TODO: SchedulerClient.deleteSchedule() with AssumeRole into scheduler account
     }
-
-    /**
-     * Data class carrying all info needed to create/update an EB schedule.
-     */
-    data class ScheduleRequest(
-        val name: String,
-        val scheduleExpression: String,
-        val timezone: ZoneId?,
-        val targetArn: String,
-        val targetRoleArn: String,
-        val targetInput: String,
-        val enabled: Boolean,
-        val schedulerAccountId: String
-    )
 }
