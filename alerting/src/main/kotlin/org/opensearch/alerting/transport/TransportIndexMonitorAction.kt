@@ -119,6 +119,7 @@ class TransportIndexMonitorAction @Inject constructor(
     @Volatile private var maxActionThrottle = MAX_ACTION_THROTTLE_VALUE.get(settings)
     @Volatile private var allowList = ALLOW_LIST.get(settings)
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile private var externalSchedulerEnabled = AlertingSettings.EXTERNAL_SCHEDULER_ENABLED.get(settings)
 
     private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
 
@@ -129,6 +130,9 @@ class TransportIndexMonitorAction @Inject constructor(
         clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTION_THROTTLE_VALUE) { maxActionThrottle = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED) {
+            externalSchedulerEnabled = it
+        }
         listenFilterBySettingChange(clusterService)
     }
 
@@ -583,12 +587,14 @@ class TransportIndexMonitorAction @Inject constructor(
                 }
 
                 // Create external schedule for monitor execution
-                try {
-                    createExternalSchedule(request.monitor, tenantId)
-                } catch (t: Exception) {
-                    log.error("Failed to create EB schedule for monitor ${indexResponse.id}. Rolling back.", t)
-                    cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
-                    throw t
+                if (externalSchedulerEnabled) {
+                    try {
+                        createExternalSchedule(request.monitor, tenantId)
+                    } catch (t: Exception) {
+                        log.error("Failed to create EB schedule for monitor ${indexResponse.id}. Rolling back.", t)
+                        cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
+                        throw t
+                    }
                 }
 
                 actionListener.onResponse(
@@ -788,12 +794,14 @@ class TransportIndexMonitorAction @Inject constructor(
                     MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
                 }
                 // Update external schedule with latest monitor config
-                try {
-                    updateExternalSchedule(request.monitor, tenantId)
-                } catch (t: Exception) {
-                    log.error("Failed to update EB schedule for monitor ${request.monitorId}", t)
-                    actionListener.onFailure(AlertingException.wrap(t))
-                    return
+                if (externalSchedulerEnabled) {
+                    try {
+                        updateExternalSchedule(request.monitor, tenantId)
+                    } catch (t: Exception) {
+                        log.error("Failed to update EB schedule for monitor ${request.monitorId}", t)
+                        actionListener.onFailure(AlertingException.wrap(t))
+                        return
+                    }
                 }
                 actionListener.onResponse(
                     IndexMonitorResponse(

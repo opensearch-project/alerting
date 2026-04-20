@@ -353,5 +353,16 @@ class AlertingSettings {
             false,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        /**
+         * Enables managing monitor schedules on an external EventBridge Scheduler instead of
+         * the in-cluster job scheduler. When disabled (default), monitor create/update/delete
+         * flows skip the external schedule hooks entirely.
+         */
+        val EXTERNAL_SCHEDULER_ENABLED = Setting.boolSetting(
+            "plugins.alerting.external_scheduler.enabled",
+            false,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }
