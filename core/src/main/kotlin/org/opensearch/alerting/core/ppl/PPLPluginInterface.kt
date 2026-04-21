@@ -5,35 +5,24 @@
 
 package org.opensearch.alerting.core.ppl
 
-import org.opensearch.action.ActionListenerResponseHandler
-import org.opensearch.cluster.node.DiscoveryNode
-import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.action.ActionResponse
-import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.sql.plugin.transport.PPLQueryAction
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest
 import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse
-import org.opensearch.transport.TransportException
-import org.opensearch.transport.TransportRequestOptions
-import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.node.NodeClient
 
 /**
  * Transport action plugin interfaces for the SQL/PPL plugin
  */
+@Suppress("UNCHECKED_CAST")
 object PPLPluginInterface {
     fun executeQuery(
-        transportService: TransportService,
-        localNode: DiscoveryNode,
+        client: NodeClient,
         request: TransportPPLQueryRequest,
         listener: ActionListener<TransportPPLQueryResponse>,
     ) {
-
-        val responseReader = Writeable.Reader<ActionResponse> {
-            TransportPPLQueryResponse(it)
-        }
-
         val wrappedListener = object : ActionListener<ActionResponse> {
             override fun onResponse(response: ActionResponse) {
                 val recreated = recreateObject(response) { TransportPPLQueryResponse(it) }
@@ -43,28 +32,12 @@ object PPLPluginInterface {
             override fun onFailure(exception: Exception) {
                 listener.onFailure(exception)
             }
-        }
+        } as ActionListener<TransportPPLQueryResponse>
 
-        transportService.sendRequest(
-            localNode,
-            PPLQueryAction.NAME,
+        client.execute(
+            PPLQueryAction.INSTANCE,
             request,
-            TransportRequestOptions
-                .builder()
-                .withTimeout(TimeValue.timeValueMinutes(1))
-                .build(),
-            object : ActionListenerResponseHandler<ActionResponse>(
-                wrappedListener,
-                responseReader
-            ) {
-                override fun handleResponse(response: ActionResponse) {
-                    wrappedListener.onResponse(response)
-                }
-
-                override fun handleException(e: TransportException) {
-                    wrappedListener.onFailure(e)
-                }
-            }
+            wrappedListener
         )
     }
 }

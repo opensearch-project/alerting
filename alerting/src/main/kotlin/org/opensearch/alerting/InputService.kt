@@ -58,6 +58,7 @@ import org.opensearch.script.TemplateScript
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
+import org.opensearch.transport.client.node.NodeClient
 import java.time.Duration
 import java.time.Instant
 import kotlin.time.measureTimedValue
@@ -293,8 +294,7 @@ class InputService(
                 executePplQuery(
                     limitedQueryToExecute,
                     false,
-                    monitorCtx.clusterService!!.state().nodes.localNode,
-                    transportService
+                    monitorCtx.client!! as NodeClient
                 )
             }
             logger.debug("base query results: $queryResponseJsonReceived")

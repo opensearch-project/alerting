@@ -100,6 +100,7 @@ import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
+import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
 import java.time.Duration
 import java.util.Locale
@@ -352,7 +353,7 @@ class TransportIndexMonitorAction @Inject constructor(
             // now PPL explain the base query as is.
             // if there are any PPL syntax, index not found, insufficient index permissions, or other errors,
             // this will throw an exception from the SQL/PPL plugin
-            executePplQuery(limitedQueryToExecute, true, clusterService.state().nodes.localNode, transportService)
+            executePplQuery(limitedQueryToExecute, true, client as NodeClient)
 
             // scan all the triggers with custom conditions, and ensure each query constructed
             // from the base query + custom condition is valid
@@ -384,7 +385,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
                 // if the custom condition is invalid, this will throw an exception
                 // from the SQL/PPL plugin
-                executePplQuery(limitedQueryWithCustomCondition, true, clusterService.state().nodes.localNode, transportService)
+                executePplQuery(limitedQueryWithCustomCondition, true, client as NodeClient)
             }
         } catch (e: Exception) {
             validationListener.onFailure(

@@ -9,9 +9,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.opensearch.alerting.core.ppl.PPLPluginInterface
 import org.opensearch.alerting.opensearchapi.suspendUntil
-import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest
-import org.opensearch.transport.TransportService
+import org.opensearch.transport.client.node.NodeClient
 
 object PPLUtils {
 
@@ -99,8 +98,7 @@ object PPLUtils {
     suspend fun executePplQuery(
         query: String,
         explain: Boolean,
-        localNode: DiscoveryNode,
-        transportService: TransportService
+        client: NodeClient
     ): JSONObject {
         val path = if (explain) {
             "/_plugins/_ppl/_explain"
@@ -117,8 +115,7 @@ object PPLUtils {
 
         val transportPplQueryResponse = PPLPluginInterface.suspendUntil {
             this.executeQuery(
-                transportService,
-                localNode,
+                client,
                 transportPplQueryRequest,
                 it
             )
