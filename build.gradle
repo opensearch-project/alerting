@@ -22,7 +22,8 @@ buildscript {
             opensearch_build += "-SNAPSHOT"
         }
         opensearch_no_snapshot = opensearch_version.replace("-SNAPSHOT","")
-        common_utils_version = System.getProperty("common_utils.version", opensearch_build)
+        // TODO: revert to opensearch_build after alerting version bump to 3.7.0
+        common_utils_version = System.getProperty("common_utils.version", "3.7.0.0-SNAPSHOT")
         kotlin_version = '2.2.0'
     }
 
