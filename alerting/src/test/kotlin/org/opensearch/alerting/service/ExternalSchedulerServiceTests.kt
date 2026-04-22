@@ -43,24 +43,19 @@ class ExternalSchedulerServiceTests {
 
     @Test
     fun `createSchedule does not throw`() {
-        // Verifies no exception — SDK calls are TODO stubs
-        ExternalSchedulerService.createSchedule(
-            testMonitor(), "111111111111",
-            "arn:aws:sqs:us-east-1:111:queue", "arn:aws:iam::111:role/test", "{}"
-        )
+        val routing = SchedulerRoutingResolver.Routing("111111111111", "arn:aws:sqs:us-east-1:111:queue", "arn:aws:iam::111:role/test")
+        ExternalSchedulerService.createSchedule(testMonitor(), routing, "{}")
     }
 
     @Test
     fun `updateSchedule does not throw`() {
-        ExternalSchedulerService.updateSchedule(
-            testMonitor(), "222222222222",
-            "arn:aws:sqs:us-west-2:222:queue", "arn:aws:iam::222:role/test", "{}"
-        )
+        val routing = SchedulerRoutingResolver.Routing("222222222222", "arn:aws:sqs:us-west-2:222:queue", "arn:aws:iam::222:role/test")
+        ExternalSchedulerService.updateSchedule(testMonitor(), routing, "{}")
     }
 
     @Test
     fun `deleteSchedule accepts all required params`() {
-        // Verifies no exception — SDK calls are TODO stubs
-        ExternalSchedulerService.deleteSchedule("mon-3", "333333333333", "arn:aws:iam::333:role/eb-role")
+        val routing = SchedulerRoutingResolver.Routing("333333333333", "", "arn:aws:iam::333:role/eb-role")
+        ExternalSchedulerService.deleteSchedule("mon-3", routing)
     }
 }
