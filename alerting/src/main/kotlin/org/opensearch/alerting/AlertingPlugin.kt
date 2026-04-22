@@ -525,7 +525,11 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.PPL_QUERY_RESULTS_MAX_DATAROWS,
             AlertingSettings.PPL_QUERY_RESULTS_MAX_SIZE,
             AlertingSettings.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH,
-            AlertingSettings.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH
+            AlertingSettings.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH,
+            AlertingSettings.EXTERNAL_SCHEDULER_ENABLED,
+            AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID,
+            AlertingSettings.EXTERNAL_SCHEDULER_QUEUE_ARN,
+            AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN
         )
     }
 

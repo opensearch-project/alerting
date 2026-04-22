@@ -87,6 +87,7 @@ import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonit
 import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonitorInput.Companion.REMOTE_DOC_LEVEL_MONITOR_INPUT_FIELD
 import org.opensearch.commons.alerting.model.userErrorMessage
 import org.opensearch.commons.alerting.util.AlertingException
+import org.opensearch.commons.alerting.util.SchedulePayloadBuilder
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.TenantContext
@@ -154,8 +155,6 @@ class TransportIndexMonitorAction @Inject constructor(
     @Volatile private var jobQueueName = AlertingSettings.JOB_QUEUE_NAME.get(settings)
     @Volatile private var externalSchedulerRoleName = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(settings)
     @Volatile private var externalSchedulerExecutionRoleName = AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME.get(settings)
-
-    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
 
     private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
 
@@ -899,6 +898,17 @@ class TransportIndexMonitorAction @Inject constructor(
                     }
                 }
 
+                // Create external schedule for monitor execution
+                if (externalSchedulerEnabled) {
+                    try {
+                        createExternalSchedule(request.monitor, tenantId)
+                    } catch (t: Exception) {
+                        log.error("Failed to create EB schedule for monitor ${indexResponse.id}. Rolling back.", t)
+                        cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
+                        throw t
+                    }
+                }
+
                 actionListener.onResponse(
                     IndexMonitorResponse(
                         indexResponse.id, indexResponse.version, indexResponse.seqNo,
@@ -1100,6 +1110,16 @@ class TransportIndexMonitorAction @Inject constructor(
                 if (externalSchedulerEnabled) {
                     try {
                         updateExternalSchedule(request.monitor, currentMonitor, tenantId)
+                    } catch (t: Exception) {
+                        log.error("Failed to update EB schedule for monitor ${request.monitorId}", t)
+                        actionListener.onFailure(AlertingException.wrap(t))
+                        return
+                    }
+                }
+                // Update external schedule with latest monitor config
+                if (externalSchedulerEnabled) {
+                    try {
+                        updateExternalSchedule(request.monitor, tenantId)
                     } catch (t: Exception) {
                         log.error("Failed to update EB schedule for monitor ${request.monitorId}", t)
                         actionListener.onFailure(AlertingException.wrap(t))
