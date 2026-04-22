@@ -846,13 +846,8 @@ class TransportIndexMonitorAction @Inject constructor(
          */
         private fun createExternalSchedule(monitor: Monitor, tenantId: String?) {
             val routing = resolveRouting() ?: return
-            val targetInput = SchedulePayloadBuilder.buildTargetInput(
-                monitor = monitor,
-                jobStartTimePlaceholder = "<aws.scheduler.scheduled-time>"
-            )
-            ExternalSchedulerService.createSchedule(
-                monitor, routing.accountId, routing.queueArn, routing.roleArn, targetInput
-            )
+            val targetInput = SchedulePayloadBuilder.buildTargetInput(monitor, ExternalSchedulerService.EB_SCHEDULED_TIME_PLACEHOLDER)
+            ExternalSchedulerService.createSchedule(monitor, routing, targetInput)
         }
 
         /**
@@ -862,13 +857,8 @@ class TransportIndexMonitorAction @Inject constructor(
          */
         private fun updateExternalSchedule(monitor: Monitor, tenantId: String?) {
             val routing = resolveRouting() ?: return
-            val targetInput = SchedulePayloadBuilder.buildTargetInput(
-                monitor = monitor,
-                jobStartTimePlaceholder = "<aws.scheduler.scheduled-time>"
-            )
-            ExternalSchedulerService.updateSchedule(
-                monitor, routing.accountId, routing.queueArn, routing.roleArn, targetInput
-            )
+            val targetInput = SchedulePayloadBuilder.buildTargetInput(monitor, ExternalSchedulerService.EB_SCHEDULED_TIME_PLACEHOLDER)
+            ExternalSchedulerService.updateSchedule(monitor, routing, targetInput)
         }
 
         private fun resolveRouting(): SchedulerRoutingResolver.Routing? = SchedulerRoutingResolver.resolve(

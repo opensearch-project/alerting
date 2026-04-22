@@ -117,13 +117,12 @@ class TransportDeleteMonitorAction @Inject constructor(
                     )
                     return
                 } else if (canDelete) {
-                    // Log scheduler routing info in ThreadContext for observability
-                    logSchedulerContext(monitor)
-
                     // Delete EB schedule FIRST — if this fails, the monitor record is
                     // preserved so the schedule can be retried. Deleting the monitor
                     // first would orphan the EB schedule with no record to reconcile.
-                    deleteExternalSchedule(monitor)
+                    if (externalSchedulerEnabled) {
+                        deleteExternalSchedule(monitor)
+                    }
 
                     actionListener.onResponse(
                         DeleteMonitorService.deleteMonitor(monitor, refreshPolicy)
@@ -143,15 +142,6 @@ class TransportDeleteMonitorAction @Inject constructor(
         }
 
         /**
-         * Logs scheduler routing info from ThreadContext for observability.
-         */
-        private fun logSchedulerContext(monitor: Monitor) {
-            val threadContext = client.threadPool().threadContext
-            val schedulerAccountId = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
-            log.debug("Scheduler account for monitor ${monitor.id}: $schedulerAccountId")
-        }
-
-        /**
          * Deletes the external schedule before deleting the monitor.
          * Fails the request if cleanup cannot complete — preserving the monitor
          * record so the schedule deletion can be retried.
@@ -164,7 +154,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                     .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
             ) ?: return
 
-            ExternalSchedulerService.deleteSchedule(monitor.id, routing.accountId, routing.roleArn)
+            ExternalSchedulerService.deleteSchedule(monitor.id, routing)
         }
 
         private suspend fun getMonitor(): Monitor {
