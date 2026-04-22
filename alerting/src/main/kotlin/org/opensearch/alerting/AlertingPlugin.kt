@@ -468,7 +468,11 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.REMOTE_METADATA_ENDPOINT,
             AlertingSettings.REMOTE_METADATA_REGION,
             AlertingSettings.REMOTE_METADATA_SERVICE_NAME,
-            AlertingSettings.MULTI_TENANT_TRIGGER_EVAL_ENABLED
+            AlertingSettings.MULTI_TENANT_TRIGGER_EVAL_ENABLED,
+            AlertingSettings.EXTERNAL_SCHEDULER_ENABLED,
+            AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID,
+            AlertingSettings.EXTERNAL_SCHEDULER_QUEUE_ARN,
+            AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN
         )
     }
 

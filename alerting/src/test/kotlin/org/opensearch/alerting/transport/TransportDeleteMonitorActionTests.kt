@@ -13,6 +13,7 @@ import org.mockito.Mockito
 import org.mockito.Mockito.timeout
 import org.mockito.Mockito.verify
 import org.opensearch.action.support.ActionFilters
+import org.opensearch.alerting.service.ExternalSchedulerService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
@@ -59,6 +60,9 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
         settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN)
         val clusterSettings = ClusterSettings(Settings.EMPTY, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
     }
@@ -111,6 +115,47 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         invokeDoExecute(action, request, listener)
 
         verify(listener, timeout(1000)).onFailure(any())
+    }
+
+    fun `test action constructs with external scheduler enabled`() {
+        val settings = Settings.builder()
+            .put("plugins.alerting.external_scheduler.enabled", true)
+            .put("plugins.alerting.external_scheduler.account_id", "111111111111")
+            .put("plugins.alerting.external_scheduler.role_arn", "arn:aws:iam::111:role/eb")
+            .build()
+
+        val settingSet = hashSetOf<Setting<*>>()
+        settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
+        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN)
+        val cs = ClusterSettings(settings, settingSet)
+        whenever(clusterService.clusterSettings).thenReturn(cs)
+
+        val action = TransportDeleteMonitorAction(
+            Mockito.mock(TransportService::class.java),
+            client,
+            Mockito.mock(ActionFilters::class.java),
+            clusterService,
+            settings,
+            Mockito.mock(NamedXContentRegistry::class.java),
+            sdkClient
+        )
+        // Action should construct without error — settings consumers wired correctly
+        assertNotNull(action)
+    }
+
+    fun `test action constructs with external scheduler disabled by default`() {
+        // Default Settings.EMPTY → externalSchedulerEnabled = false
+        val action = createAction()
+        assertNotNull(action)
+    }
+
+    fun `test ThreadContext scheduler account id is readable`() {
+        threadContext.putTransient(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY, "999999999999")
+        val value = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
+        assertEquals("999999999999", value)
     }
 
     private fun invokeDoExecute(

@@ -353,5 +353,37 @@ class AlertingSettings {
             false,
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        /**
+         * Enables managing monitor schedules on an external EventBridge Scheduler instead of
+         * the in-cluster job scheduler. When disabled (default), monitor create/update/delete
+         * flows skip the external schedule hooks entirely.
+         */
+        val EXTERNAL_SCHEDULER_ENABLED = Setting.boolSetting(
+            "plugins.alerting.external_scheduler.enabled",
+            false,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /**
+         * Default AWS account that owns the EventBridge schedules. May be overridden per-request
+         * by a transient ThreadContext value under [ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY].
+         */
+        val EXTERNAL_SCHEDULER_ACCOUNT_ID = Setting.simpleString(
+            "plugins.alerting.external_scheduler.account_id",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /** SQS queue ARN that EventBridge schedules dispatch monitor executions to. */
+        val EXTERNAL_SCHEDULER_QUEUE_ARN = Setting.simpleString(
+            "plugins.alerting.external_scheduler.queue_arn",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /** IAM role ARN that EventBridge assumes to send messages to the target SQS queue. */
+        val EXTERNAL_SCHEDULER_ROLE_ARN = Setting.simpleString(
+            "plugins.alerting.external_scheduler.role_arn",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }

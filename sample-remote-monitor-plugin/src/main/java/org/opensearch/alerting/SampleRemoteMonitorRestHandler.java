@@ -96,7 +96,9 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                 new DataSources(),
                 false,
                 false,
-                "sample-remote-monitor-plugin"
+                "sample-remote-monitor-plugin",
+                null,
+                null
         );
         IndexMonitorRequest indexMonitorRequest1 = new IndexMonitorRequest(
                 Monitor.NO_ID,
@@ -158,7 +160,9 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                     new DataSources(),
                     false,
                     false,
-                    "sample-remote-monitor-plugin"
+                    "sample-remote-monitor-plugin",
+                    null,
+                    null
             );
             IndexMonitorRequest indexMonitorRequest2 = new IndexMonitorRequest(
                     Monitor.NO_ID,
@@ -243,7 +247,9 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                     new DataSources(),
                     false,
                     false,
-                    "sample-remote-monitor-plugin"
+                    "sample-remote-monitor-plugin",
+                    null,
+                    null
             );
             IndexMonitorRequest indexDocLevelMonitorRequest = new IndexMonitorRequest(
                     Monitor.NO_ID,

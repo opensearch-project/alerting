@@ -16,6 +16,8 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.service.DeleteMonitorService
+import org.opensearch.alerting.service.ExternalSchedulerService
+import org.opensearch.alerting.service.SchedulerRoutingResolver
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -57,8 +59,20 @@ class TransportDeleteMonitorAction @Inject constructor(
     SecureTransportAction {
 
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile private var externalSchedulerEnabled = AlertingSettings.EXTERNAL_SCHEDULER_ENABLED.get(settings)
+    @Volatile private var externalSchedulerAccountId = AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID.get(settings)
+    @Volatile private var externalSchedulerRoleArn = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN.get(settings)
 
     init {
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED) {
+            externalSchedulerEnabled = it
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID) {
+            externalSchedulerAccountId = it
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN) {
+            externalSchedulerRoleArn = it
+        }
         listenFilterBySettingChange(clusterService)
     }
 
@@ -103,6 +117,13 @@ class TransportDeleteMonitorAction @Inject constructor(
                     )
                     return
                 } else if (canDelete) {
+                    // Delete EB schedule FIRST — if this fails, the monitor record is
+                    // preserved so the schedule can be retried. Deleting the monitor
+                    // first would orphan the EB schedule with no record to reconcile.
+                    if (externalSchedulerEnabled) {
+                        deleteExternalSchedule(monitor)
+                    }
+
                     actionListener.onResponse(
                         DeleteMonitorService.deleteMonitor(monitor, refreshPolicy)
                     )
@@ -118,6 +139,22 @@ class TransportDeleteMonitorAction @Inject constructor(
                 log.error("Failed to delete monitor $monitorId", t)
                 actionListener.onFailure(AlertingException.wrap(t))
             }
+        }
+
+        /**
+         * Deletes the external schedule before deleting the monitor.
+         * Fails the request if cleanup cannot complete — preserving the monitor
+         * record so the schedule deletion can be retried.
+         */
+        private fun deleteExternalSchedule(monitor: Monitor) {
+            val routing = SchedulerRoutingResolver.resolveForDelete(
+                settingsAccountId = externalSchedulerAccountId,
+                settingsRoleArn = externalSchedulerRoleArn,
+                threadContextAccountIdOverride = client.threadPool().threadContext
+                    .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
+            ) ?: return
+
+            ExternalSchedulerService.deleteSchedule(monitor.id, routing)
         }
 
         private suspend fun getMonitor(): Monitor {
