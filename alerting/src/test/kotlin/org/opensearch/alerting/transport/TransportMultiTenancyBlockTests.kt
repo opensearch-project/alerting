@@ -36,8 +36,12 @@ import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.util.concurrent.ThreadContext
+import org.opensearch.commons.alerting.action.AcknowledgeAlertResponse
+import org.opensearch.commons.alerting.action.AcknowledgeChainedAlertRequest
 import org.opensearch.commons.alerting.action.DeleteWorkflowRequest
 import org.opensearch.commons.alerting.action.DeleteWorkflowResponse
+import org.opensearch.commons.alerting.action.GetFindingsRequest
+import org.opensearch.commons.alerting.action.GetFindingsResponse
 import org.opensearch.commons.alerting.action.GetWorkflowAlertsRequest
 import org.opensearch.commons.alerting.action.GetWorkflowAlertsResponse
 import org.opensearch.commons.alerting.action.GetWorkflowRequest
@@ -411,9 +415,10 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
             multiTenancySettings, xContentRegistry,
             Mockito.mock(SdkClient::class.java)
         )
-        val request = org.opensearch.commons.alerting.action.AcknowledgeChainedAlertRequest("test-wf-id", listOf("alert-1"))
+        val request = AcknowledgeChainedAlertRequest("test-wf-id", listOf("alert-1"))
         @Suppress("UNCHECKED_CAST")
-        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<org.opensearch.commons.alerting.action.AcknowledgeAlertResponse>
+        val listener = Mockito.mock(ActionListener::class.java)
+            as ActionListener<AcknowledgeAlertResponse>
 
         invokeDoExecute(action, request, listener)
 
@@ -426,11 +431,13 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
             multiTenancySettings, xContentRegistry,
             Mockito.mock(NamedWriteableRegistry::class.java)
         )
-        val request = org.opensearch.commons.alerting.action.GetFindingsRequest(
-            null, Table("asc", "timestamp", null, 20, 0, null), null, null, null
+        val request = GetFindingsRequest(
+            null, Table("asc", "timestamp", null, 20, 0, null),
+            null, null, null
         )
         @Suppress("UNCHECKED_CAST")
-        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<org.opensearch.commons.alerting.action.GetFindingsResponse>
+        val listener = Mockito.mock(ActionListener::class.java)
+            as ActionListener<GetFindingsResponse>
 
         invokeDoExecute(action, request, listener)
 

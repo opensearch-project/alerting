@@ -197,7 +197,10 @@ class MultiTenancyBlockSingleNodeTests : AlertingSingleNodeTestCase() {
         val exception = expectThrows(Exception::class.java) {
             client().execute(
                 AlertingActions.GET_FINDINGS_ACTION_TYPE,
-                org.opensearch.commons.alerting.action.GetFindingsRequest(null, Table("asc", "timestamp", null, 20, 0, null), null, null, null)
+                org.opensearch.commons.alerting.action.GetFindingsRequest(
+                    null, Table("asc", "timestamp", null, 20, 0, null),
+                    null, null, null
+                )
             ).actionGet()
         }
         assertTrue(exception.message!!.contains("not allowed when multi-tenancy is enabled"))
