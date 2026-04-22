@@ -15,6 +15,7 @@ import org.opensearch.alerting.action.GetEmailGroupAction
 import org.opensearch.alerting.action.GetEmailGroupRequest
 import org.opensearch.alerting.action.GetEmailGroupResponse
 import org.opensearch.alerting.model.destination.email.EmailGroup
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.use
@@ -48,6 +49,8 @@ class TransportGetEmailGroupAction @Inject constructor(
 
     @Volatile private var allowList = ALLOW_LIST.get(settings)
 
+    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
     }
@@ -57,6 +60,18 @@ class TransportGetEmailGroupAction @Inject constructor(
         getEmailGroupRequest: GetEmailGroupRequest,
         actionListener: ActionListener<GetEmailGroupResponse>
     ) {
+
+        if (multiTenancyEnabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Email group operations are not allowed when multi-tenancy is enabled.",
+                        RestStatus.METHOD_NOT_ALLOWED
+                    )
+                )
+            )
+            return
+        }
 
         if (!allowList.contains(DestinationType.EMAIL.value)) {
             actionListener.onFailure(

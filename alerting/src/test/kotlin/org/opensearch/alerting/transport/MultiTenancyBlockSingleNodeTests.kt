@@ -6,11 +6,22 @@
 package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
+import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
+import org.opensearch.alerting.action.GetDestinationsAction
+import org.opensearch.alerting.action.GetDestinationsRequest
+import org.opensearch.alerting.action.GetEmailAccountAction
+import org.opensearch.alerting.action.GetEmailAccountRequest
+import org.opensearch.alerting.action.GetEmailGroupAction
+import org.opensearch.alerting.action.GetEmailGroupRequest
+import org.opensearch.alerting.action.GetRemoteIndexesAction
+import org.opensearch.alerting.action.GetRemoteIndexesRequest
+import org.opensearch.alerting.action.SearchEmailAccountAction
+import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.randomClusterMetricsMonitor
 import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.common.settings.Settings
@@ -120,6 +131,84 @@ class MultiTenancyBlockSingleNodeTests : AlertingSingleNodeTestCase() {
         val exception = expectThrows(Exception::class.java) {
             val request = ExecuteMonitorRequest(true, TimeValue(Instant.now().toEpochMilli()), null, randomDocumentLevelMonitor())
             client().execute(ExecuteMonitorAction.INSTANCE, request).actionGet()
+        }
+        assertTrue(exception.message!!.contains("not allowed when multi-tenancy is enabled"))
+    }
+
+    // --- Notification-related action tests ---
+
+    fun `test search email account fails when multi-tenancy is enabled`() {
+        val exception = expectThrows(Exception::class.java) {
+            client().execute(SearchEmailAccountAction.INSTANCE, SearchRequest()).actionGet()
+        }
+        assertTrue(exception.message!!.contains("not allowed when multi-tenancy is enabled"))
+    }
+
+    fun `test get email account fails when multi-tenancy is enabled`() {
+        val exception = expectThrows(Exception::class.java) {
+            client().execute(
+                GetEmailAccountAction.INSTANCE,
+                GetEmailAccountRequest("test-id", 1L, RestRequest.Method.GET, null)
+            ).actionGet()
+        }
+        assertTrue(exception.message!!.contains("not allowed when multi-tenancy is enabled"))
+    }
+
+    fun `test search email group fails when multi-tenancy is enabled`() {
+        val exception = expectThrows(Exception::class.java) {
+            client().execute(SearchEmailGroupAction.INSTANCE, SearchRequest()).actionGet()
+        }
+        assertTrue(exception.message!!.contains("not allowed when multi-tenancy is enabled"))
+    }
+
+    fun `test get email group fails when multi-tenancy is enabled`() {
+        val exception = expectThrows(Exception::class.java) {
+            client().execute(
+                GetEmailGroupAction.INSTANCE,
+                GetEmailGroupRequest("test-id", 1L, RestRequest.Method.GET, null)
+            ).actionGet()
+        }
+        assertTrue(exception.message!!.contains("not allowed when multi-tenancy is enabled"))
+    }
+
+    fun `test get destinations fails when multi-tenancy is enabled`() {
+        val exception = expectThrows(Exception::class.java) {
+            client().execute(
+                GetDestinationsAction.INSTANCE,
+                GetDestinationsRequest(null, 1L, null, Table("asc", "destination.name", null, 20, 0, null), "ALL")
+            ).actionGet()
+        }
+        assertTrue(exception.message!!.contains("not allowed when multi-tenancy is enabled"))
+    }
+
+    // --- Additional blocked action tests ---
+
+    fun `test acknowledge chained alerts fails when multi-tenancy is enabled`() {
+        val exception = expectThrows(Exception::class.java) {
+            client().execute(
+                AlertingActions.ACKNOWLEDGE_CHAINED_ALERTS_ACTION_TYPE,
+                org.opensearch.commons.alerting.action.AcknowledgeChainedAlertRequest("test-wf-id", listOf("alert-1"))
+            ).actionGet()
+        }
+        assertTrue(exception.message!!.contains("not allowed when multi-tenancy is enabled"))
+    }
+
+    fun `test get findings fails when multi-tenancy is enabled`() {
+        val exception = expectThrows(Exception::class.java) {
+            client().execute(
+                AlertingActions.GET_FINDINGS_ACTION_TYPE,
+                org.opensearch.commons.alerting.action.GetFindingsRequest(null, Table("asc", "timestamp", null, 20, 0, null), null, null, null)
+            ).actionGet()
+        }
+        assertTrue(exception.message!!.contains("not allowed when multi-tenancy is enabled"))
+    }
+
+    fun `test get remote indexes fails when multi-tenancy is enabled`() {
+        val exception = expectThrows(Exception::class.java) {
+            client().execute(
+                GetRemoteIndexesAction.INSTANCE,
+                GetRemoteIndexesRequest(listOf("cluster:index*"), false)
+            ).actionGet()
         }
         assertTrue(exception.message!!.contains("not allowed when multi-tenancy is enabled"))
     }

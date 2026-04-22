@@ -9,12 +9,22 @@ import org.junit.Before
 import org.mockito.Mockito
 import org.mockito.Mockito.verify
 import org.opensearch.OpenSearchStatusException
+import org.opensearch.action.search.SearchRequest
+import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
+import org.opensearch.alerting.action.GetDestinationsRequest
+import org.opensearch.alerting.action.GetDestinationsResponse
+import org.opensearch.alerting.action.GetEmailAccountRequest
+import org.opensearch.alerting.action.GetEmailAccountResponse
+import org.opensearch.alerting.action.GetEmailGroupRequest
+import org.opensearch.alerting.action.GetEmailGroupResponse
+import org.opensearch.alerting.action.GetRemoteIndexesRequest
+import org.opensearch.alerting.action.GetRemoteIndexesResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.settings.AlertingSettings
@@ -100,6 +110,7 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
         settingSet.add(AlertingSettings.INDEX_TIMEOUT)
         settingSet.add(AlertingSettings.MAX_ACTION_THROTTLE_VALUE)
         settingSet.add(DestinationSettings.ALLOW_LIST)
+        settingSet.add(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
         val clusterSettings = ClusterSettings(multiTenancySettings, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
 
@@ -313,6 +324,127 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
         val request = ExecuteMonitorRequest(true, TimeValue(Instant.now().toEpochMilli()), null, monitor)
         @Suppress("UNCHECKED_CAST")
         val listener = Mockito.mock(ActionListener::class.java) as ActionListener<ExecuteMonitorResponse>
+
+        invokeDoExecute(action, request, listener)
+
+        assertMethodNotAllowed(listener)
+    }
+
+    // --- Notification-related action tests ---
+
+    fun `test search email account blocked when multi-tenancy enabled`() {
+        val action = TransportSearchEmailAccountAction(
+            transportService, client, actionFilters, clusterService, multiTenancySettings
+        )
+        val request = SearchRequest()
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<SearchResponse>
+
+        invokeDoExecute(action, request, listener)
+
+        assertMethodNotAllowed(listener)
+    }
+
+    fun `test get email account blocked when multi-tenancy enabled`() {
+        val action = TransportGetEmailAccountAction(
+            transportService, client, actionFilters, clusterService, multiTenancySettings, xContentRegistry
+        )
+        val request = GetEmailAccountRequest("test-id", 1L, RestRequest.Method.GET, null)
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<GetEmailAccountResponse>
+
+        invokeDoExecute(action, request, listener)
+
+        assertMethodNotAllowed(listener)
+    }
+
+    fun `test search email group blocked when multi-tenancy enabled`() {
+        val action = TransportSearchEmailGroupAction(
+            transportService, client, actionFilters, clusterService, multiTenancySettings
+        )
+        val request = SearchRequest()
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<SearchResponse>
+
+        invokeDoExecute(action, request, listener)
+
+        assertMethodNotAllowed(listener)
+    }
+
+    fun `test get email group blocked when multi-tenancy enabled`() {
+        val action = TransportGetEmailGroupAction(
+            transportService, client, actionFilters, clusterService, multiTenancySettings, xContentRegistry
+        )
+        val request = GetEmailGroupRequest("test-id", 1L, RestRequest.Method.GET, null)
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<GetEmailGroupResponse>
+
+        invokeDoExecute(action, request, listener)
+
+        assertMethodNotAllowed(listener)
+    }
+
+    fun `test get destinations blocked when multi-tenancy enabled`() {
+        val action = TransportGetDestinationsAction(
+            transportService, client, clusterService, actionFilters,
+            multiTenancySettings, xContentRegistry,
+            Mockito.mock(SdkClient::class.java)
+        )
+        val request = GetDestinationsRequest(
+            null, 1L, null,
+            Table("asc", "destination.name", null, 20, 0, null),
+            "ALL"
+        )
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<GetDestinationsResponse>
+
+        invokeDoExecute(action, request, listener)
+
+        assertMethodNotAllowed(listener)
+    }
+
+    // --- Additional blocked action tests ---
+
+    fun `test acknowledge chained alerts blocked when multi-tenancy enabled`() {
+        val action = TransportAcknowledgeChainedAlertAction(
+            transportService, client, clusterService, actionFilters,
+            multiTenancySettings, xContentRegistry,
+            Mockito.mock(SdkClient::class.java)
+        )
+        val request = org.opensearch.commons.alerting.action.AcknowledgeChainedAlertRequest("test-wf-id", listOf("alert-1"))
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<org.opensearch.commons.alerting.action.AcknowledgeAlertResponse>
+
+        invokeDoExecute(action, request, listener)
+
+        assertMethodNotAllowed(listener)
+    }
+
+    fun `test get findings blocked when multi-tenancy enabled`() {
+        val action = TransportGetFindingsSearchAction(
+            transportService, client, clusterService, actionFilters,
+            multiTenancySettings, xContentRegistry,
+            Mockito.mock(NamedWriteableRegistry::class.java)
+        )
+        val request = org.opensearch.commons.alerting.action.GetFindingsRequest(
+            null, Table("asc", "timestamp", null, 20, 0, null), null, null, null
+        )
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<org.opensearch.commons.alerting.action.GetFindingsResponse>
+
+        invokeDoExecute(action, request, listener)
+
+        assertMethodNotAllowed(listener)
+    }
+
+    fun `test get remote indexes blocked when multi-tenancy enabled`() {
+        val action = TransportGetRemoteIndexesAction(
+            transportService, client, actionFilters, xContentRegistry,
+            clusterService, multiTenancySettings
+        )
+        val request = GetRemoteIndexesRequest(listOf("cluster:index*"), false)
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<GetRemoteIndexesResponse>
 
         invokeDoExecute(action, request, listener)
 

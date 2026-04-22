@@ -6,6 +6,7 @@
 package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
@@ -60,6 +61,8 @@ class TransportGetDestinationsAction @Inject constructor(
 
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
+    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+
     init {
         listenFilterBySettingChange(clusterService)
     }
@@ -69,6 +72,18 @@ class TransportGetDestinationsAction @Inject constructor(
         getDestinationsRequest: GetDestinationsRequest,
         actionListener: ActionListener<GetDestinationsResponse>
     ) {
+        if (multiTenancyEnabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Destination operations are not allowed when multi-tenancy is enabled.",
+                        RestStatus.METHOD_NOT_ALLOWED
+                    )
+                )
+            )
+            return
+        }
+
         val user = readUserFromThreadContext(client)
         val tableProp = getDestinationsRequest.table
 
