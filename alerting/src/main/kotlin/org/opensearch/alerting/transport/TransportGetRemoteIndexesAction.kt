@@ -64,6 +64,8 @@ class TransportGetRemoteIndexesAction @Inject constructor(
 
     @Volatile private var remoteMonitoringEnabled = CROSS_CLUSTER_MONITORING_ENABLED.get(settings)
 
+    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(CROSS_CLUSTER_MONITORING_ENABLED) { remoteMonitoringEnabled = it }
         listenFilterBySettingChange(clusterService)
@@ -74,6 +76,18 @@ class TransportGetRemoteIndexesAction @Inject constructor(
         request: GetRemoteIndexesRequest,
         actionListener: ActionListener<GetRemoteIndexesResponse>
     ) {
+        if (multiTenancyEnabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Remote index operations are not allowed when multi-tenancy is enabled.",
+                        RestStatus.METHOD_NOT_ALLOWED
+                    )
+                )
+            )
+            return
+        }
+
         log.debug("Remote monitoring enabled: {}", remoteMonitoringEnabled)
         if (!remoteMonitoringEnabled) {
             actionListener.onFailure(

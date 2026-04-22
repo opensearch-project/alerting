@@ -15,6 +15,7 @@ import org.opensearch.alerting.action.GetEmailAccountAction
 import org.opensearch.alerting.action.GetEmailAccountRequest
 import org.opensearch.alerting.action.GetEmailAccountResponse
 import org.opensearch.alerting.model.destination.email.EmailAccount
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.alerting.util.use
@@ -48,6 +49,8 @@ class TransportGetEmailAccountAction @Inject constructor(
 
     @Volatile private var allowList = ALLOW_LIST.get(settings)
 
+    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALLOW_LIST) { allowList = it }
     }
@@ -57,6 +60,18 @@ class TransportGetEmailAccountAction @Inject constructor(
         getEmailAccountRequest: GetEmailAccountRequest,
         actionListener: ActionListener<GetEmailAccountResponse>
     ) {
+
+        if (multiTenancyEnabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Email account operations are not allowed when multi-tenancy is enabled.",
+                        RestStatus.METHOD_NOT_ALLOWED
+                    )
+                )
+            )
+            return
+        }
 
         if (!allowList.contains(DestinationType.EMAIL.value)) {
             actionListener.onFailure(

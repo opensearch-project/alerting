@@ -80,6 +80,8 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
     @Volatile
     private var isAlertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
 
+    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_ENABLED) { isAlertHistoryEnabled = it }
     }
@@ -89,6 +91,18 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
         AcknowledgeChainedAlertRequest: ActionRequest,
         actionListener: ActionListener<AcknowledgeAlertResponse>,
     ) {
+        if (multiTenancyEnabled) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Chained alert operations are not allowed when multi-tenancy is enabled.",
+                        RestStatus.METHOD_NOT_ALLOWED
+                    )
+                )
+            )
+            return
+        }
+
         val request = AcknowledgeChainedAlertRequest as? AcknowledgeChainedAlertRequest
             ?: recreateObject(AcknowledgeChainedAlertRequest) { AcknowledgeChainedAlertRequest(it) }
         client.threadPool().threadContext.stashContext().use {
