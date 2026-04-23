@@ -472,7 +472,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.EXTERNAL_SCHEDULER_ENABLED,
             AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID,
             AlertingSettings.EXTERNAL_SCHEDULER_QUEUE_ARN,
-            AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN
+            AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN,
+            AlertingSettings.SQS_ACCOUNT_ID,
+            AlertingSettings.SQS_ACCOUNT_PROVIDER_TYPE
         )
     }
 

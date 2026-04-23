@@ -385,5 +385,18 @@ class AlertingSettings {
             "plugins.alerting.external_scheduler.role_arn",
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        /** AWS account ID that hosts the SQS queues available for polling. */
+        val SQS_ACCOUNT_ID = Setting.simpleString(
+            "plugins.alerting.sqs_account_id",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /** Provider type used to resolve SQS account IDs (e.g. "plugin_setting"). */
+        val SQS_ACCOUNT_PROVIDER_TYPE = Setting.simpleString(
+            "plugins.alerting.sqs_account_provider_type",
+            "plugin_setting",
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
     }
 }
