@@ -374,12 +374,6 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        /** SQS queue ARN that EventBridge schedules dispatch monitor executions to. */
-        val EXTERNAL_SCHEDULER_QUEUE_ARN = Setting.simpleString(
-            "plugins.alerting.external_scheduler.queue_arn",
-            Setting.Property.NodeScope, Setting.Property.Dynamic
-        )
-
         /** IAM role ARN that EventBridge assumes to send messages to the target SQS queue. */
         val EXTERNAL_SCHEDULER_ROLE_ARN = Setting.simpleString(
             "plugins.alerting.external_scheduler.role_arn",
@@ -397,6 +391,18 @@ class AlertingSettings {
             "plugins.alerting.job_queue_account_provider_type",
             "plugin_setting",
             Setting.Property.NodeScope, Setting.Property.Final
+        )
+
+        /** Name of the SQS queue to poll for monitor execution messages. */
+        val JOB_QUEUE_NAME = Setting.simpleString(
+            "plugins.alerting.job_queue_name",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /** Key name in monitor metadata whose value is used as the SQS MessageGroupId for fair queuing. */
+        val JOB_QUEUE_MESSAGE_GROUP_KEY_NAME = Setting.simpleString(
+            "plugins.alerting.job_queue_message_group_key_name",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
         )
     }
 }

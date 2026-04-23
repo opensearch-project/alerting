@@ -179,6 +179,16 @@ dependencies {
 
     implementation "org.opensearch:opensearch-remote-metadata-sdk:${opensearch_build}"
 
+    implementation "software.amazon.awssdk:sqs:2.30.18"
+    implementation "software.amazon.awssdk:scheduler:2.30.18"
+    implementation "software.amazon.awssdk:sts:2.30.18"
+    implementation "software.amazon.awssdk:auth:2.30.18"
+    implementation "software.amazon.awssdk:identity-spi:2.30.18"
+    implementation "software.amazon.awssdk:aws-core:2.30.18"
+    implementation "software.amazon.awssdk:sdk-core:2.30.18"
+    implementation "software.amazon.awssdk:utils:2.30.18"
+    implementation "software.amazon.awssdk:regions:2.30.18"
+
     testImplementation "org.antlr:antlr4-runtime:${versions.antlr4}"
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
     testImplementation "org.mockito:mockito-core:${versions.mockito}"

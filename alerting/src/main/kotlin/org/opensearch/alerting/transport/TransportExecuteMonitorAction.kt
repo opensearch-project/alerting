@@ -105,7 +105,7 @@ class TransportExecuteMonitorAction @Inject constructor(
                 }
             }
 
-            if (execMonitorRequest.monitorId != null) {
+            if (execMonitorRequest.monitorId != null && execMonitorRequest.monitor == null) {
                 val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
                 val getRequest = GetDataObjectRequest.builder()
                     .index(ScheduledJob.SCHEDULED_JOBS_INDEX)

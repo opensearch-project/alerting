@@ -21,7 +21,7 @@ class SchedulerRoutingResolverTests {
     @Test fun `resolve uses plugin settings when no override`() {
         val r = SchedulerRoutingResolver.resolve(acct, queue, role, threadContextAccountIdOverride = null)!!
         assertEquals(acct, r.accountId)
-        assertEquals(queue, r.queueArn)
+        assertEquals(queue, r.queueName)
         assertEquals(role, r.roleArn)
     }
 
@@ -45,7 +45,7 @@ class SchedulerRoutingResolverTests {
         assertEquals(override, r.accountId)
     }
 
-    @Test fun `resolve returns null when queueArn blank`() {
+    @Test fun `resolve returns null when queueName blank`() {
         assertNull(SchedulerRoutingResolver.resolve(acct, "", role, threadContextAccountIdOverride = null))
     }
 
@@ -74,8 +74,8 @@ class SchedulerRoutingResolverTests {
         assertNull(SchedulerRoutingResolver.resolveForDelete(acct, "", threadContextAccountIdOverride = null))
     }
 
-    @Test fun `resolveForDelete does not require queueArn`() {
-        // No queueArn parameter at all — setup covers delete path independent of create/update
+    @Test fun `resolveForDelete does not require queueName`() {
+        // No queueName parameter at all — setup covers delete path independent of create/update
         val r = SchedulerRoutingResolver.resolveForDelete(acct, role, threadContextAccountIdOverride = null)
         assertEquals(acct, r?.accountId)
     }
