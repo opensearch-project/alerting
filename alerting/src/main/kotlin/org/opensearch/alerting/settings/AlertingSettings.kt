@@ -385,5 +385,18 @@ class AlertingSettings {
             "plugins.alerting.external_scheduler.role_arn",
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        /** AWS account ID that hosts the job queues available for polling. */
+        val JOB_QUEUE_ACCOUNT_ID = Setting.simpleString(
+            "plugins.alerting.job_queue_account_id",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /** Provider type used to resolve job queue account IDs (e.g. "plugin_setting"). */
+        val JOB_QUEUE_ACCOUNT_PROVIDER_TYPE = Setting.simpleString(
+            "plugins.alerting.job_queue_account_provider_type",
+            "plugin_setting",
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
     }
 }
