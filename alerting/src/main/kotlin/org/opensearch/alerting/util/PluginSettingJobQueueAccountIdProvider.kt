@@ -9,10 +9,10 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.commons.utils.scheduler.JobQueueAccountIdProvider
 
 /**
- * [JobQueueAccountIdProvider] that reads the SQS account ID from the alerting plugin setting.
+ * [JobQueueAccountIdProvider] that reads the job queue account ID from the alerting plugin setting.
  * Throws [IllegalArgumentException] if the setting is missing or blank.
  */
-class PluginSettingSqsAccountIdProvider : JobQueueAccountIdProvider {
+class PluginSettingJobQueueAccountIdProvider : JobQueueAccountIdProvider {
 
     override fun getType(): String = "plugin_setting"
 
@@ -29,6 +29,6 @@ class PluginSettingSqsAccountIdProvider : JobQueueAccountIdProvider {
     }
 
     companion object {
-        const val SETTING_KEY = "plugins.alerting.sqs_account_id"
+        const val SETTING_KEY = "plugins.alerting.job_queue_account_id"
     }
 }
