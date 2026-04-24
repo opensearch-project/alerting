@@ -6,10 +6,14 @@
 package org.opensearch.alerting.service
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduleJobPayload
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import java.time.Instant
@@ -36,6 +40,19 @@ class ExternalSchedulerServiceTests {
         )
     }
 
+    private fun buildPayloadJson(monitor: Monitor): String {
+        val configBuilder = XContentFactory.jsonBuilder()
+        monitor.toXContent(configBuilder, ToXContent.EMPTY_PARAMS)
+        val payload = ScheduleJobPayload(
+            monitorId = monitor.id,
+            jobStartTime = ExternalSchedulerService.EB_SCHEDULED_TIME_PLACEHOLDER,
+            monitorConfig = configBuilder.toString()
+        )
+        val builder = XContentFactory.jsonBuilder()
+        payload.toXContent(builder, ToXContent.EMPTY_PARAMS)
+        return builder.toString()
+    }
+
     @Test
     fun `scheduleName formats correctly`() {
         assertEquals("monitor-abc123", ExternalSchedulerService.scheduleName("abc123"))
@@ -43,14 +60,26 @@ class ExternalSchedulerServiceTests {
 
     @Test
     fun `createSchedule does not throw`() {
+        val monitor = testMonitor()
         val routing = SchedulerRoutingResolver.Routing("111111111111", "arn:aws:sqs:us-east-1:111:queue", "arn:aws:iam::111:role/test")
-        ExternalSchedulerService.createSchedule(testMonitor(), routing, "{}")
+        ExternalSchedulerService.createSchedule(monitor, routing, buildPayloadJson(monitor))
     }
 
     @Test
     fun `updateSchedule does not throw`() {
+        val monitor = testMonitor()
         val routing = SchedulerRoutingResolver.Routing("222222222222", "arn:aws:sqs:us-west-2:222:queue", "arn:aws:iam::222:role/test")
-        ExternalSchedulerService.updateSchedule(testMonitor(), routing, "{}")
+        ExternalSchedulerService.updateSchedule(monitor, routing, buildPayloadJson(monitor))
+    }
+
+    @Test
+    fun `payload json contains all ScheduleJobPayload fields`() {
+        val monitor = testMonitor()
+        val json = buildPayloadJson(monitor)
+        assertTrue(json.contains("\"${ScheduleJobPayload.MONITOR_ID_FIELD}\""))
+        assertTrue(json.contains("\"${ScheduleJobPayload.JOB_START_TIME_FIELD}\""))
+        assertTrue(json.contains("\"${ScheduleJobPayload.MONITOR_CONFIG_FIELD}\""))
+        assertTrue(json.contains(ExternalSchedulerService.EB_SCHEDULED_TIME_PLACEHOLDER))
     }
 
     @Test

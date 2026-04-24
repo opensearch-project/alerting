@@ -53,6 +53,7 @@ import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
@@ -62,13 +63,13 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput.Companion.DOC_LEVEL_INPUT_FIELD
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorMetadata
+import org.opensearch.commons.alerting.model.ScheduleJobPayload
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonitorInput
 import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonitorInput.Companion.REMOTE_DOC_LEVEL_MONITOR_INPUT_FIELD
 import org.opensearch.commons.alerting.util.AlertingException
-import org.opensearch.commons.alerting.util.SchedulePayloadBuilder
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
@@ -846,7 +847,7 @@ class TransportIndexMonitorAction @Inject constructor(
          */
         private fun createExternalSchedule(monitor: Monitor, tenantId: String?) {
             val routing = resolveRouting() ?: return
-            val targetInput = SchedulePayloadBuilder.buildTargetInput(monitor, ExternalSchedulerService.EB_SCHEDULED_TIME_PLACEHOLDER)
+            val targetInput = buildScheduleJobPayloadJson(monitor)
             ExternalSchedulerService.createSchedule(monitor, routing, targetInput)
         }
 
@@ -857,8 +858,26 @@ class TransportIndexMonitorAction @Inject constructor(
          */
         private fun updateExternalSchedule(monitor: Monitor, tenantId: String?) {
             val routing = resolveRouting() ?: return
-            val targetInput = SchedulePayloadBuilder.buildTargetInput(monitor, ExternalSchedulerService.EB_SCHEDULED_TIME_PLACEHOLDER)
+            val targetInput = buildScheduleJobPayloadJson(monitor)
             ExternalSchedulerService.updateSchedule(monitor, routing, targetInput)
+        }
+
+        /**
+         * Builds a JSON string matching [ScheduleJobPayload] schema for the EB schedule target input.
+         * Uses the EB placeholder for job_start_time which the scheduler replaces at invocation time
+         * with a real ISO-8601 timestamp that [ScheduleJobPayload.parse] can deserialize.
+         */
+        private fun buildScheduleJobPayloadJson(monitor: Monitor): String {
+            val monitorConfigBuilder = XContentFactory.jsonBuilder()
+            monitor.toXContent(monitorConfigBuilder, ToXContent.EMPTY_PARAMS)
+            val payload = ScheduleJobPayload(
+                monitorId = monitor.id,
+                jobStartTime = ExternalSchedulerService.EB_SCHEDULED_TIME_PLACEHOLDER,
+                monitorConfig = monitorConfigBuilder.toString()
+            )
+            val builder = XContentFactory.jsonBuilder()
+            payload.toXContent(builder, ToXContent.EMPTY_PARAMS)
+            return builder.toString()
         }
 
         private fun resolveRouting(): SchedulerRoutingResolver.Routing? = SchedulerRoutingResolver.resolve(
