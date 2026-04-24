@@ -80,6 +80,7 @@ import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.ScheduleJobPayload
 import org.opensearch.commons.alerting.model.PPLInput
 import org.opensearch.commons.alerting.model.PPLTrigger
+import org.opensearch.commons.alerting.model.ScheduleJobPayload
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.commons.alerting.model.SearchInput
@@ -87,7 +88,6 @@ import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonit
 import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonitorInput.Companion.REMOTE_DOC_LEVEL_MONITOR_INPUT_FIELD
 import org.opensearch.commons.alerting.model.userErrorMessage
 import org.opensearch.commons.alerting.util.AlertingException
-import org.opensearch.commons.alerting.util.SchedulePayloadBuilder
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.TenantContext
