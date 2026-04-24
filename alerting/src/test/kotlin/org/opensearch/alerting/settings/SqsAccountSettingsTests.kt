@@ -9,7 +9,7 @@ import org.junit.Before
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.util.PluginSettingSqsAccountIdProvider
 import org.opensearch.common.settings.Settings
-import org.opensearch.commons.utils.scheduler.SqsAccountIdProvider
+import org.opensearch.commons.utils.scheduler.JobQueueAccountIdProvider
 import org.opensearch.test.OpenSearchTestCase
 
 class SqsAccountSettingsTests : OpenSearchTestCase() {
@@ -78,14 +78,14 @@ class SqsAccountSettingsTests : OpenSearchTestCase() {
         val settings = Settings.builder()
             .put(PluginSettingSqsAccountIdProvider.SETTING_KEY, "999888777666")
             .build()
-        val provider = SqsAccountIdProvider.find("plugin_setting", settings)
+        val provider = JobQueueAccountIdProvider.find("plugin_setting", settings)
         assertEquals("plugin_setting", provider.getType())
         assertEquals(listOf("999888777666"), provider.getAccountIds())
     }
 
     fun `test find throws for unknown provider type`() {
         expectThrows(IllegalArgumentException::class.java) {
-            SqsAccountIdProvider.find("nonexistent", Settings.EMPTY)
+            JobQueueAccountIdProvider.find("nonexistent", Settings.EMPTY)
         }
     }
 }

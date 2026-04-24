@@ -6,13 +6,13 @@
 package org.opensearch.alerting.util
 
 import org.opensearch.common.settings.Settings
-import org.opensearch.commons.utils.scheduler.SqsAccountIdProvider
+import org.opensearch.commons.utils.scheduler.JobQueueAccountIdProvider
 
 /**
- * [SqsAccountIdProvider] that reads the SQS account ID from the alerting plugin setting.
+ * [JobQueueAccountIdProvider] that reads the SQS account ID from the alerting plugin setting.
  * Throws [IllegalArgumentException] if the setting is missing or blank.
  */
-class PluginSettingSqsAccountIdProvider : SqsAccountIdProvider {
+class PluginSettingSqsAccountIdProvider : JobQueueAccountIdProvider {
 
     override fun getType(): String = "plugin_setting"
 
