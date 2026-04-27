@@ -382,8 +382,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.JOB_QUEUE_NAME.get(settings) ?: ""
         )
 
-        ExternalSchedulerService.region = REMOTE_METADATA_REGION.get(settings)
-        ExternalSchedulerService.messageGroupKeyName = AlertingSettings.JOB_QUEUE_MESSAGE_GROUP_KEY_NAME.get(settings) ?: ""
+        ExternalSchedulerService.initialize(settings)
 
         return listOf(
             sweeper,

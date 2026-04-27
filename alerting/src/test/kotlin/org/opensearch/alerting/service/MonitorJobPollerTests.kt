@@ -33,7 +33,8 @@ import java.util.concurrent.atomic.AtomicReference
 class MonitorJobPollerTests : OpenSearchTestCase() {
 
     class CoroutineThreadFilter : ThreadFilter {
-        override fun reject(t: Thread): Boolean = t.name.startsWith("DefaultDispatcher-worker")
+        override fun reject(t: Thread): Boolean =
+            t.name.startsWith("DefaultDispatcher-worker") || t.name == "kotlinx.coroutines.DefaultExecutor"
     }
 
     private fun testXContentRegistry(): NamedXContentRegistry {

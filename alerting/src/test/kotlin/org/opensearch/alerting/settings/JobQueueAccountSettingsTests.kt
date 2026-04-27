@@ -45,14 +45,14 @@ class JobQueueAccountSettingsTests : OpenSearchTestCase() {
 
     fun `test job_queue_account_id reads configured value`() {
         val settings = Settings.builder()
-            .put("plugins.alerting.job_queue_account_id", "123456789012")
+            .put("plugins.alerting.external_scheduler.job_queue_account_id", "123456789012")
             .build()
         assertEquals("123456789012", AlertingSettings.JOB_QUEUE_ACCOUNT_ID.get(settings))
     }
 
     fun `test job_queue_account_provider_type reads configured value`() {
         val settings = Settings.builder()
-            .put("plugins.alerting.job_queue_account_provider_type", "custom_provider")
+            .put("plugins.alerting.external_scheduler.job_queue_account_provider_type", "custom_provider")
             .build()
         assertEquals("custom_provider", AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE.get(settings))
     }

@@ -382,26 +382,26 @@ class AlertingSettings {
 
         /** AWS account ID that hosts the job queues available for polling. */
         val JOB_QUEUE_ACCOUNT_ID = Setting.simpleString(
-            "plugins.alerting.job_queue_account_id",
+            "plugins.alerting.external_scheduler.job_queue_account_id",
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         /** Provider type used to resolve job queue account IDs (e.g. "plugin_setting"). */
         val JOB_QUEUE_ACCOUNT_PROVIDER_TYPE = Setting.simpleString(
-            "plugins.alerting.job_queue_account_provider_type",
+            "plugins.alerting.external_scheduler.job_queue_account_provider_type",
             "plugin_setting",
             Setting.Property.NodeScope, Setting.Property.Final
         )
 
         /** Name of the SQS queue to poll for monitor execution messages. */
         val JOB_QUEUE_NAME = Setting.simpleString(
-            "plugins.alerting.job_queue_name",
+            "plugins.alerting.external_scheduler.job_queue_name",
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
         /** Key name in monitor metadata whose value is used as the SQS MessageGroupId for fair queuing. */
         val JOB_QUEUE_MESSAGE_GROUP_KEY_NAME = Setting.simpleString(
-            "plugins.alerting.job_queue_message_group_key_name",
+            "plugins.alerting.external_scheduler.job_queue_message_group_key_name",
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
     }

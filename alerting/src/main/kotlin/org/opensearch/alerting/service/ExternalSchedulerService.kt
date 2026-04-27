@@ -6,10 +6,11 @@
 package org.opensearch.alerting.service
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.settings.AlertingSettings.Companion.REMOTE_METADATA_REGION
+import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.util.ScheduleTranslator
-import software.amazon.awssdk.auth.credentials.AwsSessionCredentials
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.scheduler.SchedulerClient
 import software.amazon.awssdk.services.scheduler.model.ActionAfterCompletion
@@ -18,8 +19,7 @@ import software.amazon.awssdk.services.scheduler.model.FlexibleTimeWindowMode
 import software.amazon.awssdk.services.scheduler.model.ResourceNotFoundException
 import software.amazon.awssdk.services.scheduler.model.ScheduleState
 import software.amazon.awssdk.services.scheduler.model.Target
-import software.amazon.awssdk.services.sts.StsClient
-import software.amazon.awssdk.services.sts.model.AssumeRoleRequest
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Manages external EventBridge schedules for monitor execution.
@@ -27,8 +27,7 @@ import software.amazon.awssdk.services.sts.model.AssumeRoleRequest
  * Called from TransportIndexMonitorAction (create/update) and
  * TransportDeleteMonitorAction (delete) during monitor CRUD.
  *
- * [stsClient] must be set before any schedule operations are invoked.
- * It is not created in the open-source plugin — the closed-source layer injects it.
+ * [credentialsCache] must be set before any schedule operations are invoked.
  */
 object ExternalSchedulerService {
 
@@ -47,12 +46,17 @@ object ExternalSchedulerService {
     const val SCHEDULER_ACCOUNT_ID_KEY = "x-scheduler-account-id"
 
     @Volatile
-    var stsClient: StsClient? = null
+    var credentialsCache: AssumeRoleCredentialsCache? = null
 
-    @Volatile
-    var region: String? = null
+    private var region: String? = null
+    private var messageGroupKeyName: String = ""
 
-    var messageGroupKeyName: String = ""
+    private val schedulerClients = ConcurrentHashMap<String, SchedulerClient>()
+
+    fun initialize(settings: Settings) {
+        region = AlertingSettings.REMOTE_METADATA_REGION.get(settings)
+        messageGroupKeyName = AlertingSettings.JOB_QUEUE_MESSAGE_GROUP_KEY_NAME.get(settings) ?: ""
+    }
 
     fun scheduleName(monitorId: String): String = "$SCHEDULE_NAME_PREFIX$monitorId"
 
@@ -68,16 +72,15 @@ object ExternalSchedulerService {
                 "expr=$scheduleExpression tz=$timezone enabled=${monitor.enabled} " +
                 "queue=$queueUrl role=${routing.roleArn} inputBytes=${targetInput.length}"
         )
-        withSchedulerClient(routing) { client ->
-            client.createSchedule {
-                it.name(name)
-                    .scheduleExpression(scheduleExpression)
-                    .scheduleExpressionTimezone(timezone?.toString() ?: "UTC")
-                    .state(if (monitor.enabled) ScheduleState.ENABLED else ScheduleState.DISABLED)
-                    .actionAfterCompletion(ActionAfterCompletion.NONE)
-                    .flexibleTimeWindow(FlexibleTimeWindow.builder().mode(FlexibleTimeWindowMode.OFF).build())
-                    .target(buildTarget(queueUrl, routing, targetInput, monitor))
-            }
+        val client = getSchedulerClient(routing)
+        client.createSchedule {
+            it.name(name)
+                .scheduleExpression(scheduleExpression)
+                .scheduleExpressionTimezone(timezone?.toString() ?: "UTC")
+                .state(if (monitor.enabled) ScheduleState.ENABLED else ScheduleState.DISABLED)
+                .actionAfterCompletion(ActionAfterCompletion.NONE)
+                .flexibleTimeWindow(FlexibleTimeWindow.builder().mode(FlexibleTimeWindowMode.OFF).build())
+                .target(buildTarget(queueUrl, routing, targetInput, monitor))
         }
     }
 
@@ -93,16 +96,15 @@ object ExternalSchedulerService {
                 "expr=$scheduleExpression tz=$timezone enabled=${monitor.enabled} " +
                 "queue=$queueUrl role=${routing.roleArn} inputBytes=${targetInput.length}"
         )
-        withSchedulerClient(routing) { client ->
-            client.updateSchedule {
-                it.name(name)
-                    .scheduleExpression(scheduleExpression)
-                    .scheduleExpressionTimezone(timezone?.toString() ?: "UTC")
-                    .state(if (monitor.enabled) ScheduleState.ENABLED else ScheduleState.DISABLED)
-                    .actionAfterCompletion(ActionAfterCompletion.NONE)
-                    .flexibleTimeWindow(FlexibleTimeWindow.builder().mode(FlexibleTimeWindowMode.OFF).build())
-                    .target(buildTarget(queueUrl, routing, targetInput, monitor))
-            }
+        val client = getSchedulerClient(routing)
+        client.updateSchedule {
+            it.name(name)
+                .scheduleExpression(scheduleExpression)
+                .scheduleExpressionTimezone(timezone?.toString() ?: "UTC")
+                .state(if (monitor.enabled) ScheduleState.ENABLED else ScheduleState.DISABLED)
+                .actionAfterCompletion(ActionAfterCompletion.NONE)
+                .flexibleTimeWindow(FlexibleTimeWindow.builder().mode(FlexibleTimeWindowMode.OFF).build())
+                .target(buildTarget(queueUrl, routing, targetInput, monitor))
         }
     }
 
@@ -112,17 +114,16 @@ object ExternalSchedulerService {
     fun deleteSchedule(monitorId: String, routing: SchedulerRoutingResolver.Routing) {
         val name = scheduleName(monitorId)
         log.info("Deleting EB schedule $name from account ${routing.accountId} role=${routing.roleArn}")
-        withSchedulerClient(routing) { client ->
-            try {
-                client.deleteSchedule { it.name(name) }
-            } catch (e: ResourceNotFoundException) {
-                log.info("Schedule $name not found in account ${routing.accountId}, nothing to delete")
-            }
+        val client = getSchedulerClient(routing)
+        try {
+            client.deleteSchedule { it.name(name) }
+        } catch (e: ResourceNotFoundException) {
+            log.info("Schedule $name not found in account ${routing.accountId}, nothing to delete")
         }
     }
 
     /** Universal target ARN for SQS SendMessage via EventBridge Scheduler. */
-    const val SQS_SEND_MESSAGE_ARN = "arn:aws:scheduler:::aws-sdk:sqs:sendMessage"
+    const val EB_SQS_UNIVERSAL_TARGET_ARN = "arn:aws:scheduler:::aws-sdk:sqs:sendMessage"
 
     private fun buildTarget(
         queueUrl: String,
@@ -132,7 +133,7 @@ object ExternalSchedulerService {
     ): Target {
         val universalInput = buildUniversalInput(queueUrl, targetInput, monitor)
         return Target.builder()
-            .arn(SQS_SEND_MESSAGE_ARN)
+            .arn(EB_SQS_UNIVERSAL_TARGET_ARN)
             .roleArn(routing.roleArn)
             .input(universalInput)
             .build()
@@ -163,28 +164,14 @@ object ExternalSchedulerService {
         return "https://sqs.$resolvedRegion.amazonaws.com/${routing.accountId}/${routing.queueName}"
     }
 
-    private fun <T> withSchedulerClient(routing: SchedulerRoutingResolver.Routing, block: (SchedulerClient) -> T): T {
-        val sts = requireNotNull(stsClient) { "stsClient must be set before invoking schedule operations" }
+    private fun getSchedulerClient(routing: SchedulerRoutingResolver.Routing): SchedulerClient {
+        val cache = requireNotNull(credentialsCache) { "credentialsCache must be set before invoking schedule operations" }
         val resolvedRegion = requireNotNull(region) { "region must be set" }
-        val assumeRoleResponse = sts.assumeRole(
-            AssumeRoleRequest.builder()
-                .roleArn(routing.roleArn)
-                .roleSessionName("alerting-scheduler-${routing.accountId}")
+        return schedulerClients.computeIfAbsent(routing.accountId) {
+            SchedulerClient.builder()
+                .region(Region.of(resolvedRegion))
+                .credentialsProvider(cache.getCredentialsProvider(routing.accountId))
                 .build()
-        )
-        val credentials = assumeRoleResponse.credentials()
-        val schedulerClient = SchedulerClient.builder()
-            .region(Region.of(resolvedRegion))
-            .credentialsProvider(
-                StaticCredentialsProvider.create(
-                    AwsSessionCredentials.create(
-                        credentials.accessKeyId(),
-                        credentials.secretAccessKey(),
-                        credentials.sessionToken()
-                    )
-                )
-            )
-            .build()
-        return schedulerClient.use(block)
+        }
     }
 }

@@ -8,6 +8,7 @@ package org.opensearch.alerting.service
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
@@ -99,7 +100,10 @@ class MonitorJobPoller(
                 val queueUrl = cachedQueueUrls[queueIndex.getAndIncrement() % cachedQueueUrls.size]
 
                 val messages = receiveMessages(sqs, queueUrl)
-                if (messages.isEmpty()) continue
+                if (messages.isEmpty()) {
+                    delay(POLL_INTERVAL_MS)
+                    continue
+                }
 
                 val message = messages[0]
                 try {
@@ -178,5 +182,6 @@ class MonitorJobPoller(
 
     companion object {
         const val POLLER_THREAD_COUNT = 10
+        const val POLL_INTERVAL_MS = 1000L
     }
 }
