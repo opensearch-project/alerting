@@ -1626,4 +1626,42 @@ class MonitorRestApiIT : AlertingRestTestCase() {
             client().updateSettings("plugins.alerting.monitor.max_triggers", 10)
         }
     }
+
+    @Suppress("UNCHECKED_CAST")
+    fun `test metadata field is not exposed in get monitor response`() {
+        // Create a monitor with metadata using toXContentWithUser (secure=false) so metadata is persisted
+        val monitor = randomQueryLevelMonitor().copy(
+            metadata = mapOf("appId" to "test-app", "workspaceId" to "ws-123")
+        )
+        val createResponse = client().makeRequest(
+            "POST", "$ALERTING_BASE_URI?refresh=true", emptyMap(),
+            monitor.toHttpEntityWithUser()
+        )
+        assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
+        val createMap = createParser(XContentType.JSON.xContent(), createResponse.entity.content).map()
+        val monitorId = createMap["_id"] as String
+        val createMonitorMap = createMap["monitor"] as Map<String, Any>
+        assertFalse("Metadata should not be in create response", createMonitorMap.containsKey("metadata"))
+
+        // GET monitor — metadata should not be exposed
+        val getResponse = client().makeRequest("GET", "$ALERTING_BASE_URI/$monitorId", emptyMap())
+        assertEquals("Get monitor failed", RestStatus.OK, getResponse.restStatus())
+        val getMap = createParser(XContentType.JSON.xContent(), getResponse.entity.content).map()
+        val getMonitorMap = getMap["monitor"] as Map<String, Any>
+        assertFalse("Metadata should not be in get response", getMonitorMap.containsKey("metadata"))
+
+        // Search monitor — metadata should not be exposed
+        val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitorId)).toString()
+        val searchResponse = client().makeRequest(
+            "GET", "$ALERTING_BASE_URI/_search", emptyMap(),
+            StringEntity(search, ContentType.APPLICATION_JSON)
+        )
+        assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
+        val searchMap = createParser(XContentType.JSON.xContent(), searchResponse.entity.content).map()
+        val hits = searchMap["hits"] as Map<String, Any>
+        val hitsList = hits["hits"] as List<Map<String, Any>>
+        assertFalse("Search should return results", hitsList.isEmpty())
+        val source = hitsList[0]["_source"] as Map<String, Any>
+        assertFalse("Metadata should not be in search response", source.containsKey("metadata"))
+    }
 }
