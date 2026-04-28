@@ -134,7 +134,7 @@ class MonitorJobPoller(
     }
 
     private suspend fun executeMonitor(monitor: Monitor, jobStartTime: Instant) {
-        // populate thread context for downstream Oasis interception the moment
+        // populate thread context for downstream request interception the moment
         // Monitor config is in hand
         populateThreadContext(monitor)
 
@@ -184,8 +184,8 @@ class MonitorJobPoller(
         }
     }
 
-    // populates thread context with KVs that Oasis will need
-    // when intercepting search or PPL calls to external customer
+    // populates thread context with KVs that downstream interception will
+    // need when intercepting search or PPL calls to external customer
     // data source
     internal fun populateThreadContext(monitor: Monitor) {
         if (monitor.target == null) {
@@ -202,7 +202,7 @@ class MonitorJobPoller(
 
         val threadContext = client.threadPool().threadContext
 
-        // Oasis checks for this flag to know that because this is
+        // Request interception checks for this flag to know that because this is
         // a scheduled background monitor execution, there will be
         // no user credentials to make the search/ppl call to customer
         // data source with, and it must use service credentials
@@ -222,7 +222,7 @@ class MonitorJobPoller(
         const val POLLER_THREAD_COUNT = 10
         const val POLL_INTERVAL_MS = 1000L
 
-        // thread context header keys for Oasis interception
+        // thread context header keys for request interception
         const val IS_BACKGROUND_JOB_HEADER = "alerting-is-background-job"
         const val SERVICE_NAME_HEADER = "aws-service-name"
         const val OPENSEARCH_ENDPOINT_HEADER = "opensearch-url"
