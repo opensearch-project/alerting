@@ -59,20 +59,6 @@ class ExternalSchedulerServiceTests {
     }
 
     @Test
-    fun `createSchedule does not throw`() {
-        val monitor = testMonitor()
-        val routing = SchedulerRoutingResolver.Routing("111111111111", "arn:aws:sqs:us-east-1:111:queue", "arn:aws:iam::111:role/test")
-        ExternalSchedulerService.createSchedule(monitor, routing, buildPayloadJson(monitor))
-    }
-
-    @Test
-    fun `updateSchedule does not throw`() {
-        val monitor = testMonitor()
-        val routing = SchedulerRoutingResolver.Routing("222222222222", "arn:aws:sqs:us-west-2:222:queue", "arn:aws:iam::222:role/test")
-        ExternalSchedulerService.updateSchedule(monitor, routing, buildPayloadJson(monitor))
-    }
-
-    @Test
     fun `payload json contains all ScheduleJobPayload fields`() {
         val monitor = testMonitor()
         val json = buildPayloadJson(monitor)
@@ -83,8 +69,35 @@ class ExternalSchedulerServiceTests {
     }
 
     @Test
-    fun `deleteSchedule accepts all required params`() {
-        val routing = SchedulerRoutingResolver.Routing("333333333333", "", "arn:aws:iam::333:role/eb-role")
-        ExternalSchedulerService.deleteSchedule("mon-3", routing)
+    fun `createSchedule throws when credentialsCache not set`() {
+        ExternalSchedulerService.credentialsCache = null
+        ExternalSchedulerService.initialize(
+            org.opensearch.common.settings.Settings.builder()
+                .put("plugins.alerting.remote_metadata_region", "us-west-2").build()
+        )
+        val monitor = testMonitor()
+        val routing = SchedulerRoutingResolver.Routing("111111111111", "queue", "arn:aws:iam::111:role/test")
+        try {
+            ExternalSchedulerService.createSchedule(monitor, routing, buildPayloadJson(monitor))
+            throw AssertionError("Expected IllegalArgumentException")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message!!.contains("credentialsCache"))
+        }
+    }
+
+    @Test
+    fun `deleteSchedule throws when credentialsCache not set`() {
+        ExternalSchedulerService.credentialsCache = null
+        ExternalSchedulerService.initialize(
+            org.opensearch.common.settings.Settings.builder()
+                .put("plugins.alerting.remote_metadata_region", "us-west-2").build()
+        )
+        val routing = SchedulerRoutingResolver.Routing("333333333333", "queue", "arn:aws:iam::333:role/test")
+        try {
+            ExternalSchedulerService.deleteSchedule("mon-3", routing)
+            throw AssertionError("Expected IllegalArgumentException")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message!!.contains("credentialsCache"))
+        }
     }
 }

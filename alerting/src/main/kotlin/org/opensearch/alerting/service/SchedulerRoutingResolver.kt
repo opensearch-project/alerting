@@ -16,21 +16,21 @@ package org.opensearch.alerting.service
 object SchedulerRoutingResolver {
 
     /** Routing info for external scheduler operations. */
-    data class Routing(val accountId: String, val queueArn: String, val roleArn: String)
+    data class Routing(val accountId: String, val queueName: String, val roleArn: String)
 
     fun resolve(
         settingsAccountId: String,
-        settingsQueueArn: String,
+        settingsQueueName: String,
         settingsRoleArn: String,
         threadContextAccountIdOverride: String?
     ): Routing? {
         val accountId = pickAccountId(settingsAccountId, threadContextAccountIdOverride) ?: return null
-        val queueArn = settingsQueueArn.takeIf { it.isNotBlank() } ?: return null
+        val queueName = settingsQueueName.takeIf { it.isNotBlank() } ?: return null
         val roleArn = settingsRoleArn.takeIf { it.isNotBlank() } ?: return null
-        return Routing(accountId, queueArn, roleArn)
+        return Routing(accountId, queueName, roleArn)
     }
 
-    /** Delete only needs accountId + roleArn; queueArn is set to empty. */
+    /** Delete only needs accountId + roleArn; queueName is set to empty. */
     fun resolveForDelete(
         settingsAccountId: String,
         settingsRoleArn: String,

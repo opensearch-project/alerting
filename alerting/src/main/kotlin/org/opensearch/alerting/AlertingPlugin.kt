@@ -53,6 +53,8 @@ import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.service.DeleteMonitorService
+import org.opensearch.alerting.service.ExternalSchedulerService
+import org.opensearch.alerting.service.MonitorJobPoller
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.DOC_LEVEL_MONITOR_SHARD_FETCH_SIZE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MULTI_TENANCY_ENABLED
@@ -114,6 +116,7 @@ import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JO
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.remote.monitors.RemoteMonitorTrigger
+import org.opensearch.commons.utils.scheduler.JobQueueAccountIdProvider
 import org.opensearch.core.action.ActionResponse
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
 import org.opensearch.core.common.io.stream.StreamInput
@@ -369,6 +372,18 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
         DeleteMonitorService.initialize(client, lockService)
 
+        val providerType = AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE.get(settings)
+        val monitorJobPoller = MonitorJobPoller(
+            xContentRegistry,
+            client,
+            MULTI_TENANCY_ENABLED.get(settings),
+            if (providerType.isNotEmpty()) JobQueueAccountIdProvider.find(providerType, settings) else null,
+            REMOTE_METADATA_REGION.get(settings) ?: "",
+            AlertingSettings.JOB_QUEUE_NAME.get(settings) ?: ""
+        )
+
+        ExternalSchedulerService.initialize(settings)
+
         return listOf(
             sweeper,
             scheduler,
@@ -380,7 +395,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             lockService,
             alertService,
             triggerService,
-            sdkClient
+            sdkClient,
+            monitorJobPoller
         )
     }
 
@@ -471,7 +487,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.MULTI_TENANT_TRIGGER_EVAL_ENABLED,
             AlertingSettings.EXTERNAL_SCHEDULER_ENABLED,
             AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID,
-            AlertingSettings.EXTERNAL_SCHEDULER_QUEUE_ARN,
+            AlertingSettings.JOB_QUEUE_NAME,
+            AlertingSettings.JOB_QUEUE_MESSAGE_GROUP_KEY_NAME,
             AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN,
             AlertingSettings.JOB_QUEUE_ACCOUNT_ID,
             AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE

@@ -65,7 +65,7 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
         settingSet.add(DestinationSettings.ALLOW_LIST)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_QUEUE_ARN)
+        settingSet.add(AlertingSettings.JOB_QUEUE_NAME)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN)
         return ClusterSettings(settings, settingSet)
     }
@@ -126,7 +126,7 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
     fun `test scheduler settings are registered as dynamic`() {
         assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED.isDynamic)
         assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID.isDynamic)
-        assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_QUEUE_ARN.isDynamic)
+        assertTrue(AlertingSettings.JOB_QUEUE_NAME.isDynamic)
         assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN.isDynamic)
     }
 
@@ -137,7 +137,7 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
 
     fun `test scheduler string settings default to empty`() {
         assertEquals("", AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID.get(Settings.EMPTY))
-        assertEquals("", AlertingSettings.EXTERNAL_SCHEDULER_QUEUE_ARN.get(Settings.EMPTY))
+        assertEquals("", AlertingSettings.JOB_QUEUE_NAME.get(Settings.EMPTY))
         assertEquals("", AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN.get(Settings.EMPTY))
     }
 }
