@@ -404,6 +404,18 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             }
         }
 
+        val providerType = AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE.get(settings)
+        val monitorJobPoller = MonitorJobPoller(
+            xContentRegistry,
+            client,
+            MULTI_TENANCY_ENABLED.get(settings),
+            if (providerType.isNotEmpty()) JobQueueAccountIdProvider.find(providerType, settings) else null,
+            REMOTE_METADATA_REGION.get(settings) ?: "",
+            AlertingSettings.JOB_QUEUE_NAME.get(settings) ?: ""
+        )
+
+        ExternalSchedulerService.initialize(settings)
+
         return listOf(
             sweeper,
             scheduler,
@@ -528,8 +540,11 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH,
             AlertingSettings.EXTERNAL_SCHEDULER_ENABLED,
             AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID,
-            AlertingSettings.EXTERNAL_SCHEDULER_QUEUE_ARN,
-            AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN
+            AlertingSettings.JOB_QUEUE_NAME,
+            AlertingSettings.JOB_QUEUE_MESSAGE_GROUP_KEY_NAME,
+            AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN,
+            AlertingSettings.JOB_QUEUE_ACCOUNT_ID,
+            AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE
         )
     }
 
