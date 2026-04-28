@@ -149,7 +149,9 @@ class TransportGetMonitorActionTests : OpenSearchTestCase() {
 
         val action = createAction(settings)
         // Invoke the private getAssociatedWorkflows method via reflection
-        val method = action.javaClass.getDeclaredMethod("getAssociatedWorkflows", String::class.java, kotlin.coroutines.Continuation::class.java)
+        val method = action.javaClass.getDeclaredMethod(
+            "getAssociatedWorkflows", String::class.java, kotlin.coroutines.Continuation::class.java
+        )
         method.isAccessible = true
 
         // Use runBlocking to call the suspend function

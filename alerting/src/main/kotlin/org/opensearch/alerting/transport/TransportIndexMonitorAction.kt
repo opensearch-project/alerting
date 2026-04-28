@@ -587,7 +587,8 @@ class TransportIndexMonitorAction @Inject constructor(
                 if (!multiTenancyEnabled) {
                     var metadata: MonitorMetadata?
                     try {
-                        var (monitorMetadata: MonitorMetadata, created: Boolean) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
+                        var (monitorMetadata: MonitorMetadata, created: Boolean) =
+                            MonitorMetadataService.getOrCreateMetadata(request.monitor)
                         if (created == false) {
                             log.warn("Metadata doc id:${monitorMetadata.id} exists, but it shouldn't!")
                         }
@@ -801,10 +802,10 @@ class TransportIndexMonitorAction @Inject constructor(
                     // Recreate runContext if metadata exists
                     // Delete and insert all queries from/to queryIndex
 
-                    if (!created &&
-                        currentMonitor.isMonitorOfStandardType() &&
-                        Monitor.MonitorType.valueOf(currentMonitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
-                    ) {
+                    val isDocLevelMonitor = currentMonitor.isMonitorOfStandardType() &&
+                        Monitor.MonitorType.valueOf(currentMonitor.monitorType.uppercase(Locale.ROOT)) ==
+                        Monitor.MonitorType.DOC_LEVEL_MONITOR
+                    if (!created && isDocLevelMonitor) {
                         updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
                         if (docLevelMonitorQueries.docLevelQueryIndexExists(currentMonitor.dataSources)) {
                             client.suspendUntil<Client, BulkByScrollResponse> {
