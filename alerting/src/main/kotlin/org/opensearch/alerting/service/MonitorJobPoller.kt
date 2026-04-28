@@ -134,6 +134,10 @@ class MonitorJobPoller(
     }
 
     private suspend fun executeMonitor(monitor: Monitor, jobStartTime: Instant) {
+        // populate thread context for downstream Oasis interception the moment
+        // Monitor config is in hand
+        populateThreadContext(monitor)
+
         val request = ExecuteMonitorRequest(
             dryrun = false,
             requestEnd = TimeValue(jobStartTime.toEpochMilli()),
@@ -180,8 +184,48 @@ class MonitorJobPoller(
         }
     }
 
+    // populates thread context with KVs that Oasis will need
+    // when intercepting search or PPL calls to external customer
+    // data source
+    private fun populateThreadContext(monitor: Monitor) {
+        if (monitor.target == null) {
+            throw AlertingException.wrap(
+                IllegalStateException("Monitor received by Job Poller did not contain target")
+            )
+        }
+
+        if (region.isBlank()) {
+            throw AlertingException.wrap(
+                IllegalStateException("Monitor received by Job Poller did not contain target")
+            )
+        }
+
+        val threadContext = client.threadPool().threadContext
+
+        // Oasis checks for this flag to know that because this is
+        // a scheduled background monitor execution, there will be
+        // no user credentials to make the search/ppl call to customer
+        // data source with, and it must use service credentials
+        threadContext.putHeader(IS_BACKGROUND_JOB_HEADER, "true")
+
+        // TODO: in long term, may need to generalize to aos data source type
+        threadContext.putHeader(SERVICE_NAME_HEADER, "aoss")
+
+        // external customer data source endpoint, to run search/ppl against
+        threadContext.putHeader(OPENSEARCH_ENDPOINT_HEADER, monitor.target!!.endpoint)
+
+        // populated upstream in AlertingPlugin.kt with REMOTE_METADATA_REGION.get(settings)
+        threadContext.putHeader(REGION_HEADER, region)
+    }
+
     companion object {
         const val POLLER_THREAD_COUNT = 10
         const val POLL_INTERVAL_MS = 1000L
+
+        // thread context header keys for Oasis interception
+        const val IS_BACKGROUND_JOB_HEADER = "alerting-is-background-job"
+        const val SERVICE_NAME_HEADER = "aws-service-name"
+        const val OPENSEARCH_ENDPOINT_HEADER = "opensearch-url"
+        const val REGION_HEADER = "aws-region"
     }
 }
