@@ -8,9 +8,12 @@ package org.opensearch.alerting.service
 import com.carrotsearch.randomizedtesting.ThreadFilter
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
+import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.Target
 import org.opensearch.commons.utils.scheduler.JobQueueAccountIdProvider
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.search.SearchModule
@@ -333,6 +336,31 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         expectThrows(Exception::class.java) {
             poller.parseMessage(body)
         }
+        poller.close()
+    }
+
+    fun `test thread context populated correctly`() {
+        val mockClient = mockClient()
+        val mockThreadPool = mock(org.opensearch.threadpool.ThreadPool::class.java)
+        val mockThreadContext = org.opensearch.common.util.concurrent.ThreadContext(Settings.EMPTY)
+
+        `when`(mockClient.threadPool()).thenReturn(mockThreadPool)
+        `when`(mockThreadPool.threadContext).thenReturn(mockThreadContext)
+
+        val poller = MonitorJobPoller(
+            testXContentRegistry(), mockClient, true,
+            testAccountIdProvider(), "us-east-1", "test-queue"
+        )
+
+        val monitor = randomQueryLevelMonitor().copy(target = Target(endpoint = "https://test.aoss.amazonaws.com"))
+
+        poller.populateThreadContext(monitor)
+
+        assertEquals("true", mockThreadContext.getHeader(MonitorJobPoller.IS_BACKGROUND_JOB_HEADER))
+        assertEquals("aoss", mockThreadContext.getHeader(MonitorJobPoller.SERVICE_NAME_HEADER))
+        assertEquals("https://test.aoss.amazonaws.com", mockThreadContext.getHeader(MonitorJobPoller.OPENSEARCH_ENDPOINT_HEADER))
+        assertEquals("us-east-1", mockThreadContext.getHeader(MonitorJobPoller.REGION_HEADER))
+
         poller.close()
     }
 }

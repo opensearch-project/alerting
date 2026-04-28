@@ -187,7 +187,7 @@ class MonitorJobPoller(
     // populates thread context with KVs that Oasis will need
     // when intercepting search or PPL calls to external customer
     // data source
-    private fun populateThreadContext(monitor: Monitor) {
+    internal fun populateThreadContext(monitor: Monitor) {
         if (monitor.target == null) {
             throw AlertingException.wrap(
                 IllegalStateException("Monitor received by Job Poller did not contain target")
@@ -196,7 +196,7 @@ class MonitorJobPoller(
 
         if (region.isBlank()) {
             throw AlertingException.wrap(
-                IllegalStateException("Monitor received by Job Poller did not contain target")
+                IllegalStateException("No region configured when populating thread context from job poller")
             )
         }
 
