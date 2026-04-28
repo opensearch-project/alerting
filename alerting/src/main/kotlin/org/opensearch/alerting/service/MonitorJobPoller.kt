@@ -5,6 +5,8 @@
 
 package org.opensearch.alerting.service
 
+import java.time.Instant
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,8 +32,6 @@ import software.amazon.awssdk.services.sqs.SqsClient
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest
 import software.amazon.awssdk.services.sqs.model.Message
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest
-import java.time.Instant
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Polls SQS queues for monitor execution messages and dispatches them
@@ -65,6 +65,7 @@ class MonitorJobPoller(
         }
         val provider = requireNotNull(accountIdProvider) { "accountIdProvider must be set before starting" }
         val sqs = requireNotNull(sqsClient) { "sqsClient must be set before starting" }
+        require(region.isNotBlank()) { "region must be set before starting" }
 
         logger.info("Starting MonitorJobPoller with $POLLER_THREAD_COUNT workers")
         repeat(POLLER_THREAD_COUNT) { scope.launch { pollLoop(provider, sqs, region, queueName) } }
@@ -194,28 +195,41 @@ class MonitorJobPoller(
             )
         }
 
-        if (region.isBlank()) {
+        if (monitor.target!!.type.isBlank()) {
             throw AlertingException.wrap(
-                IllegalStateException("No region configured when populating thread context from job poller")
+                IllegalStateException("Monitor target received by Job Poller did not contain target type")
+            )
+        }
+
+        if (monitor.target!!.endpoint.isBlank()) {
+            throw AlertingException.wrap(
+                IllegalStateException("Monitor target received by Job Poller did not contain endpoint")
             )
         }
 
         val threadContext = client.threadPool().threadContext
 
-        // Request interception checks for this flag to know that because this is
-        // a scheduled background monitor execution, there will be
+        // Request interception checks for this flag to know that this is
+        // a scheduled background monitor execution, meaning there will be
         // no user credentials to make the search/ppl call to customer
         // data source with, and it must use service credentials
         threadContext.putHeader(IS_BACKGROUND_JOB_HEADER, "true")
 
-        // TODO: in long term, may need to generalize to aos data source type
-        threadContext.putHeader(SERVICE_NAME_HEADER, "aoss")
+        threadContext.putHeader(SERVICE_NAME_HEADER, mapTargetTypeToServiceName(monitor.target!!.type))
 
         // external customer data source endpoint, to run search/ppl against
         threadContext.putHeader(OPENSEARCH_ENDPOINT_HEADER, monitor.target!!.endpoint)
 
         // populated upstream in AlertingPlugin.kt with REMOTE_METADATA_REGION.get(settings)
         threadContext.putHeader(REGION_HEADER, region)
+    }
+
+    private fun mapTargetTypeToServiceName(targetType: String): String {
+        return when (targetType) {
+            "AOSS_COLLECTION" -> "aoss"
+            "AOS_DOMAIN" -> "es"
+            else -> throw AlertingException.wrap(IllegalStateException("Received unknown target type in Job Poller: " + targetType))
+        }
     }
 
     companion object {
