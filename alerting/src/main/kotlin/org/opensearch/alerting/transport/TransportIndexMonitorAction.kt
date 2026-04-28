@@ -869,7 +869,7 @@ class TransportIndexMonitorAction @Inject constructor(
          */
         private fun buildScheduleJobPayloadJson(monitor: Monitor): String {
             val monitorConfigBuilder = XContentFactory.jsonBuilder()
-            monitor.toXContent(monitorConfigBuilder, ToXContent.EMPTY_PARAMS)
+            monitor.toXContentWithUser(monitorConfigBuilder, ToXContent.EMPTY_PARAMS)
             val payload = ScheduleJobPayload(
                 monitorId = monitor.id,
                 jobStartTime = ExternalSchedulerService.EB_SCHEDULED_TIME_PLACEHOLDER,
