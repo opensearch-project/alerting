@@ -76,7 +76,7 @@ class ExternalSchedulerServiceTests {
                 .put("plugins.alerting.remote_metadata_region", "us-west-2").build()
         )
         val monitor = testMonitor()
-        val routing = SchedulerRoutingResolver.Routing("111111111111", "queue", "arn:aws:iam::111:role/test")
+        val routing = SchedulerRoutingResolver.Routing("111111111111", "queue", "arn:aws:iam::111:role/test", "arn:aws:iam::111:role/exec")
         try {
             ExternalSchedulerService.createSchedule(monitor, routing, buildPayloadJson(monitor))
             throw AssertionError("Expected IllegalArgumentException")
@@ -92,7 +92,7 @@ class ExternalSchedulerServiceTests {
             org.opensearch.common.settings.Settings.builder()
                 .put("plugins.alerting.remote_metadata_region", "us-west-2").build()
         )
-        val routing = SchedulerRoutingResolver.Routing("333333333333", "queue", "arn:aws:iam::333:role/test")
+        val routing = SchedulerRoutingResolver.Routing("333333333333", "queue", "arn:aws:iam::333:role/test", "arn:aws:iam::333:role/exec")
         try {
             ExternalSchedulerService.deleteSchedule("mon-3", routing)
             throw AssertionError("Expected IllegalArgumentException")

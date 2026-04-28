@@ -134,7 +134,7 @@ object ExternalSchedulerService {
         val universalInput = buildUniversalInput(queueUrl, targetInput, monitor)
         return Target.builder()
             .arn(EB_SQS_UNIVERSAL_TARGET_ARN)
-            .roleArn(routing.roleArn)
+            .roleArn(routing.executionRoleArn)
             .input(universalInput)
             .build()
     }
