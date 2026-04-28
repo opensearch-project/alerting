@@ -226,9 +226,10 @@ class MonitorJobPoller(
 
     private fun mapTargetTypeToServiceName(targetType: String): String {
         return when (targetType) {
-            "AOSS_COLLECTION" -> "aoss"
-            "AOS_DOMAIN" -> "es"
-            else -> throw AlertingException.wrap(IllegalStateException("Received unknown target type in Job Poller: " + targetType))
+            AOSS_COLLECTION -> AOSS_SERVICE_NAME
+            AOS_DOMAIN -> AOS_SERVICE_NAME
+            // default target type of "local" is invalid and will throw exception
+            else -> throw AlertingException.wrap(IllegalStateException("Received invalid target type in Job Poller: " + targetType))
         }
     }
 
@@ -241,5 +242,13 @@ class MonitorJobPoller(
         const val SERVICE_NAME_HEADER = "aws-service-name"
         const val OPENSEARCH_ENDPOINT_HEADER = "opensearch-url"
         const val REGION_HEADER = "aws-region"
+
+        // target types
+        const val AOSS_COLLECTION = "AOSS_COLLECTION"
+        const val AOS_DOMAIN = "AOS_DOMAIN"
+
+        // service names
+        const val AOSS_SERVICE_NAME = "aoss"
+        const val AOS_SERVICE_NAME = "es"
     }
 }
