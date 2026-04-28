@@ -5,11 +5,15 @@
 
 package org.opensearch.alerting.transport
 
+import com.carrotsearch.randomizedtesting.ThreadFilter
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters
 import org.junit.Before
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
+import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.alerting.AlertingPlugin.Companion.TENANT_ID_HEADER
 import org.opensearch.alerting.settings.AlertingSettings
@@ -34,7 +38,12 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import org.mockito.Mockito.`when` as whenever
 
+@ThreadLeakFilters(filters = [TransportGetMonitorActionTests.CoroutineThreadFilter::class])
 class TransportGetMonitorActionTests : OpenSearchTestCase() {
+
+    class CoroutineThreadFilter : ThreadFilter {
+        override fun reject(t: Thread): Boolean = t.name.startsWith("DefaultDispatcher-worker")
+    }
 
     private lateinit var client: Client
     private lateinit var sdkClient: SdkClient
@@ -131,6 +140,29 @@ class TransportGetMonitorActionTests : OpenSearchTestCase() {
         invokeDoExecute(action, request, listener)
 
         verify(listener).onFailure(any())
+    }
+
+    fun `test multi-tenancy enabled skips getAssociatedWorkflows search`() {
+        val settings = Settings.builder()
+            .put("plugins.alerting.multi_tenancy_enabled", true)
+            .build()
+
+        val action = createAction(settings)
+        // Invoke the private getAssociatedWorkflows method via reflection
+        val method = action.javaClass.getDeclaredMethod("getAssociatedWorkflows", String::class.java, kotlin.coroutines.Continuation::class.java)
+        method.isAccessible = true
+
+        // Use runBlocking to call the suspend function
+        val result = kotlinx.coroutines.runBlocking {
+            kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn<List<*>> { cont ->
+                method.invoke(action, "test-monitor-id", cont)
+            }
+        }
+
+        // Should return empty list without searching
+        assertTrue(result.isEmpty())
+        // client.search should never be called
+        verify(client, never()).search(any(SearchRequest::class.java), any())
     }
 
     private fun invokeDoExecute(
