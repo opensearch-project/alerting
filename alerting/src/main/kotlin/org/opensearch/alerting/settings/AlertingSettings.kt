@@ -462,4 +462,5 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
     }
+    }
 }

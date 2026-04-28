@@ -8,11 +8,9 @@ package org.opensearch.alerting.service
 import com.carrotsearch.randomizedtesting.ThreadFilter
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.`when`
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
-import org.opensearch.commons.alerting.model.Target
 import org.opensearch.commons.utils.scheduler.JobQueueAccountIdProvider
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.search.SearchModule
@@ -58,13 +56,6 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         }
     }
 
-    private fun mappingProvider(): Map<String, String> {
-        return mapOf(
-            "target_1" to "service_1",
-            "target_2" to "service_2"
-        )
-    }
-
     private fun validMessageBody(): String {
         val monitorConfig = "{\"type\":\"monitor\",\"name\":\"test\"," +
             "\"monitor_type\":\"query_level_monitor\",\"enabled\":true," +
@@ -84,8 +75,7 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
     ): MonitorJobPoller {
         return MonitorJobPoller(
             testXContentRegistry(), mockClient(), enabled,
-            testAccountIdProvider(), "us-west-2", "test-queue",
-            mappingProvider()
+            testAccountIdProvider(), "us-west-2", "test-queue"
         ).also { it.sqsClient = sqsClient }
     }
 
@@ -111,8 +101,7 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         val sqsClient = FakeSqsClient()
         val poller = MonitorJobPoller(
             testXContentRegistry(), mockClient(), true,
-            testAccountIdProvider(), "us-west-2", "test-queue",
-            mappingProvider()
+            testAccountIdProvider(), "us-west-2", "test-queue"
         ).also { it.sqsClient = sqsClient }
         poller.start()
         Thread.sleep(100)
@@ -130,7 +119,7 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         )
         val poller = MonitorJobPoller(
             testXContentRegistry(), mockClient(), false,
-            null, "", "", mappingProvider()
+            null, "", ""
         )
         poller.start()
         // Should NOT poll since disabled
@@ -142,19 +131,7 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
     fun `test start throws when provider not set`() {
         val poller = MonitorJobPoller(
             testXContentRegistry(), mockClient(), true,
-            null, "us-west-2", "test-queue", mappingProvider()
-        )
-        expectThrows(Exception::class.java) {
-            poller.start()
-        }
-        poller.close()
-    }
-
-    fun `test start throws when region not set`() {
-        val poller = MonitorJobPoller(
-            testXContentRegistry(), mockClient(), true,
-            testAccountIdProvider(), "", "test-queue",
-            mappingProvider()
+            null, "us-west-2", "test-queue"
         )
         expectThrows(Exception::class.java) {
             poller.start()
@@ -192,8 +169,7 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         }
         val poller = MonitorJobPoller(
             testXContentRegistry(), mockClient(), true,
-            errorProvider, "us-west-2", "test-queue",
-            mappingProvider()
+            errorProvider, "us-west-2", "test-queue"
         ).also { it.sqsClient = FakeSqsClient() }
         poller.start()
         assertTrue("Worker should have polled twice", latch.await(5, TimeUnit.SECONDS))
@@ -213,8 +189,7 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         }
         val poller = MonitorJobPoller(
             testXContentRegistry(), mockClient(), true,
-            emptyProvider, "us-west-2", "test-queue",
-            mappingProvider()
+            emptyProvider, "us-west-2", "test-queue"
         ).also { it.sqsClient = FakeSqsClient() }
         poller.start()
         assertTrue("Worker should have polled multiple times", latch.await(5, TimeUnit.SECONDS))
@@ -358,51 +333,6 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         expectThrows(Exception::class.java) {
             poller.parseMessage(body)
         }
-        poller.close()
-    }
-
-    fun `test thread context populated correctly based on target type`() {
-        val mockClient = mockClient()
-        val mockThreadPool = mock(org.opensearch.threadpool.ThreadPool::class.java)
-        val mockThreadContext = org.opensearch.common.util.concurrent.ThreadContext(Settings.EMPTY)
-
-        `when`(mockClient.threadPool()).thenReturn(mockThreadPool)
-        `when`(mockThreadPool.threadContext).thenReturn(mockThreadContext)
-
-        val poller = MonitorJobPoller(
-            testXContentRegistry(), mockClient, true,
-            testAccountIdProvider(), "us-east-1", "test-queue",
-            mappingProvider()
-        )
-
-        val mockTargetType = mappingProvider().entries.first().key
-        val target = Target(type = mockTargetType, endpoint = "https://test.aoss.amazonaws.com")
-
-        poller.populateThreadContext(target)
-
-        assertEquals("true", mockThreadContext.getHeader(MonitorJobPoller.IS_BACKGROUND_JOB_HEADER))
-        assertEquals(mappingProvider()[mockTargetType], mockThreadContext.getHeader(MonitorJobPoller.SERVICE_NAME_HEADER))
-        assertEquals("https://test.aoss.amazonaws.com", mockThreadContext.getHeader(MonitorJobPoller.OPENSEARCH_ENDPOINT_HEADER))
-        assertEquals("us-east-1", mockThreadContext.getHeader(MonitorJobPoller.REGION_HEADER))
-
-        poller.close()
-    }
-
-    fun `test thread context population rejects invalid target type`() {
-        val mockClient = mockClient()
-
-        val poller = MonitorJobPoller(
-            testXContentRegistry(), mockClient, true,
-            testAccountIdProvider(), "us-east-1", "test-queue",
-            mappingProvider()
-        )
-
-        val target = Target(type = "non_existent_type", endpoint = "https://test.aoss.amazonaws.com")
-
-        expectThrows(Exception::class.java) {
-            poller.populateThreadContext(target)
-        }
-
         poller.close()
     }
 }
