@@ -5,8 +5,6 @@
 
 package org.opensearch.alerting.service
 
-import java.time.Instant
-import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,6 +30,8 @@ import software.amazon.awssdk.services.sqs.SqsClient
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest
 import software.amazon.awssdk.services.sqs.model.Message
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest
+import java.time.Instant
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Polls SQS queues for monitor execution messages and dispatches them
