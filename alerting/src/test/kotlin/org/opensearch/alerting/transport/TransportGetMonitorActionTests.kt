@@ -62,6 +62,7 @@ class TransportGetMonitorActionTests : OpenSearchTestCase() {
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
         settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
+        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
         val clusterSettings = ClusterSettings(Settings.EMPTY, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
     }
@@ -151,6 +152,7 @@ class TransportGetMonitorActionTests : OpenSearchTestCase() {
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
         settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
+        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
         val clusterSettings = ClusterSettings(settings, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
 

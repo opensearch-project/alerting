@@ -360,6 +360,12 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         fun start() {
+            // When multi-tenancy is enabled, monitors are stored in remote metadata —
+            // skip local scheduled-job index creation and mapping updates.
+            if (multiTenancyEnabled) {
+                prepareMonitorIndexing()
+                return
+            }
             if (!scheduledJobIndices.scheduledJobIndexExists()) {
                 scheduledJobIndices.initScheduledJobIndex(object : ActionListener<CreateIndexResponse> {
                     override fun onResponse(response: CreateIndexResponse) {
@@ -428,6 +434,11 @@ class TransportIndexMonitorAction @Inject constructor(
             if (request.method == RestRequest.Method.PUT) {
                 scope.launch {
                     updateMonitor()
+                }
+            } else if (multiTenancyEnabled) {
+                // Skip local scheduled-job index search for monitor count when multi-tenancy is enabled.
+                scope.launch {
+                    indexMonitor()
                 }
             } else {
                 val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))

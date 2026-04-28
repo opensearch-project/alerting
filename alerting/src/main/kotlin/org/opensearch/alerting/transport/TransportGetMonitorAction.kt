@@ -72,6 +72,8 @@ class TransportGetMonitorAction @Inject constructor(
     @Volatile
     override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
 
+    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+
     init {
         listenFilterBySettingChange(clusterService)
     }
@@ -161,6 +163,8 @@ class TransportGetMonitorAction @Inject constructor(
     }
 
     private suspend fun getAssociatedWorkflows(id: String): List<AssociatedWorkflow> {
+        // Skip local scheduled-job index search when multi-tenancy is enabled.
+        if (multiTenancyEnabled) return emptyList()
         try {
             val associatedWorkflows = mutableListOf<AssociatedWorkflow>()
             val queryBuilder = QueryBuilders.nestedQuery(
