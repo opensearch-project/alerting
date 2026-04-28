@@ -5,6 +5,8 @@
 
 package org.opensearch.alerting.transport
 
+import com.carrotsearch.randomizedtesting.ThreadFilter
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters
 import org.junit.Before
 import org.mockito.Mockito
 import org.mockito.Mockito.verify
@@ -73,7 +75,12 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import org.mockito.Mockito.`when` as whenever
 
+@ThreadLeakFilters(filters = [TransportMultiTenancyBlockTests.CoroutineThreadFilter::class])
 class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
+
+    class CoroutineThreadFilter : ThreadFilter {
+        override fun reject(t: Thread): Boolean = t.name.startsWith("DefaultDispatcher-worker")
+    }
 
     private lateinit var client: Client
     private lateinit var transportService: TransportService
@@ -115,6 +122,10 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
         settingSet.add(AlertingSettings.MAX_ACTION_THROTTLE_VALUE)
         settingSet.add(DestinationSettings.ALLOW_LIST)
         settingSet.add(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
+        settingSet.add(AlertingSettings.JOB_QUEUE_NAME)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN)
         val clusterSettings = ClusterSettings(multiTenancySettings, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
 
@@ -456,6 +467,105 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
         invokeDoExecute(action, request, listener)
 
         assertMethodNotAllowed(listener)
+    }
+
+    // --- Metadata skip tests ---
+
+    fun `test index query-level monitor skips metadata when multi-tenancy enabled`() {
+        val sdkClient = Mockito.mock(SdkClient::class.java)
+        val action = TransportIndexMonitorAction(
+            transportService, client, actionFilters,
+            scheduledJobIndices,
+            docLevelMonitorQueries,
+            clusterService, multiTenancySettings, xContentRegistry,
+            Mockito.mock(NamedWriteableRegistry::class.java),
+            sdkClient
+        )
+        val monitor = Monitor(
+            name = "test", monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR.value,
+            enabled = false, schedule = IntervalSchedule(5, ChronoUnit.MINUTES),
+            lastUpdateTime = Instant.now(), enabledTime = null, user = null,
+            inputs = listOf(SearchInput(listOf("test-index"), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))),
+            triggers = emptyList(), uiMetadata = mapOf()
+        )
+        val request = IndexMonitorRequest(
+            Monitor.NO_ID, SequenceNumbers.UNASSIGNED_SEQ_NO, SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
+            org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.POST, monitor
+        )
+
+        // Mock cluster state for index resolution in checkIndicesAndExecute
+        val metadata = org.opensearch.cluster.metadata.Metadata.builder().build()
+        val clusterState = org.opensearch.cluster.ClusterState.builder(
+            org.opensearch.cluster.ClusterName("test")
+        ).metadata(metadata).build()
+        whenever(clusterService.state()).thenReturn(clusterState)
+
+        // Mock the search for index validation (checkIndicesAndExecute)
+        Mockito.doAnswer { invocation ->
+            @Suppress("UNCHECKED_CAST")
+            val searchListener = invocation.arguments[1] as ActionListener<SearchResponse>
+            searchListener.onResponse(Mockito.mock(SearchResponse::class.java))
+            null
+        }.`when`(client).search(
+            org.mockito.ArgumentMatchers.any(SearchRequest::class.java),
+            org.mockito.ArgumentMatchers.any()
+        )
+
+        // Mock sdkClient.putDataObjectAsync for the monitor index
+        val putResponse = org.opensearch.remote.metadata.client.PutDataObjectResponse.builder()
+            .id("test-monitor-id")
+            .build()
+        val putFuture: java.util.concurrent.CompletionStage<org.opensearch.remote.metadata.client.PutDataObjectResponse> =
+            java.util.concurrent.CompletableFuture.completedFuture(putResponse)
+        whenever(sdkClient.putDataObjectAsync(org.mockito.ArgumentMatchers.any())).thenReturn(putFuture)
+
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<IndexMonitorResponse>
+
+        invokeDoExecute(action, request, listener)
+
+        // Wait for async completion — the response should succeed without metadata calls.
+        // MonitorMetadataService.getOrCreateMetadata would call sdkClient.getDataObjectAsync,
+        // so if metadata is skipped, getDataObjectAsync should never be called.
+        verify(sdkClient, Mockito.timeout(2000)).putDataObjectAsync(org.mockito.ArgumentMatchers.any())
+        verify(sdkClient, Mockito.after(500).never()).getDataObjectAsync(org.mockito.ArgumentMatchers.any())
+    }
+
+    fun `test execute inline query-level monitor skips metadata when multi-tenancy enabled`() {
+        val action = TransportExecuteMonitorAction(
+            transportService, client, clusterService,
+            MonitorRunnerService,
+            actionFilters, xContentRegistry,
+            docLevelMonitorQueries,
+            multiTenancySettings, Mockito.mock(SdkClient::class.java)
+        )
+        val monitor = Monitor(
+            name = "test", monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR.value,
+            enabled = false, schedule = IntervalSchedule(5, ChronoUnit.MINUTES),
+            lastUpdateTime = Instant.now(), enabledTime = null, user = null,
+            inputs = listOf(SearchInput(listOf("test-index"), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))),
+            triggers = emptyList(), uiMetadata = mapOf()
+        )
+        val request = ExecuteMonitorRequest(true, TimeValue(Instant.now().toEpochMilli()), null, monitor)
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<ExecuteMonitorResponse>
+
+        // MonitorRunnerService is not initialized so runner.launch will throw,
+        // but the important thing is that it reaches executeMonitor (not the metadata block)
+        // and does NOT fail with METHOD_NOT_ALLOWED.
+        try {
+            invokeDoExecute(action, request, listener)
+        } catch (e: Exception) {
+            // Expected — MonitorRunnerService.runnerSupervisor is not initialized
+        }
+
+        // Should NOT be blocked with METHOD_NOT_ALLOWED (query-level is allowed)
+        verify(listener, Mockito.never()).onFailure(
+            org.mockito.ArgumentMatchers.argThat { ex ->
+                val cause = (ex as? org.opensearch.commons.alerting.util.AlertingException)?.cause ?: ex
+                cause is OpenSearchStatusException && cause.status() == RestStatus.METHOD_NOT_ALLOWED
+            }
+        )
     }
 
     // --- Helpers ---

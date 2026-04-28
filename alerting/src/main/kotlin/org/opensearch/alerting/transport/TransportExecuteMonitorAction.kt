@@ -183,6 +183,7 @@ class TransportExecuteMonitorAction @Inject constructor(
                 }
 
                 if (
+                    !multiTenancyEnabled &&
                     monitor.isMonitorOfStandardType() &&
                     Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
                 ) {

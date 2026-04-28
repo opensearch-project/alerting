@@ -582,33 +582,36 @@ class TransportIndexMonitorAction @Inject constructor(
                 }
                 val indexResponse = putResponse.indexResponse()
                     ?: throw OpenSearchStatusException("No index response from SDK", RestStatus.INTERNAL_SERVER_ERROR)
-                var metadata: MonitorMetadata?
-                try { // delete monitor if metadata creation fails, log the right error and re-throw the error to fail listener
-                    request.monitor = request.monitor.copy(id = indexResponse.id)
-                    var (monitorMetadata: MonitorMetadata, created: Boolean) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
-                    if (created == false) {
-                        log.warn("Metadata doc id:${monitorMetadata.id} exists, but it shouldn't!")
+                request.monitor = request.monitor.copy(id = indexResponse.id)
+
+                if (!multiTenancyEnabled) {
+                    var metadata: MonitorMetadata?
+                    try {
+                        var (monitorMetadata: MonitorMetadata, created: Boolean) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
+                        if (created == false) {
+                            log.warn("Metadata doc id:${monitorMetadata.id} exists, but it shouldn't!")
+                        }
+                        metadata = monitorMetadata
+                    } catch (t: Exception) {
+                        log.error("failed to create metadata for monitor ${indexResponse.id}. deleting monitor")
+                        cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
+                        throw t
                     }
-                    metadata = monitorMetadata
-                } catch (t: Exception) {
-                    log.error("failed to create metadata for monitor ${indexResponse.id}. deleting monitor")
-                    cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
-                    throw t
-                }
-                try {
-                    if (
-                        request.monitor.isMonitorOfStandardType() &&
-                        Monitor.MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT)) ==
-                        Monitor.MonitorType.DOC_LEVEL_MONITOR
-                    ) {
-                        indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
+                    try {
+                        if (
+                            request.monitor.isMonitorOfStandardType() &&
+                            Monitor.MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT)) ==
+                            Monitor.MonitorType.DOC_LEVEL_MONITOR
+                        ) {
+                            indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
+                        }
+                        // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
+                        MonitorMetadataService.upsertMetadata(metadata, updating = true)
+                    } catch (t: Exception) {
+                        log.error("failed to index doc level queries monitor ${indexResponse.id}. deleting monitor", t)
+                        cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
+                        throw t
                     }
-                    // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
-                    MonitorMetadataService.upsertMetadata(metadata, updating = true)
-                } catch (t: Exception) {
-                    log.error("failed to index doc level queries monitor ${indexResponse.id}. deleting monitor", t)
-                    cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
-                    throw t
                 }
 
                 // Create external schedule for monitor execution
@@ -788,35 +791,37 @@ class TransportIndexMonitorAction @Inject constructor(
                     isDocLevelMonitorRestarted = true
                 }
 
-                var updatedMetadata: MonitorMetadata
-                val (metadata, created) = MonitorMetadataService.getOrCreateMetadata(
-                    request.monitor,
-                    forceCreateLastRunContext = isDocLevelMonitorRestarted
-                )
-
-                // Recreate runContext if metadata exists
-                // Delete and insert all queries from/to queryIndex
-
-                if (!created &&
-                    currentMonitor.isMonitorOfStandardType() &&
-                    Monitor.MonitorType.valueOf(currentMonitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
-                ) {
-                    updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
-                    if (docLevelMonitorQueries.docLevelQueryIndexExists(currentMonitor.dataSources)) {
-                        client.suspendUntil<Client, BulkByScrollResponse> {
-                            DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                                .source(currentMonitor.dataSources.queryIndex)
-                                .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
-                                .execute(it)
-                        }
-                    }
-                    indexDocLevelMonitorQueries(
+                if (!multiTenancyEnabled) {
+                    var updatedMetadata: MonitorMetadata
+                    val (metadata, created) = MonitorMetadataService.getOrCreateMetadata(
                         request.monitor,
-                        currentMonitor.id,
-                        updatedMetadata,
-                        request.refreshPolicy
+                        forceCreateLastRunContext = isDocLevelMonitorRestarted
                     )
-                    MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
+
+                    // Recreate runContext if metadata exists
+                    // Delete and insert all queries from/to queryIndex
+
+                    if (!created &&
+                        currentMonitor.isMonitorOfStandardType() &&
+                        Monitor.MonitorType.valueOf(currentMonitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
+                    ) {
+                        updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
+                        if (docLevelMonitorQueries.docLevelQueryIndexExists(currentMonitor.dataSources)) {
+                            client.suspendUntil<Client, BulkByScrollResponse> {
+                                DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                                    .source(currentMonitor.dataSources.queryIndex)
+                                    .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
+                                    .execute(it)
+                            }
+                        }
+                        indexDocLevelMonitorQueries(
+                            request.monitor,
+                            currentMonitor.id,
+                            updatedMetadata,
+                            request.refreshPolicy
+                        )
+                        MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
+                    }
                 }
                 // Update external schedule with latest monitor config
                 if (externalSchedulerEnabled) {
