@@ -56,7 +56,7 @@ object MonitorMetadataService :
     private lateinit var xContentRegistry: NamedXContentRegistry
     private lateinit var clusterService: ClusterService
     private lateinit var settings: Settings
-    private lateinit var sdkClient: SdkClient
+    lateinit var sdkClient: SdkClient
 
     @Volatile
     private lateinit var indexTimeout: TimeValue

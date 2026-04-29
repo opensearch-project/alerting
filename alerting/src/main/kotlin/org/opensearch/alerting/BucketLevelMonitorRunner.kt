@@ -84,6 +84,13 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         }
 
         var monitorResult = MonitorRunResult<BucketLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
+
+        if (monitorCtx.multiTenantTriggerEvalEnabled && monitor.triggers.size > 1) {
+            val msg = "Bucket-level monitors only support 1 trigger when remote trigger evaluation is enabled."
+            logger.error(msg)
+            return monitorResult.copy(error = IllegalArgumentException(msg))
+        }
+
         val currentAlerts = try {
             monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
             monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)
@@ -137,12 +144,17 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 // in the final output of monitorResult which occurs when all pages have been exhausted.
                 // If it's favorable to return the last page, will need to check how to accomplish that with multiple aggregation paths
                 // with different page counts.
+                //
+                // When the flag is on, bucket-level monitors are limited to 1 trigger. The standard
+                // bucket_selector is injected directly into the query so a single search call performs
+                // both data collection and trigger evaluation — no separate per-trigger queries needed.
                 val inputResults = monitorCtx.inputService!!.collectInputResults(
                     monitor,
                     periodStart,
                     periodEnd,
                     monitorResult.inputResults,
-                    workflowRunContext
+                    workflowRunContext,
+                    useStandardBucketSelector = monitorCtx.multiTenantTriggerEvalEnabled
                 )
                 if (firstIteration) {
                     firstPageOfInputResults = inputResults
@@ -155,13 +167,15 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                 // The currentAlerts map is formed by iterating over the Monitor's Triggers as keys so null should not be returned here
                 val currentAlertsForTrigger = currentAlerts[trigger]!!
                 val triggerCtx = BucketLevelTriggerExecutionContext(
-                    monitor,
-                    trigger as BucketLevelTrigger,
-                    monitorResult,
+                    monitor, trigger as BucketLevelTrigger, monitorResult,
                     clusterSettings = monitorCtx.clusterService!!.clusterSettings
                 )
                 triggerContexts[trigger.id] = triggerCtx
-                val triggerResult = monitorCtx.triggerService!!.runBucketLevelTrigger(monitor, trigger, triggerCtx)
+                val triggerResult = if (monitorCtx.multiTenantTriggerEvalEnabled) {
+                    monitorCtx.triggerService!!.runBucketLevelTriggerFromFilteredResponse(monitor, trigger, triggerCtx)
+                } else {
+                    monitorCtx.triggerService!!.runBucketLevelTrigger(monitor, trigger, triggerCtx)
+                }
                 triggerResults[trigger.id] = triggerResult.getCombinedTriggerRunResult(triggerResults[trigger.id])
 
                 /*
