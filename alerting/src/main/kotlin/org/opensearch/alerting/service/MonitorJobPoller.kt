@@ -22,6 +22,7 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduleJobPayload
+import org.opensearch.commons.alerting.model.Target
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.utils.scheduler.JobQueueAccountIdProvider
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -137,7 +138,7 @@ class MonitorJobPoller(
     private suspend fun executeMonitor(monitor: Monitor, jobStartTime: Instant) {
         // populate thread context for downstream request interception the moment
         // Monitor config is in hand
-        populateThreadContext(monitor)
+        populateThreadContext(monitor.target)
 
         val request = ExecuteMonitorRequest(
             dryrun = false,
@@ -188,20 +189,20 @@ class MonitorJobPoller(
     // populates thread context with KVs that downstream interception will
     // need when intercepting search or PPL calls to external customer
     // data source
-    internal fun populateThreadContext(monitor: Monitor) {
-        if (monitor.target == null) {
+    internal fun populateThreadContext(target: Target?) {
+        if (target == null) {
             throw AlertingException.wrap(
                 IllegalStateException("Monitor received by Job Poller did not contain target")
             )
         }
 
-        if (monitor.target!!.type.isBlank()) {
+        if (target.type.isBlank()) {
             throw AlertingException.wrap(
                 IllegalStateException("Monitor target received by Job Poller did not contain target type")
             )
         }
 
-        if (monitor.target!!.endpoint.isBlank()) {
+        if (target.endpoint.isBlank()) {
             throw AlertingException.wrap(
                 IllegalStateException("Monitor target received by Job Poller did not contain endpoint")
             )
@@ -215,10 +216,10 @@ class MonitorJobPoller(
         // data source with, and it must use service credentials
         threadContext.putHeader(IS_BACKGROUND_JOB_HEADER, "true")
 
-        threadContext.putHeader(SERVICE_NAME_HEADER, mapTargetTypeToServiceName(monitor.target!!.type))
+        threadContext.putHeader(SERVICE_NAME_HEADER, mapTargetTypeToServiceName(target.type))
 
         // external customer data source endpoint, to run search/ppl against
-        threadContext.putHeader(OPENSEARCH_ENDPOINT_HEADER, monitor.target!!.endpoint)
+        threadContext.putHeader(OPENSEARCH_ENDPOINT_HEADER, target.endpoint)
 
         // populated upstream in AlertingPlugin.kt with REMOTE_METADATA_REGION.get(settings)
         threadContext.putHeader(REGION_HEADER, region)
