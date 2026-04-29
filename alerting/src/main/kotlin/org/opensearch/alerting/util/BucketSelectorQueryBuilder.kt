@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting.util
 
-import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.search.aggregations.AggregationBuilder
 import org.opensearch.search.aggregations.AggregatorFactories
@@ -41,10 +40,9 @@ object BucketSelectorQueryBuilder {
                 query.aggregations() as AggregatorFactories.Builder,
                 selector.parentBucketPath
             )
-            val bucketsPathsMap = extractBucketsPathsMap(selector)
             val pipelineAgg = PipelineAggregatorBuilders.bucketSelector(
                 "$TRIGGER_FILTER_PREFIX${trigger.id}",
-                bucketsPathsMap,
+                selector.bucketsPathsMap,
                 selector.script
             )
             parentAgg.subAggregation(pipelineAgg)
@@ -72,16 +70,5 @@ object BucketSelectorQueryBuilder {
         }
 
         return found!!
-    }
-
-    /**
-     * Extracts the bucketsPathsMap from [BucketSelectorExtAggregationBuilder] via reflection
-     * since the field is private with no public getter in the commons library.
-     */
-    @Suppress("UNCHECKED_CAST")
-    private fun extractBucketsPathsMap(selector: BucketSelectorExtAggregationBuilder): Map<String, String> {
-        val field = BucketSelectorExtAggregationBuilder::class.java.getDeclaredField("bucketsPathsMap")
-        field.isAccessible = true
-        return field.get(selector) as Map<String, String>
     }
 }

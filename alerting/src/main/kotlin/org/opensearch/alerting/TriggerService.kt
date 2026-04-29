@@ -182,7 +182,6 @@ class TriggerService(val scriptService: ScriptService) {
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
     fun runBucketLevelTriggerFromFilteredResponse(
         monitor: Monitor,
         trigger: BucketLevelTrigger,
@@ -191,13 +190,20 @@ class TriggerService(val scriptService: ScriptService) {
         return try {
             val parentBucketPath = trigger.bucketSelector.parentBucketPath
             val aggregationPath = AggregationPath.parse(parentBucketPath)
-            var parentAgg = (ctx.results[0][Aggregations.AGGREGATIONS_FIELD] as HashMap<*, *>)
+            val aggs = ctx.results[0][Aggregations.AGGREGATIONS_FIELD]
+            require(aggs is Map<*, *>) { "Unexpected aggregations type: ${aggs?.javaClass}" }
+            var parentAgg: Map<*, *> = aggs
             aggregationPath.pathElementsAsStringList.forEach { subAgg ->
-                parentAgg = (parentAgg[subAgg] as HashMap<*, *>)
+                val child = parentAgg[subAgg]
+                require(child is Map<*, *>) { "Unexpected type for agg '$subAgg': ${child?.javaClass}" }
+                parentAgg = child
             }
-            val buckets = parentAgg[Aggregation.CommonFields.BUCKETS.preferredName] as List<*>
+            val buckets = parentAgg[Aggregation.CommonFields.BUCKETS.preferredName]
+            require(buckets is List<*>) { "Unexpected buckets type: ${buckets?.javaClass}" }
             val selectedBuckets = mutableMapOf<String, AggregationResultBucket>()
             for (bucket in buckets) {
+                require(bucket is Map<*, *>) { "Unexpected bucket type: ${bucket?.javaClass}" }
+                @Suppress("UNCHECKED_CAST")
                 val bucketDict = bucket as Map<String, Any>
                 val bucketKeyValuesList = getBucketKeyValuesList(bucketDict)
                 val aggResultBucket = AggregationResultBucket(parentBucketPath, bucketKeyValuesList, bucketDict)

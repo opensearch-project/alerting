@@ -84,6 +84,13 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         }
 
         var monitorResult = MonitorRunResult<BucketLevelTriggerRunResult>(monitor.name, periodStart, periodEnd)
+
+        if (monitorCtx.multiTenantTriggerEvalEnabled && monitor.triggers.size > 1) {
+            val msg = "Bucket-level monitors only support 1 trigger when remote trigger evaluation is enabled."
+            logger.error(msg)
+            return monitorResult.copy(error = IllegalArgumentException(msg))
+        }
+
         val currentAlerts = try {
             monitorCtx.alertIndices!!.createOrUpdateAlertIndex(monitor.dataSources)
             monitorCtx.alertIndices!!.createOrUpdateInitialAlertHistoryIndex(monitor.dataSources)

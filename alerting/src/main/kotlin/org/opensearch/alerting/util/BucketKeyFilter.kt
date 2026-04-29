@@ -5,8 +5,11 @@
 
 package org.opensearch.alerting.util
 
+import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtFilter
 import org.opensearch.commons.alerting.model.AggregationResultBucket
+import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.search.aggregations.bucket.terms.IncludeExclude
 import java.util.regex.Pattern
 
@@ -19,13 +22,6 @@ import java.util.regex.Pattern
  */
 object BucketKeyFilter {
 
-    /**
-     * Filters buckets by applying include/exclude patterns from the [BucketSelectorExtFilter].
-     *
-     * @param buckets The triggered buckets keyed by bucket keys hash
-     * @param filter The optional filter with include/exclude patterns; null means pass-through
-     * @return Filtered map of buckets
-     */
     fun filterBuckets(
         buckets: Map<String, AggregationResultBucket>,
         filter: BucketSelectorExtFilter?
@@ -44,11 +40,12 @@ object BucketKeyFilter {
         buckets: Map<String, AggregationResultBucket>,
         filtersMap: HashMap<String, IncludeExclude>
     ): Map<String, AggregationResultBucket> {
+        val patterns = filtersMap.mapValues { (_, ie) -> extractPatterns(ie) }
         return buckets.filter { (_, bucket) ->
             val keyMap = bucket.bucket?.get("key") as? Map<String, Any> ?: return@filter true
-            filtersMap.all { (sourceKey, includeExclude) ->
+            patterns.all { (sourceKey, regexPair) ->
                 val value = keyMap[sourceKey]?.toString() ?: return@all true
-                isAccepted(value, includeExclude)
+                isAccepted(value, regexPair)
             }
         }
     }
@@ -57,31 +54,33 @@ object BucketKeyFilter {
         buckets: Map<String, AggregationResultBucket>,
         includeExclude: IncludeExclude
     ): Map<String, AggregationResultBucket> {
+        val regexPair = extractPatterns(includeExclude)
         return buckets.filter { (_, bucket) ->
             val key = bucket.bucketKeys.joinToString("#")
-            isAccepted(key, includeExclude)
+            isAccepted(key, regexPair)
         }
     }
 
-    internal fun isAccepted(value: String, includeExclude: IncludeExclude): Boolean {
-        val (includeRegex, excludeRegex) = extractPatterns(includeExclude)
+    private fun isAccepted(value: String, patterns: Pair<Pattern?, Pattern?>): Boolean {
+        val (includeRegex, excludeRegex) = patterns
         if (includeRegex != null && !includeRegex.matcher(value).matches()) return false
         if (excludeRegex != null && excludeRegex.matcher(value).matches()) return false
         return true
     }
 
     /**
-     * Extracts include/exclude regex patterns from [IncludeExclude].
-     * Uses reflection to access private fields since no public API exposes the raw patterns.
+     * Extracts include/exclude regex strings from [IncludeExclude] via XContent serialization.
      */
     private fun extractPatterns(includeExclude: IncludeExclude): Pair<Pattern?, Pattern?> {
-        val clazz = IncludeExclude::class.java
-        val includeField = clazz.getDeclaredField("include")
-        val excludeField = clazz.getDeclaredField("exclude")
-        includeField.isAccessible = true
-        excludeField.isAccessible = true
-        val include = (includeField.get(includeExclude) as? String)?.let { Pattern.compile(it) }
-        val exclude = (excludeField.get(includeExclude) as? String)?.let { Pattern.compile(it) }
+        val builder = XContentFactory.jsonBuilder().startObject()
+        includeExclude.toXContent(builder, ToXContent.EMPTY_PARAMS)
+        builder.endObject()
+        val json = builder.toString()
+        val map = XContentType.JSON.xContent()
+            .createParser(null, null, json)
+            .use { parser -> parser.map() }
+        val include = (map["include"] as? String)?.let { Pattern.compile(it) }
+        val exclude = (map["exclude"] as? String)?.let { Pattern.compile(it) }
         return Pair(include, exclude)
     }
 }
