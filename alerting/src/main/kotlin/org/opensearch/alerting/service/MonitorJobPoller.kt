@@ -242,7 +242,7 @@ class MonitorJobPoller(
 
         // thread context header keys for request interception
         const val OPERATION_NAME_HEADER = "x-amzn-oasis-operation"
-        const val IS_BACKGROUND_JOB_HEADER = "alerting-is-background-job"
+        const val IS_BACKGROUND_JOB_HEADER = "is-observability-bg-job"
         const val SERVICE_NAME_HEADER = "aws-service-name"
         const val OPENSEARCH_ENDPOINT_HEADER = "opensearch-url"
         const val REGION_HEADER = "aws-region"
