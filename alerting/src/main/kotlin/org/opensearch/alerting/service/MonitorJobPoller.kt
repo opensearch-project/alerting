@@ -22,6 +22,7 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduleJobPayload
+import org.opensearch.commons.alerting.model.Target
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.utils.scheduler.JobQueueAccountIdProvider
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -48,7 +49,8 @@ class MonitorJobPoller(
     private val enabled: Boolean,
     private val accountIdProvider: JobQueueAccountIdProvider?,
     private val region: String,
-    private val queueName: String
+    private val queueName: String,
+    private val targetTypeToServiceName: Map<String, String>
 ) : AbstractLifecycleComponent() {
 
     private val logger = LogManager.getLogger(MonitorJobPoller::class.java)
@@ -65,6 +67,7 @@ class MonitorJobPoller(
         }
         val provider = requireNotNull(accountIdProvider) { "accountIdProvider must be set before starting" }
         val sqs = requireNotNull(sqsClient) { "sqsClient must be set before starting" }
+        require(region.isNotBlank()) { "region must be set before starting" }
 
         logger.info("Starting MonitorJobPoller with $POLLER_THREAD_COUNT workers")
         repeat(POLLER_THREAD_COUNT) { scope.launch { pollLoop(provider, sqs, region, queueName) } }
@@ -134,6 +137,10 @@ class MonitorJobPoller(
     }
 
     private suspend fun executeMonitor(monitor: Monitor, jobStartTime: Instant) {
+        // populate thread context for downstream request interception the moment
+        // Monitor config is in hand
+        populateThreadContext(monitor.target)
+
         val request = ExecuteMonitorRequest(
             dryrun = false,
             requestEnd = TimeValue(jobStartTime.toEpochMilli()),
@@ -180,8 +187,66 @@ class MonitorJobPoller(
         }
     }
 
+    // populates thread context with KVs that downstream interception will
+    // need when intercepting search or PPL calls to external customer
+    // data source
+    internal fun populateThreadContext(target: Target?) {
+        if (target == null) {
+            throw AlertingException.wrap(
+                IllegalStateException("Monitor received by Job Poller did not contain target")
+            )
+        }
+
+        if (target.type.isBlank()) {
+            throw AlertingException.wrap(
+                IllegalStateException("Monitor target received by Job Poller did not contain target type")
+            )
+        }
+
+        if (target.endpoint.isBlank()) {
+            throw AlertingException.wrap(
+                IllegalStateException("Monitor target received by Job Poller did not contain endpoint")
+            )
+        }
+
+        val threadContext = client.threadPool().threadContext
+
+        // Request interception checks for this flag to know that this is
+        // a scheduled background monitor execution, meaning there will be
+        // no user credentials to make the search/ppl call to customer
+        // data source with, and it must use service credentials
+        threadContext.putHeader(IS_BACKGROUND_JOB_HEADER, "true")
+
+        threadContext.putHeader(SERVICE_NAME_HEADER, mapTargetTypeToServiceName(target.type))
+
+        // external customer data source endpoint, to run search/ppl against
+        threadContext.putHeader(OPENSEARCH_ENDPOINT_HEADER, target.endpoint)
+
+        // populated upstream in AlertingPlugin.kt with REMOTE_METADATA_REGION.get(settings)
+        threadContext.putHeader(REGION_HEADER, region)
+    }
+
+    private fun mapTargetTypeToServiceName(targetType: String): String {
+        if (!targetTypeToServiceName.containsKey(targetType)) {
+            throw AlertingException.wrap(
+                IllegalStateException(
+                    "Received invalid target type in Job Poller: " + targetType +
+                        ", expected one of: " + targetTypeToServiceName.keys
+                )
+            )
+        }
+
+        return targetTypeToServiceName[targetType]!!
+    }
+
     companion object {
         const val POLLER_THREAD_COUNT = 10
         const val POLL_INTERVAL_MS = 1000L
+
+        // thread context header keys for request interception
+        const val IS_BACKGROUND_JOB_HEADER = "is-observability-bg-job"
+        const val SERVICE_NAME_HEADER = "aws-service-name"
+        const val OPENSEARCH_ENDPOINT_HEADER = "opensearch-url"
+        const val REGION_HEADER = "aws-region"
     }
 }

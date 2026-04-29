@@ -410,5 +410,12 @@ class AlertingSettings {
             "plugins.alerting.external_scheduler.job_queue_message_group_key_name",
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        /** Mappings from Monitor target type to opensearch service name, used in MonitorJobPoller
+         * to populate thread context with required Monitor target information */
+        val TARGET_TYPE_TO_SERVICE_NAME = Setting.groupSetting(
+            "plugins.alerting.monitor.target_type_to_service_name.",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }
