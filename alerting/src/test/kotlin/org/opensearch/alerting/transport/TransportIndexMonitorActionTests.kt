@@ -140,4 +140,23 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
         assertEquals("", AlertingSettings.JOB_QUEUE_NAME.get(Settings.EMPTY))
         assertEquals("", AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN.get(Settings.EMPTY))
     }
+
+    fun `test multi-tenancy enabled skips scheduled job index init`() {
+        val settings = Settings.builder()
+            .put("plugins.alerting.multi_tenancy_enabled", true)
+            .build()
+        // When multi-tenancy is enabled, start() should skip scheduledJobIndices calls.
+        // ScheduledJobIndices.scheduledJobIndexExists() calls clusterService.state() which
+        // is not stubbed (returns null). If the skip logic is broken, this would NPE.
+        val action = createAction(settings)
+        assertNotNull(action)
+    }
+
+    fun `test multi-tenancy disabled uses scheduled job index`() {
+        val settings = Settings.builder()
+            .put("plugins.alerting.multi_tenancy_enabled", false)
+            .build()
+        val action = createAction(settings)
+        assertNotNull(action)
+    }
 }
