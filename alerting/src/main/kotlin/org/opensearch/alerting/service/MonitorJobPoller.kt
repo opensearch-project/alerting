@@ -49,7 +49,8 @@ class MonitorJobPoller(
     private val enabled: Boolean,
     private val accountIdProvider: JobQueueAccountIdProvider?,
     private val region: String,
-    private val queueName: String
+    private val queueName: String,
+    private val targetTypeToServiceName: Map<String, String>
 ) : AbstractLifecycleComponent() {
 
     private val logger = LogManager.getLogger(MonitorJobPoller::class.java)
@@ -210,8 +211,6 @@ class MonitorJobPoller(
 
         val threadContext = client.threadPool().threadContext
 
-        threadContext.putHeader(OPERATION_NAME_HEADER, ALERTING_OP_TYPE)
-
         // Request interception checks for this flag to know that this is
         // a scheduled background monitor execution, meaning there will be
         // no user credentials to make the search/ppl call to customer
@@ -228,12 +227,16 @@ class MonitorJobPoller(
     }
 
     private fun mapTargetTypeToServiceName(targetType: String): String {
-        return when (targetType) {
-            AOSS_COLLECTION -> AOSS_SERVICE_NAME
-            AOS_DOMAIN -> AOS_SERVICE_NAME
-            // default target type of "local" is invalid and will throw exception
-            else -> throw AlertingException.wrap(IllegalStateException("Received invalid target type in Job Poller: " + targetType))
+        if (!targetTypeToServiceName.containsKey(targetType)) {
+            throw AlertingException.wrap(
+                IllegalStateException(
+                    "Received invalid target type in Job Poller: " + targetType +
+                        ", expected one of: " + targetTypeToServiceName.keys
+                )
+            )
         }
+
+        return targetTypeToServiceName[targetType]!!
     }
 
     companion object {
@@ -241,21 +244,9 @@ class MonitorJobPoller(
         const val POLL_INTERVAL_MS = 1000L
 
         // thread context header keys for request interception
-        const val OPERATION_NAME_HEADER = "x-amzn-oasis-operation"
         const val IS_BACKGROUND_JOB_HEADER = "is-observability-bg-job"
         const val SERVICE_NAME_HEADER = "aws-service-name"
         const val OPENSEARCH_ENDPOINT_HEADER = "opensearch-url"
         const val REGION_HEADER = "aws-region"
-
-        // operation type
-        const val ALERTING_OP_TYPE = "Alerting"
-
-        // target types
-        const val AOSS_COLLECTION = "AOSS_COLLECTION"
-        const val AOS_DOMAIN = "AOS_DOMAIN"
-
-        // service names
-        const val AOSS_SERVICE_NAME = "aoss"
-        const val AOS_SERVICE_NAME = "es"
     }
 }

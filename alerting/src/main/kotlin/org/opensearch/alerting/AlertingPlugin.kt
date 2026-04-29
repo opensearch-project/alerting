@@ -379,7 +379,10 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             MULTI_TENANCY_ENABLED.get(settings),
             if (providerType.isNotEmpty()) JobQueueAccountIdProvider.find(providerType, settings) else null,
             REMOTE_METADATA_REGION.get(settings) ?: "",
-            AlertingSettings.JOB_QUEUE_NAME.get(settings) ?: ""
+            AlertingSettings.JOB_QUEUE_NAME.get(settings) ?: "",
+            AlertingSettings.JOB_QUEUE_TARGET_TYPE_TO_SERVICE_NAME.get(settings).let {
+                it.keySet().associateWith { key -> it.get(key) }
+            }
         )
 
         ExternalSchedulerService.initialize(settings)
@@ -491,7 +494,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.JOB_QUEUE_MESSAGE_GROUP_KEY_NAME,
             AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN,
             AlertingSettings.JOB_QUEUE_ACCOUNT_ID,
-            AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE
+            AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE,
+            AlertingSettings.JOB_QUEUE_TARGET_TYPE_TO_SERVICE_NAME
         )
     }
 

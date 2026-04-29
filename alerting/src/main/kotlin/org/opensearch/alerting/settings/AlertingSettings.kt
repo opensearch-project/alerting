@@ -404,5 +404,10 @@ class AlertingSettings {
             "plugins.alerting.external_scheduler.job_queue_message_group_key_name",
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        val JOB_QUEUE_TARGET_TYPE_TO_SERVICE_NAME = Setting.groupSetting(
+            "plugins.alerting.external_scheduler.type_to_service.",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }
