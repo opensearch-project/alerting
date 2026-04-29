@@ -27,6 +27,7 @@ import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.utils.scheduler.JobQueueAccountIdProvider
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.transport.client.Client
+import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.sqs.SqsClient
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest
 import software.amazon.awssdk.services.sqs.model.Message
@@ -66,8 +67,13 @@ class MonitorJobPoller(
             return
         }
         val provider = requireNotNull(accountIdProvider) { "accountIdProvider must be set before starting" }
-        val sqs = requireNotNull(sqsClient) { "sqsClient must be set before starting" }
         require(region.isNotBlank()) { "region must be set before starting" }
+        if (sqsClient == null) {
+            sqsClient = SqsClient.builder()
+                .region(Region.of(region))
+                .build()
+        }
+        val sqs = sqsClient!!
 
         logger.info("Starting MonitorJobPoller with $POLLER_THREAD_COUNT workers")
         repeat(POLLER_THREAD_COUNT) { scope.launch { pollLoop(provider, sqs, region, queueName) } }
