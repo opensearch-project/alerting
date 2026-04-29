@@ -48,6 +48,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTIFICATION_
 import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.PPL_MAX_QUERY_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.PPL_QUERY_RESULTS_MAX_DATAROWS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.MULTI_TENANT_TRIGGER_EVAL_ENABLED
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.DocLevelMonitorQueries
@@ -132,6 +133,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
     @Volatile private var maxMonitors = ALERTING_MAX_MONITORS.get(settings)
     @Volatile private var maxTriggersPerMonitor = MAX_TRIGGERS_PER_MONITOR.get(settings)
+    @Volatile private var multiTenantTriggerEvalEnabled = MULTI_TENANT_TRIGGER_EVAL_ENABLED.get(settings)
     @Volatile private var requestTimeout = REQUEST_TIMEOUT.get(settings)
     @Volatile private var indexTimeout = INDEX_TIMEOUT.get(settings)
     @Volatile private var maxActionThrottle = MAX_ACTION_THROTTLE_VALUE.get(settings)
@@ -154,6 +156,9 @@ class TransportIndexMonitorAction @Inject constructor(
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(ALERTING_MAX_MONITORS) { maxMonitors = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_TRIGGERS_PER_MONITOR) { maxTriggersPerMonitor = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(MULTI_TENANT_TRIGGER_EVAL_ENABLED) {
+            multiTenantTriggerEvalEnabled = it
+        }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(INDEX_TIMEOUT) { indexTimeout = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_ACTION_THROTTLE_VALUE) { maxActionThrottle = it }
@@ -692,6 +697,14 @@ class TransportIndexMonitorAction @Inject constructor(
         private fun validateTriggerCount(monitor: Monitor) {
             require(monitor.triggers.size <= maxTriggersPerMonitor) {
                 "The current cluster settings only allow up to $maxTriggersPerMonitor triggers per monitor."
+            }
+            if (multiTenantTriggerEvalEnabled &&
+                Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) ==
+                Monitor.MonitorType.BUCKET_LEVEL_MONITOR
+            ) {
+                require(monitor.triggers.size <= 1) {
+                    "Bucket-level monitors only support 1 trigger when remote trigger evaluation is enabled."
+                }
             }
         }
 
