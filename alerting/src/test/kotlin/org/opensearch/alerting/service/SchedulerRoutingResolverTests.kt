@@ -15,42 +15,52 @@ class SchedulerRoutingResolverTests {
     private val override = "999999999999"
     private val queue = "arn:aws:sqs:us-east-1:111:queue"
     private val role = "arn:aws:iam::111:role/eb"
+    private val execRole = "arn:aws:iam::111:role/eb-exec"
 
     // ---------- resolve() — create/update path ----------
 
     @Test fun `resolve uses plugin settings when no override`() {
-        val r = SchedulerRoutingResolver.resolve(acct, queue, role, threadContextAccountIdOverride = null)!!
+        val r = SchedulerRoutingResolver.resolve(acct, queue, role, execRole, threadContextAccountIdOverride = null)!!
         assertEquals(acct, r.accountId)
         assertEquals(queue, r.queueName)
         assertEquals(role, r.roleArn)
+        assertEquals(execRole, r.executionRoleArn)
     }
 
     @Test fun `resolve applies ThreadContext override for accountId`() {
-        val r = SchedulerRoutingResolver.resolve(acct, queue, role, threadContextAccountIdOverride = override)!!
+        val r = SchedulerRoutingResolver.resolve(acct, queue, role, execRole, threadContextAccountIdOverride = override)!!
         assertEquals(override, r.accountId)
     }
 
     @Test fun `resolve treats blank override as absent`() {
-        val r = SchedulerRoutingResolver.resolve(acct, queue, role, threadContextAccountIdOverride = "   ")!!
+        val r = SchedulerRoutingResolver.resolve(acct, queue, role, execRole, threadContextAccountIdOverride = "   ")!!
         assertEquals(acct, r.accountId)
     }
 
     @Test fun `resolve returns null when accountId missing in both setting and override`() {
-        assertNull(SchedulerRoutingResolver.resolve("", queue, role, threadContextAccountIdOverride = null))
-        assertNull(SchedulerRoutingResolver.resolve("", queue, role, threadContextAccountIdOverride = ""))
+        assertNull(SchedulerRoutingResolver.resolve("", queue, role, execRole, threadContextAccountIdOverride = null))
+        assertNull(SchedulerRoutingResolver.resolve("", queue, role, execRole, threadContextAccountIdOverride = ""))
     }
 
     @Test fun `resolve still succeeds when setting blank but override provided`() {
-        val r = SchedulerRoutingResolver.resolve("", queue, role, threadContextAccountIdOverride = override)!!
+        val r = SchedulerRoutingResolver.resolve("", queue, role, execRole, threadContextAccountIdOverride = override)!!
         assertEquals(override, r.accountId)
     }
 
     @Test fun `resolve returns null when queueName blank`() {
-        assertNull(SchedulerRoutingResolver.resolve(acct, "", role, threadContextAccountIdOverride = null))
+        assertNull(SchedulerRoutingResolver.resolve(acct, "", role, execRole, threadContextAccountIdOverride = null))
     }
 
     @Test fun `resolve returns null when roleArn blank`() {
-        assertNull(SchedulerRoutingResolver.resolve(acct, queue, "", threadContextAccountIdOverride = null))
+        assertNull(SchedulerRoutingResolver.resolve(acct, queue, "", execRole, threadContextAccountIdOverride = null))
+    }
+
+    @Test fun `resolve returns null when executionRoleArn blank`() {
+        assertNull(SchedulerRoutingResolver.resolve(acct, queue, role, "  ", threadContextAccountIdOverride = null))
+    }
+
+    @Test fun `resolve returns null when executionRoleArn omitted`() {
+        assertNull(SchedulerRoutingResolver.resolve(acct, queue, role, threadContextAccountIdOverride = null))
     }
 
     // ---------- resolveForDelete() ----------

@@ -16,18 +16,20 @@ package org.opensearch.alerting.service
 object SchedulerRoutingResolver {
 
     /** Routing info for external scheduler operations. */
-    data class Routing(val accountId: String, val queueName: String, val roleArn: String)
+    data class Routing(val accountId: String, val queueName: String, val roleArn: String, val executionRoleArn: String)
 
     fun resolve(
         settingsAccountId: String,
         settingsQueueName: String,
         settingsRoleArn: String,
+        settingsExecutionRoleArn: String? = null,
         threadContextAccountIdOverride: String?
     ): Routing? {
         val accountId = pickAccountId(settingsAccountId, threadContextAccountIdOverride) ?: return null
         val queueName = settingsQueueName.takeIf { it.isNotBlank() } ?: return null
         val roleArn = settingsRoleArn.takeIf { it.isNotBlank() } ?: return null
-        return Routing(accountId, queueName, roleArn)
+        val executionRoleArn = settingsExecutionRoleArn?.takeIf { it.isNotBlank() } ?: return null
+        return Routing(accountId, queueName, roleArn, executionRoleArn)
     }
 
     /** Delete only needs accountId + roleArn; queueName is set to empty. */
@@ -38,7 +40,7 @@ object SchedulerRoutingResolver {
     ): Routing? {
         val accountId = pickAccountId(settingsAccountId, threadContextAccountIdOverride) ?: return null
         val roleArn = settingsRoleArn.takeIf { it.isNotBlank() } ?: return null
-        return Routing(accountId, "", roleArn)
+        return Routing(accountId, "", roleArn, "")
     }
 
     /** ThreadContext override wins; falls back to plugin setting; null if both are blank. */
