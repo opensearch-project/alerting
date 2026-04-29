@@ -210,6 +210,8 @@ class MonitorJobPoller(
 
         val threadContext = client.threadPool().threadContext
 
+        threadContext.putHeader(OPERATION_NAME_HEADER, ALERTING_OP_TYPE)
+
         // Request interception checks for this flag to know that this is
         // a scheduled background monitor execution, meaning there will be
         // no user credentials to make the search/ppl call to customer
@@ -239,10 +241,14 @@ class MonitorJobPoller(
         const val POLL_INTERVAL_MS = 1000L
 
         // thread context header keys for request interception
+        const val OPERATION_NAME_HEADER = "x-amzn-oasis-operation"
         const val IS_BACKGROUND_JOB_HEADER = "alerting-is-background-job"
         const val SERVICE_NAME_HEADER = "aws-service-name"
         const val OPENSEARCH_ENDPOINT_HEADER = "opensearch-url"
         const val REGION_HEADER = "aws-region"
+
+        // operation type
+        const val ALERTING_OP_TYPE = "Alerting"
 
         // target types
         const val AOSS_COLLECTION = "AOSS_COLLECTION"
