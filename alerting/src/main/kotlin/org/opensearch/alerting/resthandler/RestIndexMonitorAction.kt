@@ -18,6 +18,7 @@ import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
@@ -30,7 +31,6 @@ import org.opensearch.core.xcontent.XContentParser.Token
 import org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.rest.BaseRestHandler
-import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.BytesRestResponse
 import org.opensearch.rest.RestChannel
 import org.opensearch.rest.RestHandler.ReplacedRoute
@@ -132,6 +132,14 @@ class RestIndexMonitorAction : BaseRestHandler() {
                         triggers.forEach {
                             if (it !is DocumentLevelTrigger) {
                                 throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for document level monitor")
+                            }
+                        }
+                    }
+
+                    Monitor.MonitorType.PPL_MONITOR -> {
+                        triggers.forEach {
+                            if (it !is PPLTrigger) {
+                                throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for PPL monitor")
                             }
                         }
                     }
