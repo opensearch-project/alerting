@@ -7,7 +7,7 @@ buildscript {
     apply from: 'build-tools/repositories.gradle'
 
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "3.6.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.7.0-SNAPSHOT")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         // 3.0.0-SNAPSHOT -> 3.0.0.0-SNAPSHOT
@@ -126,6 +126,9 @@ allprojects {
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${kotlin_version}"
             force "org.jetbrains.kotlin:kotlin-reflect:${kotlin_version}"
+            force "org.apache.logging.log4j:log4j-api:2.25.4"
+            force "org.apache.logging.log4j:log4j-core:2.25.4"
+            force "org.apache.httpcomponents.client5:httpclient5:5.6.1"
         }
     }
 
