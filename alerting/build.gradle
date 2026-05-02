@@ -204,7 +204,6 @@ dependencies {
     implementation "software.amazon.awssdk:retries-spi:${versions.aws}"
     implementation "software.amazon.awssdk:checksums:${versions.aws}"
     implementation "software.amazon.awssdk:checksums-spi:${versions.aws}"
-    implementation "software.amazon.awssdk:annotations:${versions.aws}"
     implementation "software.amazon.awssdk:apache-client:${versions.aws}"
 
     testImplementation "org.antlr:antlr4-runtime:${versions.antlr4}"
