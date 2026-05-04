@@ -154,7 +154,7 @@ class TransportSearchMonitorAction @Inject constructor(
         return false
     }
 
-    fun search(searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>, tenantId: String?) {
+    fun search(searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>, tenantId: String? = null) {
         val sdkSearchRequest = SearchDataObjectRequest.builder()
             .indices(*searchRequest.indices())
             .tenantId(tenantId)

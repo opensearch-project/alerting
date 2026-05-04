@@ -8,11 +8,13 @@ package org.opensearch.alerting.transport
 import com.carrotsearch.randomizedtesting.ThreadFilter
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters
 import org.junit.Before
+import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
 import org.mockito.Mockito.timeout
 import org.mockito.Mockito.verify
 import org.opensearch.action.support.ActionFilters
+import org.opensearch.alerting.AlertingPlugin.Companion.TENANT_ID_HEADER
 import org.opensearch.alerting.service.ExternalSchedulerService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
@@ -156,6 +158,50 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         threadContext.putTransient(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY, "999999999999")
         val value = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
         assertEquals("999999999999", value)
+    }
+
+    fun `test tenantId preserved across stashContext and scope launch`() {
+        val expectedTenantId = "test-tenant:test-scope"
+        threadContext.putHeader(TENANT_ID_HEADER, expectedTenantId)
+
+        val response = GetDataObjectResponse.builder()
+            .id("test-monitor-id")
+            .index(".opendistro-alerting-config")
+            .source(null)
+            .build()
+        whenever(sdkClient.getDataObject(any(GetDataObjectRequest::class.java))).thenReturn(response)
+
+        val action = createAction()
+        val request = DeleteMonitorRequest("test-monitor-id", org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE)
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<DeleteMonitorResponse>
+
+        invokeDoExecute(action, request, listener)
+
+        val captor = ArgumentCaptor.forClass(GetDataObjectRequest::class.java)
+        verify(sdkClient, timeout(1000)).getDataObject(captor.capture())
+        assertEquals(expectedTenantId, captor.value.tenantId())
+    }
+
+    fun `test null tenantId preserved when header absent`() {
+        // No TENANT_ID_HEADER set in threadContext
+        val response = GetDataObjectResponse.builder()
+            .id("test-monitor-id")
+            .index(".opendistro-alerting-config")
+            .source(null)
+            .build()
+        whenever(sdkClient.getDataObject(any(GetDataObjectRequest::class.java))).thenReturn(response)
+
+        val action = createAction()
+        val request = DeleteMonitorRequest("test-monitor-id", org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE)
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<DeleteMonitorResponse>
+
+        invokeDoExecute(action, request, listener)
+
+        val captor = ArgumentCaptor.forClass(GetDataObjectRequest::class.java)
+        verify(sdkClient, timeout(1000)).getDataObject(captor.capture())
+        assertNull(captor.value.tenantId())
     }
 
     private fun invokeDoExecute(
