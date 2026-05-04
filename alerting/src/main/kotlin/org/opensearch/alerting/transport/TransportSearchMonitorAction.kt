@@ -105,7 +105,7 @@ class TransportSearchMonitorAction @Inject constructor(
         searchMonitorRequest: SearchMonitorRequest,
         actionListener: ActionListener<SearchResponse>,
         user: User?,
-        tenantId: String?,
+        tenantId: String? = null,
     ) {
         if (user == null) {
             // user header is null when: 1/ security is disabled. 2/when user is super-admin.
