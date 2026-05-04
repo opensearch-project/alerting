@@ -254,7 +254,12 @@ class TransportGetAlertsAction @Inject constructor(
         }
     }
 
-    fun search(alertIndex: String, searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetAlertsResponse>, tenantId: String? = null) {
+    fun search(
+        alertIndex: String,
+        searchSourceBuilder: SearchSourceBuilder,
+        actionListener: ActionListener<GetAlertsResponse>,
+        tenantId: String? = null,
+    ) {
         val sdkSearchRequest = SearchDataObjectRequest.builder()
             .indices(alertIndex)
             .tenantId(tenantId)

@@ -149,7 +149,11 @@ class TransportGetDestinationsAction @Inject constructor(
         }
     }
 
-    fun search(searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetDestinationsResponse>, tenantId: String? = null) {
+    fun search(
+        searchSourceBuilder: SearchSourceBuilder,
+        actionListener: ActionListener<GetDestinationsResponse>,
+        tenantId: String? = null,
+    ) {
         val sdkSearchRequest = SearchDataObjectRequest.builder()
             .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
             .tenantId(tenantId)
