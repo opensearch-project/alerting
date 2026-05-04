@@ -33,6 +33,8 @@ import org.opensearch.commons.alerting.action.GetWorkflowAlertsResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.TenantContext
+import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
@@ -157,8 +159,9 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
             .size(tableProp.size)
             .from(from)
 
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         client.threadPool().threadContext.stashContext().use {
-            scope.launch {
+            scope.launch(TenantContext(tenantId)) {
                 try {
                     val alertIndex = resolveAlertsIndexName(getWorkflowAlertsRequest)
                     getAlerts(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener, user)
@@ -225,7 +228,7 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
         try {
             val searchRequest = SearchDataObjectRequest.builder()
                 .indices(alertIndex)
-                .tenantId(client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER))
+                .tenantId(currentTenantId())
                 .searchSourceBuilder(searchSourceBuilder)
                 .build()
             val alerts = mutableListOf<Alert>()
@@ -277,7 +280,7 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
             searchRequest.source().query(queryBuilder)
             val sdkSearchRequest = SearchDataObjectRequest.builder()
                 .indices(*searchRequest.indices())
-                .tenantId(client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER))
+                .tenantId(currentTenantId())
                 .searchSourceBuilder(searchRequest.source())
                 .build()
             val sdkResponse = sdkClient.searchDataObject(sdkSearchRequest)

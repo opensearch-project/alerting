@@ -34,6 +34,7 @@ import org.opensearch.commons.alerting.model.MonitorMetadata
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonitorInput
 import org.opensearch.commons.alerting.util.AlertingException
+import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
@@ -77,9 +78,6 @@ object MonitorMetadataService :
         this.clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.INDEX_TIMEOUT) { indexTimeout = it }
     }
 
-    private fun getTenantId(): String? =
-        client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
-
     @Suppress("ComplexMethod", "ReturnCount")
     suspend fun upsertMetadata(metadata: MonitorMetadata, updating: Boolean): MonitorMetadata {
         try {
@@ -90,7 +88,7 @@ object MonitorMetadataService :
                 val putRequestBuilder = PutDataObjectRequest.builder()
                     .index(ScheduledJob.SCHEDULED_JOBS_INDEX)
                     .id(metadata.id)
-                    .tenantId(getTenantId())
+                    .tenantId(currentTenantId())
                     .dataObject(metadataObj)
 
                 if (updating) {
@@ -177,7 +175,7 @@ object MonitorMetadataService :
             val getRequest = GetDataObjectRequest.builder()
                 .index(ScheduledJob.SCHEDULED_JOBS_INDEX)
                 .id(metadataId)
-                .tenantId(getTenantId())
+                .tenantId(currentTenantId())
                 .build()
 
             val response = sdkClient.getDataObjectAsync(getRequest).await()

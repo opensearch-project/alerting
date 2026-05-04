@@ -36,6 +36,7 @@ import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.TenantContext
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -73,12 +74,13 @@ class TransportExecuteMonitorAction @Inject constructor(
         log.debug("User and roles string from thread context: $userStr")
         val user: User? = User.parse(userStr)
 
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         client.threadPool().threadContext.stashContext().use {
             val executeMonitor = fun(monitor: Monitor) {
                 // Launch the coroutine with the clients threadContext. This is needed to preserve authentication information
                 // stored on the threadContext set by the security plugin when using the Alerting plugin with the Security plugin.
                 // runner.launch(ElasticThreadContextElement(client.threadPool().threadContext)) {
-                runner.launch {
+                runner.launch(TenantContext(tenantId)) {
                     val (periodStart, periodEnd) = if (execMonitorRequest.requestStart != null) {
                         Pair(
                             Instant.ofEpochMilli(execMonitorRequest.requestStart.millis),
@@ -106,7 +108,6 @@ class TransportExecuteMonitorAction @Inject constructor(
             }
 
             if (execMonitorRequest.monitorId != null && execMonitorRequest.monitor == null) {
-                val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
                 val getRequest = GetDataObjectRequest.builder()
                     .index(ScheduledJob.SCHEDULED_JOBS_INDEX)
                     .id(execMonitorRequest.monitorId)
@@ -187,7 +188,7 @@ class TransportExecuteMonitorAction @Inject constructor(
                     Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
                 ) {
                     try {
-                        scope.launch {
+                        scope.launch(TenantContext(tenantId)) {
                             if (!docLevelMonitorQueries.docLevelQueryIndexExists(monitor.dataSources)) {
                                 docLevelMonitorQueries.initDocLevelQueryIndex(monitor.dataSources)
                                 log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")

@@ -32,6 +32,8 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.TenantContext
+import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
@@ -101,20 +103,22 @@ class TransportSearchAlertingCommentAction @Inject constructor(
             .version(true)
 
         val user = readUserFromThreadContext(client)
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         client.threadPool().threadContext.stashContext().use {
-            scope.launch {
+            scope.launch(TenantContext(tenantId)) {
                 resolve(transformedRequest, actionListener, user)
             }
         }
     }
 
     suspend fun resolve(searchCommentRequest: SearchCommentRequest, actionListener: ActionListener<SearchResponse>, user: User?) {
+        val tenantId = currentTenantId()
         if (user == null) {
             // user is null when: 1/ security is disabled. 2/when user is super-admin.
-            search(searchCommentRequest.searchRequest, actionListener)
+            search(searchCommentRequest.searchRequest, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.
-            search(searchCommentRequest.searchRequest, actionListener)
+            search(searchCommentRequest.searchRequest, actionListener, tenantId)
         } else {
             // security is enabled and filterby is enabled.
             try {
@@ -131,15 +135,14 @@ class TransportSearchAlertingCommentAction @Inject constructor(
                     )
                 )
 
-                search(searchCommentRequest.searchRequest, actionListener)
+                search(searchCommentRequest.searchRequest, actionListener, tenantId)
             } catch (ex: IOException) {
                 actionListener.onFailure(AlertingException.wrap(ex))
             }
         }
     }
 
-    fun search(searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>) {
-        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+    fun search(searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>, tenantId: String? = null) {
         val sdkSearchRequest = SearchDataObjectRequest.builder()
             .indices(*searchRequest.indices())
             .tenantId(tenantId)

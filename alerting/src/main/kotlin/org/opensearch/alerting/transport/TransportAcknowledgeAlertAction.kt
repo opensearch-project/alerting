@@ -14,6 +14,7 @@ import org.opensearch.action.ActionRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.await
@@ -33,6 +34,7 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.optionalTimeField
+import org.opensearch.commons.utils.TenantContext
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -86,8 +88,9 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     ) {
         val request = acknowledgeAlertRequest as? AcknowledgeAlertRequest
             ?: recreateObject(acknowledgeAlertRequest) { AcknowledgeAlertRequest(it) }
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         client.threadPool().threadContext.stashContext().use {
-            scope.launch {
+            scope.launch(TenantContext(tenantId)) {
                 val getMonitorResponse: GetMonitorResponse =
                     transportGetMonitorAction.client.suspendUntil {
                         val getMonitorRequest = GetMonitorRequest(

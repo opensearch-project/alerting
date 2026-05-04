@@ -32,6 +32,8 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.TenantContext
+import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
@@ -84,7 +86,8 @@ class TransportDeleteMonitorAction @Inject constructor(
         if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
-        scope.launch {
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        scope.launch(TenantContext(tenantId)) {
             DeleteMonitorHandler(
                 client,
                 actionListener,
@@ -158,7 +161,7 @@ class TransportDeleteMonitorAction @Inject constructor(
         }
 
         private suspend fun getMonitor(): Monitor {
-            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+            val tenantId = currentTenantId()
             val getRequest = GetDataObjectRequest.builder()
                 .index(ScheduledJob.SCHEDULED_JOBS_INDEX)
                 .id(monitorId)

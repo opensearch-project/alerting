@@ -73,6 +73,8 @@ import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonit
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.TenantContext
+import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
@@ -263,8 +265,9 @@ class TransportIndexMonitorAction @Inject constructor(
             object : ActionListener<SearchResponse> {
                 override fun onResponse(searchResponse: SearchResponse) {
                     // User has read access to configured indices in the monitor, now create monitor with out user context.
+                    val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
                     client.threadPool().threadContext.stashContext().use {
-                        IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStart()
+                        IndexMonitorHandler(client, actionListener, request, user, tenantId).resolveUserAndStart()
                     }
                 }
 
@@ -301,8 +304,9 @@ class TransportIndexMonitorAction @Inject constructor(
         request: IndexMonitorRequest,
         user: User?,
     ) {
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         client.threadPool().threadContext.stashContext().use {
-            IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStartForAD()
+            IndexMonitorHandler(client, actionListener, request, user, tenantId).resolveUserAndStartForAD()
         }
     }
 
@@ -311,6 +315,7 @@ class TransportIndexMonitorAction @Inject constructor(
         private val actionListener: ActionListener<IndexMonitorResponse>,
         private val request: IndexMonitorRequest,
         private val user: User?,
+        private val tenantId: String?,
     ) {
 
         fun resolveUserAndStart() {
@@ -383,7 +388,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     override fun onFailure(t: Exception) {
                         // https://github.com/opensearch-project/alerting/issues/646
                         if (ExceptionsHelper.unwrapCause(t) is ResourceAlreadyExistsException) {
-                            scope.launch {
+                            scope.launch(TenantContext(tenantId)) {
                                 // Wait for the yellow status
                                 val request = ClusterHealthRequest()
                                     .indices(SCHEDULED_JOBS_INDEX)
@@ -441,12 +446,12 @@ class TransportIndexMonitorAction @Inject constructor(
             }
 
             if (request.method == RestRequest.Method.PUT) {
-                scope.launch {
+                scope.launch(TenantContext(tenantId)) {
                     updateMonitor()
                 }
             } else if (multiTenancyEnabled) {
                 // Skip local scheduled-job index search for monitor count when multi-tenancy is enabled.
-                scope.launch {
+                scope.launch(TenantContext(tenantId)) {
                     indexMonitor()
                 }
             } else {
@@ -517,7 +522,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                 )
             } else {
-                scope.launch {
+                scope.launch(TenantContext(tenantId)) {
                     indexMonitor()
                 }
             }
@@ -574,7 +579,6 @@ class TransportIndexMonitorAction @Inject constructor(
 
             log.info("Creating new monitor: ${request.monitor.name}, type: ${request.monitor.monitorType}")
 
-            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
             val monitorObj = ToXContentObject { builder, params ->
                 request.monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
             }
@@ -693,7 +697,6 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         private suspend fun updateMonitor() {
-            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
             val getRequest = GetDataObjectRequest.builder()
                 .index(SCHEDULED_JOBS_INDEX)
                 .id(request.monitorId)
@@ -771,7 +774,6 @@ class TransportIndexMonitorAction @Inject constructor(
 
             log.info("Updating monitor, ${currentMonitor.id}")
 
-            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
             val monitorObj = ToXContentObject { builder, params ->
                 request.monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
             }

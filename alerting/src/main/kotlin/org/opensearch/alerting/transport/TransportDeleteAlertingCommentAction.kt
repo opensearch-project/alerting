@@ -28,6 +28,8 @@ import org.opensearch.commons.alerting.action.DeleteCommentResponse
 import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.TenantContext
+import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
@@ -88,7 +90,8 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
         if (!validateUserBackendRoles(user, actionListener)) {
             return
         }
-        scope.launch {
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        scope.launch(TenantContext(tenantId)) {
             DeleteCommentHandler(
                 client,
                 actionListener,
@@ -129,7 +132,7 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
                 val deleteRequest = DeleteDataObjectRequest.builder()
                     .index(sourceIndex)
                     .id(commentId)
-                    .tenantId(client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER))
+                    .tenantId(currentTenantId())
                     .build()
 
                 if (canDelete) {
@@ -158,7 +161,7 @@ class TransportDeleteAlertingCommentAction @Inject constructor(
                     .query(queryBuilder)
             val searchRequest = SearchDataObjectRequest.builder()
                 .indices(ALL_COMMENTS_INDEX_PATTERN)
-                .tenantId(client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER))
+                .tenantId(currentTenantId())
                 .searchSourceBuilder(searchSourceBuilder)
                 .build()
 

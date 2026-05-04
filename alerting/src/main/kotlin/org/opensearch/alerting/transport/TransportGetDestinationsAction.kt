@@ -122,36 +122,34 @@ class TransportGetDestinationsAction @Inject constructor(
         }
         searchSourceBuilder.query(queryBuilder)
 
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         client.threadPool().threadContext.stashContext().use {
-            resolve(searchSourceBuilder, actionListener, user)
+            resolve(searchSourceBuilder, actionListener, user, tenantId)
         }
     }
 
     fun resolve(
         searchSourceBuilder: SearchSourceBuilder,
         actionListener: ActionListener<GetDestinationsResponse>,
-        user: User?
+        user: User?,
+        tenantId: String? = null,
     ) {
         if (user == null) {
-            // user is null when: 1/ security is disabled. 2/when user is super-admin.
-            search(searchSourceBuilder, actionListener)
+            search(searchSourceBuilder, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
-            // security is enabled and filterby is disabled.
-            search(searchSourceBuilder, actionListener)
+            search(searchSourceBuilder, actionListener, tenantId)
         } else {
-            // security is enabled and filterby is enabled.
             try {
                 log.info("Filtering result by: ${user.backendRoles}")
                 addFilter(user, searchSourceBuilder, "destination.user.backend_roles.keyword")
-                search(searchSourceBuilder, actionListener)
+                search(searchSourceBuilder, actionListener, tenantId)
             } catch (ex: IOException) {
                 actionListener.onFailure(AlertingException.wrap(ex))
             }
         }
     }
 
-    fun search(searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetDestinationsResponse>) {
-        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+    fun search(searchSourceBuilder: SearchSourceBuilder, actionListener: ActionListener<GetDestinationsResponse>, tenantId: String? = null) {
         val sdkSearchRequest = SearchDataObjectRequest.builder()
             .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
             .tenantId(tenantId)

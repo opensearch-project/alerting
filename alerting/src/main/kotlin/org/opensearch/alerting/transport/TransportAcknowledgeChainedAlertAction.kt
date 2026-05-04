@@ -24,6 +24,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.action.update.UpdateRequest
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.ScheduledJobUtils
@@ -45,6 +46,7 @@ import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.optionalTimeField
+import org.opensearch.commons.utils.TenantContext
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
@@ -105,8 +107,9 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
 
         val request = AcknowledgeChainedAlertRequest as? AcknowledgeChainedAlertRequest
             ?: recreateObject(AcknowledgeChainedAlertRequest) { AcknowledgeChainedAlertRequest(it) }
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         client.threadPool().threadContext.stashContext().use {
-            scope.launch {
+            scope.launch(TenantContext(tenantId)) {
                 try {
                     val getResponse = getWorkflow(request.workflowId)
                     if (getResponse.isExists == false) {
