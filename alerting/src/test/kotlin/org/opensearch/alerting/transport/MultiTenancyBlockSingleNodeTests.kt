@@ -87,7 +87,7 @@ class MultiTenancyBlockSingleNodeTests : AlertingSingleNodeTestCase() {
         val exception = expectThrows(Exception::class.java) {
             client().execute(
                 ExecuteWorkflowAction.INSTANCE,
-                ExecuteWorkflowRequest(true, TimeValue(Instant.now().toEpochMilli()), "test-id", null)
+                ExecuteWorkflowRequest(true, false, TimeValue(Instant.now().toEpochMilli()), "test-id", null)
             ).actionGet()
         }
         assertTrue(exception.message!!.contains("Workflow operations are not allowed"))
@@ -129,7 +129,7 @@ class MultiTenancyBlockSingleNodeTests : AlertingSingleNodeTestCase() {
 
     fun `test execute inline doc-level monitor fails when multi-tenancy is enabled`() {
         val exception = expectThrows(Exception::class.java) {
-            val request = ExecuteMonitorRequest(true, TimeValue(Instant.now().toEpochMilli()), null, randomDocumentLevelMonitor())
+            val request = ExecuteMonitorRequest(true, false, TimeValue(Instant.now().toEpochMilli()), null, randomDocumentLevelMonitor())
             client().execute(ExecuteMonitorAction.INSTANCE, request).actionGet()
         }
         assertTrue(exception.message!!.contains("not allowed when multi-tenancy is enabled"))
