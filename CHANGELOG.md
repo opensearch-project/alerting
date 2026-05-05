@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Repo initialization [(#2)](https://github.com/wazuh/wazuh-indexer-alerting/pull/2)
 - Add Support Revert Bump Functionality [(#23)](https://github.com/wazuh/wazuh-indexer-alerting/pull/23)
+- Add new AR monitor [(#46)](https://github.com/wazuh/wazuh-indexer-alerting/pull/46)
 
 ### Dependencies
 

@@ -88,6 +88,10 @@ fun Monitor.isQueryLevelMonitor(): Boolean =
     this.isMonitorOfStandardType() &&
         Monitor.MonitorType.valueOf(this.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.QUERY_LEVEL_MONITOR
 
+fun Monitor.isActiveResponseMonitor(): Boolean =
+    this.isMonitorOfStandardType() &&
+        Monitor.MonitorType.valueOf(this.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR
+
 /**
  * Since buckets can have multi-value keys, this converts the bucket key values to a string that can be used
  * as the key for a HashMap to easily retrieve [AggregationResultBucket] based on the bucket key values.
@@ -103,7 +107,7 @@ fun Action.getActionExecutionPolicy(monitor: Monitor): ActionExecutionPolicy? {
     // the parse.
     return this.actionExecutionPolicy ?: if (monitor.isBucketLevelMonitor()) {
         ActionExecutionPolicy.getDefaultConfigurationForBucketLevelMonitor()
-    } else if (monitor.isDocLevelMonitor()) {
+    } else if (monitor.isDocLevelMonitor() || monitor.isActiveResponseMonitor()) {
         ActionExecutionPolicy.getDefaultConfigurationForDocumentLevelMonitor()
     } else {
         null

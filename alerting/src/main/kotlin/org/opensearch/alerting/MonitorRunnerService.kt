@@ -52,6 +52,7 @@ import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.isActiveResponseMonitor
 import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.alerting.workflow.CompositeWorkflowRunner
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
@@ -482,7 +483,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     executionId = executionId,
                     transportService = transportService
                 )
-            } else if (monitor.isDocLevelMonitor()) {
+            } else if (monitor.isDocLevelMonitor() || monitor.isActiveResponseMonitor()) {
                 DocumentLevelMonitorRunner().runMonitor(
                     monitor,
                     monitorCtx,

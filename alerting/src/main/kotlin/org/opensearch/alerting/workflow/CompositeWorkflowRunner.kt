@@ -15,6 +15,7 @@ import org.opensearch.alerting.QueryLevelMonitorRunner
 import org.opensearch.alerting.WorkflowMetadataService
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.ChainedAlertTriggerExecutionContext
+import org.opensearch.alerting.util.isActiveResponseMonitor
 import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.alerting.util.isQueryLevelMonitor
 import org.opensearch.cluster.routing.Preference
@@ -265,7 +266,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 executionId,
                 transportService
             )
-        } else if (delegateMonitor.isDocLevelMonitor()) {
+        } else if (delegateMonitor.isDocLevelMonitor() || delegateMonitor.isActiveResponseMonitor()) {
             return DocumentLevelMonitorRunner().runMonitor(
                 delegateMonitor,
                 monitorCtx,

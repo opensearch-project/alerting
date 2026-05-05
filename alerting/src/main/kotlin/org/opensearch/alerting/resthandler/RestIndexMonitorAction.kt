@@ -15,8 +15,10 @@ import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.IndexMonitorRequest
 import org.opensearch.commons.alerting.action.IndexMonitorResponse
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
+import org.opensearch.commons.alerting.model.CronSchedule
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
+import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -42,7 +44,9 @@ import org.opensearch.rest.RestResponse
 import org.opensearch.rest.action.RestResponseListener
 import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
+import java.time.Duration
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.*
 
 private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)
@@ -135,6 +139,16 @@ class RestIndexMonitorAction : BaseRestHandler() {
                             }
                         }
                     }
+
+                    Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR -> {
+                        validateDocLevelQueryName(monitor)
+                        validateActiveResponseMonitor(monitor)
+                        triggers.forEach {
+                            if (it !is DocumentLevelTrigger) {
+                                throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for active response monitor")
+                            }
+                        }
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -163,6 +177,28 @@ class RestIndexMonitorAction : BaseRestHandler() {
                         "Doc level query name may not start with [_, +, -], contain '..', or contain: " +
                             getInvalidNameChars().replace("\\", "")
                     )
+                }
+            }
+        }
+    }
+
+    private fun validateActiveResponseMonitor(monitor: Monitor) {
+        // Validate schedule interval is less than 1 minute
+        val schedule = monitor.schedule
+        if (schedule is IntervalSchedule) {
+            val intervalMs = Duration.of(schedule.interval.toLong(), schedule.unit).toMillis()
+            require(intervalMs <= Duration.of(1, ChronoUnit.MINUTES).toMillis()) {
+                "Active response monitor schedule interval must be 1 minute or less."
+            }
+        } else if (schedule is CronSchedule) {
+            throw IllegalArgumentException("Active response monitor does not support cron schedules. Use an interval schedule of 1 minute or less.")
+        }
+
+        // Validate indices start with wazuh-findings-v5
+        monitor.inputs.filterIsInstance<DocLevelMonitorInput>().forEach { input ->
+            input.indices.forEach { index ->
+                require(index.startsWith("wazuh-findings-v5")) {
+                    "Active response monitor indices must start with 'wazuh-findings-v5'. Found: $index"
                 }
             }
         }
