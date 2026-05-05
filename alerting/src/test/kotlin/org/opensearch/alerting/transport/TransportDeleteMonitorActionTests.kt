@@ -160,6 +160,18 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         assertEquals("999999999999", value)
     }
 
+    fun `test EB cell account ID read from monitor metadata`() {
+        val metadata = mapOf(ExternalSchedulerService.EB_CELL_ACCOUNT_ID_METADATA_KEY to "444455556666")
+        val accountId = metadata[ExternalSchedulerService.EB_CELL_ACCOUNT_ID_METADATA_KEY]
+        assertEquals("444455556666", accountId)
+    }
+
+    fun `test EB cell account ID null when metadata absent`() {
+        val metadata: Map<String, String>? = null
+        val accountId = metadata?.get(ExternalSchedulerService.EB_CELL_ACCOUNT_ID_METADATA_KEY)
+        assertNull(accountId)
+    }
+
     fun `test tenantId preserved across stashContext and scope launch`() {
         val expectedTenantId = "test-tenant:test-scope"
         threadContext.putHeader(TENANT_ID_HEADER, expectedTenantId)

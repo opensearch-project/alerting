@@ -24,11 +24,15 @@ object SchedulerRoutingResolver {
         settingsRoleName: String,
         settingsExecutionRoleName: String? = null,
         threadContextAccountIdOverride: String?
-    ): Routing? {
-        val accountId = pickAccountId(settingsAccountId, threadContextAccountIdOverride) ?: return null
-        val queueName = settingsQueueName.takeIf { it.isNotBlank() } ?: return null
-        val roleName = settingsRoleName.takeIf { it.isNotBlank() } ?: return null
-        val executionRoleName = settingsExecutionRoleName?.takeIf { it.isNotBlank() } ?: return null
+    ): Routing {
+        val accountId = pickAccountId(settingsAccountId, threadContextAccountIdOverride)
+            ?: error("External scheduler account ID is not configured and no override was provided")
+        val queueName = settingsQueueName.takeIf { it.isNotBlank() }
+            ?: error("External scheduler queue name is not configured")
+        val roleName = settingsRoleName.takeIf { it.isNotBlank() }
+            ?: error("External scheduler role name is not configured")
+        val executionRoleName = settingsExecutionRoleName?.takeIf { it.isNotBlank() }
+            ?: error("External scheduler execution role name is not configured")
         return Routing(accountId, queueName, buildRoleArn(accountId, roleName), buildRoleArn(accountId, executionRoleName))
     }
 
@@ -37,9 +41,11 @@ object SchedulerRoutingResolver {
         settingsAccountId: String,
         settingsRoleName: String,
         threadContextAccountIdOverride: String?
-    ): Routing? {
-        val accountId = pickAccountId(settingsAccountId, threadContextAccountIdOverride) ?: return null
-        val roleName = settingsRoleName.takeIf { it.isNotBlank() } ?: return null
+    ): Routing {
+        val accountId = pickAccountId(settingsAccountId, threadContextAccountIdOverride)
+            ?: error("External scheduler account ID is not configured and no override was provided")
+        val roleName = settingsRoleName.takeIf { it.isNotBlank() }
+            ?: error("External scheduler role name is not configured")
         return Routing(accountId, "", buildRoleArn(accountId, roleName), "")
     }
 

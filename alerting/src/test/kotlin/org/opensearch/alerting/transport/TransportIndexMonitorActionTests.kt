@@ -124,6 +124,22 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
         assertEquals("999999999999", value)
     }
 
+    fun `test scheduler account id is lost after stashContext`() {
+        threadContext.putTransient(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY, "999999999999")
+        threadContext.stashContext().use {
+            val value = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
+            assertNull("Transient should be null inside stashed context", value)
+        }
+    }
+
+    fun `test scheduler account id preserved when read before stash`() {
+        threadContext.putTransient(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY, "999999999999")
+        val preserved = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
+        threadContext.stashContext().use {
+            assertEquals("999999999999", preserved)
+        }
+    }
+
     fun `test scheduler settings are registered as dynamic`() {
         assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED.isDynamic)
         assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID.isDynamic)

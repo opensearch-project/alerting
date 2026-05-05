@@ -153,10 +153,8 @@ class TransportDeleteMonitorAction @Inject constructor(
             val routing = SchedulerRoutingResolver.resolveForDelete(
                 settingsAccountId = externalSchedulerAccountId,
                 settingsRoleName = externalSchedulerRoleName,
-                threadContextAccountIdOverride = client.threadPool().threadContext
-                    .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
-            ) ?: return
-
+                threadContextAccountIdOverride = monitor.metadata?.get(ExternalSchedulerService.EB_CELL_ACCOUNT_ID_METADATA_KEY)
+            )
             ExternalSchedulerService.deleteSchedule(monitor.id, routing)
         }
 

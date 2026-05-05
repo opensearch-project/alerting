@@ -45,6 +45,9 @@ object ExternalSchedulerService {
      */
     const val SCHEDULER_ACCOUNT_ID_KEY = "x-scheduler-account-id"
 
+    /** Monitor metadata key that persists the EB cell account ID used for scheduling. */
+    const val EB_CELL_ACCOUNT_ID_METADATA_KEY = "ebCellAccountId"
+
     @Volatile
     var credentialsCache: AssumeRoleCredentialsCache? = null
 
