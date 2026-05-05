@@ -135,4 +135,54 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
         verify(listener).onResponse(captor.capture())
         assertEquals(0, captor.value.totalDestinations)
     }
+
+    fun `test resolve passes tenantId through to search`() {
+        val expectedTenantId = "test-tenant:test-scope"
+
+        val future: CompletionStage<SearchDataObjectResponse> =
+            CompletableFuture.completedFuture(SearchDataObjectResponse(null as org.opensearch.action.search.SearchResponse?))
+        whenever(sdkClient.searchDataObjectAsync(any(SearchDataObjectRequest::class.java))).thenReturn(future)
+
+        val action = TransportGetDestinationsAction(
+            Mockito.mock(TransportService::class.java),
+            client,
+            clusterService,
+            Mockito.mock(ActionFilters::class.java),
+            Settings.EMPTY,
+            Mockito.mock(NamedXContentRegistry::class.java),
+            sdkClient
+        )
+
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<GetDestinationsResponse>
+        action.resolve(SearchSourceBuilder(), listener, null, expectedTenantId)
+
+        val captor = ArgumentCaptor.forClass(SearchDataObjectRequest::class.java)
+        verify(sdkClient).searchDataObjectAsync(captor.capture())
+        assertEquals(expectedTenantId, captor.value.tenantId())
+    }
+
+    fun `test resolve passes null tenantId when not provided`() {
+        val future: CompletionStage<SearchDataObjectResponse> =
+            CompletableFuture.completedFuture(SearchDataObjectResponse(null as org.opensearch.action.search.SearchResponse?))
+        whenever(sdkClient.searchDataObjectAsync(any(SearchDataObjectRequest::class.java))).thenReturn(future)
+
+        val action = TransportGetDestinationsAction(
+            Mockito.mock(TransportService::class.java),
+            client,
+            clusterService,
+            Mockito.mock(ActionFilters::class.java),
+            Settings.EMPTY,
+            Mockito.mock(NamedXContentRegistry::class.java),
+            sdkClient
+        )
+
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<GetDestinationsResponse>
+        action.resolve(SearchSourceBuilder(), listener, null)
+
+        val captor = ArgumentCaptor.forClass(SearchDataObjectRequest::class.java)
+        verify(sdkClient).searchDataObjectAsync(captor.capture())
+        assertNull(captor.value.tenantId())
+    }
 }

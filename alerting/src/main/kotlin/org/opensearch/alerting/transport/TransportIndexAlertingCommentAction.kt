@@ -37,6 +37,8 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Comment
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.TenantContext
+import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
@@ -140,8 +142,9 @@ constructor(
 
         val user = readUserFromThreadContext(client)
 
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         client.threadPool().threadContext.stashContext().use {
-            scope.launch {
+            scope.launch(TenantContext(tenantId)) {
                 IndexCommentHandler(client, actionListener, transformedRequest, user).start()
             }
         }
@@ -189,7 +192,7 @@ constructor(
                 user = user
             )
 
-            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+            val tenantId = currentTenantId()
             val wrappedComment = ToXContentObject { builder, params ->
                 comment.toXContentWithUser(builder)
             }
@@ -235,7 +238,7 @@ constructor(
             // retains everything from the original comment except content and lastUpdatedTime
             val requestComment = currentComment.copy(content = request.content, lastUpdatedTime = Instant.now())
 
-            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+            val tenantId = currentTenantId()
             val wrappedComment = ToXContentObject { builder, params ->
                 requestComment.toXContentWithUser(builder)
             }
@@ -279,7 +282,7 @@ constructor(
                     .seqNoAndPrimaryTerm(true)
                     .query(queryBuilder)
 
-            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+            val tenantId = currentTenantId()
             val sdkSearchRequest = SearchDataObjectRequest.builder()
                 .indices(AlertIndices.ALL_ALERT_INDEX_PATTERN)
                 .tenantId(tenantId)
@@ -335,7 +338,7 @@ constructor(
                     .seqNoAndPrimaryTerm(true)
                     .query(queryBuilder)
 
-            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+            val tenantId = currentTenantId()
             val sdkSearchRequest = SearchDataObjectRequest.builder()
                 .indices(CommentsIndices.ALL_COMMENTS_INDEX_PATTERN)
                 .tenantId(tenantId)

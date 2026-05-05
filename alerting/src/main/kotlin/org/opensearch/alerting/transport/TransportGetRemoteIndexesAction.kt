@@ -20,6 +20,7 @@ import org.opensearch.action.admin.indices.resolve.ResolveIndexAction
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.IndicesOptions
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.GetRemoteIndexesAction
 import org.opensearch.alerting.action.GetRemoteIndexesRequest
 import org.opensearch.alerting.action.GetRemoteIndexesResponse
@@ -33,6 +34,7 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.util.AlertingException
+import org.opensearch.commons.utils.TenantContext
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -110,8 +112,9 @@ class TransportGetRemoteIndexesAction @Inject constructor(
             return
         }
 
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         client.threadPool().threadContext.stashContext().use {
-            scope.launch {
+            scope.launch(TenantContext(tenantId)) {
                 val singleThreadContext = newSingleThreadContext("GetRemoteIndexesActionThread")
                 withContext(singleThreadContext) {
                     it.restore()

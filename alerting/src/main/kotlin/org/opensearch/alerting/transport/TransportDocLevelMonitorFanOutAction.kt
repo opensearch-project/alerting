@@ -26,6 +26,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertService
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.TriggerService
 import org.opensearch.alerting.action.GetDestinationsAction
@@ -100,6 +101,7 @@ import org.opensearch.commons.alerting.model.userErrorMessage
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.string
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
+import org.opensearch.commons.utils.TenantContext
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.Strings
 import org.opensearch.core.common.bytes.BytesReference
@@ -205,7 +207,8 @@ class TransportDocLevelMonitorFanOutAction
         request: DocLevelMonitorFanOutRequest,
         listener: ActionListener<DocLevelMonitorFanOutResponse>
     ) {
-        scope.launch {
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        scope.launch(TenantContext(tenantId)) {
             executeMonitor(request, listener)
         }
     }
