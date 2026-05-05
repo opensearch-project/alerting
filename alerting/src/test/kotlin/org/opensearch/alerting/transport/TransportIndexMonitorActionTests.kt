@@ -66,7 +66,8 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
         settingSet.add(AlertingSettings.JOB_QUEUE_NAME)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME)
         return ClusterSettings(settings, settingSet)
     }
 
@@ -101,7 +102,7 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
             .put("plugins.alerting.external_scheduler.enabled", true)
             .put("plugins.alerting.external_scheduler.account_id", "111111111111")
             .put("plugins.alerting.external_scheduler.queue_arn", "arn:aws:sqs:us-east-1:111:queue")
-            .put("plugins.alerting.external_scheduler.role_arn", "arn:aws:iam::111:role/eb")
+            .put("plugins.alerting.external_scheduler.role_name", "eb")
             .build()
 
         val action = createAction(settings)
@@ -127,7 +128,7 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
         assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED.isDynamic)
         assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID.isDynamic)
         assertTrue(AlertingSettings.JOB_QUEUE_NAME.isDynamic)
-        assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN.isDynamic)
+        assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.isDynamic)
     }
 
     fun `test scheduler enabled defaults to false`() {
@@ -138,7 +139,7 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
     fun `test scheduler string settings default to empty`() {
         assertEquals("", AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID.get(Settings.EMPTY))
         assertEquals("", AlertingSettings.JOB_QUEUE_NAME.get(Settings.EMPTY))
-        assertEquals("", AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN.get(Settings.EMPTY))
+        assertEquals("", AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(Settings.EMPTY))
     }
 
     fun `test multi-tenancy enabled skips scheduled job index init`() {

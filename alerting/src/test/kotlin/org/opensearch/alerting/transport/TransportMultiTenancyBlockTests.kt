@@ -125,7 +125,8 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
         settingSet.add(AlertingSettings.JOB_QUEUE_NAME)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME)
         val clusterSettings = ClusterSettings(multiTenancySettings, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
 

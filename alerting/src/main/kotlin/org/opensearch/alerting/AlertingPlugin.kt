@@ -492,8 +492,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID,
             AlertingSettings.JOB_QUEUE_NAME,
             AlertingSettings.JOB_QUEUE_MESSAGE_GROUP_KEY_NAME,
-            AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN,
-            AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_ARN,
+            AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME,
+            AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME,
             AlertingSettings.JOB_QUEUE_ACCOUNT_ID,
             AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE,
             AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME

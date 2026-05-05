@@ -374,15 +374,15 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        /** IAM role ARN that EventBridge assumes to send messages to the target SQS queue. */
-        val EXTERNAL_SCHEDULER_ROLE_ARN = Setting.simpleString(
-            "plugins.alerting.external_scheduler.role_arn",
+        /** IAM role name that EventBridge assumes to send messages to the target SQS queue. The full ARN is constructed from the account ID. */
+        val EXTERNAL_SCHEDULER_ROLE_NAME = Setting.simpleString(
+            "plugins.alerting.external_scheduler.role_name",
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
-        /** IAM role ARN that EventBridge Scheduler assumes at fire time (Target.roleArn). Required when external scheduler is enabled. */
-        val EXTERNAL_SCHEDULER_EXECUTION_ROLE_ARN = Setting.simpleString(
-            "plugins.alerting.external_scheduler.execution_role_arn",
+        /** IAM role name that EventBridge Scheduler assumes at fire time (Target.roleArn). The full ARN is constructed from the account ID. */
+        val EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME = Setting.simpleString(
+            "plugins.alerting.external_scheduler.execution_role_name",
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
