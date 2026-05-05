@@ -327,6 +327,8 @@ class TransportIndexMonitorAction @Inject constructor(
         // of monitor indexing after PPL validations are complete
         val validationListener = object : ActionListener<Unit> { // validationListener
             override fun onResponse(response: Unit) {
+                val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+
                 // user permissions to indices have already been checked if we made it to the onResponse(),
                 // proceed without the context of the user, otherwise,
                 // we would get permissions errors trying to search the alerting-config
@@ -342,7 +344,7 @@ class TransportIndexMonitorAction @Inject constructor(
                         indexMonitorRequest.monitor = pplMonitor
                             .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttributes))
                     }
-                    IndexMonitorHandler(client, actionListener, indexMonitorRequest, user).resolveUserAndStart()
+                    IndexMonitorHandler(client, actionListener, indexMonitorRequest, user, tenantId).resolveUserAndStart()
                 }
             }
 
