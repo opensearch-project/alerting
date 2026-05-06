@@ -52,6 +52,7 @@ import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
 import org.opensearch.alerting.script.TriggerScript
+import org.opensearch.alerting.service.AssumeRoleCredentialsCache
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.service.ExternalSchedulerService
 import org.opensearch.alerting.service.MonitorJobPoller
@@ -152,6 +153,8 @@ import org.opensearch.script.ScriptService
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
 import org.opensearch.watcher.ResourceWatcherService
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.sts.StsClient
 import java.util.function.Supplier
 
 /**
@@ -386,6 +389,19 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         )
 
         ExternalSchedulerService.initialize(settings)
+        if (AlertingSettings.EXTERNAL_SCHEDULER_ENABLED.get(settings)) {
+            val region = REMOTE_METADATA_REGION.get(settings)
+            val roleName = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(settings)
+            if (!region.isNullOrBlank() && roleName.isNotBlank()) {
+                val stsClient = StsClient.builder()
+                    .region(Region.of(region))
+                    .build()
+                ExternalSchedulerService.credentialsCache = AssumeRoleCredentialsCache(
+                    stsClient,
+                    "arn:aws:iam::%s:role/$roleName"
+                )
+            }
+        }
 
         return listOf(
             sweeper,

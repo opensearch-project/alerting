@@ -150,10 +150,14 @@ class TransportDeleteMonitorAction @Inject constructor(
          * record so the schedule deletion can be retried.
          */
         private fun deleteExternalSchedule(monitor: Monitor) {
+            val scheduleArn = monitor.metadata?.get(ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY)
+            val accountIdOverride = scheduleArn?.let {
+                ExternalSchedulerService.parseScheduleArn(it).accountId
+            }
             val routing = SchedulerRoutingResolver.resolveForDelete(
                 settingsAccountId = externalSchedulerAccountId,
                 settingsRoleName = externalSchedulerRoleName,
-                threadContextAccountIdOverride = monitor.metadata?.get(ExternalSchedulerService.EB_CELL_ACCOUNT_ID_METADATA_KEY)
+                threadContextAccountIdOverride = accountIdOverride
             )
             ExternalSchedulerService.deleteSchedule(monitor.id, routing)
         }

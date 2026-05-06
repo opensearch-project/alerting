@@ -640,10 +640,14 @@ class TransportIndexMonitorAction @Inject constructor(
                     }
                 }
 
-                // Create external schedule for monitor execution
+                // Create external schedule and update monitor with the schedule ARN
                 if (externalSchedulerEnabled) {
                     try {
-                        createExternalSchedule(request.monitor, tenantId)
+                        val scheduleArn = createExternalSchedule(request.monitor)
+                        val updatedMetadata = (request.monitor.metadata.orEmpty()) +
+                            (ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY to scheduleArn)
+                        request.monitor = request.monitor.copy(metadata = updatedMetadata)
+                        updateMonitorMetadata(request.monitor, tenantId)
                     } catch (t: Exception) {
                         log.error("Failed to create EB schedule for monitor ${indexResponse.id}. Rolling back.", t)
                         cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
@@ -881,22 +885,24 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         /**
-         * Reads scheduler routing info from plugin settings (with optional ThreadContext
-         * override for account id) and creates an external schedule.
+         * Creates an external schedule and returns the schedule ARN.
          */
-        private fun createExternalSchedule(monitor: Monitor, tenantId: String?) {
+        private fun createExternalSchedule(monitor: Monitor): String {
             val routing = resolveRouting(schedulerAccountId)
             val targetInput = buildScheduleJobPayloadJson(monitor)
             ExternalSchedulerService.createSchedule(monitor, routing, targetInput)
+            return ExternalSchedulerService.buildScheduleArn(routing, monitor.id)
         }
 
         /**
-         * Reads scheduler routing info from plugin settings (with account id from existing
-         * monitor metadata) and updates the external schedule. Always refreshes
-         * Target.Input with the latest monitor config.
+         * Reads the schedule ARN from the existing monitor's metadata to determine
+         * the target account, then updates the external schedule with the latest monitor config.
          */
         private fun updateExternalSchedule(monitor: Monitor, currentMonitor: Monitor, tenantId: String?) {
-            val accountIdOverride = currentMonitor.metadata?.get(ExternalSchedulerService.EB_CELL_ACCOUNT_ID_METADATA_KEY)
+            val scheduleArn = currentMonitor.metadata?.get(ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY)
+            val accountIdOverride = scheduleArn?.let {
+                ExternalSchedulerService.parseScheduleArn(it).accountId
+            }
             val routing = resolveRouting(accountIdOverride)
             val targetInput = buildScheduleJobPayloadJson(monitor)
             ExternalSchedulerService.updateSchedule(monitor, routing, targetInput)
@@ -918,6 +924,20 @@ class TransportIndexMonitorAction @Inject constructor(
             val builder = XContentFactory.jsonBuilder()
             payload.toXContent(builder, ToXContent.EMPTY_PARAMS)
             return builder.toString()
+        }
+
+        private suspend fun updateMonitorMetadata(monitor: Monitor, tenantId: String?) {
+            val monitorObj = ToXContentObject { builder, params ->
+                monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
+            }
+            val putRequest = PutDataObjectRequest.builder()
+                .index(SCHEDULED_JOBS_INDEX)
+                .id(monitor.id)
+                .tenantId(tenantId)
+                .overwriteIfExists(true)
+                .dataObject(monitorObj)
+                .build()
+            sdkClient.putDataObjectAsync(putRequest).await()
         }
 
         private fun resolveRouting(accountIdOverride: String?): SchedulerRoutingResolver.Routing = SchedulerRoutingResolver.resolve(

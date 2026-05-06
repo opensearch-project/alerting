@@ -176,4 +176,18 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
         val action = createAction(settings)
         assertNotNull(action)
     }
+
+    fun `test schedule ARN stored in monitor metadata map`() {
+        val arn = "arn:aws:scheduler:us-west-2:111222333444:schedule/default/monitor-test123"
+        val metadata = mapOf(ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY to arn)
+        assertEquals(arn, metadata[ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY])
+    }
+
+    fun `test schedule ARN parsed for account ID on update`() {
+        val arn = "arn:aws:scheduler:us-west-2:555666777888:schedule/default/monitor-m1"
+        val info = ExternalSchedulerService.parseScheduleArn(arn)
+        assertEquals("555666777888", info.accountId)
+        assertEquals("us-west-2", info.region)
+        assertEquals("monitor-m1", info.name)
+    }
 }
