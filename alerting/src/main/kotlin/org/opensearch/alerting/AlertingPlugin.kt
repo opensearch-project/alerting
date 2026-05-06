@@ -371,7 +371,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             settings
         )
 
-        DeleteMonitorService.initialize(client, lockService)
+        DeleteMonitorService.initialize(client, lockService, sdkClient)
 
         val providerType = AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE.get(settings)
         val monitorJobPoller = MonitorJobPoller(

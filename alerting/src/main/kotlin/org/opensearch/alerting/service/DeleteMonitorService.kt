@@ -14,8 +14,6 @@ import org.apache.lucene.search.join.ScoreMode
 import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
 import org.opensearch.action.admin.indices.exists.indices.IndicesExistsRequest
 import org.opensearch.action.admin.indices.exists.indices.IndicesExistsResponse
-import org.opensearch.action.delete.DeleteRequest
-import org.opensearch.action.delete.DeleteResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.IndicesOptions
@@ -27,16 +25,21 @@ import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_MONITOR_PATH
+import org.opensearch.alerting.util.await
 import org.opensearch.alerting.util.use
 import org.opensearch.commons.alerting.action.DeleteMonitorResponse
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
+import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.core.action.ActionListener
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
 import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
+import org.opensearch.remote.metadata.client.DeleteDataObjectRequest
+import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.transport.client.Client
 import kotlin.coroutines.resume
@@ -52,13 +55,16 @@ object DeleteMonitorService :
 
     private lateinit var client: Client
     private lateinit var lockService: LockService
+    private lateinit var sdkClient: SdkClient
 
     fun initialize(
         client: Client,
-        lockService: LockService
+        lockService: LockService,
+        sdkClient: SdkClient
     ) {
         DeleteMonitorService.client = client
         DeleteMonitorService.lockService = lockService
+        DeleteMonitorService.sdkClient = sdkClient
     }
 
     /**
@@ -67,29 +73,40 @@ object DeleteMonitorService :
      * @param refreshPolicy
      */
     suspend fun deleteMonitor(monitor: Monitor, refreshPolicy: RefreshPolicy): DeleteMonitorResponse {
-        val deleteResponse = deleteMonitor(monitor.id, refreshPolicy)
+        val deleteResponse = deleteMonitorDoc(monitor.id, refreshPolicy)
         deleteDocLevelMonitorQueriesAndIndices(monitor)
         deleteMetadata(monitor)
         deleteLock(monitor)
-        return DeleteMonitorResponse(deleteResponse.id, deleteResponse.version)
+        return deleteResponse
     }
 
-    private suspend fun deleteMonitor(monitorId: String, refreshPolicy: RefreshPolicy): DeleteResponse {
-        val deleteMonitorRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorId)
-            .setRefreshPolicy(refreshPolicy)
-        return client.suspendUntil { delete(deleteMonitorRequest, it) }
+    private suspend fun deleteMonitorDoc(monitorId: String, refreshPolicy: RefreshPolicy): DeleteMonitorResponse {
+        val tenantId = currentTenantId()
+        val deleteRequest = DeleteDataObjectRequest.builder()
+            .index(ScheduledJob.SCHEDULED_JOBS_INDEX)
+            .id(monitorId)
+            .tenantId(tenantId)
+            .refreshPolicy(refreshPolicy)
+            .build()
+        val deleteResponse = sdkClient.deleteDataObjectAsync(deleteRequest).await()
+        return DeleteMonitorResponse(deleteResponse.id(), deleteResponse.deleteResponse().version)
     }
 
     private suspend fun deleteMetadata(monitor: Monitor) {
-        val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, "${monitor.id}-metadata")
-            .setRefreshPolicy(RefreshPolicy.IMMEDIATE)
+        val tenantId = currentTenantId()
+        val deleteRequest = DeleteDataObjectRequest.builder()
+            .index(ScheduledJob.SCHEDULED_JOBS_INDEX)
+            .id("${monitor.id}-metadata")
+            .tenantId(tenantId)
+            .refreshPolicy(RefreshPolicy.IMMEDIATE)
+            .build()
         try {
-            val deleteResponse: DeleteResponse = client.suspendUntil { delete(deleteRequest, it) }
-            log.debug("Monitor metadata: ${deleteResponse.id} deletion result: ${deleteResponse.result}")
+            val deleteResponse = sdkClient.deleteDataObjectAsync(deleteRequest).await()
+            log.debug("Monitor metadata: ${deleteResponse.id()} deletion result: ${deleteResponse.status()}")
         } catch (e: Exception) {
             // we only log the error and don't fail the request because if monitor document has been deleted,
             // we cannot retry based on this failure
-            log.error("Failed to delete monitor metadata ${deleteRequest.id()}.", e)
+            log.error("Failed to delete monitor metadata ${monitor.id}-metadata.", e)
         }
     }
 
@@ -187,12 +204,18 @@ object DeleteMonitorService :
             ScoreMode.None
         )
         try {
-            val searchRequest = SearchRequest()
+            val tenantId = currentTenantId()
+            val searchRequest = SearchDataObjectRequest.builder()
                 .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
-                .source(SearchSourceBuilder().query(queryBuilder))
+                .tenantId(tenantId)
+                .searchSourceBuilder(SearchSourceBuilder().query(queryBuilder))
+                .build()
 
             client.threadPool().threadContext.stashContext().use {
-                val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+                val sdkResponse = sdkClient.searchDataObjectAsync(searchRequest).await()
+                val searchResponse = sdkResponse.searchResponse()
+                    ?: throw RuntimeException("Unknown error searching for workflow delegates")
+
                 if (searchResponse.hits.totalHits?.value == 0L) {
                     return false
                 }

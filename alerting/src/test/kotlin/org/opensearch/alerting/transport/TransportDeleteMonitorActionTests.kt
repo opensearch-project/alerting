@@ -62,6 +62,7 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
         settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
+        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
@@ -215,6 +216,33 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         val captor = ArgumentCaptor.forClass(GetDataObjectRequest::class.java)
         verify(sdkClient, timeout(1000)).getDataObject(captor.capture())
         assertNull(captor.value.tenantId())
+    }
+
+    fun `test action constructs with multi tenancy enabled`() {
+        val settings = Settings.builder()
+            .put("plugins.alerting.multi_tenancy_enabled", true)
+            .build()
+
+        val settingSet = hashSetOf<Setting<*>>()
+        settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
+        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
+        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
+        val cs = ClusterSettings(settings, settingSet)
+        whenever(clusterService.clusterSettings).thenReturn(cs)
+
+        val action = TransportDeleteMonitorAction(
+            Mockito.mock(TransportService::class.java),
+            client,
+            Mockito.mock(ActionFilters::class.java),
+            clusterService,
+            settings,
+            Mockito.mock(NamedXContentRegistry::class.java),
+            sdkClient
+        )
+        assertNotNull(action)
     }
 
     private fun invokeDoExecute(
