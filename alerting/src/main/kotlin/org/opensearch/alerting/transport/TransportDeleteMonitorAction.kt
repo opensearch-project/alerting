@@ -128,9 +128,15 @@ class TransportDeleteMonitorAction @Inject constructor(
                         deleteExternalSchedule(monitor)
                     }
 
-                    actionListener.onResponse(
-                        DeleteMonitorService.deleteMonitor(monitor, refreshPolicy)
-                    )
+                    val response = DeleteMonitorService.deleteMonitor(monitor, refreshPolicy)
+                    val schedulerAccountId = monitor.metadata
+                        ?.get(ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY)
+                        ?.let { ExternalSchedulerService.parseScheduleArn(it).accountId }
+                    if (schedulerAccountId != null) {
+                        client.threadPool().threadContext
+                            .putTransient(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY, schedulerAccountId)
+                    }
+                    actionListener.onResponse(response)
                 } else {
                     actionListener.onFailure(
                         AlertingException("Not allowed to delete this monitor!", RestStatus.FORBIDDEN, IllegalStateException())
