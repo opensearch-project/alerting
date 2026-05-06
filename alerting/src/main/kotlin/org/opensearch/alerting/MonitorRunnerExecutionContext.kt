@@ -72,4 +72,5 @@ data class MonitorRunnerExecutionContext(
     @Volatile var totalNodesFanOut: Int = AlertingSettings.DEFAULT_FAN_OUT_NODES,
     @Volatile var lockService: LockService? = null,
     @Volatile var multiTenantTriggerEvalEnabled: Boolean = false,
+    var multiTenancyEnabled: Boolean = false,
 )
