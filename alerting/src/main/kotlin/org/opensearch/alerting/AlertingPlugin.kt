@@ -153,8 +153,6 @@ import org.opensearch.script.ScriptService
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
 import org.opensearch.watcher.ResourceWatcherService
-import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.sts.StsClient
 import java.util.function.Supplier
 
 /**
@@ -393,11 +391,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             val region = REMOTE_METADATA_REGION.get(settings)
             val roleName = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(settings)
             if (!region.isNullOrBlank() && roleName.isNotBlank()) {
-                val stsClient = StsClient.builder()
-                    .region(Region.of(region))
-                    .build()
                 ExternalSchedulerService.credentialsCache = AssumeRoleCredentialsCache(
-                    stsClient,
+                    region,
                     "arn:aws:iam::%s:role/$roleName"
                 )
             }
