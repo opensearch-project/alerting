@@ -264,6 +264,8 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             monitorCtx.multiTenantTriggerEvalEnabled = it
         }
 
+        monitorCtx.multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(monitorCtx.settings)
+
         return this
     }
 
@@ -299,6 +301,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     override fun doClose() {}
 
     override fun postIndex(job: ScheduledJob) {
+        if (monitorCtx.multiTenancyEnabled) return
         if (job is Monitor) {
             launch {
                 try {
@@ -327,6 +330,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     }
 
     override fun postDelete(jobId: String) {
+        if (monitorCtx.multiTenancyEnabled) return
         launch {
             try {
                 monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
@@ -438,7 +442,9 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     ): MonitorRunResult<*> {
         // Updating the scheduled job index at the start of monitor execution runs for when there is an upgrade the the schema mapping
         // has not been updated.
-        if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {
+        if (!monitorCtx.multiTenancyEnabled && !IndexUtils.scheduledJobIndexUpdated &&
+            monitorCtx.clusterService != null && monitorCtx.client != null
+        ) {
             IndexUtils.updateIndexMapping(
                 ScheduledJob.SCHEDULED_JOBS_INDEX,
                 ScheduledJobIndices.scheduledJobMappings(), monitorCtx.clusterService!!.state(), monitorCtx.client!!.admin().indices(),

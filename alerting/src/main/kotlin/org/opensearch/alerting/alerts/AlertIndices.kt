@@ -83,7 +83,8 @@ class AlertIndices(
     settings: Settings,
     private val client: Client,
     private val threadPool: ThreadPool,
-    private val clusterService: ClusterService
+    private val clusterService: ClusterService,
+    private val multiTenancyEnabled: Boolean = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
 ) : ClusterStateListener {
 
     init {
@@ -254,10 +255,12 @@ class AlertIndices(
     }
 
     fun isAlertInitialized(): Boolean {
+        if (multiTenancyEnabled) return true
         return alertIndexInitialized && alertHistoryIndexInitialized
     }
 
     fun isAlertInitialized(dataSources: DataSources): Boolean {
+        if (multiTenancyEnabled) return true
         val alertsIndex = dataSources.alertsIndex
         val alertsHistoryIndex = dataSources.alertsHistoryIndex
         if (alertsIndex == ALERT_INDEX && alertsHistoryIndex == ALERT_HISTORY_WRITE_INDEX) {
@@ -279,6 +282,7 @@ class AlertIndices(
     fun isFindingHistoryEnabled(): Boolean = findingHistoryEnabled
 
     suspend fun createOrUpdateAlertIndex() {
+        if (multiTenancyEnabled) return
         if (!alertIndexInitialized) {
             alertIndexInitialized = createIndex(ALERT_INDEX, alertMapping())
             if (alertIndexInitialized) IndexUtils.alertIndexUpdated()
@@ -288,6 +292,7 @@ class AlertIndices(
         alertIndexInitialized
     }
     suspend fun createOrUpdateAlertIndex(dataSources: DataSources) {
+        if (multiTenancyEnabled) return
         if (dataSources.alertsIndex == ALERT_INDEX) {
             return createOrUpdateAlertIndex()
         }
@@ -300,6 +305,7 @@ class AlertIndices(
     }
 
     suspend fun createOrUpdateInitialAlertHistoryIndex(dataSources: DataSources) {
+        if (multiTenancyEnabled) return
         if (dataSources.alertsIndex == ALERT_INDEX) {
             return createOrUpdateInitialAlertHistoryIndex()
         }
@@ -318,6 +324,7 @@ class AlertIndices(
         }
     }
     suspend fun createOrUpdateInitialAlertHistoryIndex() {
+        if (multiTenancyEnabled) return
         if (!alertHistoryIndexInitialized) {
             alertHistoryIndexInitialized = createIndex(ALERT_HISTORY_INDEX_PATTERN, alertMapping(), ALERT_HISTORY_WRITE_INDEX)
             if (alertHistoryIndexInitialized)
@@ -332,6 +339,7 @@ class AlertIndices(
     }
 
     suspend fun createOrUpdateInitialFindingHistoryIndex() {
+        if (multiTenancyEnabled) return
         if (!findingHistoryIndexInitialized) {
             findingHistoryIndexInitialized = createIndex(FINDING_HISTORY_INDEX_PATTERN, findingMapping(), FINDING_HISTORY_WRITE_INDEX)
             if (findingHistoryIndexInitialized) {
@@ -347,6 +355,7 @@ class AlertIndices(
     }
 
     suspend fun createOrUpdateInitialFindingHistoryIndex(dataSources: DataSources) {
+        if (multiTenancyEnabled) return
         if (dataSources.findingsIndex == FINDING_HISTORY_WRITE_INDEX) {
             return createOrUpdateInitialFindingHistoryIndex()
         }
