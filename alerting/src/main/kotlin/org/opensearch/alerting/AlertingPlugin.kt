@@ -52,6 +52,7 @@ import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
 import org.opensearch.alerting.script.TriggerScript
+import org.opensearch.alerting.service.AssumeRoleCredentialsCache
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.service.ExternalSchedulerService
 import org.opensearch.alerting.service.MonitorJobPoller
@@ -386,6 +387,16 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         )
 
         ExternalSchedulerService.initialize(settings)
+        if (AlertingSettings.EXTERNAL_SCHEDULER_ENABLED.get(settings)) {
+            val region = REMOTE_METADATA_REGION.get(settings)
+            val roleName = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(settings)
+            if (!region.isNullOrBlank() && roleName.isNotBlank()) {
+                ExternalSchedulerService.credentialsCache = AssumeRoleCredentialsCache(
+                    region,
+                    "arn:aws:iam::%s:role/$roleName"
+                )
+            }
+        }
 
         return listOf(
             sweeper,
@@ -492,8 +503,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID,
             AlertingSettings.JOB_QUEUE_NAME,
             AlertingSettings.JOB_QUEUE_MESSAGE_GROUP_KEY_NAME,
-            AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN,
-            AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_ARN,
+            AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME,
+            AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME,
             AlertingSettings.JOB_QUEUE_ACCOUNT_ID,
             AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE,
             AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME

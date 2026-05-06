@@ -63,7 +63,7 @@ class TransportDeleteMonitorAction @Inject constructor(
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
     @Volatile private var externalSchedulerEnabled = AlertingSettings.EXTERNAL_SCHEDULER_ENABLED.get(settings)
     @Volatile private var externalSchedulerAccountId = AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID.get(settings)
-    @Volatile private var externalSchedulerRoleArn = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN.get(settings)
+    @Volatile private var externalSchedulerRoleName = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED) {
@@ -72,8 +72,8 @@ class TransportDeleteMonitorAction @Inject constructor(
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID) {
             externalSchedulerAccountId = it
         }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN) {
-            externalSchedulerRoleArn = it
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME) {
+            externalSchedulerRoleName = it
         }
         listenFilterBySettingChange(clusterService)
     }
@@ -150,13 +150,15 @@ class TransportDeleteMonitorAction @Inject constructor(
          * record so the schedule deletion can be retried.
          */
         private fun deleteExternalSchedule(monitor: Monitor) {
+            val scheduleArn = monitor.metadata?.get(ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY)
+            val accountIdOverride = scheduleArn?.let {
+                ExternalSchedulerService.parseScheduleArn(it).accountId
+            }
             val routing = SchedulerRoutingResolver.resolveForDelete(
                 settingsAccountId = externalSchedulerAccountId,
-                settingsRoleArn = externalSchedulerRoleArn,
-                threadContextAccountIdOverride = client.threadPool().threadContext
-                    .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
-            ) ?: return
-
+                settingsRoleName = externalSchedulerRoleName,
+                threadContextAccountIdOverride = accountIdOverride
+            )
             ExternalSchedulerService.deleteSchedule(monitor.id, routing)
         }
 

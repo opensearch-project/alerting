@@ -11,6 +11,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.REMOTE_METADA
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.util.ScheduleTranslator
+import software.amazon.awssdk.arns.Arn
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.scheduler.SchedulerClient
 import software.amazon.awssdk.services.scheduler.model.ActionAfterCompletion
@@ -44,6 +45,9 @@ object ExternalSchedulerService {
      * settings only and are not overridable via ThreadContext.
      */
     const val SCHEDULER_ACCOUNT_ID_KEY = "x-scheduler-account-id"
+
+    /** Monitor metadata key that stores the full ARN of the created EventBridge schedule. */
+    const val SCHEDULE_ARN_METADATA_KEY = "schedule_arn"
 
     @Volatile
     var credentialsCache: AssumeRoleCredentialsCache? = null
@@ -173,5 +177,25 @@ object ExternalSchedulerService {
                 .credentialsProvider(cache.getCredentialsProvider(routing.accountId))
                 .build()
         }
+    }
+
+    /** Builds the schedule ARN from routing info and monitor ID. */
+    fun buildScheduleArn(routing: SchedulerRoutingResolver.Routing, monitorId: String): String {
+        val resolvedRegion = requireNotNull(region) { "region must be set" }
+        return "arn:aws:scheduler:$resolvedRegion:${routing.accountId}:schedule/default/${scheduleName(monitorId)}"
+    }
+
+    /**
+     * Parsed components of a schedule ARN.
+     */
+    data class ScheduleArnInfo(val region: String, val accountId: String, val name: String)
+
+    /** Parses a schedule ARN into its components using [Arn.fromString]. */
+    fun parseScheduleArn(arn: String): ScheduleArnInfo {
+        val parsed = Arn.fromString(arn)
+        val region = parsed.region().orElseThrow { IllegalArgumentException("Schedule ARN missing region: $arn") }
+        val accountId = parsed.accountId().orElseThrow { IllegalArgumentException("Schedule ARN missing account ID: $arn") }
+        val name = parsed.resourceAsString().substringAfterLast("/")
+        return ScheduleArnInfo(region, accountId, name)
     }
 }

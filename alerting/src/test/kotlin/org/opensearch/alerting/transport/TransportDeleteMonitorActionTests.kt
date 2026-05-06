@@ -64,7 +64,7 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
         val clusterSettings = ClusterSettings(Settings.EMPTY, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
     }
@@ -123,7 +123,7 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         val settings = Settings.builder()
             .put("plugins.alerting.external_scheduler.enabled", true)
             .put("plugins.alerting.external_scheduler.account_id", "111111111111")
-            .put("plugins.alerting.external_scheduler.role_arn", "arn:aws:iam::111:role/eb")
+            .put("plugins.alerting.external_scheduler.role_name", "eb")
             .build()
 
         val settingSet = hashSetOf<Setting<*>>()
@@ -131,7 +131,7 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
         val cs = ClusterSettings(settings, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(cs)
 
@@ -158,6 +158,19 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         threadContext.putTransient(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY, "999999999999")
         val value = threadContext.getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
         assertEquals("999999999999", value)
+    }
+
+    fun `test schedule ARN read from monitor metadata`() {
+        val arn = "arn:aws:scheduler:us-west-2:444455556666:schedule/default/monitor-abc123"
+        val metadata = mapOf(ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY to arn)
+        val value = metadata[ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY]
+        assertEquals(arn, value)
+    }
+
+    fun `test schedule ARN null when metadata absent`() {
+        val metadata: Map<String, String>? = null
+        val value = metadata?.get(ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY)
+        assertNull(value)
     }
 
     fun `test tenantId preserved across stashContext and scope launch`() {

@@ -127,8 +127,8 @@ class TransportIndexMonitorAction @Inject constructor(
     @Volatile private var externalSchedulerEnabled = AlertingSettings.EXTERNAL_SCHEDULER_ENABLED.get(settings)
     @Volatile private var externalSchedulerAccountId = AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID.get(settings)
     @Volatile private var jobQueueName = AlertingSettings.JOB_QUEUE_NAME.get(settings)
-    @Volatile private var externalSchedulerRoleArn = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN.get(settings)
-    @Volatile private var externalSchedulerExecutionRoleArn = AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_ARN.get(settings)
+    @Volatile private var externalSchedulerRoleName = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(settings)
+    @Volatile private var externalSchedulerExecutionRoleName = AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME.get(settings)
 
     private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
 
@@ -151,11 +151,11 @@ class TransportIndexMonitorAction @Inject constructor(
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.JOB_QUEUE_NAME) {
             jobQueueName = it
         }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN) {
-            externalSchedulerRoleArn = it
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME) {
+            externalSchedulerRoleName = it
         }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_ARN) {
-            externalSchedulerExecutionRoleArn = it
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME) {
+            externalSchedulerExecutionRoleName = it
         }
         listenFilterBySettingChange(clusterService)
     }
@@ -265,8 +265,10 @@ class TransportIndexMonitorAction @Inject constructor(
                 override fun onResponse(searchResponse: SearchResponse) {
                     // User has read access to configured indices in the monitor, now create monitor with out user context.
                     val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+                    val schedulerAccountId = client.threadPool().threadContext
+                        .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
                     client.threadPool().threadContext.stashContext().use {
-                        IndexMonitorHandler(client, actionListener, request, user, tenantId).resolveUserAndStart()
+                        IndexMonitorHandler(client, actionListener, request, user, tenantId, schedulerAccountId).resolveUserAndStart()
                     }
                 }
 
@@ -304,8 +306,10 @@ class TransportIndexMonitorAction @Inject constructor(
         user: User?,
     ) {
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        val schedulerAccountId = client.threadPool().threadContext
+            .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
         client.threadPool().threadContext.stashContext().use {
-            IndexMonitorHandler(client, actionListener, request, user, tenantId).resolveUserAndStartForAD()
+            IndexMonitorHandler(client, actionListener, request, user, tenantId, schedulerAccountId).resolveUserAndStartForAD()
         }
     }
 
@@ -315,6 +319,7 @@ class TransportIndexMonitorAction @Inject constructor(
         private val request: IndexMonitorRequest,
         private val user: User?,
         private val tenantId: String?,
+        private val schedulerAccountId: String?,
     ) {
 
         fun resolveUserAndStart() {
@@ -635,10 +640,14 @@ class TransportIndexMonitorAction @Inject constructor(
                     }
                 }
 
-                // Create external schedule for monitor execution
+                // Create external schedule and update monitor with the schedule ARN
                 if (externalSchedulerEnabled) {
                     try {
-                        createExternalSchedule(request.monitor, tenantId)
+                        val scheduleArn = createExternalSchedule(request.monitor)
+                        val updatedMetadata = (request.monitor.metadata.orEmpty()) +
+                            (ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY to scheduleArn)
+                        request.monitor = request.monitor.copy(metadata = updatedMetadata)
+                        updateMonitorMetadata(request.monitor, tenantId)
                     } catch (t: Exception) {
                         log.error("Failed to create EB schedule for monitor ${indexResponse.id}. Rolling back.", t)
                         cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
@@ -845,7 +854,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 // Update external schedule with latest monitor config
                 if (externalSchedulerEnabled) {
                     try {
-                        updateExternalSchedule(request.monitor, tenantId)
+                        updateExternalSchedule(request.monitor, currentMonitor, tenantId)
                     } catch (t: Exception) {
                         log.error("Failed to update EB schedule for monitor ${request.monitorId}", t)
                         actionListener.onFailure(AlertingException.wrap(t))
@@ -876,23 +885,25 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         /**
-         * Reads scheduler routing info from plugin settings (with optional ThreadContext
-         * override for account id) and creates an external schedule.
-         * No-op when required settings are blank.
+         * Creates an external schedule and returns the schedule ARN.
          */
-        private fun createExternalSchedule(monitor: Monitor, tenantId: String?) {
-            val routing = resolveRouting() ?: return
+        private fun createExternalSchedule(monitor: Monitor): String {
+            val routing = resolveRouting(schedulerAccountId)
             val targetInput = buildScheduleJobPayloadJson(monitor)
             ExternalSchedulerService.createSchedule(monitor, routing, targetInput)
+            return ExternalSchedulerService.buildScheduleArn(routing, monitor.id)
         }
 
         /**
-         * Reads scheduler routing info from plugin settings (with optional ThreadContext
-         * override for account id) and updates the external schedule. Always refreshes
-         * Target.Input with the latest monitor config.
+         * Reads the schedule ARN from the existing monitor's metadata to determine
+         * the target account, then updates the external schedule with the latest monitor config.
          */
-        private fun updateExternalSchedule(monitor: Monitor, tenantId: String?) {
-            val routing = resolveRouting() ?: return
+        private fun updateExternalSchedule(monitor: Monitor, currentMonitor: Monitor, tenantId: String?) {
+            val scheduleArn = currentMonitor.metadata?.get(ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY)
+            val accountIdOverride = scheduleArn?.let {
+                ExternalSchedulerService.parseScheduleArn(it).accountId
+            }
+            val routing = resolveRouting(accountIdOverride)
             val targetInput = buildScheduleJobPayloadJson(monitor)
             ExternalSchedulerService.updateSchedule(monitor, routing, targetInput)
         }
@@ -915,13 +926,26 @@ class TransportIndexMonitorAction @Inject constructor(
             return builder.toString()
         }
 
-        private fun resolveRouting(): SchedulerRoutingResolver.Routing? = SchedulerRoutingResolver.resolve(
+        private suspend fun updateMonitorMetadata(monitor: Monitor, tenantId: String?) {
+            val monitorObj = ToXContentObject { builder, params ->
+                monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
+            }
+            val putRequest = PutDataObjectRequest.builder()
+                .index(SCHEDULED_JOBS_INDEX)
+                .id(monitor.id)
+                .tenantId(tenantId)
+                .overwriteIfExists(true)
+                .dataObject(monitorObj)
+                .build()
+            sdkClient.putDataObjectAsync(putRequest).await()
+        }
+
+        private fun resolveRouting(accountIdOverride: String?): SchedulerRoutingResolver.Routing = SchedulerRoutingResolver.resolve(
             settingsAccountId = externalSchedulerAccountId,
             settingsQueueName = jobQueueName,
-            settingsRoleArn = externalSchedulerRoleArn,
-            settingsExecutionRoleArn = externalSchedulerExecutionRoleArn,
-            threadContextAccountIdOverride = client.threadPool().threadContext
-                .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
+            settingsRoleName = externalSchedulerRoleName,
+            settingsExecutionRoleName = externalSchedulerExecutionRoleName,
+            threadContextAccountIdOverride = accountIdOverride
         )
     }
 }

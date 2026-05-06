@@ -189,6 +189,7 @@ dependencies {
     implementation "software.amazon.awssdk:sdk-core:${versions.aws}"
     implementation "software.amazon.awssdk:utils:${versions.aws}"
     implementation "software.amazon.awssdk:regions:${versions.aws}"
+    implementation "software.amazon.awssdk:arns:${versions.aws}"
 
     testImplementation "org.antlr:antlr4-runtime:${versions.antlr4}"
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
