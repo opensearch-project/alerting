@@ -1546,6 +1546,130 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    private fun validateAlertingStatsNodeResponse(nodesResponse: Map<String, Int>) {
+        assertEquals("Incorrect number of nodes", numberOfNodes, nodesResponse["total"])
+        assertEquals("Failed nodes found during monitor stats call", 0, nodesResponse["failed"])
+        assertEquals("More than $numberOfNodes successful node", numberOfNodes, nodesResponse["successful"])
+    }
+
+    private fun assertAlertingStatsSweeperEnabled(alertingStatsResponse: Map<String, Any>, expected: Boolean) {
+        assertEquals(
+            "Legacy scheduled job enabled field is not set to $expected",
+            expected,
+            alertingStatsResponse[statsResponseOpendistroSweeperEnabledField]
+        )
+        assertEquals(
+            "Scheduled job is not ${if (expected) "enabled" else "disabled"}",
+            expected,
+            alertingStatsResponse[statsResponseOpenSearchSweeperEnabledField]
+        )
+    }
+
+    fun `test sweeper works with id field data disabled`() {
+        client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
+        val monitor = createRandomMonitor(refresh = true)
+        // Disable _id fielddata — this previously broke the sweeper
+        client().updateSettings("indices.id_field_data.enabled", false)
+        try {
+            val monitor2 = createRandomMonitor(refresh = true)
+            assertNotNull("Monitor was not created", monitor2.id)
+            val executeResponse = executeMonitor(monitor2.id)
+            assertEquals("Execute monitor failed", RestStatus.OK, executeResponse.restStatus())
+        } finally {
+            client().updateSettings("indices.id_field_data.enabled", true)
+        }
+    }
+
+    fun `test sweeper works after all monitors deleted`() {
+        client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
+        val monitor = createRandomMonitor(refresh = true)
+        client().makeRequest("DELETE", "$ALERTING_BASE_URI/${monitor.id}")
+        refreshIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)
+        // Create a new monitor after index was emptied — sweeper should handle this
+        val monitor2 = createRandomMonitor(refresh = true)
+        assertNotNull("Monitor was not created", monitor2.id)
+        val executeResponse = executeMonitor(monitor2.id)
+        assertEquals("Execute monitor failed", RestStatus.OK, executeResponse.restStatus())
+    }
+
+    fun `test existing monitor with triggers over new limit still executes`() {
+        // Create monitor with 10 triggers at default limit
+        val triggers = (1..10).map {
+            randomQueryLevelTrigger(name = "trigger-$it", condition = Script("return true"))
+        }
+        val monitor = createMonitor(randomQueryLevelMonitor(triggers = triggers, enabled = true))
+        assertEquals("Monitor should have 10 triggers", 10, monitor.triggers.size)
+
+        // Execute monitor — should succeed
+        val executeResponse = executeMonitor(monitor.id)
+        assertEquals("Execute monitor failed", RestStatus.OK, executeResponse.restStatus())
+
+        // Lower the limit to 5
+        client().updateSettings("plugins.alerting.monitor.max_triggers", 5)
+
+        // Execute the existing monitor again — should still succeed
+        val executeResponse2 = executeMonitor(monitor.id)
+        assertEquals("Existing monitor should still execute after lowering limit", RestStatus.OK, executeResponse2.restStatus())
+
+        // Reset setting
+        client().updateSettings("plugins.alerting.monitor.max_triggers", 10)
+    }
+
+    fun `test new monitor rejected when over trigger limit`() {
+        client().updateSettings("plugins.alerting.monitor.max_triggers", 5)
+        try {
+            val triggers = (1..6).map {
+                randomQueryLevelTrigger(name = "trigger-$it", condition = Script("return true"))
+            }
+            try {
+                createMonitor(randomQueryLevelMonitor(triggers = triggers))
+                fail("Expected monitor creation to fail")
+            } catch (e: ResponseException) {
+                assertEquals("Should be bad request", RestStatus.BAD_REQUEST.status, e.response.statusLine.statusCode)
+            }
+        } finally {
+            client().updateSettings("plugins.alerting.monitor.max_triggers", 10)
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun `test metadata field is not exposed in get monitor response`() {
+        // Create a monitor with metadata using toXContentWithUser (secure=false) so metadata is persisted
+        val monitor = randomQueryLevelMonitor().copy(
+            metadata = mapOf("appId" to "test-app", "workspaceId" to "ws-123")
+        )
+        val createResponse = client().makeRequest(
+            "POST", "$ALERTING_BASE_URI?refresh=true", emptyMap(),
+            monitor.toHttpEntityWithUser()
+        )
+        assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
+        val createMap = createParser(XContentType.JSON.xContent(), createResponse.entity.content).map()
+        val monitorId = createMap["_id"] as String
+        val createMonitorMap = createMap["monitor"] as Map<String, Any>
+        assertFalse("Metadata should not be in create response", createMonitorMap.containsKey("metadata"))
+
+        // GET monitor — metadata should not be exposed
+        val getResponse = client().makeRequest("GET", "$ALERTING_BASE_URI/$monitorId", emptyMap())
+        assertEquals("Get monitor failed", RestStatus.OK, getResponse.restStatus())
+        val getMap = createParser(XContentType.JSON.xContent(), getResponse.entity.content).map()
+        val getMonitorMap = getMap["monitor"] as Map<String, Any>
+        assertFalse("Metadata should not be in get response", getMonitorMap.containsKey("metadata"))
+
+        // Search monitor — metadata should not be exposed
+        val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitorId)).toString()
+        val searchResponse = client().makeRequest(
+            "GET", "$ALERTING_BASE_URI/_search", emptyMap(),
+            StringEntity(search, ContentType.APPLICATION_JSON)
+        )
+        assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
+        val searchMap = createParser(XContentType.JSON.xContent(), searchResponse.entity.content).map()
+        val hits = searchMap["hits"] as Map<String, Any>
+        val hitsList = hits["hits"] as List<Map<String, Any>>
+        assertFalse("Search should return results", hitsList.isEmpty())
+        val source = hitsList[0]["_source"] as Map<String, Any>
+        assertFalse("Metadata should not be in search response", source.containsKey("metadata"))
+    }
+
     /* PPL Monitor Simple Case Tests */
     fun `test create ppl monitor`() {
         createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
@@ -1888,129 +2012,5 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.NOT_FOUND, e.response.restStatus())
         }
-    }
-
-    private fun validateAlertingStatsNodeResponse(nodesResponse: Map<String, Int>) {
-        assertEquals("Incorrect number of nodes", numberOfNodes, nodesResponse["total"])
-        assertEquals("Failed nodes found during monitor stats call", 0, nodesResponse["failed"])
-        assertEquals("More than $numberOfNodes successful node", numberOfNodes, nodesResponse["successful"])
-    }
-
-    private fun assertAlertingStatsSweeperEnabled(alertingStatsResponse: Map<String, Any>, expected: Boolean) {
-        assertEquals(
-            "Legacy scheduled job enabled field is not set to $expected",
-            expected,
-            alertingStatsResponse[statsResponseOpendistroSweeperEnabledField]
-        )
-        assertEquals(
-            "Scheduled job is not ${if (expected) "enabled" else "disabled"}",
-            expected,
-            alertingStatsResponse[statsResponseOpenSearchSweeperEnabledField]
-        )
-    }
-
-    fun `test sweeper works with id field data disabled`() {
-        client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
-        val monitor = createRandomMonitor(refresh = true)
-        // Disable _id fielddata — this previously broke the sweeper
-        client().updateSettings("indices.id_field_data.enabled", false)
-        try {
-            val monitor2 = createRandomMonitor(refresh = true)
-            assertNotNull("Monitor was not created", monitor2.id)
-            val executeResponse = executeMonitor(monitor2.id)
-            assertEquals("Execute monitor failed", RestStatus.OK, executeResponse.restStatus())
-        } finally {
-            client().updateSettings("indices.id_field_data.enabled", true)
-        }
-    }
-
-    fun `test sweeper works after all monitors deleted`() {
-        client().updateSettings(ScheduledJobSettings.SWEEPER_ENABLED.key, true)
-        val monitor = createRandomMonitor(refresh = true)
-        client().makeRequest("DELETE", "$ALERTING_BASE_URI/${monitor.id}")
-        refreshIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)
-        // Create a new monitor after index was emptied — sweeper should handle this
-        val monitor2 = createRandomMonitor(refresh = true)
-        assertNotNull("Monitor was not created", monitor2.id)
-        val executeResponse = executeMonitor(monitor2.id)
-        assertEquals("Execute monitor failed", RestStatus.OK, executeResponse.restStatus())
-    }
-
-    fun `test existing monitor with triggers over new limit still executes`() {
-        // Create monitor with 10 triggers at default limit
-        val triggers = (1..10).map {
-            randomQueryLevelTrigger(name = "trigger-$it", condition = Script("return true"))
-        }
-        val monitor = createMonitor(randomQueryLevelMonitor(triggers = triggers, enabled = true))
-        assertEquals("Monitor should have 10 triggers", 10, monitor.triggers.size)
-
-        // Execute monitor — should succeed
-        val executeResponse = executeMonitor(monitor.id)
-        assertEquals("Execute monitor failed", RestStatus.OK, executeResponse.restStatus())
-
-        // Lower the limit to 5
-        client().updateSettings("plugins.alerting.monitor.max_triggers", 5)
-
-        // Execute the existing monitor again — should still succeed
-        val executeResponse2 = executeMonitor(monitor.id)
-        assertEquals("Existing monitor should still execute after lowering limit", RestStatus.OK, executeResponse2.restStatus())
-
-        // Reset setting
-        client().updateSettings("plugins.alerting.monitor.max_triggers", 10)
-    }
-
-    fun `test new monitor rejected when over trigger limit`() {
-        client().updateSettings("plugins.alerting.monitor.max_triggers", 5)
-        try {
-            val triggers = (1..6).map {
-                randomQueryLevelTrigger(name = "trigger-$it", condition = Script("return true"))
-            }
-            try {
-                createMonitor(randomQueryLevelMonitor(triggers = triggers))
-                fail("Expected monitor creation to fail")
-            } catch (e: ResponseException) {
-                assertEquals("Should be bad request", RestStatus.BAD_REQUEST.status, e.response.statusLine.statusCode)
-            }
-        } finally {
-            client().updateSettings("plugins.alerting.monitor.max_triggers", 10)
-        }
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    fun `test metadata field is not exposed in get monitor response`() {
-        // Create a monitor with metadata using toXContentWithUser (secure=false) so metadata is persisted
-        val monitor = randomQueryLevelMonitor().copy(
-            metadata = mapOf("appId" to "test-app", "workspaceId" to "ws-123")
-        )
-        val createResponse = client().makeRequest(
-            "POST", "$ALERTING_BASE_URI?refresh=true", emptyMap(),
-            monitor.toHttpEntityWithUser()
-        )
-        assertEquals("Create monitor failed", RestStatus.CREATED, createResponse.restStatus())
-        val createMap = createParser(XContentType.JSON.xContent(), createResponse.entity.content).map()
-        val monitorId = createMap["_id"] as String
-        val createMonitorMap = createMap["monitor"] as Map<String, Any>
-        assertFalse("Metadata should not be in create response", createMonitorMap.containsKey("metadata"))
-
-        // GET monitor — metadata should not be exposed
-        val getResponse = client().makeRequest("GET", "$ALERTING_BASE_URI/$monitorId", emptyMap())
-        assertEquals("Get monitor failed", RestStatus.OK, getResponse.restStatus())
-        val getMap = createParser(XContentType.JSON.xContent(), getResponse.entity.content).map()
-        val getMonitorMap = getMap["monitor"] as Map<String, Any>
-        assertFalse("Metadata should not be in get response", getMonitorMap.containsKey("metadata"))
-
-        // Search monitor — metadata should not be exposed
-        val search = SearchSourceBuilder().query(QueryBuilders.termQuery("_id", monitorId)).toString()
-        val searchResponse = client().makeRequest(
-            "GET", "$ALERTING_BASE_URI/_search", emptyMap(),
-            StringEntity(search, ContentType.APPLICATION_JSON)
-        )
-        assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
-        val searchMap = createParser(XContentType.JSON.xContent(), searchResponse.entity.content).map()
-        val hits = searchMap["hits"] as Map<String, Any>
-        val hitsList = hits["hits"] as List<Map<String, Any>>
-        assertFalse("Search should return results", hitsList.isEmpty())
-        val source = hitsList[0]["_source"] as Map<String, Any>
-        assertFalse("Metadata should not be in search response", source.containsKey("metadata"))
     }
 }
