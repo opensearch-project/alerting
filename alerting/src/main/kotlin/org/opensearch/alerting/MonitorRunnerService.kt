@@ -615,21 +615,4 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
             .execute()
     }
-
-    private fun updateAlertingConfigIndexSchema() {
-        if (!IndexUtils.scheduledJobIndexUpdated && monitorCtx.clusterService != null && monitorCtx.client != null) {
-            IndexUtils.updateIndexMapping(
-                ScheduledJob.SCHEDULED_JOBS_INDEX,
-                ScheduledJobIndices.scheduledJobMappings(), monitorCtx.clusterService!!.state(), monitorCtx.client!!.admin().indices(),
-                object : ActionListener<AcknowledgedResponse> {
-                    override fun onResponse(response: AcknowledgedResponse) {
-                    }
-
-                    override fun onFailure(t: Exception) {
-                        logger.error("Failed to update config index schema", t)
-                    }
-                }
-            )
-        }
-    }
 }

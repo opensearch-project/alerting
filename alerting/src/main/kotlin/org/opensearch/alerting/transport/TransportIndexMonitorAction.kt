@@ -936,7 +936,6 @@ class TransportIndexMonitorAction @Inject constructor(
                     getResponse.sourceAsBytesRef, XContentType.JSON
                 )
                 val monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
-
                 onGetResponse(monitor)
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
