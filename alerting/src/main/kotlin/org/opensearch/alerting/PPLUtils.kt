@@ -5,7 +5,9 @@
 
 package org.opensearch.alerting
 
-import org.json.JSONArray
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ArrayNode
 import org.json.JSONObject
 import org.opensearch.alerting.core.ppl.PPLPluginInterface
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -15,6 +17,7 @@ import org.opensearch.transport.client.node.NodeClient
 object PPLUtils {
 
     private val customConditionValidationRegex = """^\s*where\s+.+""".toRegex()
+    private val mapper = ObjectMapper()
 
     const val PPL_RESULTS_SIZE_EXCEEDED_MESSAGE = "The PPL Query results were too large and thus excluded."
 
@@ -72,16 +75,15 @@ object PPLUtils {
     }
 
     /**
-     * Executes a PPL query and returns the response as a parsable JSONObject.
+     * Executes a PPL query and returns the response as a parsable JsonNode.
      *
      * This method calls the PPL Plugin's Execute or Explain API via the transport layer to execute the provided query
      * and parses the response into a structured JSON format suitable for trigger evaluation
      *
      * @param query The PPL query string to execute
      * @param explain true if the query should just be explained, false if the query should be executed
-     * @param localNode The node within which the request will be serviced
-     * @param transportService The transport service used to run the request
-     * @return A JSONObject containing the query execution results
+     * @param client The node client used to run the request
+     * @return A JsonNode containing the query execution results
      *
      * @throws Exception if the query execution fails or the response cannot be parsed as JSON
      *
@@ -92,7 +94,7 @@ object PPLUtils {
         query: String,
         explain: Boolean,
         client: NodeClient
-    ): JSONObject {
+    ): JsonNode {
         val path = if (explain) {
             "/_plugins/_ppl/_explain"
         } else {
@@ -114,15 +116,13 @@ object PPLUtils {
             )
         }
 
-        val queryResponseJson = JSONObject(transportPplQueryResponse.result)
-
-        return queryResponseJson
+        return mapper.readTree(transportPplQueryResponse.result)
     }
 
-    fun capAndReformatPPLQueryResults(rawQueryResults: JSONObject, maxSize: Long): List<Map<String, Any?>> {
-        val cappedQueryResults = capPPLQueryResultsSize(rawQueryResults, maxSize).toMap()
-        val reformattedQueryResults = constructPPLQueryResultsMap(cappedQueryResults)
-        return reformattedQueryResults
+    fun capAndReformatPPLQueryResults(rawQueryResults: JsonNode, maxSize: Long): List<Map<String, Any?>> {
+        val cappedQueryResults = capPPLQueryResultsSize(rawQueryResults, maxSize)
+        val cappedMap = mapper.convertValue(cappedQueryResults, Map::class.java) as Map<String, Any>
+        return constructPPLQueryResultsMap(cappedMap)
     }
 
     /**
@@ -133,7 +133,7 @@ object PPLUtils {
      * is replaced with an informational message while preserving the original structure of the response.
      * This ensures alerts can still be created even when query results are too large.
      *
-     * @param pplQueryResults The PPL query response JSONObject
+     * @param pplQueryResults The PPL query response JsonNode
      * @param maxSize The maximum allowed size in bytes (estimated by serialized string length)
      * @return The original results if under the limit, or a modified version with datarows replaced by a message
      *
@@ -155,29 +155,25 @@ object PPLUtils {
      *       - `total`: Total number of result rows
      *       - `size`: Same as `total` (redundant field in PPL response)
      */
-    fun capPPLQueryResultsSize(pplQueryResults: JSONObject, maxSize: Long): JSONObject {
-        // estimate byte size with serialized string length
-        // if query results size are already under the limit, do nothing
-        // and return the query results as is
+    fun capPPLQueryResultsSize(pplQueryResults: JsonNode, maxSize: Long): JsonNode {
         val pplQueryResultsSize = pplQueryResults.toString().length
         if (pplQueryResultsSize <= maxSize) {
             return pplQueryResults
         }
 
-        // if the query results exceed the limit, we need to replace the query results
-        // with a message that says the results were too large, but still retain the other
-        // ppl query response fields like schema, total, and size
-        val limitExceedMessageQueryResults = JSONObject()
+        val result = mapper.createObjectNode()
+        val schema = mapper.createArrayNode().add(
+            mapper.createObjectNode().put("name", "message").put("type", "string")
+        )
+        val datarows = mapper.createArrayNode().add(
+            mapper.createArrayNode().add(PPL_RESULTS_SIZE_EXCEEDED_MESSAGE)
+        )
+        result.set<ArrayNode>("schema", schema)
+        result.set<ArrayNode>("datarows", datarows)
+        result.put("total", 1)
+        result.put("size", 1)
 
-        val schema = JSONArray().put(JSONObject(mapOf("name" to "message", "type" to "string")))
-        val datarows = JSONArray().put(JSONArray(listOf(PPL_RESULTS_SIZE_EXCEEDED_MESSAGE)))
-
-        limitExceedMessageQueryResults.put("schema", schema)
-        limitExceedMessageQueryResults.put("datarows", datarows)
-        limitExceedMessageQueryResults.put("total", 1)
-        limitExceedMessageQueryResults.put("size", 1)
-
-        return limitExceedMessageQueryResults
+        return result
     }
 
     /**
