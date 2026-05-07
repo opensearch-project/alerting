@@ -328,6 +328,8 @@ class TransportIndexMonitorAction @Inject constructor(
         val validationListener = object : ActionListener<Unit> { // validationListener
             override fun onResponse(response: Unit) {
                 val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+                val schedulerAccountId = client.threadPool().threadContext
+                    .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
 
                 // user permissions to indices have already been checked if we made it to the onResponse(),
                 // proceed without the context of the user, otherwise,
@@ -344,7 +346,14 @@ class TransportIndexMonitorAction @Inject constructor(
                         indexMonitorRequest.monitor = pplMonitor
                             .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttributes))
                     }
-                    IndexMonitorHandler(client, actionListener, indexMonitorRequest, user, tenantId).resolveUserAndStart()
+                    IndexMonitorHandler(
+                        client,
+                        actionListener,
+                        indexMonitorRequest,
+                        user,
+                        tenantId,
+                        schedulerAccountId
+                    ).resolveUserAndStart()
                 }
             }
 
