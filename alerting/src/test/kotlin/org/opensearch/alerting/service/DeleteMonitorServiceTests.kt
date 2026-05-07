@@ -179,7 +179,8 @@ class DeleteMonitorServiceTests : OpenSearchTestCase() {
 
         val result = kotlinx.coroutines.runBlocking {
             @Suppress("UNCHECKED_CAST")
-            method.invoke(DeleteMonitorService, "test-monitor-id", RefreshPolicy.IMMEDIATE) as org.opensearch.commons.alerting.action.DeleteMonitorResponse
+            method.invoke(DeleteMonitorService, "test-monitor-id", RefreshPolicy.IMMEDIATE)
+                as org.opensearch.commons.alerting.action.DeleteMonitorResponse
         }
 
         assertEquals("test-monitor-id", result.id)
