@@ -412,7 +412,7 @@ class TriggerService(val scriptService: ScriptService) {
                 // the custom condition query returns all buckets that met the custom condition,
                 // so if there are any results at all, the custom condition was met for at least one bukcet,
                 // this trigger has triggered.
-                triggered = queryResponseJson.getLong("total") > 0
+                triggered = queryResponseJson.get("total").asLong() > 0
 
                 // cap and reformat the results to be included in trigger run result
                 customConditionQueryResults = capAndReformatPPLQueryResults(queryResponseJson, queryResultsSizeLimit)
