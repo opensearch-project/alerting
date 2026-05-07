@@ -17,7 +17,6 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.util.isIndexNotFoundException
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
