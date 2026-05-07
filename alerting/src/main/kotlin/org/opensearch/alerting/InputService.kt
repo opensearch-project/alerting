@@ -5,11 +5,11 @@
 
 package org.opensearch.alerting
 
+import com.fasterxml.jackson.databind.JsonNode
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.apache.logging.log4j.LogManager
-import org.json.JSONObject
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.PPLUtils.appendDataRowsLimit
@@ -245,7 +245,7 @@ class InputService(
                 monitorCtx,
                 transportService
             )
-            val numPplResults = basePplQueryResults.getLong("total")
+            val numPplResults = basePplQueryResults.get("total").asLong()
 
             // PPL Alerting:
             // PPL Trigger evaluations won't read this input result in.
@@ -278,7 +278,7 @@ class InputService(
         baseQuery: String,
         monitorCtx: MonitorRunnerExecutionContext,
         transportService: TransportService
-    ): JSONObject {
+    ): JsonNode {
 
         // TODO: change name to trigger max duration
         val monitorExecutionDuration = monitorCtx
@@ -286,7 +286,7 @@ class InputService(
             .clusterSettings
             .get(AlertingSettings.PPL_MONITOR_EXECUTION_MAX_DURATION)
 
-        var queryResponseJson: JSONObject? = null
+        var queryResponseJson: JsonNode? = null
 
         withTimeout(monitorExecutionDuration.millis) {
             // limit the number of PPL query result data rows returned
