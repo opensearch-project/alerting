@@ -47,7 +47,6 @@ class IndexUtils {
             private set
         var commentsIndexUpdated: Boolean = false
             private set
-
         var lastUpdatedAlertHistoryIndex: String? = null
         var lastUpdatedFindingHistoryIndex: String? = null
         var lastUpdatedCommentsHistoryIndex: String? = null

@@ -39,9 +39,7 @@ import org.opensearch.commons.alerting.model.action.ActionExecutionScope
 import org.opensearch.commons.alerting.util.isBucketLevelMonitor
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.notifications.model.NotificationConfigInfo
-import org.opensearch.index.IndexNotFoundException
 import org.opensearch.script.Script
-import org.opensearch.transport.RemoteTransportException
 import org.opensearch.transport.client.node.NodeClient
 import java.util.Locale
 import kotlin.math.max
@@ -307,22 +305,6 @@ fun printsSampleDocData(trigger: Trigger): Boolean {
         )
         validTags.any { tag -> action.messageTemplate.idOrCode.contains(tag) }
     }
-}
-
-// Checks if the exception is caused by an IndexNotFoundException (directly or nested).
-// Used in Get and Search monitor functionalities to determine whether a "no results"
-// response should be returned
-fun isIndexNotFoundException(e: Exception): Boolean {
-    if (e is IndexNotFoundException) {
-        return true
-    }
-    if (e is RemoteTransportException) {
-        val cause = e.cause
-        if (cause is IndexNotFoundException) {
-            return true
-        }
-    }
-    return false
 }
 
 suspend fun getConfigAndSendNotification(

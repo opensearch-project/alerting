@@ -92,7 +92,6 @@ class RestIndexMonitorAction : BaseRestHandler() {
 
         val monitor: Monitor
         val rbacRoles: List<String>?
-
         try {
             monitor = Monitor.parse(xcp, id).copy(lastUpdateTime = Instant.now())
 
