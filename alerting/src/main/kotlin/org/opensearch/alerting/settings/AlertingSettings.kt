@@ -309,6 +309,50 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        val PPL_MONITOR_EXECUTION_MAX_DURATION = Setting.positiveTimeSetting(
+            "plugins.alerting.ppl_monitor_max_execution_duration",
+            TimeValue(1, TimeUnit.MINUTES),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val PPL_MAX_QUERY_LENGTH = Setting.longSetting(
+            "plugins.alerting.ppl_monitor_max_query_length",
+            2000L,
+            0L,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        // max data rows to retrieve when executing PPL query against
+        // SQL/PPL plugin during monitor execution
+        val PPL_QUERY_RESULTS_MAX_DATAROWS = Setting.longSetting(
+            "plugins.alerting.ppl_query_results_max_datarows",
+            10000L,
+            1L,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        // max size of query results to store in alerts and notifications
+        val PPL_QUERY_RESULTS_MAX_SIZE = Setting.longSetting(
+            "plugins.alerting.ppl_query_results_max_size",
+            3000L,
+            0L,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH = Setting.intSetting(
+            "plugins.alerting.notification_subject_source_max_length",
+            1000,
+            100,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH = Setting.intSetting(
+            "plugins.alerting.notification_message_source_max_length",
+            3000,
+            1000,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES: Setting<List<String>> = Setting.listSetting(
             "plugins.alerting.notification_context_results_allowed_roles",
             listOf(),
