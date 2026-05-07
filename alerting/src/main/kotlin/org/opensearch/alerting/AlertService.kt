@@ -43,6 +43,7 @@ import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.commons.alerting.util.isPPLMonitor
+import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.rest.RestStatus
