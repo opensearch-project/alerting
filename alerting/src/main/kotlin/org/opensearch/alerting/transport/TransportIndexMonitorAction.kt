@@ -8,8 +8,6 @@ package org.opensearch.alerting.transport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.newSingleThreadContext
-import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.OpenSearchException
@@ -116,7 +114,7 @@ private val log = LogManager.getLogger(TransportIndexMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
 class TransportIndexMonitorAction @Inject constructor(
-    val transportService: TransportService,
+    transportService: TransportService,
     val client: Client,
     actionFilters: ActionFilters,
     val scheduledJobIndices: ScheduledJobIndices,
@@ -372,29 +370,27 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         // initiate the PPL monitor and PPL query validations
-        client.threadPool().threadContext.stashContext().use {
-            scope.launch {
-                val singleThreadContext = newSingleThreadContext("IndexPPLMonitorActionThread")
-                withContext(singleThreadContext) {
-                    it.restore()
+        val storedContext = client.threadPool().threadContext.stashContext()
+        scope.launch(Dispatchers.IO) {
+            storedContext.use {
+                it.restore()
 
-                    val pplMonitor = indexMonitorRequest.monitor
+                val pplMonitor = indexMonitorRequest.monitor
 
-                    // validate the PPL query syntax and that user has permissions to
-                    // the indices being queried
-                    val pplQueryValid = validatePPLQuery(pplMonitor, validationListener)
-                    if (!pplQueryValid) {
-                        return@withContext
-                    }
-
-                    // run basic validations against the PPL Monitor
-                    val pplMonitorValid = validatePPLMonitor(pplMonitor, validationListener)
-                    if (!pplMonitorValid) {
-                        return@withContext
-                    }
-
-                    validationListener.onResponse(Unit)
+                // run basic validations against the PPL Monitor
+                val pplMonitorValid = validatePPLMonitor(pplMonitor, validationListener)
+                if (!pplMonitorValid) {
+                    return@launch
                 }
+
+                // validate the PPL query syntax and that user has permissions to
+                // the indices being queried
+                val pplQueryValid = validatePPLQuery(pplMonitor, validationListener)
+                if (!pplQueryValid) {
+                    return@launch
+                }
+
+                validationListener.onResponse(Unit)
             }
         }
     }
@@ -472,7 +468,7 @@ class TransportIndexMonitorAction @Inject constructor(
                             "Trigger ${trigger.id} checks for number of results threshold of ${trigger.numResultsValue}, " +
                                 "but PPL Alerting is configured only to retrieve $maxQueryResults query results maximum. " +
                                 "Please lower the number of results value to one below this maximum value, or adjust the cluster " +
-                                "setting: $PPL_QUERY_RESULTS_MAX_DATAROWS.key}"
+                                "setting: ${PPL_QUERY_RESULTS_MAX_DATAROWS.key}"
                         )
                     )
                 )

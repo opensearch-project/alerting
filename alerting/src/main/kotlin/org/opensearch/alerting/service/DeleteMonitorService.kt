@@ -184,11 +184,7 @@ object DeleteMonitorService :
     }
 
     private suspend fun deleteLock(monitor: Monitor) {
-        deleteLock(monitor.id)
-    }
-
-    private suspend fun deleteLock(monitorId: String) {
-        client.suspendUntil<Client, Boolean> { lockService.deleteLock(LockModel.generateLockId(monitorId), it) }
+        client.suspendUntil<Client, Boolean> { lockService.deleteLock(LockModel.generateLockId(monitor.id), it) }
     }
 
     /**
