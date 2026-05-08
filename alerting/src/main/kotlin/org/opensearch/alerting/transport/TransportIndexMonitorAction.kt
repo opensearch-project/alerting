@@ -335,6 +335,9 @@ class TransportIndexMonitorAction @Inject constructor(
         // the indices being queried. if it does, proceed to index the
         // PPL Monitor
         validatePPLQuery(pplMonitor, actionListener) {
+            // at this point, validatePPLQuery() has finished validating the PPL Query
+            // and the validation has passed. we now proceed to index the PPL Monitor
+
             val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
             val schedulerAccountId = client.threadPool().threadContext
                 .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
