@@ -298,7 +298,7 @@ fun randomQueryLevelTrigger(
     severity: String = "1",
     condition: Script = randomScript(),
     actions: List<Action> = mutableListOf(),
-    destinationId: String = ""
+    destinationId: String = "sample"
 ): QueryLevelTrigger {
     return QueryLevelTrigger(
         id = id,
@@ -315,7 +315,7 @@ fun randomBucketLevelTrigger(
     severity: String = "1",
     bucketSelector: BucketSelectorExtAggregationBuilder = randomBucketSelectorExtAggregationBuilder(name = id),
     actions: List<Action> = mutableListOf(),
-    destinationId: String = ""
+    destinationId: String = "sample"
 ): BucketLevelTrigger {
     return BucketLevelTrigger(
         id = id,
@@ -326,7 +326,7 @@ fun randomBucketLevelTrigger(
     )
 }
 
-fun randomActionsForBucketLevelTrigger(min: Int = 0, max: Int = 10, destinationId: String = ""): List<Action> =
+fun randomActionsForBucketLevelTrigger(min: Int = 0, max: Int = 10, destinationId: String = "sample"): List<Action> =
     (min..randomInt(max)).map { randomActionWithPolicy(destinationId = destinationId) }
 
 fun randomDocumentLevelTrigger(
@@ -335,7 +335,7 @@ fun randomDocumentLevelTrigger(
     severity: String = "1",
     condition: Script = randomScript(),
     actions: List<Action> = mutableListOf(),
-    destinationId: String = ""
+    destinationId: String = "sample"
 ): DocumentLevelTrigger {
     return DocumentLevelTrigger(
         id = id,
@@ -424,7 +424,7 @@ fun randomTemplateScript(
 fun randomAction(
     name: String = OpenSearchRestTestCase.randomUnicodeOfLength(10),
     template: Script = randomTemplateScript("Hello World"),
-    destinationId: String = "",
+    destinationId: String = "sample",
     throttleEnabled: Boolean = false,
     throttle: Throttle = randomThrottle()
 ) = Action(name, destinationId, template, template, throttleEnabled, throttle, actionExecutionPolicy = null)
@@ -432,7 +432,7 @@ fun randomAction(
 fun randomActionWithPolicy(
     name: String = OpenSearchRestTestCase.randomUnicodeOfLength(10),
     template: Script = randomTemplateScript("Hello World"),
-    destinationId: String = "",
+    destinationId: String = "sample",
     throttleEnabled: Boolean = false,
     throttle: Throttle = randomThrottle(),
     actionExecutionPolicy: ActionExecutionPolicy? = randomActionExecutionPolicy()
@@ -773,7 +773,7 @@ fun randomChainedAlertTrigger(
     severity: String = "1",
     condition: Script = randomScript(),
     actions: List<Action> = mutableListOf(),
-    destinationId: String = ""
+    destinationId: String = "sample"
 ): ChainedAlertTrigger {
     return ChainedAlertTrigger(
         id = id,
