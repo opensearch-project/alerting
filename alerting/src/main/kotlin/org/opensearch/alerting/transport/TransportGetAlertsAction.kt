@@ -27,6 +27,8 @@ import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetAlertsRequest
 import org.opensearch.commons.alerting.action.GetAlertsResponse
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.Alert.Companion.MONITOR_NAME_FIELD
+import org.opensearch.commons.alerting.model.Alert.Companion.TRIGGER_NAME_FIELD
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
@@ -138,8 +140,8 @@ class TransportGetAlertsAction @Inject constructor(
                     QueryBuilders
                         .queryStringQuery(tableProp.searchString)
                         .defaultOperator(Operator.AND)
-                        .field("monitor_name")
-                        .field("trigger_name")
+                        .field(MONITOR_NAME_FIELD)
+                        .field(TRIGGER_NAME_FIELD)
                 )
         }
         val searchSourceBuilder = SearchSourceBuilder()

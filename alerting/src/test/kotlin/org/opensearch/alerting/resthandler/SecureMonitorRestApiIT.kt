@@ -40,6 +40,8 @@ import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomBucketLevelMonitor
 import org.opensearch.alerting.randomBucketLevelTrigger
 import org.opensearch.alerting.randomDocumentLevelMonitor
+import org.opensearch.alerting.randomPPLMonitor
+import org.opensearch.alerting.randomPPLTrigger
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomTemplateScript
@@ -53,6 +55,7 @@ import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.rest.SecureRestClientBuilder
@@ -1641,6 +1644,44 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertEquals("Monitors found. Clean up unsuccessful", 0, numberDocsFound)
         } finally {
             deleteRoleAndRoleMapping(ALERTING_INDEX_MONITOR_ACCESS)
+        }
+    }
+
+    fun `test create PPL monitor fails when user lacks index permissions`() {
+        // Create a user with alerting permissions but only access to TEST_HR_INDEX
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            listOf(TEST_HR_BACKEND_ROLE),
+            getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS)
+        )
+        try {
+            // Create a PPL monitor targeting TEST_NON_HR_INDEX which the user does NOT have access to
+            val monitor = randomPPLMonitor(
+                triggers = listOf(
+                    randomPPLTrigger(
+                        conditionType = PPLTrigger.ConditionType.NUMBER_OF_RESULTS,
+                        numResultsCondition = PPLTrigger.NumResultsCondition.GREATER_THAN,
+                        numResultsValue = 0L,
+                        customCondition = null
+                    )
+                ),
+                query = "source = $TEST_NON_HR_INDEX | head 10"
+            )
+
+            // Attempt to create the monitor — should fail because the user
+            // doesn't have read permissions on TEST_NON_HR_INDEX.
+            // PPL alerting validates index permissions at creation time via
+            // the SQL plugin's explain API.
+            try {
+                userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
+                fail("Expected create PPL monitor to fail due to missing index permissions")
+            } catch (e: ResponseException) {
+                assertEquals("Should be Bad Request", RestStatus.BAD_REQUEST.status, e.response.statusLine.statusCode)
+            }
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
     }
 }
