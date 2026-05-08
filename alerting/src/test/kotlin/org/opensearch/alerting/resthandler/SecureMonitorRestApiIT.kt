@@ -1678,7 +1678,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 userClient?.makeRequest("POST", ALERTING_BASE_URI, emptyMap(), monitor.toHttpEntity())
                 fail("Expected create PPL monitor to fail due to missing index permissions")
             } catch (e: ResponseException) {
-                assertEquals("Should be forbidden", RestStatus.BAD_REQUEST.status, e.response.statusLine.statusCode)
+                assertEquals("Should be Bad Request", RestStatus.BAD_REQUEST.status, e.response.statusLine.statusCode)
             }
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
