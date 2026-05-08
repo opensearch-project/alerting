@@ -822,6 +822,12 @@ class TransportIndexMonitorAction @Inject constructor(
 
             log.info("Creating new monitor: ${request.monitor.name}, type: ${request.monitor.monitorType}")
 
+            if (!tenantId.isNullOrEmpty()) {
+                val updatedMetadata = (request.monitor.metadata.orEmpty()) +
+                    (AlertingPlugin.TENANT_ID_METADATA_KEY to tenantId)
+                request.monitor = request.monitor.copy(metadata = updatedMetadata)
+            }
+
             val monitorObj = ToXContentObject { builder, params ->
                 request.monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
             }
