@@ -85,6 +85,7 @@ import org.opensearch.commons.alerting.model.userErrorMessage
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
 import org.opensearch.commons.authuser.User
+import org.opensearch.commons.utils.TenantContext
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
@@ -147,7 +148,8 @@ class TransportIndexMonitorAction @Inject constructor(
     @Volatile private var externalSchedulerEnabled = AlertingSettings.EXTERNAL_SCHEDULER_ENABLED.get(settings)
     @Volatile private var externalSchedulerAccountId = AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID.get(settings)
     @Volatile private var jobQueueName = AlertingSettings.JOB_QUEUE_NAME.get(settings)
-    @Volatile private var externalSchedulerRoleArn = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN.get(settings)
+    @Volatile private var externalSchedulerRoleName = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(settings)
+    @Volatile private var externalSchedulerExecutionRoleName = AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME.get(settings)
 
     private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
 
@@ -180,9 +182,13 @@ class TransportIndexMonitorAction @Inject constructor(
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.JOB_QUEUE_NAME) {
             jobQueueName = it
         }
-        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN) {
-            externalSchedulerRoleArn = it
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME) {
+            externalSchedulerRoleName = it
         }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME) {
+            externalSchedulerExecutionRoleName = it
+        }
+
         listenFilterBySettingChange(clusterService)
     }
 
@@ -292,8 +298,11 @@ class TransportIndexMonitorAction @Inject constructor(
             object : ActionListener<SearchResponse> {
                 override fun onResponse(searchResponse: SearchResponse) {
                     // User has read access to configured indices in the monitor, now create monitor with out user context.
+                    val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+                    val schedulerAccountId = client.threadPool().threadContext
+                        .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
                     client.threadPool().threadContext.stashContext().use {
-                        IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStart()
+                        IndexMonitorHandler(client, actionListener, request, user, tenantId, schedulerAccountId).resolveUserAndStart()
                     }
                 }
 
@@ -334,9 +343,6 @@ class TransportIndexMonitorAction @Inject constructor(
         // the indices being queried. if it does, proceed to index the
         // PPL Monitor
         validatePPLQuery(pplMonitor, actionListener) {
-            // at this point, validatePPLQuery() has finished validating the PPL Query
-            // and the validation has passed. we now proceed to index the PPL Monitor
-
             val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
             val schedulerAccountId = client.threadPool().threadContext
                 .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
@@ -538,8 +544,11 @@ class TransportIndexMonitorAction @Inject constructor(
         request: IndexMonitorRequest,
         user: User?,
     ) {
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        val schedulerAccountId = client.threadPool().threadContext
+            .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
         client.threadPool().threadContext.stashContext().use {
-            IndexMonitorHandler(client, actionListener, request, user).resolveUserAndStartForAD()
+            IndexMonitorHandler(client, actionListener, request, user, tenantId, schedulerAccountId).resolveUserAndStartForAD()
         }
     }
 
@@ -548,6 +557,8 @@ class TransportIndexMonitorAction @Inject constructor(
         private val actionListener: ActionListener<IndexMonitorResponse>,
         private val request: IndexMonitorRequest,
         private val user: User?,
+        private val tenantId: String?,
+        private val schedulerAccountId: String?,
     ) {
 
         fun resolveUserAndStart() {
@@ -606,6 +617,12 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         fun start() {
+            // When multi-tenancy is enabled, monitors are stored in remote metadata —
+            // skip local scheduled-job index creation and mapping updates.
+            if (multiTenancyEnabled) {
+                prepareMonitorIndexing()
+                return
+            }
             if (!scheduledJobIndices.scheduledJobIndexExists()) {
                 scheduledJobIndices.initScheduledJobIndex(object : ActionListener<CreateIndexResponse> {
                     override fun onResponse(response: CreateIndexResponse) {
@@ -614,7 +631,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     override fun onFailure(t: Exception) {
                         // https://github.com/opensearch-project/alerting/issues/646
                         if (ExceptionsHelper.unwrapCause(t) is ResourceAlreadyExistsException) {
-                            scope.launch {
+                            scope.launch(TenantContext(tenantId)) {
                                 // Wait for the yellow status
                                 val request = ClusterHealthRequest()
                                     .indices(SCHEDULED_JOBS_INDEX)
@@ -672,8 +689,13 @@ class TransportIndexMonitorAction @Inject constructor(
             }
 
             if (request.method == RestRequest.Method.PUT) {
-                scope.launch {
+                scope.launch(TenantContext(tenantId)) {
                     updateMonitor()
+                }
+            } else if (multiTenancyEnabled) {
+                // Skip local scheduled-job index search for monitor count when multi-tenancy is enabled.
+                scope.launch(TenantContext(tenantId)) {
+                    indexMonitor()
                 }
             } else {
                 val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
@@ -743,7 +765,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     )
                 )
             } else {
-                scope.launch {
+                scope.launch(TenantContext(tenantId)) {
                     indexMonitor()
                 }
             }
@@ -800,7 +822,6 @@ class TransportIndexMonitorAction @Inject constructor(
 
             log.info("Creating new monitor: ${request.monitor.name}, type: ${request.monitor.monitorType}")
 
-            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
             val monitorObj = ToXContentObject { builder, params ->
                 request.monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
             }
@@ -825,39 +846,47 @@ class TransportIndexMonitorAction @Inject constructor(
                 }
                 val indexResponse = putResponse.indexResponse()
                     ?: throw OpenSearchStatusException("No index response from SDK", RestStatus.INTERNAL_SERVER_ERROR)
-                var metadata: MonitorMetadata?
-                try { // delete monitor if metadata creation fails, log the right error and re-throw the error to fail listener
-                    request.monitor = request.monitor.copy(id = indexResponse.id)
-                    var (monitorMetadata: MonitorMetadata, created: Boolean) = MonitorMetadataService.getOrCreateMetadata(request.monitor)
-                    if (created == false) {
-                        log.warn("Metadata doc id:${monitorMetadata.id} exists, but it shouldn't!")
+                request.monitor = request.monitor.copy(id = indexResponse.id)
+
+                if (!multiTenancyEnabled) {
+                    var metadata: MonitorMetadata?
+                    try {
+                        var (monitorMetadata: MonitorMetadata, created: Boolean) =
+                            MonitorMetadataService.getOrCreateMetadata(request.monitor)
+                        if (created == false) {
+                            log.warn("Metadata doc id:${monitorMetadata.id} exists, but it shouldn't!")
+                        }
+                        metadata = monitorMetadata
+                    } catch (t: Exception) {
+                        log.error("failed to create metadata for monitor ${indexResponse.id}. deleting monitor")
+                        cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
+                        throw t
                     }
-                    metadata = monitorMetadata
-                } catch (t: Exception) {
-                    log.error("failed to create metadata for monitor ${indexResponse.id}. deleting monitor")
-                    cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
-                    throw t
-                }
-                try {
-                    if (
-                        request.monitor.isMonitorOfStandardType() &&
-                        Monitor.MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT)) ==
-                        Monitor.MonitorType.DOC_LEVEL_MONITOR
-                    ) {
-                        indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
+                    try {
+                        if (
+                            request.monitor.isMonitorOfStandardType() &&
+                            Monitor.MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT)) ==
+                            Monitor.MonitorType.DOC_LEVEL_MONITOR
+                        ) {
+                            indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
+                        }
+                        // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
+                        MonitorMetadataService.upsertMetadata(metadata, updating = true)
+                    } catch (t: Exception) {
+                        log.error("failed to index doc level queries monitor ${indexResponse.id}. deleting monitor", t)
+                        cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
+                        throw t
                     }
-                    // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
-                    MonitorMetadataService.upsertMetadata(metadata, updating = true)
-                } catch (t: Exception) {
-                    log.error("failed to index doc level queries monitor ${indexResponse.id}. deleting monitor", t)
-                    cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
-                    throw t
                 }
 
-                // Create external schedule for monitor execution
+                // Create external schedule and update monitor with the schedule ARN
                 if (externalSchedulerEnabled) {
                     try {
-                        createExternalSchedule(request.monitor, tenantId)
+                        val scheduleArn = createExternalSchedule(request.monitor)
+                        val updatedMetadata = (request.monitor.metadata.orEmpty()) +
+                            (ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY to scheduleArn)
+                        request.monitor = request.monitor.copy(metadata = updatedMetadata)
+                        updateMonitorMetadata(request.monitor, tenantId)
                     } catch (t: Exception) {
                         log.error("Failed to create EB schedule for monitor ${indexResponse.id}. Rolling back.", t)
                         cleanupMonitorAfterPartialFailure(request.monitor, indexResponse)
@@ -915,7 +944,6 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         private suspend fun updateMonitor() {
-            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
             val getRequest = GetDataObjectRequest.builder()
                 .index(SCHEDULED_JOBS_INDEX)
                 .id(request.monitorId)
@@ -993,7 +1021,6 @@ class TransportIndexMonitorAction @Inject constructor(
 
             log.info("Updating monitor, ${currentMonitor.id}")
 
-            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
             val monitorObj = ToXContentObject { builder, params ->
                 request.monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
             }
@@ -1031,40 +1058,42 @@ class TransportIndexMonitorAction @Inject constructor(
                     isDocLevelMonitorRestarted = true
                 }
 
-                var updatedMetadata: MonitorMetadata
-                val (metadata, created) = MonitorMetadataService.getOrCreateMetadata(
-                    request.monitor,
-                    forceCreateLastRunContext = isDocLevelMonitorRestarted
-                )
-
-                // Recreate runContext if metadata exists
-                // Delete and insert all queries from/to queryIndex
-
-                if (!created &&
-                    currentMonitor.isMonitorOfStandardType() &&
-                    Monitor.MonitorType.valueOf(currentMonitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
-                ) {
-                    updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
-                    if (docLevelMonitorQueries.docLevelQueryIndexExists(currentMonitor.dataSources)) {
-                        client.suspendUntil<Client, BulkByScrollResponse> {
-                            DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
-                                .source(currentMonitor.dataSources.queryIndex)
-                                .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
-                                .execute(it)
-                        }
-                    }
-                    indexDocLevelMonitorQueries(
+                if (!multiTenancyEnabled) {
+                    var updatedMetadata: MonitorMetadata
+                    val (metadata, created) = MonitorMetadataService.getOrCreateMetadata(
                         request.monitor,
-                        currentMonitor.id,
-                        updatedMetadata,
-                        request.refreshPolicy
+                        forceCreateLastRunContext = isDocLevelMonitorRestarted
                     )
-                    MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
+
+                    // Recreate runContext if metadata exists
+                    // Delete and insert all queries from/to queryIndex
+
+                    val isDocLevelMonitor = currentMonitor.isMonitorOfStandardType() &&
+                        Monitor.MonitorType.valueOf(currentMonitor.monitorType.uppercase(Locale.ROOT)) ==
+                        Monitor.MonitorType.DOC_LEVEL_MONITOR
+                    if (!created && isDocLevelMonitor) {
+                        updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
+                        if (docLevelMonitorQueries.docLevelQueryIndexExists(currentMonitor.dataSources)) {
+                            client.suspendUntil<Client, BulkByScrollResponse> {
+                                DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+                                    .source(currentMonitor.dataSources.queryIndex)
+                                    .filter(QueryBuilders.matchQuery("monitor_id", currentMonitor.id))
+                                    .execute(it)
+                            }
+                        }
+                        indexDocLevelMonitorQueries(
+                            request.monitor,
+                            currentMonitor.id,
+                            updatedMetadata,
+                            request.refreshPolicy
+                        )
+                        MonitorMetadataService.upsertMetadata(updatedMetadata, updating = true)
+                    }
                 }
                 // Update external schedule with latest monitor config
                 if (externalSchedulerEnabled) {
                     try {
-                        updateExternalSchedule(request.monitor, tenantId)
+                        updateExternalSchedule(request.monitor, currentMonitor, tenantId)
                     } catch (t: Exception) {
                         log.error("Failed to update EB schedule for monitor ${request.monitorId}", t)
                         actionListener.onFailure(AlertingException.wrap(t))
@@ -1095,23 +1124,25 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         /**
-         * Reads scheduler routing info from plugin settings (with optional ThreadContext
-         * override for account id) and creates an external schedule.
-         * No-op when required settings are blank.
+         * Creates an external schedule and returns the schedule ARN.
          */
-        private fun createExternalSchedule(monitor: Monitor, tenantId: String?) {
-            val routing = resolveRouting() ?: return
+        private fun createExternalSchedule(monitor: Monitor): String {
+            val routing = resolveRouting(schedulerAccountId)
             val targetInput = buildScheduleJobPayloadJson(monitor)
             ExternalSchedulerService.createSchedule(monitor, routing, targetInput)
+            return ExternalSchedulerService.buildScheduleArn(routing, monitor.id)
         }
 
         /**
-         * Reads scheduler routing info from plugin settings (with optional ThreadContext
-         * override for account id) and updates the external schedule. Always refreshes
-         * Target.Input with the latest monitor config.
+         * Reads the schedule ARN from the existing monitor's metadata to determine
+         * the target account, then updates the external schedule with the latest monitor config.
          */
-        private fun updateExternalSchedule(monitor: Monitor, tenantId: String?) {
-            val routing = resolveRouting() ?: return
+        private fun updateExternalSchedule(monitor: Monitor, currentMonitor: Monitor, tenantId: String?) {
+            val scheduleArn = currentMonitor.metadata?.get(ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY)
+            val accountIdOverride = scheduleArn?.let {
+                ExternalSchedulerService.parseScheduleArn(it).accountId
+            }
+            val routing = resolveRouting(accountIdOverride)
             val targetInput = buildScheduleJobPayloadJson(monitor)
             ExternalSchedulerService.updateSchedule(monitor, routing, targetInput)
         }
@@ -1123,7 +1154,7 @@ class TransportIndexMonitorAction @Inject constructor(
          */
         private fun buildScheduleJobPayloadJson(monitor: Monitor): String {
             val monitorConfigBuilder = XContentFactory.jsonBuilder()
-            monitor.toXContent(monitorConfigBuilder, ToXContent.EMPTY_PARAMS)
+            monitor.toXContentWithUser(monitorConfigBuilder, ToXContent.EMPTY_PARAMS)
             val payload = ScheduleJobPayload(
                 monitorId = monitor.id,
                 jobStartTime = ExternalSchedulerService.EB_SCHEDULED_TIME_PLACEHOLDER,
@@ -1134,12 +1165,26 @@ class TransportIndexMonitorAction @Inject constructor(
             return builder.toString()
         }
 
-        private fun resolveRouting(): SchedulerRoutingResolver.Routing? = SchedulerRoutingResolver.resolve(
+        private suspend fun updateMonitorMetadata(monitor: Monitor, tenantId: String?) {
+            val monitorObj = ToXContentObject { builder, params ->
+                monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
+            }
+            val putRequest = PutDataObjectRequest.builder()
+                .index(SCHEDULED_JOBS_INDEX)
+                .id(monitor.id)
+                .tenantId(tenantId)
+                .overwriteIfExists(true)
+                .dataObject(monitorObj)
+                .build()
+            sdkClient.putDataObjectAsync(putRequest).await()
+        }
+
+        private fun resolveRouting(accountIdOverride: String?): SchedulerRoutingResolver.Routing = SchedulerRoutingResolver.resolve(
             settingsAccountId = externalSchedulerAccountId,
             settingsQueueName = jobQueueName,
-            settingsRoleArn = externalSchedulerRoleArn,
-            threadContextAccountIdOverride = client.threadPool().threadContext
-                .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
+            settingsRoleName = externalSchedulerRoleName,
+            settingsExecutionRoleName = externalSchedulerExecutionRoleName,
+            threadContextAccountIdOverride = accountIdOverride
         )
     }
 }
