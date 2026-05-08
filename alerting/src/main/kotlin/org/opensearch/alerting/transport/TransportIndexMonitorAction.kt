@@ -386,66 +386,6 @@ class TransportIndexMonitorAction @Inject constructor(
         }
     }
 
-    private suspend fun validatePPLQuery(
-        pplMonitor: Monitor,
-        validationListener: ActionListener<Unit>
-    ): Boolean {
-        // first attempt to run the monitor query and all possible
-        // extensions of it (from custom conditions)
-        try {
-            val query = (pplMonitor.inputs[0] as PPLInput).query
-
-            val limitedQueryToExecute = appendDataRowsLimit(query, maxQueryResults)
-
-            // now PPL explain the base query as is.
-            // if there are any PPL syntax, index not found, insufficient index permissions, or other errors,
-            // this will throw an exception from the SQL/PPL plugin
-            executePplQuery(limitedQueryToExecute, true, client as NodeClient)
-
-            // scan all the triggers with custom conditions, and ensure each query constructed
-            // from the base query + custom condition is valid
-            for (trigger in pplMonitor.triggers) {
-                val pplTrigger = trigger as PPLTrigger
-
-                if (pplTrigger.conditionType != PPLTrigger.ConditionType.CUSTOM) {
-                    continue
-                }
-
-                val customCondition = pplTrigger.customCondition!!
-
-                // validate the custom condition is a where statement and
-                // not some other valid PPL statement
-                if (!customConditionIsValid(customCondition)) {
-                    validationListener.onFailure(
-                        AlertingException.wrap(
-                            IllegalArgumentException(
-                                "Custom condition for trigger ${trigger.name} is invalid, " +
-                                    "custom condition must be a valid PPL where statement."
-                            )
-                        )
-                    )
-                    return false
-                }
-
-                val queryWithCustomCondition = appendCustomCondition(query, customCondition)
-                val limitedQueryWithCustomCondition = appendDataRowsLimit(queryWithCustomCondition, maxQueryResults)
-
-                // if the custom condition is invalid, this will throw an exception
-                // from the SQL/PPL plugin
-                executePplQuery(limitedQueryWithCustomCondition, true, client as NodeClient)
-            }
-        } catch (e: Exception) {
-            validationListener.onFailure(
-                AlertingException.wrap(
-                    IllegalArgumentException("Validation error for PPL Query in PPL Monitor: ${e.userErrorMessage()}")
-                )
-            )
-            return false
-        }
-
-        return true
-    }
-
     private fun validatePPLMonitor(pplMonitor: Monitor, validationListener: ActionListener<Unit>): Boolean {
         pplMonitor.triggers.forEach { trigger ->
             val pplTrigger = trigger as PPLTrigger
@@ -500,6 +440,66 @@ class TransportIndexMonitorAction @Inject constructor(
                     IllegalArgumentException(
                         "PPL Query length must be at most $maxQueryLength but was ${query.length}"
                     )
+                )
+            )
+            return false
+        }
+
+        return true
+    }
+
+    private suspend fun validatePPLQuery(
+        pplMonitor: Monitor,
+        validationListener: ActionListener<Unit>
+    ): Boolean {
+        // first attempt to run the monitor query and all possible
+        // extensions of it (from custom conditions)
+        try {
+            val query = (pplMonitor.inputs[0] as PPLInput).query
+
+            val limitedQueryToExecute = appendDataRowsLimit(query, maxQueryResults)
+
+            // now PPL explain the base query as is.
+            // if there are any PPL syntax, index not found, insufficient index permissions, or other errors,
+            // this will throw an exception from the SQL/PPL plugin
+            executePplQuery(limitedQueryToExecute, true, client as NodeClient)
+
+            // scan all the triggers with custom conditions, and ensure each query constructed
+            // from the base query + custom condition is valid
+            for (trigger in pplMonitor.triggers) {
+                val pplTrigger = trigger as PPLTrigger
+
+                if (pplTrigger.conditionType != PPLTrigger.ConditionType.CUSTOM) {
+                    continue
+                }
+
+                val customCondition = pplTrigger.customCondition!!
+
+                // validate the custom condition is a where statement and
+                // not some other valid PPL statement
+                if (!customConditionIsValid(customCondition)) {
+                    validationListener.onFailure(
+                        AlertingException.wrap(
+                            IllegalArgumentException(
+                                "Custom condition for trigger ${trigger.name} is invalid, " +
+                                    "custom condition must be a valid PPL where statement."
+                            )
+                        )
+                    )
+                    return false
+                }
+
+                val queryWithCustomCondition = appendCustomCondition(query, customCondition)
+                val limitedQueryWithCustomCondition = appendDataRowsLimit(queryWithCustomCondition, maxQueryResults)
+
+                // if the custom condition is invalid, this will throw an exception
+                // from the SQL/PPL plugin
+                executePplQuery(limitedQueryWithCustomCondition, true, client)
+            }
+        } catch (e: Exception) {
+            validationListener.onFailure(
+                AlertingException.wrap(
+                    IllegalArgumentException("Validation error for PPL Query in PPL Monitor: ${e.userErrorMessage()}")
                 )
             )
             return false
