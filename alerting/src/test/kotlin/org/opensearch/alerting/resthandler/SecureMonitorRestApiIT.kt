@@ -1684,4 +1684,126 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
         }
     }
+
+    fun `test execute monitor by ID blocked when user backend roles differ from monitor owner`() {
+        enableFilterBy()
+        if (!isHttps()) return
+
+        // Create monitor as admin with specific backend roles
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE),
+            false
+        )
+        val monitor = createMonitorWithClient(
+            userClient!!,
+            randomQueryLevelMonitor(
+                inputs = listOf(
+                    SearchInput(listOf(TEST_HR_INDEX), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
+                )
+            ),
+            listOf(TEST_HR_BACKEND_ROLE)
+        )
+
+        // Create a different user with different backend roles
+        val otherUser = "otherUser"
+        createUserWithTestDataAndCustomRole(
+            otherUser,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            listOf("different_backend_role"),
+            listOf(
+                getClusterPermissionsFromCustomRole(ALERTING_EXECUTE_MONITOR_ACCESS),
+                getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
+            )
+        )
+        val otherClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), otherUser, password)
+            .setSocketTimeout(60000).build()
+
+        try {
+            // Other user tries to execute the monitor by ID — should be blocked
+            otherClient.makeRequest("POST", "$ALERTING_BASE_URI/${monitor.id}/_execute", mutableMapOf())
+            fail("Expected execute to be blocked due to backend role mismatch")
+        } catch (e: ResponseException) {
+            assertEquals("Should be forbidden", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
+        } finally {
+            otherClient.close()
+            deleteUser(otherUser)
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
+            deleteRoleMapping(READALL_AND_MONITOR_ROLE)
+        }
+    }
+
+    fun `test execute monitor with body blocked when user backend roles differ from monitor in request`() {
+        enableFilterBy()
+        if (!isHttps()) return
+
+        // Create a user with specific backend roles
+        createUserWithTestDataAndCustomRole(
+            user,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            listOf("different_backend_role"),
+            listOf(
+                getClusterPermissionsFromCustomRole(ALERTING_EXECUTE_MONITOR_ACCESS),
+                getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS)
+            )
+        )
+
+        try {
+            // User tries to execute a monitor (passed in request body) that has a different user's backend roles
+            val adminUser = User(ADMIN, listOf(TEST_HR_BACKEND_ROLE), listOf(ALL_ACCESS_ROLE), listOf())
+            val monitor = randomQueryLevelMonitor(
+                inputs = listOf(
+                    SearchInput(listOf(TEST_HR_INDEX), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
+                )
+            ).copy(user = adminUser)
+
+            val response = executeMonitor(userClient!!, monitor, DRYRUN_MONITOR)
+            val output = entityAsMap(response)
+            val inputResults = output.stringMap("input_results")
+            assertTrue(
+                "Expected permission error",
+                (inputResults?.get("error") as String).contains("permissions")
+            )
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
+        }
+    }
+
+    fun `test non-manual execute monitor respects backend role filtering`() {
+        enableFilterBy()
+        if (!isHttps()) return
+
+        // Create monitor as a user with specific backend roles
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE),
+            false
+        )
+        val monitor = createMonitorWithClient(
+            userClient!!,
+            randomQueryLevelMonitor(
+                inputs = listOf(
+                    SearchInput(listOf(TEST_HR_INDEX), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
+                ),
+                enabled = true
+            ),
+            listOf(TEST_HR_BACKEND_ROLE)
+        )
+
+        // Execute the monitor non-manually (simulating scheduled execution)
+        // This should succeed because scheduled executions run as the system,
+        // not as a specific user
+        try {
+            val response = executeMonitor(monitor.id)
+            assertEquals("Execute monitor failed", RestStatus.OK, response.restStatus())
+        } finally {
+            deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
+            deleteRoleMapping(READALL_AND_MONITOR_ROLE)
+        }
+    }
 }
