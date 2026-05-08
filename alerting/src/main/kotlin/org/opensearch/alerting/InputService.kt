@@ -280,7 +280,7 @@ class InputService(
         val monitorExecutionDuration = monitorCtx
             .clusterService!!
             .clusterSettings
-            .get(AlertingSettings.PPL_MONITOR_EXECUTION_MAX_DURATION)
+            .get(AlertingSettings.PPL_TRIGGER_EXECUTION_MAX_DURATION)
 
         var queryResponseJson: JsonNode? = null
 

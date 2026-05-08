@@ -352,10 +352,10 @@ class TriggerService(val scriptService: ScriptService) {
         }
 
         // TODO: change name to trigger max duration
-        val monitorExecutionDuration = monitorCtx
+        val pplTriggerExecutionDuration = monitorCtx
             .clusterService!!
             .clusterSettings
-            .get(AlertingSettings.PPL_MONITOR_EXECUTION_MAX_DURATION)
+            .get(AlertingSettings.PPL_TRIGGER_EXECUTION_MAX_DURATION)
         val queryResultsSizeLimit = monitorCtx
             .clusterService!!
             .clusterSettings
@@ -365,7 +365,7 @@ class TriggerService(val scriptService: ScriptService) {
         var customConditionQueryResults: List<Map<String, Any?>>? = null
 
         try {
-            withTimeout(monitorExecutionDuration.millis) {
+            withTimeout(pplTriggerExecutionDuration.millis) {
                 logger.debug("checking if custom condition is used and appending to base query")
 
                 val customCondition = pplTrigger.customCondition!!
