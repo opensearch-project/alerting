@@ -122,7 +122,6 @@ class TransportExecuteMonitorAction @Inject constructor(
             }
 
             if (execMonitorRequest.monitorId != null && execMonitorRequest.monitor == null) {
-                val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
                 val getRequest = GetDataObjectRequest.builder()
                     .index(ScheduledJob.SCHEDULED_JOBS_INDEX)
                     .id(execMonitorRequest.monitorId)
@@ -163,6 +162,18 @@ class TransportExecuteMonitorAction @Inject constructor(
                         ).use { xcp ->
                             val monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
 
+                            if (multiTenancyEnabled && monitor.isUnsupportedMultiTenantMonitorType()) {
+                                actionListener.onFailure(
+                                    AlertingException.wrap(
+                                        OpenSearchStatusException(
+                                            "${monitor.monitorType} monitors are not allowed when multi-tenancy is enabled.",
+                                            RestStatus.METHOD_NOT_ALLOWED
+                                        )
+                                    )
+                                )
+                                return@whenComplete
+                            }
+
                             if (execMonitorRequest.manual && !checkUserPermissionsWithResource(
                                     user, monitor.user, actionListener,
                                     "monitor", execMonitorRequest.monitorId
@@ -196,12 +207,20 @@ class TransportExecuteMonitorAction @Inject constructor(
                     return@use
                 }
 
+                if (execMonitorRequest.manual && !checkUserPermissionsWithResource(
+                        user, monitor.user, actionListener,
+                        "monitor", monitor.id
+                    )
+                ) {
+                    return@use
+                }
+
                 if (
                     monitor.isMonitorOfStandardType() &&
                     Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
                 ) {
                     try {
-                        scope.launch {
+                        scope.launch(TenantContext(tenantId)) {
                             if (!docLevelMonitorQueries.docLevelQueryIndexExists(monitor.dataSources)) {
                                 docLevelMonitorQueries.initDocLevelQueryIndex(monitor.dataSources)
                                 log.info("Central Percolation index ${ScheduledJob.DOC_LEVEL_QUERIES_INDEX} created")
