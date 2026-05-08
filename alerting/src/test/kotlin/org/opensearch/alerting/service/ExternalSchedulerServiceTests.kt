@@ -76,7 +76,7 @@ class ExternalSchedulerServiceTests {
                 .put("plugins.alerting.remote_metadata_region", "us-west-2").build()
         )
         val monitor = testMonitor()
-        val routing = SchedulerRoutingResolver.Routing("111111111111", "queue", "arn:aws:iam::111:role/test")
+        val routing = SchedulerRoutingResolver.Routing("111111111111", "queue", "arn:aws:iam::111:role/test", "arn:aws:iam::111:role/exec")
         try {
             ExternalSchedulerService.createSchedule(monitor, routing, buildPayloadJson(monitor))
             throw AssertionError("Expected IllegalArgumentException")
@@ -92,12 +92,52 @@ class ExternalSchedulerServiceTests {
             org.opensearch.common.settings.Settings.builder()
                 .put("plugins.alerting.remote_metadata_region", "us-west-2").build()
         )
-        val routing = SchedulerRoutingResolver.Routing("333333333333", "queue", "arn:aws:iam::333:role/test")
+        val routing = SchedulerRoutingResolver.Routing("333333333333", "queue", "arn:aws:iam::333:role/test", "arn:aws:iam::333:role/exec")
         try {
             ExternalSchedulerService.deleteSchedule("mon-3", routing)
             throw AssertionError("Expected IllegalArgumentException")
         } catch (e: IllegalArgumentException) {
             assertTrue(e.message!!.contains("credentialsCache"))
         }
+    }
+
+    @Test
+    fun `buildScheduleArn constructs correct ARN`() {
+        ExternalSchedulerService.initialize(
+            org.opensearch.common.settings.Settings.builder()
+                .put("plugins.alerting.remote_metadata_region", "us-east-1").build()
+        )
+        val routing = SchedulerRoutingResolver.Routing("444455556666", "queue", "arn:aws:iam::444:role/r", "arn:aws:iam::444:role/e")
+        val arn = ExternalSchedulerService.buildScheduleArn(routing, "mon-xyz")
+        assertEquals("arn:aws:scheduler:us-east-1:444455556666:schedule/default/monitor-mon-xyz", arn)
+    }
+
+    @Test
+    fun `parseScheduleArn extracts region accountId and name`() {
+        val arn = "arn:aws:scheduler:us-west-2:111222333444:schedule/default/monitor-abc123"
+        val info = ExternalSchedulerService.parseScheduleArn(arn)
+        assertEquals("us-west-2", info.region)
+        assertEquals("111222333444", info.accountId)
+        assertEquals("monitor-abc123", info.name)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `parseScheduleArn throws on missing region`() {
+        ExternalSchedulerService.parseScheduleArn("arn:aws:scheduler::111222333444:schedule/default/monitor-abc")
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `parseScheduleArn throws on missing account ID`() {
+        ExternalSchedulerService.parseScheduleArn("arn:aws:scheduler:us-west-2::schedule/default/monitor-abc")
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `parseScheduleArn throws on invalid ARN`() {
+        ExternalSchedulerService.parseScheduleArn("not-an-arn")
+    }
+
+    @Test
+    fun `SCHEDULE_ARN_METADATA_KEY is schedule_arn`() {
+        assertEquals("schedule_arn", ExternalSchedulerService.SCHEDULE_ARN_METADATA_KEY)
     }
 }
