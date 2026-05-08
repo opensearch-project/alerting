@@ -101,6 +101,7 @@ import org.opensearch.remote.metadata.client.PutDataObjectRequest
 import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
@@ -321,78 +322,56 @@ class TransportIndexMonitorAction @Inject constructor(
         indexMonitorRequest: IndexMonitorRequest,
         user: User?
     ) {
-        // declare upfront the validation listener that will move on to the next phase
-        // of monitor indexing after PPL validations are complete
-        val validationListener = object : ActionListener<Unit> { // validationListener
-            override fun onResponse(response: Unit) {
-                val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
-                val schedulerAccountId = client.threadPool().threadContext
-                    .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
+        val pplMonitor = indexMonitorRequest.monitor
 
-                // user permissions to indices have already been checked if we made it to the onResponse(),
-                // proceed without the context of the user, otherwise,
-                // we would get permissions errors trying to search the alerting-config
-                // index as the user. pass the user object itself so backend
-                // roles can be matched and checked downstream
-                client.threadPool().threadContext.stashContext().use {
-                    val pplMonitor = indexMonitorRequest.monitor
-                    if (user == null) {
-                        indexMonitorRequest.monitor = pplMonitor
-                            .copy(user = User("", listOf(), listOf(), mapOf()))
-                    } else {
-                        indexMonitorRequest.monitor = pplMonitor
-                            .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttributes))
-                    }
-                    IndexMonitorHandler(
-                        client,
-                        actionListener,
-                        indexMonitorRequest,
-                        user,
-                        tenantId,
-                        schedulerAccountId
-                    ).resolveUserAndStart()
-                }
-            }
-
-            override fun onFailure(e: Exception) {
-                actionListener.onFailure(e)
-            }
+        // run basic validations against the PPL Monitor
+        val pplMonitorValid = validatePPLMonitor(pplMonitor, actionListener)
+        if (!pplMonitorValid) {
+            return
         }
 
-        // initiate the PPL monitor and PPL query validations
-        val storedContext = client.threadPool().threadContext.stashContext()
-        scope.launch(Dispatchers.IO) {
-            storedContext.use {
-                it.restore()
+        // validate the PPL query syntax and that user has permissions to
+        // the indices being queried. if it does, proceed to index the
+        // PPL Monitor
+        validatePPLQuery(pplMonitor, actionListener) {
+            val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+            val schedulerAccountId = client.threadPool().threadContext
+                .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
 
+            // user permissions to indices have already been checked if we made it to the onResponse(),
+            // proceed without the context of the user, otherwise,
+            // we would get permissions errors trying to search the alerting-config
+            // index as the user. pass the user object itself so backend
+            // roles can be matched and checked downstream
+            client.threadPool().threadContext.stashContext().use {
                 val pplMonitor = indexMonitorRequest.monitor
-
-                // run basic validations against the PPL Monitor
-                val pplMonitorValid = validatePPLMonitor(pplMonitor, validationListener)
-                if (!pplMonitorValid) {
-                    return@launch
+                if (user == null) {
+                    indexMonitorRequest.monitor = pplMonitor
+                        .copy(user = User("", listOf(), listOf(), mapOf()))
+                } else {
+                    indexMonitorRequest.monitor = pplMonitor
+                        .copy(user = User(user.name, user.backendRoles, user.roles, user.customAttributes))
                 }
-
-                // validate the PPL query syntax and that user has permissions to
-                // the indices being queried
-                val pplQueryValid = validatePPLQuery(pplMonitor, validationListener)
-                if (!pplQueryValid) {
-                    return@launch
-                }
-
-                validationListener.onResponse(Unit)
+                IndexMonitorHandler(
+                    client,
+                    actionListener,
+                    indexMonitorRequest,
+                    user,
+                    tenantId,
+                    schedulerAccountId
+                ).resolveUserAndStart()
             }
         }
     }
 
-    private fun validatePPLMonitor(pplMonitor: Monitor, validationListener: ActionListener<Unit>): Boolean {
+    private fun validatePPLMonitor(pplMonitor: Monitor, actionListener: ActionListener<IndexMonitorResponse>): Boolean {
         pplMonitor.triggers.forEach { trigger ->
             val pplTrigger = trigger as PPLTrigger
 
             if (pplTrigger.conditionType == PPLTrigger.ConditionType.NUMBER_OF_RESULTS &&
                 pplTrigger.numResultsValue!! > maxQueryResults
             ) {
-                validationListener.onFailure(
+                actionListener.onFailure(
                     AlertingException.wrap(
                         IllegalArgumentException(
                             "Trigger ${trigger.id} checks for number of results threshold of ${trigger.numResultsValue}, " +
@@ -406,8 +385,8 @@ class TransportIndexMonitorAction @Inject constructor(
             }
 
             pplTrigger.actions.forEach { action ->
-                if (action.subjectTemplate?.idOrCode?.length!! > notificationSubjectMaxLength) {
-                    validationListener.onFailure(
+                if ((action.subjectTemplate?.idOrCode?.length ?: 0) > notificationSubjectMaxLength) {
+                    actionListener.onFailure(
                         AlertingException.wrap(
                             IllegalArgumentException(
                                 "Notification subject source cannot exceed length: $notificationSubjectMaxLength"
@@ -418,7 +397,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 }
 
                 if (action.messageTemplate.idOrCode.length > notificationMessageMaxLength) {
-                    validationListener.onFailure(
+                    actionListener.onFailure(
                         AlertingException.wrap(
                             IllegalArgumentException(
                                 "Notification message source cannot exceed length: $notificationMessageMaxLength"
@@ -434,7 +413,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
         // ensure the query length doesn't exceed the limit
         if (query.length > maxQueryLength) {
-            validationListener.onFailure(
+            actionListener.onFailure(
                 AlertingException.wrap(
                     IllegalArgumentException(
                         "PPL Query length must be at most $maxQueryLength but was ${query.length}"
@@ -447,64 +426,100 @@ class TransportIndexMonitorAction @Inject constructor(
         return true
     }
 
-    private suspend fun validatePPLQuery(
+    private fun validatePPLQuery(
         pplMonitor: Monitor,
-        validationListener: ActionListener<Unit>
-    ): Boolean {
+        actionListener: ActionListener<IndexMonitorResponse>,
+        onSuccess: () -> Unit
+    ) {
         // first attempt to run the monitor query and all possible
         // extensions of it (from custom conditions)
-        try {
-            val query = (pplMonitor.inputs[0] as PPLInput).query
+        val baseQuery = (pplMonitor.inputs[0] as PPLInput).query
 
-            val limitedQueryToExecute = appendDataRowsLimit(query, maxQueryResults)
+        val limitedQueryToExecute = appendDataRowsLimit(baseQuery, maxQueryResults)
 
-            // now PPL explain the base query as is.
-            // if there are any PPL syntax, index not found, insufficient index permissions, or other errors,
-            // this will throw an exception from the SQL/PPL plugin
-            executePplQuery(limitedQueryToExecute, true, client as NodeClient)
+        // now PPL explain the base query as is.
+        // if there are any PPL syntax, index not found, insufficient index permissions, or other errors,
+        // this will throw an exception from the SQL/PPL plugin
+        executePplQuery(
+            limitedQueryToExecute,
+            true,
+            client as NodeClient,
+            object : ActionListener<TransportPPLQueryResponse> {
+                override fun onResponse(response: TransportPPLQueryResponse) {
+                    // Base query is valid. Now validate custom conditions.
+                    val customTriggers = pplMonitor.triggers
+                        .filterIsInstance<PPLTrigger>()
+                        .filter { it.conditionType == PPLTrigger.ConditionType.CUSTOM }
 
-            // scan all the triggers with custom conditions, and ensure each query constructed
-            // from the base query + custom condition is valid
-            for (trigger in pplMonitor.triggers) {
-                val pplTrigger = trigger as PPLTrigger
-
-                if (pplTrigger.conditionType != PPLTrigger.ConditionType.CUSTOM) {
-                    continue
+                    validatePPLCustomConditions(baseQuery, customTriggers, 0, actionListener, onSuccess)
                 }
 
-                val customCondition = pplTrigger.customCondition!!
-
-                // validate the custom condition is a where statement and
-                // not some other valid PPL statement
-                if (!customConditionIsValid(customCondition)) {
-                    validationListener.onFailure(
+                override fun onFailure(e: Exception) {
+                    actionListener.onFailure(
                         AlertingException.wrap(
-                            IllegalArgumentException(
-                                "Custom condition for trigger ${trigger.name} is invalid, " +
-                                    "custom condition must be a valid PPL where statement."
-                            )
+                            IllegalArgumentException("PPL Query validation failed: ${e.userErrorMessage()}")
                         )
                     )
-                    return false
                 }
-
-                val queryWithCustomCondition = appendCustomCondition(query, customCondition)
-                val limitedQueryWithCustomCondition = appendDataRowsLimit(queryWithCustomCondition, maxQueryResults)
-
-                // if the custom condition is invalid, this will throw an exception
-                // from the SQL/PPL plugin
-                executePplQuery(limitedQueryWithCustomCondition, true, client as NodeClient)
             }
-        } catch (e: Exception) {
-            validationListener.onFailure(
-                AlertingException.wrap(
-                    IllegalArgumentException("Validation error for PPL Query in PPL Monitor: ${e.userErrorMessage()}")
-                )
-            )
-            return false
+        )
+    }
+
+    private fun validatePPLCustomConditions(
+        baseQuery: String,
+        customTriggers: List<PPLTrigger>,
+        recursionIndex: Int,
+        actionListener: ActionListener<IndexMonitorResponse>,
+        onSuccess: () -> Unit
+    ) {
+        // base case: the recursion index iterates over the list of custom triggers. if
+        // we have scanned all custom triggers and none of them had issues, all custom
+        // triggers are valid, proceed with indexing the PPL Monitor
+        if (recursionIndex >= customTriggers.size) {
+            onSuccess()
+            return
         }
 
-        return true
+        val customTrigger = customTriggers[recursionIndex]
+        val customCondition = customTrigger.customCondition!!
+
+        // validate the custom condition is a where statement and
+        // not some other valid PPL statement
+        if (!customConditionIsValid(customCondition)) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    IllegalArgumentException(
+                        "Custom condition for trigger ${customTrigger.name} is invalid, " +
+                            "custom condition must be a valid PPL where statement."
+                    )
+                )
+            )
+            return
+        }
+
+        val queryWithCustomCondition = appendCustomCondition(baseQuery, customCondition)
+        val limitedQueryWithCustomCondition = appendDataRowsLimit(queryWithCustomCondition, maxQueryResults)
+
+        // if the custom condition is invalid, this will throw an exception
+        // from the SQL/PPL plugin and onFailure will be called
+        executePplQuery(
+            limitedQueryWithCustomCondition,
+            true,
+            client as NodeClient,
+            object : ActionListener<TransportPPLQueryResponse> {
+                override fun onResponse(response: TransportPPLQueryResponse) {
+                    validatePPLCustomConditions(baseQuery, customTriggers, recursionIndex + 1, actionListener, onSuccess)
+                }
+
+                override fun onFailure(e: Exception) {
+                    actionListener.onFailure(
+                        AlertingException.wrap(
+                            IllegalArgumentException("PPL Query validation failed: ${e.userErrorMessage()}")
+                        )
+                    )
+                }
+            }
+        )
     }
 
     /**

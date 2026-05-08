@@ -49,7 +49,6 @@ import org.opensearch.script.ScriptService
 import org.opensearch.search.aggregations.Aggregation
 import org.opensearch.search.aggregations.Aggregations
 import org.opensearch.search.aggregations.support.AggregationPath
-import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.node.NodeClient
 import kotlin.time.measureTimedValue
 
@@ -341,8 +340,7 @@ class TriggerService(val scriptService: ScriptService) {
         pplMonitor: Monitor,
         pplTrigger: PPLTrigger,
         query: String,
-        monitorCtx: MonitorRunnerExecutionContext,
-        transportService: TransportService
+        monitorCtx: MonitorRunnerExecutionContext
     ): QueryLevelTriggerRunResult {
 
         if (pplTrigger.customCondition == null) {
