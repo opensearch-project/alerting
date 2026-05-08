@@ -184,6 +184,7 @@ dependencies {
     implementation project(path: ":alerting-spi", configuration: 'shadow')
 
     implementation "org.opensearch:opensearch-remote-metadata-sdk:${opensearch_build}"
+    implementation "org.opensearch:opensearch-remote-metadata-sdk-ddb-client:${opensearch_build}"
 
     implementation(platform("software.amazon.awssdk:bom:${versions.aws}"))
     implementation "software.amazon.awssdk:sqs:${versions.aws}"
