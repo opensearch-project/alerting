@@ -127,7 +127,7 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
         assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED.isDynamic)
         assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID.isDynamic)
         assertTrue(AlertingSettings.JOB_QUEUE_NAME.isDynamic)
-        assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN.isDynamic)
+        assertTrue(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.isDynamic)
     }
 
     fun `test scheduler enabled defaults to false`() {
@@ -138,6 +138,6 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
     fun `test scheduler string settings default to empty`() {
         assertEquals("", AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID.get(Settings.EMPTY))
         assertEquals("", AlertingSettings.JOB_QUEUE_NAME.get(Settings.EMPTY))
-        assertEquals("", AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN.get(Settings.EMPTY))
+        assertEquals("", AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(Settings.EMPTY))
     }
 }
