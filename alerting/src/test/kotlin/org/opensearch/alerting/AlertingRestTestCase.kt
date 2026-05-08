@@ -156,22 +156,6 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getMonitor(monitorId = monitorJson["_id"] as String)
     }
 
-    // used only for PPL Monitor tests
-    // a createMonitorWithClient() wrapper that creates an index before proceeding
-    protected fun createPPLIndexThenMonitorWithClient(
-        client: RestClient,
-        monitor: Monitor,
-        rbacRoles: List<String>? = null,
-        refresh: Boolean = true
-    ): Monitor {
-        // every random ppl monitor's query searches index TEST_INDEX_NAME
-        // by default, so create that first before creating the monitor
-        if (!indexExists(TEST_INDEX_NAME)) {
-            createIndex(TEST_INDEX_NAME, Settings.EMPTY, TEST_INDEX_MAPPINGS)
-        }
-        return createMonitorWithClient(client, monitor, rbacRoles, refresh)
-    }
-
     protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
         return createMonitorWithClient(client(), monitor, emptyList(), refresh)
     }
@@ -1468,9 +1452,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return map[key]
     }
 
-    fun getAlertingStats(metrics: String = "", alertingVersion: String? = null): Map<String, Any> {
-        val endpoint = "/_plugins/_alerting/stats$metrics${alertingVersion?.let { "?version=$it" }.orEmpty()}"
-        val monitorStatsResponse = client().makeRequest("GET", endpoint)
+    fun getAlertingStats(metrics: String = ""): Map<String, Any> {
+        val monitorStatsResponse = client().makeRequest("GET", "/_plugins/_alerting/stats$metrics")
         val responseMap = createParser(XContentType.JSON.xContent(), monitorStatsResponse.entity.content).map()
         return responseMap
     }
