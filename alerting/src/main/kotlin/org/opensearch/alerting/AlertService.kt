@@ -41,7 +41,6 @@ import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.commons.alerting.model.action.AlertCategory
-import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.commons.alerting.util.isPPLMonitor
 import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.core.action.ActionListener
@@ -69,6 +68,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
+
 /** Service that handles CRUD operations for alerts */
 class AlertService(
     val client: Client,

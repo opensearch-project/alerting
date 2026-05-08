@@ -242,7 +242,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
     override fun getActions(): List<ActionPlugin.ActionHandler<out ActionRequest, out ActionResponse>> {
         return listOf(
-            // Alerting V1
             ActionPlugin.ActionHandler(ScheduledJobsStatsAction.INSTANCE, ScheduledJobsStatsTransportAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.INDEX_MONITOR_ACTION_TYPE, TransportIndexMonitorAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_MONITOR_ACTION_TYPE, TransportGetMonitorAction::class.java),
@@ -403,16 +402,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             }
         }
 
-        val providerType = AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE.get(settings)
-        val monitorJobPoller = MonitorJobPoller(
-            xContentRegistry,
-            client,
-            MULTI_TENANCY_ENABLED.get(settings),
-            if (providerType.isNotEmpty()) JobQueueAccountIdProvider.find(providerType, settings) else null,
-            REMOTE_METADATA_REGION.get(settings) ?: "",
-            AlertingSettings.JOB_QUEUE_NAME.get(settings) ?: ""
-        )
-
         ExternalSchedulerService.initialize(settings)
 
         return listOf(
@@ -530,23 +519,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME,
             AlertingSettings.JOB_QUEUE_ACCOUNT_ID,
             AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE,
-            AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME,
-            AlertingSettings.PPL_MONITOR_EXECUTION_MAX_DURATION,
-            AlertingSettings.PPL_MAX_QUERY_LENGTH,
-            AlertingSettings.PPL_QUERY_RESULTS_MAX_DATAROWS,
-            AlertingSettings.PPL_QUERY_RESULTS_MAX_SIZE,
-            AlertingSettings.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH,
-            AlertingSettings.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH,
-            AlertingSettings.EXTERNAL_SCHEDULER_ENABLED,
-            AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID,
-            AlertingSettings.JOB_QUEUE_NAME,
-            AlertingSettings.JOB_QUEUE_MESSAGE_GROUP_KEY_NAME,
-            AlertingSettings.EXTERNAL_SCHEDULER_ROLE_ARN,
-            AlertingSettings.JOB_QUEUE_ACCOUNT_ID,
-            AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE
+            AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME
         )
     }
-
 
     override fun onIndexModule(indexModule: IndexModule) {
         if (indexModule.index.name == ScheduledJob.SCHEDULED_JOBS_INDEX) {
