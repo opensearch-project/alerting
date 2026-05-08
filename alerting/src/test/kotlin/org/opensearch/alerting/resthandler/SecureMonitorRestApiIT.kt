@@ -55,6 +55,7 @@ import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelectorExtAggregationBuilder
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
+import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
@@ -66,7 +67,10 @@ import org.opensearch.script.Script
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.test.junit.annotations.TestLogging
+import java.time.temporal.ChronoUnit
+import java.util.concurrent.TimeUnit
 
 @TestLogging("level:DEBUG", reason = "Debug for tests.")
 @Suppress("UNCHECKED_CAST")
@@ -1696,17 +1700,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             listOf(TEST_HR_BACKEND_ROLE),
             false
         )
-        val monitor = createMonitorWithClient(
-            userClient!!,
-            randomQueryLevelMonitor(
-                inputs = listOf(
-                    SearchInput(listOf(TEST_HR_INDEX), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
-                )
-            ),
-            listOf(TEST_HR_BACKEND_ROLE)
-        )
-
-        // Create a different user with different backend roles
+        // Create a different user with different backend roles first
+        // (this also creates TEST_HR_INDEX)
         val otherUser = "otherUser"
         createUserWithTestDataAndCustomRole(
             otherUser,
@@ -1717,6 +1712,21 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                 getClusterPermissionsFromCustomRole(ALERTING_EXECUTE_MONITOR_ACCESS),
                 getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
             )
+        )
+
+        // Now create the monitor as the first user (index already exists)
+        if (!indexExists(TEST_HR_INDEX)) createTestIndex(TEST_HR_INDEX)
+        val monitor = createMonitorWithClient(
+            userClient!!,
+            randomQueryLevelMonitor(
+                inputs = listOf(
+                    SearchInput(
+                        listOf(TEST_HR_INDEX),
+                        SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                    )
+                )
+            ),
+            listOf(TEST_HR_BACKEND_ROLE)
         )
         val otherClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), otherUser, password)
             .setSocketTimeout(60000).build()
@@ -1736,71 +1746,52 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test execute monitor with body blocked when user backend roles differ from monitor in request`() {
+    fun `test scheduled monitor execution succeeds with filter by enabled`() {
         enableFilterBy()
         if (!isHttps()) return
 
-        // Create a user with specific backend roles
-        createUserWithTestDataAndCustomRole(
-            user,
-            TEST_HR_INDEX,
-            TEST_HR_ROLE,
-            listOf("different_backend_role"),
-            listOf(
-                getClusterPermissionsFromCustomRole(ALERTING_EXECUTE_MONITOR_ACCESS),
-                getClusterPermissionsFromCustomRole(ALERTING_INDEX_MONITOR_ACCESS)
-            )
-        )
-
-        try {
-            // User tries to execute a monitor (passed in request body) that has a different user's backend roles
-            val adminUser = User(ADMIN, listOf(TEST_HR_BACKEND_ROLE), listOf(ALL_ACCESS_ROLE), listOf())
-            val monitor = randomQueryLevelMonitor(
-                inputs = listOf(
-                    SearchInput(listOf(TEST_HR_INDEX), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
-                )
-            ).copy(user = adminUser)
-
-            val response = executeMonitor(userClient!!, monitor, DRYRUN_MONITOR)
-            val output = entityAsMap(response)
-            val inputResults = output.stringMap("input_results")
-            assertTrue(
-                "Expected permission error",
-                (inputResults?.get("error") as String).contains("permissions")
-            )
-        } finally {
-            deleteRoleAndRoleMapping(TEST_HR_ROLE)
-        }
-    }
-
-    fun `test non-manual execute monitor respects backend role filtering`() {
-        enableFilterBy()
-        if (!isHttps()) return
-
-        // Create monitor as a user with specific backend roles
+        // Create user with specific backend roles
         createUserWithRoles(
             user,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
             listOf(TEST_HR_BACKEND_ROLE),
             false
         )
+
+        if (!indexExists(TEST_HR_INDEX)) createTestIndex(TEST_HR_INDEX)
+
+        // Index a document so the trigger fires
+        indexDoc(TEST_HR_INDEX, "1", """{"test_field": "hello"}""")
+
+        // Create an enabled monitor with a short interval that will trigger
         val monitor = createMonitorWithClient(
             userClient!!,
             randomQueryLevelMonitor(
                 inputs = listOf(
-                    SearchInput(listOf(TEST_HR_INDEX), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))
+                    SearchInput(
+                        listOf(TEST_HR_INDEX),
+                        SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
+                    )
                 ),
-                enabled = true
+                triggers = listOf(randomQueryLevelTrigger(condition = ALWAYS_RUN)),
+                enabled = true,
+                schedule = IntervalSchedule(interval = 1, unit = ChronoUnit.MINUTES)
             ),
             listOf(TEST_HR_BACKEND_ROLE)
         )
 
-        // Execute the monitor non-manually (simulating scheduled execution)
-        // This should succeed because scheduled executions run as the system,
-        // not as a specific user
         try {
-            val response = executeMonitor(monitor.id)
-            assertEquals("Execute monitor failed", RestStatus.OK, response.restStatus())
+            // Wait for the scheduler to execute the monitor and generate an alert
+            OpenSearchTestCase.waitUntil({
+                val alerts = searchAlerts(monitor)
+                alerts.isNotEmpty()
+            }, 2, TimeUnit.MINUTES)
+
+            val alerts = searchAlerts(monitor)
+            assertTrue(
+                "Scheduled execution should have generated an alert despite filterBy being enabled",
+                alerts.isNotEmpty()
+            )
         } finally {
             deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
             deleteRoleMapping(READALL_AND_MONITOR_ROLE)

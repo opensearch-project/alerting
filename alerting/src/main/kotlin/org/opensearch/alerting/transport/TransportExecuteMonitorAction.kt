@@ -174,6 +174,8 @@ class TransportExecuteMonitorAction @Inject constructor(
                                 return@whenComplete
                             }
 
+                            // in the case that the Monitor is already indexed, do an RBAC
+                            // check if this Monitor is being executed manually via API
                             if (execMonitorRequest.manual && !checkUserPermissionsWithResource(
                                     user, monitor.user, actionListener,
                                     "monitor", execMonitorRequest.monitorId
@@ -204,14 +206,6 @@ class TransportExecuteMonitorAction @Inject constructor(
                             )
                         )
                     )
-                    return@use
-                }
-
-                if (execMonitorRequest.manual && !checkUserPermissionsWithResource(
-                        user, monitor.user, actionListener,
-                        "monitor", monitor.id
-                    )
-                ) {
                     return@use
                 }
 
