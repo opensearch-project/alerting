@@ -334,7 +334,6 @@ class TransportIndexMonitorAction @Inject constructor(
                 // we would get permissions errors trying to search the alerting-config
                 // index as the user. pass the user object itself so backend
                 // roles can be matched and checked downstream
-                // roles can be matched and checked downstream
                 client.threadPool().threadContext.stashContext().use {
                     val pplMonitor = indexMonitorRequest.monitor
                     if (user == null) {
@@ -494,7 +493,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
                 // if the custom condition is invalid, this will throw an exception
                 // from the SQL/PPL plugin
-                executePplQuery(limitedQueryWithCustomCondition, true, client)
+                executePplQuery(limitedQueryWithCustomCondition, true, client as NodeClient)
             }
         } catch (e: Exception) {
             validationListener.onFailure(
