@@ -11,7 +11,12 @@ import com.fasterxml.jackson.databind.node.ArrayNode
 import org.json.JSONObject
 import org.opensearch.alerting.core.ppl.PPLPluginInterface
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.commons.utils.recreateObject
+import org.opensearch.core.action.ActionListener
+import org.opensearch.core.action.ActionResponse
+import org.opensearch.sql.plugin.transport.PPLQueryAction
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest
+import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse
 import org.opensearch.transport.client.node.NodeClient
 
 object PPLUtils {
@@ -101,7 +106,7 @@ object PPLUtils {
             "/_plugins/_ppl"
         }
 
-        // call PPL plugin to execute query
+        // prepare request to SQL/PPL Plugin
         val transportPplQueryRequest = TransportPPLQueryRequest(
             query,
             JSONObject(mapOf("query" to query)),
@@ -117,6 +122,39 @@ object PPLUtils {
         }
 
         return mapper.readTree(transportPplQueryResponse.result)
+    }
+
+    fun executePplQuery(
+        query: String,
+        explain: Boolean,
+        client: NodeClient,
+        listener: ActionListener<TransportPPLQueryResponse>
+    ) {
+        val path = if (explain) {
+            "/_plugins/_ppl/_explain"
+        } else {
+            "/_plugins/_ppl"
+        }
+
+        // prepare request to SQL/PPL Plugin
+        val request = TransportPPLQueryRequest(
+            query,
+            JSONObject(mapOf("query" to query)),
+            path
+        )
+
+        val wrappedListener = object : ActionListener<ActionResponse> {
+            override fun onResponse(response: ActionResponse) {
+                val recreated = recreateObject(response) { TransportPPLQueryResponse(it) }
+                listener.onResponse(recreated)
+            }
+
+            override fun onFailure(exception: Exception) {
+                listener.onFailure(exception)
+            }
+        } as ActionListener<TransportPPLQueryResponse>
+
+        client.execute(PPLQueryAction.INSTANCE, request, wrappedListener)
     }
 
     fun capAndReformatPPLQueryResults(rawQueryResults: JsonNode, maxSize: Long): List<Map<String, Any?>> {
