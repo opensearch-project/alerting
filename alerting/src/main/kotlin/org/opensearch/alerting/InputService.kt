@@ -58,7 +58,6 @@ import org.opensearch.script.ScriptService
 import org.opensearch.script.ScriptType
 import org.opensearch.script.TemplateScript
 import org.opensearch.search.builder.SearchSourceBuilder
-import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import org.opensearch.transport.client.node.NodeClient
 import java.time.Duration
@@ -231,8 +230,7 @@ class InputService(
 
     suspend fun collectInputResultsForPPLMonitor(
         monitor: Monitor,
-        monitorCtx: MonitorRunnerExecutionContext,
-        transportService: TransportService
+        monitorCtx: MonitorRunnerExecutionContext
     ): InputRunResults {
         return try {
             // PPL Alerting:
@@ -242,8 +240,7 @@ class InputService(
             val basePplQueryResults = runPPLBaseQuery(
                 monitor,
                 (monitor.inputs[0] as PPLInput).query,
-                monitorCtx,
-                transportService
+                monitorCtx
             )
             val numPplResults = basePplQueryResults.get("total").asLong()
 
@@ -277,7 +274,6 @@ class InputService(
         pplMonitor: Monitor,
         baseQuery: String,
         monitorCtx: MonitorRunnerExecutionContext,
-        transportService: TransportService
     ): JsonNode {
 
         // TODO: change name to trigger max duration
