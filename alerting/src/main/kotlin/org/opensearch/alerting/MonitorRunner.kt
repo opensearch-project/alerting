@@ -17,6 +17,7 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
 import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.commons.alerting.model.action.Action
+import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.core.common.Strings
 import org.opensearch.transport.TransportService
 import java.time.Instant
@@ -57,8 +58,10 @@ abstract class MonitorRunner {
                 val client = monitorCtx.client
                 val userStr = client!!.threadPool().threadContext
                     .getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
+                val tenantId = currentTenantId()
                 client.threadPool().threadContext.stashContext().use {
                     client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
+                    tenantId?.let { client.threadPool().threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, it) }
                     withClosableContext(
                         InjectorContextElement(
                             monitor.id,
