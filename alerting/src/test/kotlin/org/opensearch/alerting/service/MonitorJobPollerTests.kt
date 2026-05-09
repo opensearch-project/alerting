@@ -377,8 +377,9 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
 
         val mockTargetType = mappingProvider().entries.first().key
         val target = Target(type = mockTargetType, endpoint = "https://test.aoss.amazonaws.com")
+        val monitor = org.opensearch.alerting.randomQueryLevelMonitor().copy(target = target)
 
-        poller.populateThreadContext(target)
+        poller.populateThreadContext(monitor)
 
         assertEquals("true", mockThreadContext.getHeader(MonitorJobPoller.IS_BACKGROUND_JOB_HEADER))
         assertEquals(mappingProvider()[mockTargetType], mockThreadContext.getHeader(MonitorJobPoller.SERVICE_NAME_HEADER))
@@ -398,9 +399,10 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         )
 
         val target = Target(type = "non_existent_type", endpoint = "https://test.aoss.amazonaws.com")
+        val monitor = org.opensearch.alerting.randomQueryLevelMonitor().copy(target = target)
 
         expectThrows(Exception::class.java) {
-            poller.populateThreadContext(target)
+            poller.populateThreadContext(monitor)
         }
 
         poller.close()

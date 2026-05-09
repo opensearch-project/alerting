@@ -12,6 +12,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
@@ -22,7 +23,6 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduleJobPayload
-import org.opensearch.commons.alerting.model.Target
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.utils.scheduler.JobQueueAccountIdProvider
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -145,7 +145,7 @@ class MonitorJobPoller(
     private suspend fun executeMonitor(monitor: Monitor, jobStartTime: Instant) {
         // populate thread context for downstream request interception the moment
         // Monitor config is in hand
-        populateThreadContext(monitor.target)
+        populateThreadContext(monitor)
 
         val request = ExecuteMonitorRequest(
             dryrun = false,
@@ -196,7 +196,8 @@ class MonitorJobPoller(
     // populates thread context with KVs that downstream interception will
     // need when intercepting search or PPL calls to external customer
     // data source
-    internal fun populateThreadContext(target: Target?) {
+    internal fun populateThreadContext(monitor: Monitor) {
+        val target = monitor.target
         if (target == null) {
             throw AlertingException.wrap(
                 IllegalStateException("Monitor received by Job Poller did not contain target")
@@ -230,6 +231,12 @@ class MonitorJobPoller(
 
         // populated upstream in AlertingPlugin.kt with REMOTE_METADATA_REGION.get(settings)
         threadContext.putHeader(REGION_HEADER, region)
+
+        // Set tenant_id header from monitor metadata for downstream SDK calls
+        val tenantId = monitor.metadata?.get(AlertingPlugin.TENANT_ID_METADATA_KEY)
+        if (!tenantId.isNullOrEmpty()) {
+            threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, tenantId)
+        }
     }
 
     private fun mapTargetTypeToServiceName(targetType: String): String {

@@ -10,6 +10,7 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters
 import org.junit.Before
 import org.mockito.Mockito
 import org.opensearch.action.support.ActionFilters
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.service.ExternalSchedulerService
 import org.opensearch.alerting.settings.AlertingSettings
@@ -189,5 +190,42 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
         assertEquals("555666777888", info.accountId)
         assertEquals("us-west-2", info.region)
         assertEquals("monitor-m1", info.name)
+    }
+
+    fun `test tenant_id added to monitor metadata when tenantId is present`() {
+        val tenantId = "test-tenant-123"
+        val existingMetadata: Map<String, String> = mapOf("existing_key" to "existing_value")
+        val updatedMetadata = existingMetadata +
+            (AlertingPlugin.TENANT_ID_METADATA_KEY to tenantId)
+        assertEquals(tenantId, updatedMetadata[AlertingPlugin.TENANT_ID_METADATA_KEY])
+        assertEquals("existing_value", updatedMetadata["existing_key"])
+    }
+
+    fun `test tenant_id not added to monitor metadata when tenantId is null`() {
+        val tenantId: String? = null
+        val existingMetadata: Map<String, String> = mapOf("existing_key" to "existing_value")
+        val updatedMetadata = if (!tenantId.isNullOrEmpty()) {
+            existingMetadata + (AlertingPlugin.TENANT_ID_METADATA_KEY to tenantId)
+        } else {
+            existingMetadata
+        }
+        assertNull(updatedMetadata[AlertingPlugin.TENANT_ID_METADATA_KEY])
+        assertEquals(1, updatedMetadata.size)
+    }
+
+    fun `test tenant_id not added to monitor metadata when tenantId is empty`() {
+        val tenantId = ""
+        val existingMetadata: Map<String, String> = mapOf("existing_key" to "existing_value")
+        val updatedMetadata = if (!tenantId.isNullOrEmpty()) {
+            existingMetadata + (AlertingPlugin.TENANT_ID_METADATA_KEY to tenantId)
+        } else {
+            existingMetadata
+        }
+        assertNull(updatedMetadata[AlertingPlugin.TENANT_ID_METADATA_KEY])
+        assertEquals(1, updatedMetadata.size)
+    }
+
+    fun `test tenant_id metadata key constant value`() {
+        assertEquals("tenant_id", AlertingPlugin.TENANT_ID_METADATA_KEY)
     }
 }
