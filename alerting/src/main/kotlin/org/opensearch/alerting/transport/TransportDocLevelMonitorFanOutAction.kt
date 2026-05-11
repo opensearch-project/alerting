@@ -616,13 +616,15 @@ class TransportDocLevelMonitorFanOutAction
         }
 
         if (monitor.shouldCreateSingleAlertForFindings == null || monitor.shouldCreateSingleAlertForFindings == false) {
-            try {
-                findings.forEach { finding ->
+            findings.forEach { finding ->
+                // Per-iteration try/catch: a synchronous throw from publishFinding for one
+                // finding must not drop the remaining findings in this batch from the
+                // downstream subscriber (security-analytics enrichment + correlation).
+                try {
                     publishFinding(monitor, finding)
+                } catch (e: Exception) {
+                    log.error("Optional finding callback failed for finding ${finding.id}", e)
                 }
-            } catch (e: Exception) {
-                // suppress exception
-                log.error("Optional finding callback failed", e)
             }
         }
         this.findingsToTriggeredQueries += findingsToTriggeredQueries
