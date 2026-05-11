@@ -123,6 +123,7 @@ class MonitorJobPoller(
                     val payload = parseMessage(message.body())
                     val monitor = payload.toMonitor(xContentRegistry)
                     val jobStartTime = Instant.parse(payload.jobStartTime)
+
                     logger.info(
                         "Parsed monitor [{}] type [{}] jobStartTime [{}]",
                         monitor.id, monitor.monitorType, jobStartTime
@@ -143,9 +144,6 @@ class MonitorJobPoller(
     }
 
     private suspend fun executeMonitor(monitor: Monitor, jobStartTime: Instant) {
-        // populate thread context for downstream request interception the moment
-        // Monitor config is in hand
-        populateThreadContext(monitor)
 
         val request = ExecuteMonitorRequest(
             dryrun = false,
@@ -155,8 +153,11 @@ class MonitorJobPoller(
             requestStart = null
         )
         try {
-            client.suspendUntil<Client, ExecuteMonitorResponse> {
-                client.execute(ExecuteMonitorAction.INSTANCE, request, it)
+            client.threadPool().threadContext.stashContext().use {
+                populateThreadContext(monitor)
+                client.suspendUntil<Client, ExecuteMonitorResponse> {
+                    client.execute(ExecuteMonitorAction.INSTANCE, request, it)
+                }
             }
         } catch (e: Exception) {
             throw AlertingException.wrap(e)
@@ -191,6 +192,17 @@ class MonitorJobPoller(
         } catch (e: Exception) {
             throw AlertingException.wrap(e)
         }
+    }
+
+    companion object {
+        const val POLLER_THREAD_COUNT = 10
+        const val POLL_INTERVAL_MS = 1000L
+
+        // thread context header keys for request interception
+        const val IS_BACKGROUND_JOB_HEADER = "is-observability-bg-job"
+        const val SERVICE_NAME_HEADER = "aws-service-name"
+        const val OPENSEARCH_ENDPOINT_HEADER = "opensearch-url"
+        const val REGION_HEADER = "aws-region"
     }
 
     // populates thread context with KVs that downstream interception will
@@ -250,16 +262,5 @@ class MonitorJobPoller(
         }
 
         return targetTypeToServiceName[targetType]!!
-    }
-
-    companion object {
-        const val POLLER_THREAD_COUNT = 10
-        const val POLL_INTERVAL_MS = 1000L
-
-        // thread context header keys for request interception
-        const val IS_BACKGROUND_JOB_HEADER = "is-observability-bg-job"
-        const val SERVICE_NAME_HEADER = "aws-service-name"
-        const val OPENSEARCH_ENDPOINT_HEADER = "opensearch-url"
-        const val REGION_HEADER = "aws-region"
     }
 }
