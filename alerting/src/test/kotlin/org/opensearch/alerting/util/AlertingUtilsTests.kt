@@ -17,10 +17,10 @@ import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomTemplateScript
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
+import org.opensearch.client.Client
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.test.OpenSearchTestCase
-import org.opensearch.transport.client.Client
 class AlertingUtilsTests : OpenSearchTestCase() {
     fun `test parseSampleDocTags only returns expected tags`() {
         val expectedDocSourceTags = (0..3).map { "field$it" }
