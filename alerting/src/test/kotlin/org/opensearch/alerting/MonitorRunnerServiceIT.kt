@@ -2255,7 +2255,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         )
 
         // Set monitor execution timeout to 1 nanosecond to force a timeout
-        adminClient().updateSettings(AlertingSettings.PPL_TRIGGER_EXECUTION_MAX_DURATION.key, TimeValue.timeValueNanos(1))
+        adminClient().updateSettings(AlertingSettings.PPL_QUERY_EXECUTION_MAX_DURATION.key, TimeValue.timeValueNanos(1))
 
         val response = executeMonitor(monitor.id)
 
@@ -2297,7 +2297,7 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
         )
 
         // Set monitor execution timeout to 1 nanosecond to force a timeout
-        adminClient().updateSettings(AlertingSettings.PPL_TRIGGER_EXECUTION_MAX_DURATION.key, TimeValue.timeValueNanos(1))
+        adminClient().updateSettings(AlertingSettings.PPL_QUERY_EXECUTION_MAX_DURATION.key, TimeValue.timeValueNanos(1))
 
         val response = executeMonitor(monitor.id)
 

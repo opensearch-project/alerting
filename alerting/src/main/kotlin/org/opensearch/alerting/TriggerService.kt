@@ -355,7 +355,7 @@ class TriggerService(val scriptService: ScriptService) {
         val pplTriggerExecutionDuration = monitorCtx
             .clusterService!!
             .clusterSettings
-            .get(AlertingSettings.PPL_TRIGGER_EXECUTION_MAX_DURATION)
+            .get(AlertingSettings.PPL_QUERY_EXECUTION_MAX_DURATION)
         val queryResultsSizeLimit = monitorCtx
             .clusterService!!
             .clusterSettings

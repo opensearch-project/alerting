@@ -276,15 +276,14 @@ class InputService(
         monitorCtx: MonitorRunnerExecutionContext,
     ): JsonNode {
 
-        // TODO: change name to trigger max duration
-        val monitorExecutionDuration = monitorCtx
+        val queryExecutionDuration = monitorCtx
             .clusterService!!
             .clusterSettings
-            .get(AlertingSettings.PPL_TRIGGER_EXECUTION_MAX_DURATION)
+            .get(AlertingSettings.PPL_QUERY_EXECUTION_MAX_DURATION)
 
         var queryResponseJson: JsonNode? = null
 
-        withTimeout(monitorExecutionDuration.millis) {
+        withTimeout(queryExecutionDuration.millis) {
             // limit the number of PPL query result data rows returned
             val dataRowsLimit = monitorCtx.clusterService!!.clusterSettings.get(AlertingSettings.PPL_QUERY_RESULTS_MAX_DATAROWS)
             val limitedQueryToExecute = appendDataRowsLimit(baseQuery, dataRowsLimit)

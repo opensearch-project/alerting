@@ -205,7 +205,10 @@ class AlertService(
                 }
             }
 
-        // populate PPL Monitor specific fields
+        // these fields are only populated for PPL Monitors for now.
+        // this can be extended to let DSL-based Monitors like Query
+        // or Bucket level Monitors include their results in Alerts
+        // as well
         val query = if (ctx.monitor.isPPLMonitor()) (ctx.monitor.inputs[0] as PPLInput).query else null
         val queryResults = if (ctx.monitor.isPPLMonitor()) ctx.pplQueryResults else emptyList()
 
