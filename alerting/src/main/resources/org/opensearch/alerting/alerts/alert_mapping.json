@@ -4,7 +4,7 @@
     "required": true
   },
   "_meta" : {
-    "schema_version": 5
+    "schema_version": 6
   },
   "properties": {
     "schema_version": {
@@ -177,6 +177,13 @@
           "type" : "keyword"
         }
       }
+    },
+    "query": {
+      "type": "text"
+    },
+    "query_results":  {
+      "type": "nested",
+      "dynamic": true
     }
   }
 }
