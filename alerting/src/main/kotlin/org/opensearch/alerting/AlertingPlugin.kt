@@ -322,7 +322,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             client.threadPool().executor(ThreadPool.Names.GENERIC)
         )
 
-        val alertService = AlertService(client, xContentRegistry, alertIndices, sdkClient)
+        val alertService = AlertService(client, xContentRegistry, alertIndices, sdkClient, MULTI_TENANCY_ENABLED.get(settings))
         val triggerService = TriggerService(scriptService)
         runner = MonitorRunnerService
             .registerClusterService(clusterService)
