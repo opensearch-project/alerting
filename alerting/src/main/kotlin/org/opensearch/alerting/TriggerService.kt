@@ -405,8 +405,6 @@ class TriggerService(val scriptService: ScriptService) {
                 logger.debug("query results for trigger ${pplTrigger.id}: $queryResponseJson")
                 logger.debug("time taken to execute query against sql/ppl plugin: $timeTaken")
 
-                // val numPplResults = basePplQueryResults.getLong("total")
-
                 // the custom condition query returns all buckets that met the custom condition,
                 // so if there are any results at all, the custom condition was met for at least one bukcet,
                 // this trigger has triggered.
