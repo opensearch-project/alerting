@@ -54,7 +54,7 @@ jobs:
       - name: Build and run with Gradle
         run: |
           chown -R 1000:1000 `pwd`
-          su `id -un 1000` -c "whoami && java -version && ./gradlew assemble integTest"
+          su `id -un 1000` -c "whoami && java -version && ./gradlew assemble integTest --refresh-dependencies"
 
       - name: Create Artifact Path
         run: |
