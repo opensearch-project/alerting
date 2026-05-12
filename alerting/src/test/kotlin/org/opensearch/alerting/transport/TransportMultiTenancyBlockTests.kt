@@ -196,7 +196,7 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
             MonitorRunnerService,
             actionFilters, xContentRegistry, multiTenancySettings
         )
-        val request = ExecuteWorkflowRequest(true, false, TimeValue(Instant.now().toEpochMilli()), "test-id", null)
+        val request = ExecuteWorkflowRequest(true, TimeValue(Instant.now().toEpochMilli()), "test-id", null)
         @Suppress("UNCHECKED_CAST")
         val listener = Mockito.mock(ActionListener::class.java) as ActionListener<ExecuteWorkflowResponse>
 
@@ -337,7 +337,7 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
             inputs = listOf(DocLevelMonitorInput("desc", listOf("index"), emptyList())),
             triggers = emptyList(), uiMetadata = mapOf()
         )
-        val request = ExecuteMonitorRequest(true, false, TimeValue(Instant.now().toEpochMilli()), null, monitor)
+        val request = ExecuteMonitorRequest(true, TimeValue(Instant.now().toEpochMilli()), null, monitor)
         @Suppress("UNCHECKED_CAST")
         val listener = Mockito.mock(ActionListener::class.java) as ActionListener<ExecuteMonitorResponse>
 
@@ -547,7 +547,7 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
             inputs = listOf(SearchInput(listOf("test-index"), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))),
             triggers = emptyList(), uiMetadata = mapOf()
         )
-        val request = ExecuteMonitorRequest(true, false, TimeValue(Instant.now().toEpochMilli()), null, monitor)
+        val request = ExecuteMonitorRequest(true, TimeValue(Instant.now().toEpochMilli()), null, monitor)
         @Suppress("UNCHECKED_CAST")
         val listener = Mockito.mock(ActionListener::class.java) as ActionListener<ExecuteMonitorResponse>
 

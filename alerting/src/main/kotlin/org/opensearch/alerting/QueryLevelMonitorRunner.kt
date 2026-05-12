@@ -39,7 +39,6 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
-        manual: Boolean,
         workflowRunContext: WorkflowRunContext?,
         executionId: String,
         transportService: TransportService

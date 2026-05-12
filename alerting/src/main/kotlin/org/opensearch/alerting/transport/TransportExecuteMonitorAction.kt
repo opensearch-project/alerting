@@ -106,7 +106,6 @@ class TransportExecuteMonitorAction @Inject constructor(
                             periodStart,
                             periodEnd,
                             execMonitorRequest.dryrun,
-                            execMonitorRequest.manual,
                             transportService
                         )
                         withContext(Dispatchers.IO) {
@@ -174,9 +173,8 @@ class TransportExecuteMonitorAction @Inject constructor(
                                 return@whenComplete
                             }
 
-                            // in the case that the Monitor is already indexed, do an RBAC
-                            // check if this Monitor is being executed manually via API
-                            if (execMonitorRequest.manual && !checkUserPermissionsWithResource(
+                            // RBAC check: verify calling user has permissions to this monitor
+                            if (!checkUserPermissionsWithResource(
                                     user, monitor.user, actionListener,
                                     "monitor", execMonitorRequest.monitorId
                                 )

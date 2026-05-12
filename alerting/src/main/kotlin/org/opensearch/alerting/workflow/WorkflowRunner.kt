@@ -29,7 +29,6 @@ abstract class WorkflowRunner {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
-        manual: Boolean,
         transportService: TransportService
     ): WorkflowRunResult
 

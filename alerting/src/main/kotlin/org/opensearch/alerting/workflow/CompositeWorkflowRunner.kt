@@ -56,7 +56,6 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
-        manual: Boolean,
         transportService: TransportService
     ): WorkflowRunResult {
         val workflowExecutionStartTime = Instant.now()
@@ -146,7 +145,6 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                         periodStart,
                         periodEnd,
                         dryRun,
-                        manual,
                         workflowRunContext,
                         executionId,
                         transportService
@@ -251,7 +249,6 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
-        manual: Boolean,
         workflowRunContext: WorkflowRunContext,
         executionId: String,
         transportService: TransportService
@@ -264,7 +261,6 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 periodStart,
                 periodEnd,
                 dryRun,
-                manual,
                 workflowRunContext,
                 executionId,
                 transportService
@@ -276,7 +272,6 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 periodStart,
                 periodEnd,
                 dryRun,
-                manual,
                 workflowRunContext,
                 executionId,
                 transportService
@@ -288,7 +283,6 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 periodStart,
                 periodEnd,
                 dryRun,
-                manual,
                 workflowRunContext,
                 executionId,
                 transportService

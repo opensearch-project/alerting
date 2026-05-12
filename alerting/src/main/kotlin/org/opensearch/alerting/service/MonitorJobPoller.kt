@@ -149,7 +149,6 @@ class MonitorJobPoller(
 
         val request = ExecuteMonitorRequest(
             dryrun = false,
-            manual = false,
             requestEnd = TimeValue(jobStartTime.toEpochMilli()),
             monitorId = monitor.id,
             monitor = monitor,

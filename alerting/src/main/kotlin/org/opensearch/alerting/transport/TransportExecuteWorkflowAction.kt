@@ -96,7 +96,6 @@ class TransportExecuteWorkflowAction @Inject constructor(
                                 periodStart,
                                 periodEnd,
                                 execWorkflowRequest.dryrun,
-                                execWorkflowRequest.manual,
                                 transportService = transportService
                             )
                         withContext(Dispatchers.IO, {

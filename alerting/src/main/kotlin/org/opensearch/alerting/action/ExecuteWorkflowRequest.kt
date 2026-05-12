@@ -19,7 +19,6 @@ import java.io.IOException
  */
 class ExecuteWorkflowRequest : ActionRequest {
     val dryrun: Boolean
-    val manual: Boolean
     val requestEnd: TimeValue
     val workflowId: String?
     val workflow: Workflow?
@@ -27,14 +26,12 @@ class ExecuteWorkflowRequest : ActionRequest {
 
     constructor(
         dryrun: Boolean,
-        manual: Boolean,
         requestEnd: TimeValue,
         workflowId: String?,
         workflow: Workflow?,
         requestStart: TimeValue? = null,
     ) : super() {
         this.dryrun = dryrun
-        this.manual = manual
         this.requestEnd = requestEnd
         this.requestStart = requestStart
         this.workflowId = workflowId
@@ -43,7 +40,6 @@ class ExecuteWorkflowRequest : ActionRequest {
 
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
-        sin.readBoolean(),
         sin.readBoolean(),
         sin.readTimeValue(),
         sin.readOptionalString(),
@@ -66,7 +62,6 @@ class ExecuteWorkflowRequest : ActionRequest {
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
         out.writeBoolean(dryrun)
-        out.writeBoolean(manual)
         out.writeTimeValue(requestEnd)
         out.writeOptionalTimeValue(requestStart)
         out.writeOptionalString(workflowId)

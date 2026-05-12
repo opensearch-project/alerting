@@ -15,7 +15,6 @@ import java.io.IOException
 
 class ExecuteMonitorRequest : ActionRequest {
     val dryrun: Boolean
-    val manual: Boolean
     val requestEnd: TimeValue
     val monitorId: String?
     val monitor: Monitor?
@@ -23,14 +22,12 @@ class ExecuteMonitorRequest : ActionRequest {
 
     constructor(
         dryrun: Boolean,
-        manual: Boolean,
         requestEnd: TimeValue,
         monitorId: String?,
         monitor: Monitor?,
         requestStart: TimeValue? = null
     ) : super() {
         this.dryrun = dryrun
-        this.manual = manual
         this.requestEnd = requestEnd
         this.monitorId = monitorId
         this.monitor = monitor
@@ -40,7 +37,6 @@ class ExecuteMonitorRequest : ActionRequest {
     @Throws(IOException::class)
     constructor(sin: StreamInput) : this(
         sin.readBoolean(), // dryrun
-        sin.readBoolean(), // manual
         sin.readTimeValue(), // requestEnd
         sin.readOptionalString(), // monitorId
         if (sin.readBoolean()) {
@@ -56,7 +52,6 @@ class ExecuteMonitorRequest : ActionRequest {
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
         out.writeBoolean(dryrun)
-        out.writeBoolean(manual)
         out.writeTimeValue(requestEnd)
         out.writeOptionalString(monitorId)
         if (monitor != null) {

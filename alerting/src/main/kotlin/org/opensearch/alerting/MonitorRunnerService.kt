@@ -368,7 +368,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                                 ExecuteWorkflowAction.INSTANCE,
                                 ExecuteWorkflowRequest(
                                     false,
-                                    false,
                                     TimeValue(periodEnd.toEpochMilli()),
                                     job.id,
                                     job,
@@ -398,7 +397,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                                 monitorCtx.clusterService!!.state().nodes().localNode.id
                         )
                         val executeMonitorRequest = ExecuteMonitorRequest(
-                            false,
                             false,
                             TimeValue(periodEnd.toEpochMilli()),
                             job.id,
@@ -431,10 +429,9 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
-        manual: Boolean,
         transportService: TransportService
     ): WorkflowRunResult {
-        return CompositeWorkflowRunner.runWorkflow(workflow, monitorCtx, periodStart, periodEnd, dryrun, manual, transportService)
+        return CompositeWorkflowRunner.runWorkflow(workflow, monitorCtx, periodStart, periodEnd, dryrun, transportService)
     }
 
     suspend fun runJob(
@@ -442,7 +439,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         periodStart: Instant,
         periodEnd: Instant,
         dryrun: Boolean,
-        manual: Boolean,
         transportService: TransportService
     ): MonitorRunResult<*> {
         // Updating the scheduled job index at the start of monitor execution runs for when there is an upgrade the the schema mapping
@@ -466,7 +462,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
         if (job is Workflow) {
             logger.info("Executing scheduled workflow - id: ${job.id}, periodStart: $periodStart, periodEnd: $periodEnd, dryrun: $dryrun")
-            CompositeWorkflowRunner.runWorkflow(workflow = job, monitorCtx, periodStart, periodEnd, dryrun, manual, transportService)
+            CompositeWorkflowRunner.runWorkflow(workflow = job, monitorCtx, periodStart, periodEnd, dryrun, transportService)
         }
         val monitor = job as Monitor
         val executionId = "${monitor.id}_${LocalDateTime.now(ZoneOffset.UTC)}_${UUID.randomUUID()}"
@@ -497,7 +493,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     periodStart,
                     periodEnd,
                     dryrun,
-                    manual,
                     executionId = executionId,
                     transportService = transportService,
                 )
@@ -508,7 +503,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     periodStart,
                     periodEnd,
                     dryrun,
-                    manual,
                     executionId = executionId,
                     transportService = transportService
                 )
@@ -519,7 +513,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     periodStart,
                     periodEnd,
                     dryrun,
-                    manual,
                     executionId = executionId,
                     transportService = transportService
                 )
@@ -530,7 +523,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                     periodStart,
                     periodEnd,
                     dryrun,
-                    manual,
                     executionId = executionId,
                     transportService = transportService
                 )
@@ -546,7 +538,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                         periodStart,
                         periodEnd,
                         dryrun,
-                        manual,
                         executionId = executionId,
                         transportService = transportService
                     )
