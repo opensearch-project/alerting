@@ -41,6 +41,7 @@ import org.opensearch.commons.alerting.model.ClusterMetricsInput
 import org.opensearch.commons.alerting.model.InputRunResults
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.PPLInput
+import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.TriggerAfterKey
 import org.opensearch.commons.alerting.model.WorkflowRunContext
@@ -62,7 +63,6 @@ import org.opensearch.transport.client.Client
 import org.opensearch.transport.client.node.NodeClient
 import java.time.Duration
 import java.time.Instant
-import org.opensearch.commons.alerting.model.PPLTrigger
 import kotlin.time.measureTimedValue
 
 /** Service that handles the collection of input results for Monitor executions */

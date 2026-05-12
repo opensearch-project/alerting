@@ -502,6 +502,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.REMOTE_METADATA_ENDPOINT,
             AlertingSettings.REMOTE_METADATA_REGION,
             AlertingSettings.REMOTE_METADATA_SERVICE_NAME,
+            AlertingSettings.MAX_PPL_TRIGGERS_PER_MONITOR,
             AlertingSettings.PPL_QUERY_EXECUTION_MAX_DURATION,
             AlertingSettings.PPL_MAX_QUERY_LENGTH,
             AlertingSettings.PPL_QUERY_RESULTS_MAX_DATAROWS,

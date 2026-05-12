@@ -309,9 +309,17 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        val MAX_PPL_TRIGGERS_PER_MONITOR = Setting.intSetting(
+            "plugins.alerting.monitor.max_ppl_triggers",
+            10,
+            0,
+            10,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val PPL_QUERY_EXECUTION_MAX_DURATION = Setting.positiveTimeSetting(
             "plugins.alerting.ppl_query_max_execution_duration",
-            TimeValue(1, TimeUnit.MINUTES),
+            TimeValue(30, TimeUnit.SECONDS),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 

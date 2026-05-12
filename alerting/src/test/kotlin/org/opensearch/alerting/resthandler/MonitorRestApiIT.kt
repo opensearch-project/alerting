@@ -43,6 +43,7 @@ import org.opensearch.alerting.randomThrottle
 import org.opensearch.alerting.randomUser
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
+import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_PPL_TRIGGERS_PER_MONITOR
 import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH
 import org.opensearch.alerting.settings.AlertingSettings.Companion.PPL_MAX_QUERY_LENGTH
@@ -60,6 +61,7 @@ import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.PPLTrigger.ConditionType
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -2012,5 +2014,36 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertEquals("Unexpected status", RestStatus.NOT_FOUND, e.response.restStatus())
         }
+    }
+
+    fun `test create ppl monitor with too many triggers fails`() {
+        adminClient().updateSettings(MAX_PPL_TRIGGERS_PER_MONITOR.key, 1)
+
+        try {
+            createRandomPPLMonitor(
+                randomPPLMonitor(
+                    triggers = listOf(
+                        randomPPLTrigger(
+                            conditionType = ConditionType.NUMBER_OF_RESULTS,
+                            numResultsCondition = PPLTrigger.NumResultsCondition.GREATER_THAN,
+                            numResultsValue = 0L,
+                            customCondition = null
+                        ),
+                        randomPPLTrigger(
+                            conditionType = ConditionType.NUMBER_OF_RESULTS,
+                            numResultsCondition = PPLTrigger.NumResultsCondition.GREATER_THAN,
+                            numResultsValue = 5L,
+                            customCondition = null
+                        )
+                    )
+                )
+            )
+            fail("Expected request to fail with BAD_REQUEST but it succeeded")
+        } catch (e: ResponseException) {
+            assertEquals("Unexpected status", RestStatus.BAD_REQUEST, e.response.restStatus())
+        }
+
+        // ensure no monitor was created
+        ensureNumMonitors(0)
     }
 }
