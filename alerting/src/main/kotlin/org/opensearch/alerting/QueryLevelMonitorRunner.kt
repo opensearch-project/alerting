@@ -66,6 +66,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                     monitor.user
                 )
             ) {
+                reinjectHeaders(monitor, monitorCtx)
                 monitorResult = monitorResult.copy(
                     inputResults = monitorCtx.inputService!!.collectInputResults(monitor, periodStart, periodEnd, null, workflowRunContext)
                 )
@@ -86,6 +87,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.QUERY_LEVEL_MONITOR &&
             monitorResult.inputResults.results.isNotEmpty()
         ) {
+            reinjectHeaders(monitor, monitorCtx)
             val searchInput = monitor.inputs[0] as SearchInput
             val queryLevelTriggers = monitor.triggers.filterIsInstance<QueryLevelTrigger>()
             RemoteQueryLevelTriggerEvaluator.evaluate(

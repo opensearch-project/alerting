@@ -389,6 +389,10 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.JOB_QUEUE_NAME.get(settings) ?: "",
             AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME.get(settings).let {
                 it.keySet().associateWith { key -> it.get(key) }
+            },
+            AlertingSettings.TENANT_ACCOUNT_ID_HEADER.get(settings) ?: "",
+            AlertingSettings.TENANT_RESOURCE_ID_HEADER.get(settings).let {
+                it.keySet().associateWith { key -> it.get(key) }
             }
         )
 
@@ -519,7 +523,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME,
             AlertingSettings.JOB_QUEUE_ACCOUNT_ID,
             AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE,
-            AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME
+            AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME,
+            AlertingSettings.TENANT_ACCOUNT_ID_HEADER,
+            AlertingSettings.TENANT_RESOURCE_ID_HEADER
         )
     }
 

@@ -17,6 +17,7 @@ import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.util.ArnHelper
 import org.opensearch.common.lifecycle.AbstractLifecycleComponent
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -51,7 +52,9 @@ class MonitorJobPoller(
     private val accountIdProvider: JobQueueAccountIdProvider?,
     private val region: String,
     private val queueName: String,
-    private val targetTypeToServiceName: Map<String, String>
+    private val targetTypeToServiceName: Map<String, String>,
+    private val tenantAccountIdHeaderName: String = "",
+    private val tenantResourceIdHeaderNames: Map<String, String> = emptyMap()
 ) : AbstractLifecycleComponent() {
 
     private val logger = LogManager.getLogger(MonitorJobPoller::class.java)
@@ -248,6 +251,19 @@ class MonitorJobPoller(
         val tenantId = monitor.metadata?.get(AlertingPlugin.TENANT_ID_METADATA_KEY)
         if (!tenantId.isNullOrEmpty()) {
             threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, tenantId)
+        }
+
+        // Set transient headers for account ID and resource ID parsed from target ARN.
+        // to route the search request to the correct remote data source.
+        if (target.arn.isNotBlank()) {
+            val (accountId, resourceId) = ArnHelper.parseArn(target.arn)
+            if (tenantAccountIdHeaderName.isNotEmpty()) {
+                threadContext.putTransient(tenantAccountIdHeaderName, accountId)
+            }
+            val resourceHeader = tenantResourceIdHeaderNames[target.type]
+            if (!resourceHeader.isNullOrEmpty()) {
+                threadContext.putTransient(resourceHeader, resourceId)
+            }
         }
     }
 

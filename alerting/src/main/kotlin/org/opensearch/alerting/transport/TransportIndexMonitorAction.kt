@@ -49,6 +49,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.PPL_MAX_QUERY
 import org.opensearch.alerting.settings.AlertingSettings.Companion.PPL_QUERY_RESULTS_MAX_DATAROWS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
+import org.opensearch.alerting.util.ArnValidator
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.addUserBackendRolesFilter
@@ -683,6 +684,7 @@ class TransportIndexMonitorAction @Inject constructor(
             try {
                 validateActionThrottle(request.monitor, maxActionThrottle, TimeValue.timeValueMinutes(1))
                 validateTriggerCount(request.monitor)
+                ArnValidator.validateTargetArn(request.monitor.target)
             } catch (e: RuntimeException) {
                 actionListener.onFailure(AlertingException.wrap(e))
                 return

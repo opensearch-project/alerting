@@ -9,6 +9,7 @@ import com.carrotsearch.randomizedtesting.ThreadFilter
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
+import org.opensearch.alerting.util.ArnHelper
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
@@ -376,14 +377,21 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         )
 
         val mockTargetType = mappingProvider().entries.first().key
-        val target = Target(type = mockTargetType, endpoint = "https://test.aoss.amazonaws.com")
+        val target = Target(
+            type = mockTargetType,
+            endpoint = "https://my-domain.us-west-2.es.amazonaws.com",
+            arn = "arn:aws:es:us-west-2:123456789012:domain/my-domain"
+        )
         val monitor = org.opensearch.alerting.randomQueryLevelMonitor().copy(target = target)
 
         poller.populateThreadContext(monitor)
 
         assertEquals("true", mockThreadContext.getHeader(MonitorJobPoller.IS_BACKGROUND_JOB_HEADER))
         assertEquals(mappingProvider()[mockTargetType], mockThreadContext.getHeader(MonitorJobPoller.SERVICE_NAME_HEADER))
-        assertEquals("https://test.aoss.amazonaws.com", mockThreadContext.getHeader(MonitorJobPoller.OPENSEARCH_ENDPOINT_HEADER))
+        assertEquals(
+            "https://my-domain.us-west-2.es.amazonaws.com",
+            mockThreadContext.getHeader(MonitorJobPoller.OPENSEARCH_ENDPOINT_HEADER)
+        )
         assertEquals("us-east-1", mockThreadContext.getHeader(MonitorJobPoller.REGION_HEADER))
 
         poller.close()
@@ -398,12 +406,100 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
             mappingProvider()
         )
 
-        val target = Target(type = "non_existent_type", endpoint = "https://test.aoss.amazonaws.com")
+        val target = Target(
+            type = "non_existent_type",
+            endpoint = "https://my-domain.us-west-2.es.amazonaws.com",
+            arn = "arn:aws:es:us-west-2:123456789012:domain/my-domain"
+        )
         val monitor = org.opensearch.alerting.randomQueryLevelMonitor().copy(target = target)
 
         expectThrows(Exception::class.java) {
             poller.populateThreadContext(monitor)
         }
+
+        poller.close()
+    }
+
+    fun `test ArnHelper parseArn extracts account and resource from domain ARN`() {
+        val (accountId, resourceId) = ArnHelper.parseArn(
+            "arn:aws:es:us-west-2:790849549214:domain/test-domain"
+        )
+        assertEquals("790849549214", accountId)
+        assertEquals("test-domain", resourceId)
+    }
+
+    fun `test ArnHelper parseArn extracts account and resource from AOS ARN`() {
+        val (accountId, resourceId) = ArnHelper.parseArn(
+            "arn:aws:es:us-east-1:123456789012:domain/my-domain"
+        )
+        assertEquals("123456789012", accountId)
+        assertEquals("my-domain", resourceId)
+    }
+
+    fun `test ArnHelper parseArn throws on invalid ARN`() {
+        expectThrows(IllegalArgumentException::class.java) {
+            ArnHelper.parseArn("not-an-arn")
+        }
+    }
+
+    fun `test populateThreadContext sets transient headers from ARN`() {
+        val mockClient = mockClient()
+        val mockThreadPool = mock(org.opensearch.threadpool.ThreadPool::class.java)
+        val mockThreadContext = org.opensearch.common.util.concurrent.ThreadContext(Settings.EMPTY)
+
+        `when`(mockClient.threadPool()).thenReturn(mockThreadPool)
+        `when`(mockThreadPool.threadContext).thenReturn(mockThreadContext)
+
+        val poller = MonitorJobPoller(
+            testXContentRegistry(), mockClient, true,
+            testAccountIdProvider(), "us-east-1", "test-queue",
+            mappingProvider(),
+            tenantAccountIdHeaderName = "x-account-id",
+            tenantResourceIdHeaderNames = mapOf("target_1" to "x-resource-id")
+        )
+
+        val target = Target(
+            type = "target_1",
+            endpoint = "https://my-domain.us-west-2.es.amazonaws.com",
+            arn = "arn:aws:es:us-west-2:790849549214:domain/test-domain"
+        )
+        val monitor = org.opensearch.alerting.randomQueryLevelMonitor().copy(target = target)
+
+        poller.populateThreadContext(monitor)
+
+        assertEquals("790849549214", mockThreadContext.getTransient<String>("x-account-id"))
+        assertEquals("test-domain", mockThreadContext.getTransient<String>("x-resource-id"))
+
+        poller.close()
+    }
+
+    fun `test populateThreadContext skips transient headers when settings empty`() {
+        val mockClient = mockClient()
+        val mockThreadPool = mock(org.opensearch.threadpool.ThreadPool::class.java)
+        val mockThreadContext = org.opensearch.common.util.concurrent.ThreadContext(Settings.EMPTY)
+
+        `when`(mockClient.threadPool()).thenReturn(mockThreadPool)
+        `when`(mockThreadPool.threadContext).thenReturn(mockThreadContext)
+
+        val poller = MonitorJobPoller(
+            testXContentRegistry(), mockClient, true,
+            testAccountIdProvider(), "us-east-1", "test-queue",
+            mappingProvider(),
+            tenantAccountIdHeaderName = "",
+            tenantResourceIdHeaderNames = emptyMap()
+        )
+
+        val target = Target(
+            type = "target_1",
+            endpoint = "https://my-domain.us-west-2.es.amazonaws.com",
+            arn = "arn:aws:es:us-west-2:790849549214:domain/test-domain"
+        )
+        val monitor = org.opensearch.alerting.randomQueryLevelMonitor().copy(target = target)
+
+        poller.populateThreadContext(monitor)
+
+        assertNull(mockThreadContext.getTransient<String>("x-account-id"))
+        assertNull(mockThreadContext.getTransient<String>("x-resource-id"))
 
         poller.close()
     }
