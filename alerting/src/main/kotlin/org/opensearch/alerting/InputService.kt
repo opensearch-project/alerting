@@ -62,6 +62,7 @@ import org.opensearch.transport.client.Client
 import org.opensearch.transport.client.node.NodeClient
 import java.time.Duration
 import java.time.Instant
+import org.opensearch.commons.alerting.model.PPLTrigger
 import kotlin.time.measureTimedValue
 
 /** Service that handles the collection of input results for Monitor executions */
@@ -233,6 +234,16 @@ class InputService(
         monitorCtx: MonitorRunnerExecutionContext
     ): InputRunResults {
         return try {
+            if (onlyHasCustomTriggers(monitor)) {
+                // PPL Alerting:
+                // this function only runs the base query. this is called at the very
+                // beginning of PPL Monitor execution. if the PPL Monitor only contains
+                // custom triggers (which are each running their own queries), and no
+                // number of results triggers, then the base query does not need to be
+                // run, return early saying there were 0 base query results.
+                InputRunResults(emptyList(), null, null, listOf(), 0)
+            }
+
             // PPL Alerting:
             // these query results are for number_of_results PPL triggers,
             // only the number of results returned by base query matters
@@ -266,6 +277,23 @@ class InputService(
             )
             InputRunResults(emptyList(), e, null, listOf(), null)
         }
+    }
+
+    // returns true if the PPL Monitor contains only custom triggers
+    // and no number of results triggers.
+    // note that the PPL Monitor is guaranteed to have at least 1 trigger,
+    // this is validated at Monitor creation time.
+    private fun onlyHasCustomTriggers(pplMonitor: Monitor): Boolean {
+        val triggers = pplMonitor.triggers
+
+        for (trigger in triggers) {
+            val pplTrigger = trigger as PPLTrigger
+            if (pplTrigger.conditionType != PPLTrigger.ConditionType.CUSTOM) {
+                return false
+            }
+        }
+
+        return true
     }
 
     // for PPL Monitor execution, the base PPL query is run once
