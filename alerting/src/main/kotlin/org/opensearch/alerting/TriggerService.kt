@@ -351,7 +351,6 @@ class TriggerService(val scriptService: ScriptService) {
             )
         }
 
-        // TODO: change name to trigger max duration
         val pplTriggerExecutionDuration = monitorCtx
             .clusterService!!
             .clusterSettings
