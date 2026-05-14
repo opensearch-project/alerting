@@ -51,6 +51,7 @@ import org.opensearch.alerting.workflow.CompositeWorkflowRunner
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.util.FeatureFlags
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentHelper
@@ -144,6 +145,22 @@ class TransportIndexWorkflowAction @Inject constructor(
                     OpenSearchStatusException(
                         "Workflow operations are not allowed when multi-tenancy is enabled.",
                         RestStatus.METHOD_NOT_ALLOWED
+                    )
+                )
+            )
+            return
+        }
+
+        // Block workflow creation on pluggable dataformat domains
+        if (FeatureFlags.isEnabled(
+                FeatureFlags.PLUGGABLE_DATAFORMAT_EXPERIMENTAL_FLAG
+            )
+        ) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Workflow operations are not supported on this domain.",
+                        RestStatus.FORBIDDEN
                     )
                 )
             )
