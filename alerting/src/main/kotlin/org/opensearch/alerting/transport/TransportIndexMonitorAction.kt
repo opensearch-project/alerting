@@ -41,6 +41,7 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.AlertingSettings.Companion.ALERTING_MAX_MONITORS
 import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTION_THROTTLE_VALUE
+import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_PPL_TRIGGERS_PER_MONITOR
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_TRIGGERS_PER_MONITOR
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MULTI_TENANT_TRIGGER_EVAL_ENABLED
 import org.opensearch.alerting.settings.AlertingSettings.Companion.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH
@@ -141,6 +142,7 @@ class TransportIndexMonitorAction @Inject constructor(
     // PPL Alerting related settings
     @Volatile private var maxQueryLength = PPL_MAX_QUERY_LENGTH.get(settings)
     @Volatile private var maxQueryResults = PPL_QUERY_RESULTS_MAX_DATAROWS.get(settings)
+    @Volatile private var maxPPLTriggers = MAX_PPL_TRIGGERS_PER_MONITOR.get(settings)
     @Volatile private var notificationSubjectMaxLength = NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH.get(settings)
     @Volatile private var notificationMessageMaxLength = NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH.get(settings)
 
@@ -166,6 +168,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
         clusterService.clusterSettings.addSettingsUpdateConsumer(PPL_MAX_QUERY_LENGTH) { maxQueryLength = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(PPL_QUERY_RESULTS_MAX_DATAROWS) { maxQueryResults = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(MAX_PPL_TRIGGERS_PER_MONITOR) { maxPPLTriggers = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH) {
             notificationSubjectMaxLength = it
         }
@@ -374,9 +377,19 @@ class TransportIndexMonitorAction @Inject constructor(
     }
 
     private fun validatePPLMonitor(pplMonitor: Monitor, actionListener: ActionListener<IndexMonitorResponse>): Boolean {
+        if (pplMonitor.triggers.size > maxPPLTriggers) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    IllegalArgumentException(
+                        "PPL Monitor ${pplMonitor.id} has too many triggers. Max allowed triggers is $maxPPLTriggers."
+                    )
+                )
+            )
+            return false
+        }
+
         pplMonitor.triggers.forEach { trigger ->
             val pplTrigger = trigger as PPLTrigger
-
             if (pplTrigger.conditionType == PPLTrigger.ConditionType.NUMBER_OF_RESULTS &&
                 pplTrigger.numResultsValue!! > maxQueryResults
             ) {

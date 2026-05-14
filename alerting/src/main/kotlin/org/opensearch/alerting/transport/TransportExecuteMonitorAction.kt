@@ -63,10 +63,17 @@ class TransportExecuteMonitorAction @Inject constructor(
     private val sdkClient: SdkClient
 ) : HandledTransportAction<ExecuteMonitorRequest, ExecuteMonitorResponse> (
     ExecuteMonitorAction.NAME, transportService, actionFilters, ::ExecuteMonitorRequest
-) {
+),
+    SecureTransportAction {
     @Volatile private var indexTimeout = AlertingSettings.INDEX_TIMEOUT.get(settings)
 
+    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+
     private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+
+    init {
+        listenFilterBySettingChange(clusterService)
+    }
 
     override fun doExecute(task: Task, execMonitorRequest: ExecuteMonitorRequest, actionListener: ActionListener<ExecuteMonitorResponse>) {
 
@@ -94,7 +101,13 @@ class TransportExecuteMonitorAction @Inject constructor(
                             "Executing monitor from API - id: ${monitor.id}, type: ${monitor.monitorType}, " +
                                 "periodStart: $periodStart, periodEnd: $periodEnd, dryrun: ${execMonitorRequest.dryrun}"
                         )
-                        val monitorRunResult = runner.runJob(monitor, periodStart, periodEnd, execMonitorRequest.dryrun, transportService)
+                        val monitorRunResult = runner.runJob(
+                            monitor,
+                            periodStart,
+                            periodEnd,
+                            execMonitorRequest.dryrun,
+                            transportService
+                        )
                         withContext(Dispatchers.IO) {
                             actionListener.onResponse(ExecuteMonitorResponse(monitorRunResult))
                         }
@@ -131,26 +144,7 @@ class TransportExecuteMonitorAction @Inject constructor(
                             )
                             return@whenComplete
                         }
-                        if (!getResponse.isSourceEmpty) {
-                            XContentHelper.createParser(
-                                xContentRegistry, LoggingDeprecationHandler.INSTANCE,
-                                getResponse.sourceAsBytesRef, XContentType.JSON
-                            ).use { xcp ->
-                                val monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
-                                if (multiTenancyEnabled && monitor.isUnsupportedMultiTenantMonitorType()) {
-                                    actionListener.onFailure(
-                                        AlertingException.wrap(
-                                            OpenSearchStatusException(
-                                                "${monitor.monitorType} monitors are not allowed when multi-tenancy is enabled.",
-                                                RestStatus.METHOD_NOT_ALLOWED
-                                            )
-                                        )
-                                    )
-                                    return@whenComplete
-                                }
-                                executeMonitor(monitor)
-                            }
-                        } else {
+                        if (getResponse.isSourceEmpty) {
                             actionListener.onFailure(
                                 AlertingException.wrap(
                                     OpenSearchStatusException(
@@ -159,6 +153,36 @@ class TransportExecuteMonitorAction @Inject constructor(
                                     )
                                 )
                             )
+                            return@whenComplete
+                        }
+                        XContentHelper.createParser(
+                            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+                            getResponse.sourceAsBytesRef, XContentType.JSON
+                        ).use { xcp ->
+                            val monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+
+                            if (multiTenancyEnabled && monitor.isUnsupportedMultiTenantMonitorType()) {
+                                actionListener.onFailure(
+                                    AlertingException.wrap(
+                                        OpenSearchStatusException(
+                                            "${monitor.monitorType} monitors are not allowed when multi-tenancy is enabled.",
+                                            RestStatus.METHOD_NOT_ALLOWED
+                                        )
+                                    )
+                                )
+                                return@whenComplete
+                            }
+
+                            // RBAC check: verify calling user has permissions to this monitor
+                            if (!checkUserPermissionsWithResource(
+                                    user, monitor.user, actionListener,
+                                    "monitor", execMonitorRequest.monitorId
+                                )
+                            ) {
+                                return@whenComplete
+                            }
+
+                            executeMonitor(monitor)
                         }
                     } catch (e: Exception) {
                         log.error("Failed to get monitor ${execMonitorRequest.monitorId} for execution", e)

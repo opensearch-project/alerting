@@ -35,11 +35,13 @@ import org.opensearch.commons.alerting.model.ClusterMetricsTriggerRunResult
 import org.opensearch.commons.alerting.model.DataSources
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.NoOpTrigger
+import org.opensearch.commons.alerting.model.PPLInput
 import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.commons.alerting.model.action.AlertCategory
+import org.opensearch.commons.alerting.util.isPPLMonitor
 import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.common.bytes.BytesReference
@@ -66,6 +68,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
+
 /** Service that handles CRUD operations for alerts */
 class AlertService(
     val client: Client,
@@ -202,6 +205,13 @@ class AlertService(
                 }
             }
 
+        // these fields are only populated for PPL Monitors for now.
+        // this can be extended to let DSL-based Monitors like Query
+        // or Bucket level Monitors include their results in Alerts
+        // as well
+        val query = if (ctx.monitor.isPPLMonitor()) (ctx.monitor.inputs[0] as PPLInput).query else null
+        val queryResults = if (ctx.monitor.isPPLMonitor()) ctx.pplQueryResults else emptyList()
+
         // Merge the alert's error message to the current alert's history
         val updatedHistory = currentAlert?.errorHistory.update(alertError)
         return if (alertError == null && !result.triggered) {
@@ -212,7 +222,9 @@ class AlertService(
                 errorHistory = updatedHistory,
                 actionExecutionResults = updatedActionExecutionResults,
                 schemaVersion = IndexUtils.alertIndexSchemaVersion,
-                clusters = triggeredClusters
+                clusters = triggeredClusters,
+                query = query,
+                queryResults = queryResults
             )
         } else if (alertError == null && currentAlert?.isAcknowledged() == true) {
             null
@@ -225,7 +237,9 @@ class AlertService(
                 errorHistory = updatedHistory,
                 actionExecutionResults = updatedActionExecutionResults,
                 schemaVersion = IndexUtils.alertIndexSchemaVersion,
-                clusters = triggeredClusters
+                clusters = triggeredClusters,
+                query = query,
+                queryResults = queryResults
             )
         } else {
             val alertState = if (workflorwRunContext?.auditDelegateMonitorAlerts == true) {
@@ -238,7 +252,7 @@ class AlertService(
                 errorHistory = updatedHistory, actionExecutionResults = updatedActionExecutionResults,
                 schemaVersion = IndexUtils.alertIndexSchemaVersion, executionId = executionId,
                 workflowId = workflorwRunContext?.workflowId ?: "",
-                clusters = triggeredClusters
+                clusters = triggeredClusters, query = query, queryResults = queryResults
             )
         }
     }

@@ -243,7 +243,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
     override fun getActions(): List<ActionPlugin.ActionHandler<out ActionRequest, out ActionResponse>> {
         return listOf(
-            // Alerting V1
             ActionPlugin.ActionHandler(ScheduledJobsStatsAction.INSTANCE, ScheduledJobsStatsTransportAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.INDEX_MONITOR_ACTION_TYPE, TransportIndexMonitorAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_MONITOR_ACTION_TYPE, TransportGetMonitorAction::class.java),
@@ -504,7 +503,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.REMOTE_METADATA_ENDPOINT,
             AlertingSettings.REMOTE_METADATA_REGION,
             AlertingSettings.REMOTE_METADATA_SERVICE_NAME,
-            AlertingSettings.PPL_MONITOR_EXECUTION_MAX_DURATION,
+            AlertingSettings.MAX_PPL_TRIGGERS_PER_MONITOR,
+            AlertingSettings.PPL_QUERY_EXECUTION_MAX_DURATION,
             AlertingSettings.PPL_MAX_QUERY_LENGTH,
             AlertingSettings.PPL_QUERY_RESULTS_MAX_DATAROWS,
             AlertingSettings.PPL_QUERY_RESULTS_MAX_SIZE,

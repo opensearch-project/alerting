@@ -80,7 +80,7 @@ object PPLUtils {
     }
 
     /**
-     * Executes a PPL query and returns the response as a parsable JsonNode.
+     * Executes a PPL query, for suspend functions and contexts
      *
      * This method calls the PPL Plugin's Execute or Explain API via the transport layer to execute the provided query
      * and parses the response into a structured JSON format suitable for trigger evaluation
@@ -124,6 +124,21 @@ object PPLUtils {
         return mapper.readTree(transportPplQueryResponse.result)
     }
 
+    /**
+     * Executes a PPL query, for callback style flows with an action listener
+     *
+     * This method calls the PPL Plugin's Execute or Explain API via the transport layer to execute the provided query
+     * and parses the response into a structured JSON format suitable for trigger evaluation
+     *
+     * @param query The PPL query string to execute
+     * @param explain true if the query should just be explained, false if the query should be executed
+     * @param client The node client used to run the request
+     * @param listener The callback listener for when PPL/SQL plugin sends its response or failure
+     *
+     *
+     * @note The response format follows the PPL plugin's Execute API response structure with
+     *       "schema", "datarows", "total", and "size" fields.
+     */
     fun executePplQuery(
         query: String,
         explain: Boolean,
