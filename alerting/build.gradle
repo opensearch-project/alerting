@@ -109,14 +109,32 @@ configurations.all {
         force "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${versions.jackson}"
         force "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${versions.jackson}"
         force "commons-logging:commons-logging:${versions.commonslogging}"
-        // force the version until OpenSearch upgrade to an invulnerable one, https://www.whitesourcesoftware.com/vulnerability-database/WS-2019-0379
-        force "commons-codec:commons-codec:1.13"
+        force "commons-codec:commons-codec:${versions.commonscodec}"
 
         force "org.slf4j:slf4j-api:${versions.slf4j}" //Needed for http5
 
         // This is required because kotlin-coroutines-core 1.1.1 still requires kotlin stdlib 1.3.20 and we're using a higher kotlin version
         force "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
         force "org.jetbrains.kotlin:kotlin-stdlib-common:${kotlin_version}"
+
+        // Required for DDB remote metadata SDK client
+        force "software.amazon.awssdk:bom:${versions.aws}"
+        force "software.amazon.awssdk:kms:${versions.aws}"
+        force "software.amazon.awssdk:dynamodb:${versions.aws}"
+        force "org.apache.httpcomponents.core5:httpcore5:${versions.httpcore5}"
+        force "org.apache.httpcomponents.core5:httpcore5-h2:${versions.httpcore5}"
+        force "org.apache.httpcomponents:httpcore:${versions.httpcore}"
+        force "io.netty:netty-codec-http:${versions.netty}"
+        force "io.netty:netty-codec-http2:${versions.netty}"
+        force "io.netty:netty-codec:${versions.netty}"
+        force "io.netty:netty-transport:${versions.netty}"
+        force "io.netty:netty-common:${versions.netty}"
+        force "io.netty:netty-buffer:${versions.netty}"
+        force "io.netty:netty-handler:${versions.netty}"
+        force "io.netty:netty-resolver:${versions.netty}"
+        force "io.netty:netty-transport-native-unix-common:${versions.netty}"
+        force "org.dafny:DafnyRuntime:4.9.0"
+        force "jakarta.json:jakarta.json-api:2.1.3"
     }
 }
 
@@ -184,6 +202,7 @@ dependencies {
     implementation project(path: ":alerting-spi", configuration: 'shadow')
 
     implementation "org.opensearch:opensearch-remote-metadata-sdk:${opensearch_build}"
+    implementation "org.opensearch:opensearch-remote-metadata-sdk-ddb-client:${opensearch_build}"
 
     implementation(platform("software.amazon.awssdk:bom:${versions.aws}"))
     implementation "software.amazon.awssdk:sqs:${versions.aws}"
