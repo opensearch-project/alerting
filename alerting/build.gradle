@@ -392,6 +392,46 @@ integTest {
             excludeTestsMatching "org.opensearch.alerting.bwc.*IT"
         }
     }
+
+    task integTestPluggableDataformat(type: RestIntegTestTask) {
+        description = "Runs integration tests with pluggable dataformat feature flag enabled"
+        dependsOn bundlePlugin
+        testClassesDirs = sourceSets.test.output.classesDirs
+        classpath = sourceSets.test.runtimeClasspath
+
+        systemProperty 'tests.security.manager', 'false'
+        systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
+
+        filter {
+            includeTestsMatching "org.opensearch.alerting.transport.PluggableDataFormatMonitorBlockIT"
+        }
+    }
+
+    testClusters.integTestPluggableDataformat {
+        testDistribution = "ARCHIVE"
+        systemProperty 'opensearch.experimental.feature.pluggable.dataformat.enabled', 'true'
+
+        // Include same plugins as main integTest cluster
+        plugin(provider({ new RegularFile() { @Override File getAsFile() { return configurations.zipArchive.asFileTree.matching { include '**/opensearch-notifications-core*' }.singleFile } } }))
+        plugin(provider({ new RegularFile() { @Override File getAsFile() { return configurations.zipArchive.asFileTree.matching { include '**/notifications*' }.singleFile } } }))
+        plugin(provider({ new RegularFile() { @Override File getAsFile() { return configurations.zipArchive.asFileTree.matching { include '**/opensearch-job-scheduler*' }.singleFile } } }))
+        plugin(provider({ new RegularFile() { @Override File getAsFile() { return configurations.zipArchive.asFileTree.matching { include '**/opensearch-sql-plugin*' }.singleFile } } }))
+
+    }
+
+    // Install alerting plugin on the pluggable dataformat test cluster
+    integTestPluggableDataformat.dependsOn(bundle)
+    integTestPluggableDataformat.getClusters().forEach{c -> c.plugin(project.getObjects().fileProperty().value(bundle.getArchiveFile()))}
+
+    // Exclude pluggable dataformat tests from the main integTest task
+    integTest {
+        filter {
+            excludeTestsMatching "org.opensearch.alerting.transport.PluggableDataFormatMonitorBlockIT"
+        }
+    }
+
+    check.dependsOn integTestPluggableDataformat
+    integTest.finalizedBy integTestPluggableDataformat
 }
 
 task integTestRemote(type: RestIntegTestTask) {

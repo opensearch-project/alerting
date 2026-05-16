@@ -62,6 +62,7 @@ import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.common.util.FeatureFlags
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
@@ -85,6 +86,7 @@ import org.opensearch.commons.alerting.model.remote.monitors.RemoteDocLevelMonit
 import org.opensearch.commons.alerting.model.userErrorMessage
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.isMonitorOfStandardType
+import org.opensearch.commons.alerting.util.isPPLMonitor
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.TenantContext
 import org.opensearch.commons.utils.recreateObject
@@ -207,6 +209,22 @@ class TransportIndexMonitorAction @Inject constructor(
                     OpenSearchStatusException(
                         "${transformedRequest.monitor.monitorType} monitors are not allowed when multi-tenancy is enabled.",
                         RestStatus.METHOD_NOT_ALLOWED
+                    )
+                )
+            )
+            return
+        }
+
+        // Block non-PPL monitors on pluggable dataformat domains
+        if (FeatureFlags.isEnabled(FeatureFlags.PLUGGABLE_DATAFORMAT_EXPERIMENTAL_FLAG) &&
+            !transformedRequest.monitor.isPPLMonitor()
+        ) {
+            actionListener.onFailure(
+                AlertingException.wrap(
+                    OpenSearchStatusException(
+                        "Only PPL monitors are supported on this domain." +
+                            " ${transformedRequest.monitor.monitorType} monitors are not allowed.",
+                        RestStatus.FORBIDDEN
                     )
                 )
             )
