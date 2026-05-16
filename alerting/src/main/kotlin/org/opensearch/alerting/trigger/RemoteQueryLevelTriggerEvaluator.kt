@@ -123,7 +123,7 @@ object RemoteQueryLevelTriggerEvaluator {
     ): Map<String, Boolean> {
         return triggerIds.associateWith { triggerId ->
             val aggKey = "$TRIGGER_AGG_PREFIX$triggerId"
-            val aggResult = aggResults[aggKey]
+            val aggResult = aggResults.entries.firstOrNull { it.key.endsWith(aggKey) }?.value
             if (aggResult == null) {
                 logger.warn("Missing evaluation result for trigger $triggerId, defaulting to not triggered")
                 false

@@ -9,6 +9,9 @@ import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
+import org.opensearch.alerting.service.MonitorJobPoller
+import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.ArnHelper
 import org.opensearch.alerting.util.getConfigAndSendNotification
 import org.opensearch.alerting.util.use
 import org.opensearch.commons.ConfigConstants
@@ -83,6 +86,40 @@ abstract class MonitorRunner {
             ActionRunResult(action.id, action.name, actionOutput, false, MonitorRunnerService.currentTime(), null)
         } catch (e: Exception) {
             ActionRunResult(action.id, action.name, mapOf(), false, MonitorRunnerService.currentTime(), e)
+        }
+    }
+
+    protected fun reinjectHeaders(monitor: Monitor, monitorCtx: MonitorRunnerExecutionContext) {
+        val target = monitor.target ?: return
+        val threadContext = monitorCtx.client!!.threadPool().threadContext
+        val settings = monitorCtx.settings!!
+
+        if (threadContext.getHeader(MonitorJobPoller.IS_BACKGROUND_JOB_HEADER) == null) {
+            threadContext.putHeader(MonitorJobPoller.IS_BACKGROUND_JOB_HEADER, "true")
+        }
+        if (threadContext.getHeader(MonitorJobPoller.OPENSEARCH_ENDPOINT_HEADER) == null) {
+            threadContext.putHeader(MonitorJobPoller.OPENSEARCH_ENDPOINT_HEADER, target.endpoint)
+        }
+        if (threadContext.getHeader(MonitorJobPoller.SERVICE_NAME_HEADER) == null) {
+            val serviceNameMap = AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME.get(settings)
+                .let { it.keySet().associateWith { key -> it.get(key) } }
+            threadContext.putHeader(MonitorJobPoller.SERVICE_NAME_HEADER, serviceNameMap[target.type] ?: target.type)
+        }
+        if (threadContext.getHeader(MonitorJobPoller.REGION_HEADER) == null) {
+            threadContext.putHeader(MonitorJobPoller.REGION_HEADER, AlertingSettings.REMOTE_METADATA_REGION.get(settings) ?: "")
+        }
+
+        if (target.arn.isNotBlank()) {
+            val (accountId, resourceId) = ArnHelper.parseArn(target.arn)
+            val accountHeader = AlertingSettings.TENANT_ACCOUNT_ID_HEADER.get(settings) ?: ""
+            if (accountHeader.isNotEmpty() && threadContext.getTransient<String>(accountHeader) == null) {
+                threadContext.putTransient(accountHeader, accountId)
+            }
+            val resourceHeaders = AlertingSettings.TENANT_RESOURCE_ID_HEADER.get(settings)
+            val resourceHeader = resourceHeaders?.get(target.type)
+            if (!resourceHeader.isNullOrEmpty() && threadContext.getTransient<String>(resourceHeader) == null) {
+                threadContext.putTransient(resourceHeader, resourceId)
+            }
         }
     }
 }
