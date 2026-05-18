@@ -43,6 +43,7 @@ import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.PPLInput
 import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.SearchInput
+import org.opensearch.commons.alerting.model.Target
 import org.opensearch.commons.alerting.model.TriggerAfterKey
 import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.core.common.io.stream.NamedWriteableAwareStreamInput
@@ -387,7 +388,9 @@ class InputService(
 
         val indexes = CrossClusterMonitorUtils.parseIndexesForRemoteSearch(searchInput.indices, clusterService)
 
-        val resolvedIndexes = if (searchInput.query.query() == null) indexes else {
+        val isRemoteTarget = monitor.target != null &&
+            monitor.target!!.type != Target.LOCAL
+        val resolvedIndexes = if (searchInput.query.query() == null || isRemoteTarget) indexes else {
             val query = searchInput.query.query()
             resolveOnlyQueryableIndicesFromLocalClusterAliases(
                 monitor,
