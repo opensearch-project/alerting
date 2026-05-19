@@ -541,12 +541,14 @@ class TransportIndexMonitorAction @Inject constructor(
                     throw t
                 }
                 try {
-                    if (
-                        request.monitor.isMonitorOfStandardType() &&
-                        Monitor.MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT)) ==
-                        Monitor.MonitorType.DOC_LEVEL_MONITOR
-                    ) {
-                        indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
+                    if (request.monitor.isMonitorOfStandardType()) {
+                        val type = Monitor.MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT))
+                        if (
+                            type == Monitor.MonitorType.DOC_LEVEL_MONITOR ||
+                            type == Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR
+                        ) {
+                            indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
+                        }
                     }
                     // When inserting queries in queryIndex we could update sourceToQueryIndexMapping
                     MonitorMetadataService.upsertMetadata(metadata, updating = true)

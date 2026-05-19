@@ -48,7 +48,7 @@ import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 import kotlin.math.max
 
-class DocumentLevelMonitorRunner : MonitorRunner() {
+open class DocumentLevelMonitorRunner : MonitorRunner() {
     private val logger = LogManager.getLogger(javaClass)
     private var totalTimeTakenStat = 0L
 

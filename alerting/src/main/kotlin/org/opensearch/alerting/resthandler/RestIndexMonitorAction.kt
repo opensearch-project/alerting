@@ -17,6 +17,7 @@ import org.opensearch.commons.alerting.action.IndexMonitorResponse
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocumentLevelTrigger
+import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -42,6 +43,7 @@ import org.opensearch.rest.RestResponse
 import org.opensearch.rest.action.RestResponseListener
 import org.opensearch.transport.client.node.NodeClient
 import java.io.IOException
+import java.time.Duration
 import java.time.Instant
 import java.util.*
 
@@ -51,6 +53,11 @@ private val log = LogManager.getLogger(RestIndexMonitorAction::class.java)
  * Rest handlers to create and update monitors.
  */
 class RestIndexMonitorAction : BaseRestHandler() {
+
+    companion object {
+        const val ACTIVE_RESPONSE_INDEX_PREFIX = "wazuh-findings-v5"
+        const val ACTIVE_RESPONSE_MAX_INTERVAL_MILLIS = 60_000L
+    }
 
     override fun getName(): String {
         return "index_monitor_action"
@@ -135,6 +142,17 @@ class RestIndexMonitorAction : BaseRestHandler() {
                             }
                         }
                     }
+
+                    Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR -> {
+                        validateDocLevelQueryName(monitor)
+                        triggers.forEach {
+                            if (it !is DocumentLevelTrigger) {
+                                throw IllegalArgumentException("Illegal trigger type, ${it.javaClass.name}, for active response monitor")
+                            }
+                        }
+                        validateActiveResponseIndices(monitor)
+                        validateActiveResponseSchedule(monitor)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -165,6 +183,33 @@ class RestIndexMonitorAction : BaseRestHandler() {
                     )
                 }
             }
+        }
+    }
+
+    private fun validateActiveResponseIndices(monitor: Monitor) {
+        monitor.inputs.filterIsInstance<DocLevelMonitorInput>().forEach { input ->
+            input.indices.forEach { idx ->
+                if (!idx.startsWith(ACTIVE_RESPONSE_INDEX_PREFIX)) {
+                    throw IllegalArgumentException(
+                        "Active response monitor indices must start with '$ACTIVE_RESPONSE_INDEX_PREFIX'; found: $idx"
+                    )
+                }
+            }
+        }
+    }
+
+    private fun validateActiveResponseSchedule(monitor: Monitor) {
+        val schedule = monitor.schedule
+        if (schedule !is IntervalSchedule) {
+            throw IllegalArgumentException(
+                "Active response monitor schedule must be an interval schedule (cron schedules are not supported)"
+            )
+        }
+        val durationMillis = Duration.of(schedule.interval.toLong(), schedule.unit).toMillis()
+        if (durationMillis > ACTIVE_RESPONSE_MAX_INTERVAL_MILLIS) {
+            throw IllegalArgumentException(
+                "Active response monitor schedule must be <= 60 seconds; got ${durationMillis}ms"
+            )
         }
     }
 

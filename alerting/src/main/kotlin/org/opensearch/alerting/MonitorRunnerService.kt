@@ -52,6 +52,7 @@ import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.isActiveResponseMonitor
 import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.alerting.workflow.CompositeWorkflowRunner
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
@@ -474,6 +475,16 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
             )
             val runResult = if (monitor.isBucketLevelMonitor()) {
                 BucketLevelMonitorRunner.runMonitor(
+                    monitor,
+                    monitorCtx,
+                    periodStart,
+                    periodEnd,
+                    dryrun,
+                    executionId = executionId,
+                    transportService = transportService
+                )
+            } else if (monitor.isActiveResponseMonitor()) {
+                ActiveResponseMonitorRunner().runMonitor(
                     monitor,
                     monitorCtx,
                     periodStart,
