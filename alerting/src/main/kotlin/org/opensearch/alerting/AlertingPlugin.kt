@@ -147,6 +147,7 @@ import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_REGION_
 import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_SERVICE_NAME_KEY
 import org.opensearch.remote.metadata.common.CommonValue.REMOTE_METADATA_TYPE_KEY
 import org.opensearch.remote.metadata.common.CommonValue.TENANT_AWARE_KEY
+import org.opensearch.remote.metadata.common.CommonValue.TENANT_ID_FIELD_KEY
 import org.opensearch.repositories.RepositoriesService
 import org.opensearch.rest.RestController
 import org.opensearch.rest.RestHandler
@@ -316,7 +317,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
                 REMOTE_METADATA_ENDPOINT_KEY to REMOTE_METADATA_ENDPOINT.get(settings),
                 REMOTE_METADATA_REGION_KEY to REMOTE_METADATA_REGION.get(settings),
                 REMOTE_METADATA_SERVICE_NAME_KEY to REMOTE_METADATA_SERVICE_NAME.get(settings),
-                TENANT_AWARE_KEY to MULTI_TENANCY_ENABLED.get(settings).toString()
+                TENANT_AWARE_KEY to MULTI_TENANCY_ENABLED.get(settings).toString(),
+                TENANT_ID_FIELD_KEY to "tenant_id"
             ),
             client.threadPool().executor(ThreadPool.Names.GENERIC)
         )
