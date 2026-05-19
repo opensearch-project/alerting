@@ -136,12 +136,9 @@ class TransportExecuteMonitorAction @Inject constructor(
                     false -> (execMonitorRequest.monitor as Monitor).copy(user = user)
                 }
 
-                val execMonitorTypeEnum = if (monitor.isMonitorOfStandardType()) {
-                    Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))
-                } else null
                 if (
-                    execMonitorTypeEnum == Monitor.MonitorType.DOC_LEVEL_MONITOR ||
-                    execMonitorTypeEnum == Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR
+                    monitor.isMonitorOfStandardType() &&
+                    Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
                 ) {
                     try {
                         scope.launch {

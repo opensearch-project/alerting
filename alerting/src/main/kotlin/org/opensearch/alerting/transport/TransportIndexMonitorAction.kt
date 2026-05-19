@@ -541,12 +541,10 @@ class TransportIndexMonitorAction @Inject constructor(
                     throw t
                 }
                 try {
-                    val monitorTypeEnum = if (request.monitor.isMonitorOfStandardType()) {
-                        Monitor.MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT))
-                    } else null
                     if (
-                        monitorTypeEnum == Monitor.MonitorType.DOC_LEVEL_MONITOR ||
-                        monitorTypeEnum == Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR
+                        request.monitor.isMonitorOfStandardType() &&
+                        Monitor.MonitorType.valueOf(request.monitor.monitorType.uppercase(Locale.ROOT)) ==
+                        Monitor.MonitorType.DOC_LEVEL_MONITOR
                     ) {
                         indexDocLevelMonitorQueries(request.monitor, indexResponse.id, metadata, request.refreshPolicy)
                     }
@@ -702,10 +700,9 @@ class TransportIndexMonitorAction @Inject constructor(
                 var isDocLevelMonitorRestarted = false
                 // Force re-creation of last run context if monitor is of type standard doc-level/threat-intel
                 // And monitor is re-enabled
-                val isDocOrActiveResponseType =
-                    request.monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value) ||
-                        request.monitor.monitorType.endsWith(Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR.value)
-                if (request.monitor.enabled && !currentMonitor.enabled && isDocOrActiveResponseType) {
+                if (request.monitor.enabled && !currentMonitor.enabled &&
+                    request.monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)
+                ) {
                     isDocLevelMonitorRestarted = true
                 }
 
@@ -718,13 +715,10 @@ class TransportIndexMonitorAction @Inject constructor(
                 // Recreate runContext if metadata exists
                 // Delete and insert all queries from/to queryIndex
 
-                val currentMonitorTypeEnum = if (currentMonitor.isMonitorOfStandardType()) {
-                    Monitor.MonitorType.valueOf(currentMonitor.monitorType.uppercase(Locale.ROOT))
-                } else null
-                val isCurrentDocOrActiveResponse =
-                    currentMonitorTypeEnum == Monitor.MonitorType.DOC_LEVEL_MONITOR ||
-                        currentMonitorTypeEnum == Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR
-                if (!created && isCurrentDocOrActiveResponse) {
+                if (!created &&
+                    currentMonitor.isMonitorOfStandardType() &&
+                    Monitor.MonitorType.valueOf(currentMonitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
+                ) {
                     updatedMetadata = MonitorMetadataService.recreateRunContext(metadata, currentMonitor)
                     if (docLevelMonitorQueries.docLevelQueryIndexExists(currentMonitor.dataSources)) {
                         client.suspendUntil<Client, BulkByScrollResponse> {

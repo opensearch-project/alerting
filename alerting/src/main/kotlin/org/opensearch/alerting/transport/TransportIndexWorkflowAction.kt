@@ -419,8 +419,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                     }
 
                     if (
-                        Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR ||
-                        Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR
+                        Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
                     ) {
                         val oldMonitorMetadata = MonitorMetadataService.getMetadata(monitor)
                         monitorMetadata = monitorMetadata.copy(sourceToQueryIndexMapping = oldMonitorMetadata!!.sourceToQueryIndexMapping)
@@ -582,13 +581,9 @@ class TransportIndexWorkflowAction @Inject constructor(
                         forceCreateLastRunContext = isWorkflowRestarted
                     )
 
-                    val wfMonitorTypeEnum = if (monitor.isMonitorOfStandardType()) {
-                        Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))
-                    } else null
-                    val isWfDocOrActiveResponse =
-                        wfMonitorTypeEnum == Monitor.MonitorType.DOC_LEVEL_MONITOR ||
-                            wfMonitorTypeEnum == Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR
-                    if (!created && isWfDocOrActiveResponse) {
+                    if (!created &&
+                        Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
+                    ) {
                         var updatedMetadata = MonitorMetadataService.recreateRunContext(monitorMetadata, monitor)
                         val oldMonitorMetadata = MonitorMetadataService.getMetadata(monitor)
                         updatedMetadata = updatedMetadata.copy(sourceToQueryIndexMapping = oldMonitorMetadata!!.sourceToQueryIndexMapping)
@@ -669,7 +664,6 @@ class TransportIndexWorkflowAction @Inject constructor(
         if (monitor.isMonitorOfStandardType()) {
             return when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
                 Monitor.MonitorType.DOC_LEVEL_MONITOR -> (monitor.inputs[0] as DocLevelMonitorInput).indices
-                Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR -> (monitor.inputs[0] as DocLevelMonitorInput).indices
                 Monitor.MonitorType.BUCKET_LEVEL_MONITOR -> monitor.inputs.flatMap { s -> (s as SearchInput).indices }
                 Monitor.MonitorType.QUERY_LEVEL_MONITOR -> {
                     if (isADMonitor(monitor)) monitor.inputs.flatMap { s -> (s as SearchInput).indices }

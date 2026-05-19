@@ -529,12 +529,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                             )
 
                             if (documentLevelTriggerRunResult.error != null) {
-                                val error = if (documentLevelTriggerRunResult.error is AlertingException) {
-                                    documentLevelTriggerRunResult.error as AlertingException
-                                } else {
-                                    AlertingException.wrap(documentLevelTriggerRunResult.error!!) as AlertingException
-                                }
-                                triggerErrorMap[triggerId]!!.add(error)
+                                triggerErrorMap[triggerId]!!.add(documentLevelTriggerRunResult.error as AlertingException)
                             }
                         }
                     }

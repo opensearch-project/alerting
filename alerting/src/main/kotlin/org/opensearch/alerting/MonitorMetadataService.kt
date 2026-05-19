@@ -166,18 +166,12 @@ object MonitorMetadataService :
     private suspend fun createUpdatedRunContext(
         monitor: Monitor
     ): Map<String, MutableMap<String, Any>> {
-        val monitorIndex = if (
-            monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value ||
-            monitor.monitorType == Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR.value
-        )
+        val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value)
             (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
         else if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
             (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
         else null
-        val runContext = if (
-            monitor.monitorType == Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR.value ||
-            monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)
-        )
+        val runContext = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
             createFullRunContext(monitorIndex)
         else emptyMap()
         return runContext
@@ -210,18 +204,12 @@ object MonitorMetadataService :
 
     suspend fun recreateRunContext(metadata: MonitorMetadata, monitor: Monitor): MonitorMetadata {
         try {
-            val monitorIndex = if (
-                monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value ||
-                monitor.monitorType == Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR.value
-            )
+            val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value)
                 (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
             else if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
                 (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
             else null
-            val runContext = if (
-                monitor.monitorType == Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR.value ||
-                monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)
-            )
+            val runContext = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
                 createFullRunContext(monitorIndex, metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
             else null
             return if (runContext != null) {
@@ -241,18 +229,12 @@ object MonitorMetadataService :
         createWithRunContext: Boolean,
         workflowMetadataId: String? = null,
     ): MonitorMetadata {
-        val monitorIndex = if (
-            monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value ||
-            monitor.monitorType == Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR.value
-        )
+        val monitorIndex = if (monitor.monitorType == Monitor.MonitorType.DOC_LEVEL_MONITOR.value)
             (monitor.inputs[0] as DocLevelMonitorInput).indices[0]
         else if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
             (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
         else null
-        val runContext = if (
-            monitor.monitorType == Monitor.MonitorType.ACTIVE_RESPONSE_MONITOR.value ||
-            monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)
-        )
+        val runContext = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
             createFullRunContext(monitorIndex)
         else emptyMap()
         return MonitorMetadata(
