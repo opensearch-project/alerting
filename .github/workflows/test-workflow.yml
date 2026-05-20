@@ -71,7 +71,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: alerting-plugin-${{ matrix.os }}
+          name: alerting-plugin-${{ matrix.os }}-${{ matrix.java }}
           path: alerting-artifacts
           overwrite: true
 
@@ -82,7 +82,7 @@ jobs:
       WORKING_DIR: ${{ matrix.working_directory }}.
     strategy:
       matrix:
-        java: [21, 24]
+        java: [21, 25]
         os: [ windows-latest, macos-latest ]
         include:
           - os: windows-latest
@@ -120,6 +120,6 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: alerting-plugin-${{ matrix.os }}
+          name: alerting-plugin-${{ matrix.os }}-${{ matrix.java }}
           path: alerting-artifacts
           overwrite: true
