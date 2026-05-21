@@ -74,7 +74,8 @@ class AlertService(
     val client: Client,
     val xContentRegistry: NamedXContentRegistry,
     val alertIndices: AlertIndices,
-    val sdkClient: SdkClient
+    val sdkClient: SdkClient,
+    val multiTenancyEnabled: Boolean = false
 ) {
 
     companion object {
@@ -759,18 +760,10 @@ class AlertService(
                     throw IllegalStateException("Unexpected attempt to save ${alert.state} alert: $alert")
                 }
                 Alert.State.COMPLETED -> {
-                    deleteRequests.add(
-                        DeleteDataObjectRequest.builder()
-                            .index(alertsIndex)
-                            .id(alert.id)
-                            .routing(routingId)
-                            .tenantId(currentTenantId())
-                            .build()
-                    )
-                    if (alertIndices.isAlertHistoryEnabled()) {
+                    if (multiTenancyEnabled) {
                         putRequests.add(
                             PutDataObjectRequest.builder()
-                                .index(alertsHistoryIndex)
+                                .index(alertsIndex)
                                 .id(alert.id)
                                 .routing(routingId)
                                 .tenantId(currentTenantId())
@@ -779,7 +772,28 @@ class AlertService(
                                 .build()
                         )
                     } else {
-                        commentIdsToDelete.addAll(CommentsUtils.getCommentIDsByAlertIDs(client, listOf(alert.id)))
+                        deleteRequests.add(
+                            DeleteDataObjectRequest.builder()
+                                .index(alertsIndex)
+                                .id(alert.id)
+                                .routing(routingId)
+                                .tenantId(currentTenantId())
+                                .build()
+                        )
+                        if (alertIndices.isAlertHistoryEnabled()) {
+                            putRequests.add(
+                                PutDataObjectRequest.builder()
+                                    .index(alertsHistoryIndex)
+                                    .id(alert.id)
+                                    .routing(routingId)
+                                    .tenantId(currentTenantId())
+                                    .overwriteIfExists(true)
+                                    .dataObject(ToXContentObject { builder, _ -> alert.toXContentWithUser(builder) })
+                                    .build()
+                            )
+                        } else {
+                            commentIdsToDelete.addAll(CommentsUtils.getCommentIDsByAlertIDs(client, listOf(alert.id)))
+                        }
                     }
                 }
             }
