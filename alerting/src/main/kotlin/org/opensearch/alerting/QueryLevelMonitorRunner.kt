@@ -76,6 +76,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                     monitor.user
                 )
             ) {
+                reinjectHeaders(monitor, monitorCtx)
                 monitorResult = monitorResult.copy(
                     inputResults = monitorCtx.inputService!!.collectInputResultsForPPLMonitor(monitor, monitorCtx)
                 )
