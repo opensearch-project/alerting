@@ -74,7 +74,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             map.entries.associate { (k, v) ->
                 k to when (v) {
                     is Map<*, *> -> deepCopyMap(v as Map<String, Any>)
-                    is List<*> -> (v as List<Any>).toMutableList()
+                    is List<*> -> (v as List<Any>).map { elem ->
+                        if (elem is Map<*, *>) deepCopyMap(elem as Map<String, Any>) else elem
+                    }.toMutableList()
                     else -> v
                 }
             }.toMutableMap()
