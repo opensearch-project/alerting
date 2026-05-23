@@ -351,7 +351,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         // Traverse and update index mappings here while extracting flatten field paths
                         val flattenPaths = mutableMapOf<String, MutableMap<String, Any>>()
                         traverseMappingsAndUpdate(properties, "", leafNodeProcessor, flattenPaths)
-                        flattenPaths.keys.forEach { allFlattenPaths.add(Pair(it, concreteIndexName)) }
+                        flattenPaths.entries
+                            .filter { (_, props) -> props["type"] != "alias" }
+                            .forEach { (path, _) -> allFlattenPaths.add(Pair(path, concreteIndexName)) }
                         // Updated mappings ready to be applied on queryIndex
                         properties.forEach {
                             if (
@@ -697,6 +699,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     //
                     val leafNodeProcessor =
                         fun(fieldName: String, _: String, props: MutableMap<String, Any>): Triple<String, String, MutableMap<String, Any>> {
+                            if (props["type"] == "alias") {
+                                return Triple(fieldName, fieldName, mutableMapOf())
+                            }
                             return Triple(fieldName, fieldName, props)
                         }
                     // Traverse and update index mappings here while extracting flatten field paths
@@ -704,6 +709,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     traverseMappingsAndUpdate(properties, "", leafNodeProcessor, flattenPaths)
 
                     flattenPaths.forEach {
+                        // skip alias-type fields — they differ by design across indices and must not be flagged
+                        if (it.value["type"] == "alias") return@forEach
                         if (allFlattenPaths.containsKey(it.key) && allFlattenPaths[it.key]!! != it.value) {
                             conflictingFields.add(it.key)
                         }

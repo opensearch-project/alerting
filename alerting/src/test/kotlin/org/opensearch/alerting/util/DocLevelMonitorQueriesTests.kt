@@ -352,19 +352,13 @@ class DocLevelMonitorQueriesTests : OpenSearchTestCase() {
     }
 
     // -------------------------------------------------------------------------
-    // allFlattenPaths post-traversal filter simulation (Gap 1)
+    // allFlattenPaths post-traversal filter (H1 fix verification)
     //
     // traverseMappingsAndUpdate adds every leaf to flattenPaths BEFORE calling
-    // the processor, so alias paths land in flattenPaths regardless of what the
-    // processor returns.  The production code in indexDocLevelQueries passes
-    // allFlattenPaths (unfiltered) into doIndexAllQueries, which means alias
-    // field names flow into query rewrites for non-existent fields.
-    //
-    // This test verifies that a caller applying the same post-traversal filter
-    // used for updatedProperties (skip type==alias or empty) correctly excludes
-    // alias entries from the allFlattenPaths set — i.e., documents the fix that
-    // MUST also be applied to the allFlattenPaths construction site in
-    // indexDocLevelQueries (line ~352) to close the gap fully.
+    // the processor, so alias paths land in flattenPaths with their original props.
+    // The fix in indexDocLevelQueries filters flattenPaths entries whose props
+    // have type=="alias" before adding to allFlattenPaths, preventing alias field
+    // names from flowing into query rewrites for non-existent fields.
     // -------------------------------------------------------------------------
 
     fun `test allFlattenPaths only contains non-alias fields after post-traversal filter`() {
@@ -401,17 +395,15 @@ class DocLevelMonitorQueriesTests : OpenSearchTestCase() {
     }
 
     // -------------------------------------------------------------------------
-    // getAllConflictingFields alias passthrough (Gap 2)
+    // getAllConflictingFields alias guard (H2 fix verification)
     //
-    // getAllConflictingFields uses an identity leaf processor — it does NOT skip
-    // alias-type fields.  Two indices with an alias field at the same path but
-    // pointing to different targets will always have unequal props maps
-    // ({type:alias, path:foo} != {type:alias, path:bar}), causing a false
-    // conflict.  This test documents the unguarded behaviour by simulating the
-    // identity processor directly via traverseMappingsAndUpdate.
+    // getAllConflictingFields now skips alias-type fields via a type=="alias" guard
+    // in the flattenPaths forEach loop.  Two indices with an alias field at the
+    // same path but pointing to different targets will no longer produce a false
+    // conflict because the guard skips them before the equality comparison.
     // -------------------------------------------------------------------------
 
-    fun `test identity processor includes alias fields in flattenPaths (getAllConflictingFields gap)`() {
+    fun `test alias-skipping processor excludes alias fields from conflict detection (getAllConflictingFields fix)`() {
         val queries = makeInstance()
 
         // Index A: alias field pointing to "event.start"
@@ -428,20 +420,28 @@ class DocLevelMonitorQueriesTests : OpenSearchTestCase() {
         val flattenPathsA = mutableMapOf<String, MutableMap<String, Any>>()
         val flattenPathsB = mutableMapOf<String, MutableMap<String, Any>>()
 
-        // Identity processor — mirrors getAllConflictingFields behaviour exactly.
-        queries.traverseMappingsAndUpdate(mappingsA, "", identityLeaf, flattenPathsA)
-        queries.traverseMappingsAndUpdate(mappingsB, "", identityLeaf, flattenPathsB)
+        // Alias-skipping processor — mirrors the FIXED getAllConflictingFields behaviour.
+        queries.traverseMappingsAndUpdate(mappingsA, "", aliasSkippingLeaf, flattenPathsA)
+        queries.traverseMappingsAndUpdate(mappingsB, "", aliasSkippingLeaf, flattenPathsB)
 
-        // Both alias fields are present in their respective flattenPaths.
+        // flattenPaths stores original nodeProps (captured before the processor runs),
+        // so alias fields appear with their original type=alias props — not empty.
         assertTrue("Index A flattenPaths must include event_start", flattenPathsA.containsKey("event_start"))
         assertTrue("Index B flattenPaths must include event_start", flattenPathsB.containsKey("event_start"))
+        assertEquals("alias", flattenPathsA["event_start"]!!["type"])
+        assertEquals("alias", flattenPathsB["event_start"]!!["type"])
 
-        // Simulate the conflict-detection logic from getAllConflictingFields:
-        // seed allFlattenPaths with index A, then check index B against it.
+        // Simulate the FIXED conflict-detection logic from getAllConflictingFields:
+        // seed allFlattenPaths with index A, then check index B against it,
+        // skipping entries whose type is "alias".
         val allFlattenPaths = mutableMapOf<String, MutableMap<String, Any>>()
         val conflictingFields = mutableSetOf<String>()
-        flattenPathsA.forEach { (k, v) -> allFlattenPaths[k] = v }
+        flattenPathsA.forEach { (k, v) ->
+            if (v["type"] == "alias") return@forEach
+            allFlattenPaths[k] = v
+        }
         flattenPathsB.forEach { (k, v) ->
+            if (v["type"] == "alias") return@forEach
             if (allFlattenPaths.containsKey(k) && allFlattenPaths[k]!! != v) {
                 conflictingFields.add(k)
             }
@@ -451,14 +451,10 @@ class DocLevelMonitorQueriesTests : OpenSearchTestCase() {
         // "message" is identical in both indices — must NOT be flagged.
         assertFalse("message must not be a conflicting field", conflictingFields.contains("message"))
 
-        // "event_start" has the same field name but different alias paths — the identity
-        // processor sees them as unequal and flags a false conflict.
-        // This assertion documents the known gap: alias fields should be excluded from
-        // conflict detection because their props differ by design (they point to different
-        // concrete fields in different indices), not because of a real type conflict.
-        assertTrue(
-            "Known gap: identity processor falsely flags alias field as conflicting " +
-                "when alias paths differ across indices — getAllConflictingFields must skip alias fields",
+        // "event_start" is an alias field — the type=="alias" guard skips it,
+        // so it must NOT be flagged as conflicting.
+        assertFalse(
+            "Fixed: alias field with differing paths across indices must NOT be flagged as conflicting",
             conflictingFields.contains("event_start"),
         )
     }
