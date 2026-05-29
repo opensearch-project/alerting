@@ -206,7 +206,7 @@ class TriggerService(val scriptService: ScriptService) {
             require(aggs is Map<*, *>) { "Unexpected aggregations type: ${aggs?.javaClass}" }
             var parentAgg: Map<*, *> = aggs
             aggregationPath.pathElementsAsStringList.forEach { subAgg ->
-                val child = parentAgg[subAgg]
+                val child = parentAgg[subAgg] ?: parentAgg.entries.firstOrNull { it.key.toString().endsWith(subAgg) }?.value
                 require(child is Map<*, *>) { "Unexpected type for agg '$subAgg': ${child?.javaClass}" }
                 parentAgg = child
             }

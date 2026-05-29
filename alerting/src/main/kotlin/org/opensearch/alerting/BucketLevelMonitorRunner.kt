@@ -140,6 +140,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     monitor.user
                 )
             ) {
+                reinjectHeaders(monitor, monitorCtx)
                 // Storing the first page of results in the case of pagination input results to prevent empty results
                 // in the final output of monitorResult which occurs when all pages have been exhausted.
                 // If it's favorable to return the last page, will need to check how to accomplish that with multiple aggregation paths
@@ -165,7 +166,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
 
             for (trigger in monitor.triggers) {
                 // The currentAlerts map is formed by iterating over the Monitor's Triggers as keys so null should not be returned here
-                val currentAlertsForTrigger = currentAlerts[trigger]!!
+                val currentAlertsForTrigger = currentAlerts[trigger] ?: mutableMapOf()
                 val triggerCtx = BucketLevelTriggerExecutionContext(
                     monitor, trigger as BucketLevelTrigger, monitorResult,
                     clusterSettings = monitorCtx.clusterService!!.clusterSettings

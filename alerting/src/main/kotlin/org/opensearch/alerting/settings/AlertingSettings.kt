@@ -469,5 +469,19 @@ class AlertingSettings {
             "plugins.alerting.monitor.target_type_to_service_name.",
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
+
+        /** Header name used to propagate the account ID parsed from the monitor target ARN
+         * into the thread context as a transient header. */
+        val TENANT_ACCOUNT_ID_HEADER = Setting.simpleString(
+            "plugins.alerting.tenant.account_id_header",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /** Mappings from Monitor target type to the header name used to propagate the resource ID
+         * (collection ID or domain name) parsed from the monitor target ARN. */
+        val TENANT_RESOURCE_ID_HEADER = Setting.groupSetting(
+            "plugins.alerting.tenant.resource_id_header.",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
     }
 }
