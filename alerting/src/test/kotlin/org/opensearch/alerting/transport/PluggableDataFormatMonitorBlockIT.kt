@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.transport
 
+import org.junit.Before
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.randomWorkflow
 import org.opensearch.client.ResponseException
@@ -25,6 +26,14 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 class PluggableDataFormatMonitorBlockIT : AlertingRestTestCase() {
+
+    @Before
+    fun checkPluggableDataformatEnabled() {
+        assumeTrue(
+            "Skipping — pluggable dataformat tests require feature flag enabled on cluster",
+            System.getProperty("tests.pluggable_dataformat_enabled", "false").toBoolean()
+        )
+    }
 
     fun `test create doc-level monitor blocked on pluggable dataformat domain`() {
         val testIndex = createTestIndex()
