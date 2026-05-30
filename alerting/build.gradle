@@ -401,6 +401,7 @@ integTest {
 
         systemProperty 'tests.security.manager', 'false'
         systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
+        systemProperty 'tests.pluggable_dataformat_enabled', 'true'
 
         filter {
             includeTestsMatching "org.opensearch.alerting.transport.PluggableDataFormatMonitorBlockIT"
@@ -431,7 +432,9 @@ integTest {
     }
 
     check.dependsOn integTestPluggableDataformat
-    integTest.finalizedBy integTestPluggableDataformat
+    if (!usingRemoteCluster) {
+        integTest.finalizedBy integTestPluggableDataformat
+    }
 }
 
 task integTestRemote(type: RestIntegTestTask) {
