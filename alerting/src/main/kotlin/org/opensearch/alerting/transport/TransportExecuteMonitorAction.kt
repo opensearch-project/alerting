@@ -22,6 +22,7 @@ import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
+import org.opensearch.alerting.util.isClusterMetricsMonitor
 import org.opensearch.alerting.util.isUnsupportedMultiTenantMonitorType
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
@@ -50,6 +51,7 @@ import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.time.Instant
 import java.util.Locale
+
 private val log = LogManager.getLogger(TransportExecuteMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
@@ -211,7 +213,7 @@ class TransportExecuteMonitorAction @Inject constructor(
 
                 // Block non-PPL monitors on pluggable dataformat domains
                 if (FeatureFlags.isEnabled(FeatureFlags.PLUGGABLE_DATAFORMAT_EXPERIMENTAL_FLAG) &&
-                    !monitor.isPPLMonitor()
+                    !monitor.isPPLMonitor() && !monitor.isClusterMetricsMonitor()
                 ) {
                     actionListener.onFailure(
                         AlertingException.wrap(

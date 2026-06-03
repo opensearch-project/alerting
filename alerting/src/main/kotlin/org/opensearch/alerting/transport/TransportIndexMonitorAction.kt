@@ -57,6 +57,7 @@ import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.await
 import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.util.isADMonitor
+import org.opensearch.alerting.util.isClusterMetricsMonitor
 import org.opensearch.alerting.util.isUnsupportedMultiTenantMonitorType
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
@@ -218,7 +219,8 @@ class TransportIndexMonitorAction @Inject constructor(
 
         // Block non-PPL monitors on pluggable dataformat domains
         if (FeatureFlags.isEnabled(FeatureFlags.PLUGGABLE_DATAFORMAT_EXPERIMENTAL_FLAG) &&
-            !transformedRequest.monitor.isPPLMonitor()
+            !transformedRequest.monitor.isPPLMonitor() &&
+            !transformedRequest.monitor.isClusterMetricsMonitor()
         ) {
             actionListener.onFailure(
                 AlertingException.wrap(

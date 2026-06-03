@@ -93,6 +93,10 @@ fun Destination.isAllowed(allowList: List<String>): Boolean = allowList.contains
 
 fun Destination.isTestAction(): Boolean = this.type == DestinationType.TEST_ACTION
 
+fun Monitor.isClusterMetricsMonitor(): Boolean =
+    this.isMonitorOfStandardType() &&
+        Monitor.MonitorType.valueOf(this.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.CLUSTER_METRICS_MONITOR
+
 fun Monitor.isDocLevelMonitor(): Boolean =
     this.isMonitorOfStandardType() &&
         Monitor.MonitorType.valueOf(this.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.DOC_LEVEL_MONITOR
