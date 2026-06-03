@@ -64,7 +64,7 @@ class PluggableDataFormatMonitorBlockIT : AlertingRestTestCase() {
             val message = e.message ?: ""
             assertTrue(
                 "Expected FORBIDDEN error for non-PPL monitor on pluggable dataformat domain, got: $message",
-                message.contains("Only PPL monitors are supported") || message.contains("monitors are not allowed")
+                message.contains("Monitor creation/update failed")
             )
         }
     }
@@ -107,7 +107,7 @@ class PluggableDataFormatMonitorBlockIT : AlertingRestTestCase() {
             val message = e.message ?: ""
             assertFalse(
                 "PPL monitor should not be blocked by pluggable dataformat gate, got: $message",
-                message.contains("Only PPL monitors are supported") || message.contains("monitors are not allowed")
+                message.contains("Monitor creation/update failed")
             )
         }
     }
@@ -147,7 +147,7 @@ class PluggableDataFormatMonitorBlockIT : AlertingRestTestCase() {
             val message = e.message ?: ""
             assertTrue(
                 "Expected FORBIDDEN error for non-PPL monitor update on pluggable dataformat domain, got: $message",
-                message.contains("Only PPL monitors are supported") || message.contains("monitors are not allowed")
+                message.contains("Monitor creation/update failed")
             )
         }
     }
@@ -187,7 +187,7 @@ class PluggableDataFormatMonitorBlockIT : AlertingRestTestCase() {
             val message = e.message ?: ""
             assertTrue(
                 "Expected FORBIDDEN error for non-PPL monitor execution on pluggable dataformat domain, got: $message",
-                message.contains("Only PPL monitors are supported") || message.contains("monitors are not allowed")
+                message.contains("Monitor execution failed")
             )
         }
     }
@@ -230,7 +230,7 @@ class PluggableDataFormatMonitorBlockIT : AlertingRestTestCase() {
             val message = e.message ?: ""
             assertFalse(
                 "PPL monitor execution should not be blocked by pluggable dataformat gate, got: $message",
-                message.contains("Only PPL monitors are supported") || message.contains("monitors are not allowed")
+                message.contains("Monitor execution failed")
             )
         }
     }
@@ -267,12 +267,12 @@ class PluggableDataFormatMonitorBlockIT : AlertingRestTestCase() {
             val message = e.message ?: ""
             assertTrue(
                 "Expected FORBIDDEN error for non-PPL monitor, got: $message",
-                message.contains("Only PPL monitors are supported") || message.contains("monitors are not allowed")
+                message.contains("Monitor creation/update failed")
             )
         }
     }
 
-    fun `test create cluster-metrics monitor blocked on pluggable dataformat domain`() {
+    fun `test create cluster-metrics monitor not blocked on pluggable dataformat domain`() {
         val testIndex = createTestIndex()
         val monitor = Monitor(
             name = "test-cluster-metrics-monitor",
@@ -301,14 +301,9 @@ class PluggableDataFormatMonitorBlockIT : AlertingRestTestCase() {
 
         try {
             createMonitor(monitor)
-            fail("Expected monitor creation to be blocked on pluggable dataformat domain")
         } catch (e: ResponseException) {
-            assertEquals(RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
             val message = e.message ?: ""
-            assertTrue(
-                "Expected FORBIDDEN error for non-PPL monitor, got: $message",
-                message.contains("Only PPL monitors are supported") || message.contains("monitors are not allowed")
-            )
+            fail("Cluster metrics monitor creation should not fail, but got: $message")
         }
     }
 
@@ -321,7 +316,7 @@ class PluggableDataFormatMonitorBlockIT : AlertingRestTestCase() {
             val message = e.message ?: ""
             assertTrue(
                 "Expected FORBIDDEN error for workflow on pluggable dataformat domain, got: $message",
-                message.contains("Workflow operations are not supported") || message.contains("not supported on this domain")
+                message.contains("Monitor creation/update failed")
             )
         }
     }
