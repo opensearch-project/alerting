@@ -159,7 +159,9 @@ class TransportIndexWorkflowAction @Inject constructor(
             actionListener.onFailure(
                 AlertingException.wrap(
                     OpenSearchStatusException(
-                        "Workflow operations are not supported on this domain.",
+                        "Monitor creation/update failed. Composite monitors and DSL-based monitors " +
+                            "are not supported on this domain type. This domain supports PPL as the query language for " +
+                            "alert monitors. It also supports cluster metrics monitors. Please create one of these monitor types instead.",
                         RestStatus.FORBIDDEN
                     )
                 )
