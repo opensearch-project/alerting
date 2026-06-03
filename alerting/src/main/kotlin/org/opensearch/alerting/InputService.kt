@@ -78,6 +78,7 @@ class InputService(
 ) {
 
     private val logger = LogManager.getLogger(InputService::class.java)
+    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
 
     suspend fun collectInputResults(
         monitor: Monitor,
@@ -185,15 +186,19 @@ class InputService(
             val input = monitor.inputs[0] as SearchInput
 
             val searchParams = mapOf("period_start" to periodStart.toEpochMilli(), "period_end" to periodEnd.toEpochMilli())
-            val searchSource = scriptService.compile(
-                Script(
-                    ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                    input.query.toString(), searchParams
-                ),
-                TemplateScript.CONTEXT
-            )
-                .newInstance(searchParams)
-                .execute()
+            val searchSource = if (multiTenancyEnabled) {
+                resolveTemplateParams(input.query.toString(), searchParams)
+            } else {
+                scriptService.compile(
+                    Script(
+                        ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
+                        input.query.toString(), searchParams
+                    ),
+                    TemplateScript.CONTEXT
+                )
+                    .newInstance(searchParams)
+                    .execute()
+            }
 
             val searchRequest = SearchRequest()
                 .indices(*input.indices.toTypedArray())
@@ -376,15 +381,19 @@ class InputService(
             rewrittenQuery.query(updatedSourceQuery)
         }
 
-        val searchSource = scriptService.compile(
-            Script(
-                ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                rewrittenQuery.toString(), searchParams
-            ),
-            TemplateScript.CONTEXT
-        )
-            .newInstance(searchParams)
-            .execute()
+        val searchSource = if (multiTenancyEnabled) {
+            resolveTemplateParams(rewrittenQuery.toString(), searchParams)
+        } else {
+            scriptService.compile(
+                Script(
+                    ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
+                    rewrittenQuery.toString(), searchParams
+                ),
+                TemplateScript.CONTEXT
+            )
+                .newInstance(searchParams)
+                .execute()
+        }
 
         val indexes = CrossClusterMonitorUtils.parseIndexesForRemoteSearch(searchInput.indices, clusterService)
 
@@ -563,5 +572,18 @@ class InputService(
 
         // Add handling for other query types if necessary (e.g., NestedQueryBuilder, etc.)
         return null
+    }
+
+    /**
+     * Resolves mustache-style {{key}} template parameters in query JSON.
+     * Bypasses ScriptService.compile() which requires inline scripting to be enabled.
+     * Used in multi-tenancy mode where inline scripts are intentionally disabled.
+     */
+    internal fun resolveTemplateParams(template: String, params: Map<String, Any>): String {
+        var result = template
+        for ((key, value) in params) {
+            result = result.replace("{{$key}}", value.toString())
+        }
+        return result
     }
 }
