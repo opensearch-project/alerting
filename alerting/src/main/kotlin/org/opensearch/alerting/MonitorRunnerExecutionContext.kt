@@ -14,6 +14,7 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.settings.LegacyOpenDistroDestinationSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
+import org.opensearch.alerting.util.MustacheTemplateService
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
@@ -38,6 +39,7 @@ data class MonitorRunnerExecutionContext(
     var inputService: InputService? = null,
     var triggerService: TriggerService? = null,
     var alertService: AlertService? = null,
+    var mustacheTemplateService: MustacheTemplateService? = null,
     var docLevelMonitorQueries: DocLevelMonitorQueries? = null,
     var workflowService: WorkflowService? = null,
     var jvmStats: JvmStats? = null,

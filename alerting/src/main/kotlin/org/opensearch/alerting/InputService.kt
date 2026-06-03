@@ -22,6 +22,7 @@ import org.opensearch.alerting.util.AggregationQueryRewriter
 import org.opensearch.alerting.util.BucketSelectorQueryBuilder
 import org.opensearch.alerting.util.CrossClusterMonitorUtils
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.MustacheTemplateService
 import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.executeTransportAction
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.toMap
@@ -55,10 +56,7 @@ import org.opensearch.index.query.QueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.query.RangeQueryBuilder
 import org.opensearch.index.query.TermsQueryBuilder
-import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
-import org.opensearch.script.ScriptType
-import org.opensearch.script.TemplateScript
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.transport.client.Client
 import org.opensearch.transport.client.node.NodeClient
@@ -78,7 +76,7 @@ class InputService(
 ) {
 
     private val logger = LogManager.getLogger(InputService::class.java)
-    private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+    private val mustacheTemplateService = MustacheTemplateService(scriptService, settings)
 
     suspend fun collectInputResults(
         monitor: Monitor,
@@ -186,19 +184,7 @@ class InputService(
             val input = monitor.inputs[0] as SearchInput
 
             val searchParams = mapOf("period_start" to periodStart.toEpochMilli(), "period_end" to periodEnd.toEpochMilli())
-            val searchSource = if (multiTenancyEnabled) {
-                resolveTemplateParams(input.query.toString(), searchParams)
-            } else {
-                scriptService.compile(
-                    Script(
-                        ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                        input.query.toString(), searchParams
-                    ),
-                    TemplateScript.CONTEXT
-                )
-                    .newInstance(searchParams)
-                    .execute()
-            }
+            val searchSource = mustacheTemplateService.renderTemplate(input.query.toString(), searchParams)
 
             val searchRequest = SearchRequest()
                 .indices(*input.indices.toTypedArray())
@@ -381,19 +367,7 @@ class InputService(
             rewrittenQuery.query(updatedSourceQuery)
         }
 
-        val searchSource = if (multiTenancyEnabled) {
-            resolveTemplateParams(rewrittenQuery.toString(), searchParams)
-        } else {
-            scriptService.compile(
-                Script(
-                    ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                    rewrittenQuery.toString(), searchParams
-                ),
-                TemplateScript.CONTEXT
-            )
-                .newInstance(searchParams)
-                .execute()
-        }
+        val searchSource = mustacheTemplateService.renderTemplate(rewrittenQuery.toString(), searchParams)
 
         val indexes = CrossClusterMonitorUtils.parseIndexesForRemoteSearch(searchInput.indices, clusterService)
 
@@ -572,18 +546,5 @@ class InputService(
 
         // Add handling for other query types if necessary (e.g., NestedQueryBuilder, etc.)
         return null
-    }
-
-    /**
-     * Resolves mustache-style {{key}} template parameters in query JSON.
-     * Bypasses ScriptService.compile() which requires inline scripting to be enabled.
-     * Used in multi-tenancy mode where inline scripts are intentionally disabled.
-     */
-    internal fun resolveTemplateParams(template: String, params: Map<String, Any>): String {
-        var result = template
-        for ((key, value) in params) {
-            result = result.replace("{{$key}}", value.toString())
-        }
-        return result
     }
 }
