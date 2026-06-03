@@ -107,6 +107,11 @@ class AlertService(
     }
 
     suspend fun loadCurrentAlertsForQueryLevelMonitor(monitor: Monitor, workflowRunContext: WorkflowRunContext?): Map<Trigger, Alert?> {
+        // Return early for dry-run
+        if (monitor.id.isBlank()) {
+            return monitor.triggers.associateWith { null }
+        }
+
         val searchAlertsResponse: SearchResponse = searchAlerts(
             monitor = monitor,
             size = monitor.triggers.size * 2, // We expect there to be only a single in-progress alert so fetch 2 to check
@@ -130,6 +135,11 @@ class AlertService(
         monitor: Monitor,
         workflowRunContext: WorkflowRunContext?,
     ): Map<Trigger, MutableMap<String, Alert>> {
+        // Return early for dry-run
+        if (monitor.id.isBlank()) {
+            return monitor.triggers.associateWith { mutableMapOf() }
+        }
+
         val searchAlertsResponse: SearchResponse = searchAlerts(
             monitor = monitor,
             // TODO: This should be limited based on a circuit breaker that limits Alerts
