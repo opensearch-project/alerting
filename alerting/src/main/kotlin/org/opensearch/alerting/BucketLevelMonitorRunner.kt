@@ -50,9 +50,6 @@ import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
-import org.opensearch.script.Script
-import org.opensearch.script.ScriptType
-import org.opensearch.script.TemplateScript
 import org.opensearch.search.aggregations.AggregatorFactories
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.bucket.terms.TermsAggregationBuilder
@@ -492,15 +489,9 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         "period_start" to periodStart.toEpochMilli(),
                         "period_end" to periodEnd.toEpochMilli()
                     )
-                    val searchSource = monitorCtx.scriptService!!.compile(
-                        Script(
-                            ScriptType.INLINE, Script.DEFAULT_TEMPLATE_LANG,
-                            query.toString(), searchParams
-                        ),
-                        TemplateScript.CONTEXT
+                    val searchSource = monitorCtx.mustacheTemplateService!!.renderTemplate(
+                        query.toString(), searchParams
                     )
-                        .newInstance(searchParams)
-                        .execute()
                     val sr = SearchRequest(*input.indices.toTypedArray())
                     XContentType.JSON.xContent().createParser(monitorCtx.xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource)
                         .use {

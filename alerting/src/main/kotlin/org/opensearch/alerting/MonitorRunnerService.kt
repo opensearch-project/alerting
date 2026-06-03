@@ -52,6 +52,7 @@ import org.opensearch.alerting.settings.DestinationSettings.Companion.HOST_DENY_
 import org.opensearch.alerting.settings.DestinationSettings.Companion.loadDestinationSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.MustacheTemplateService
 import org.opensearch.alerting.util.isDocLevelMonitor
 import org.opensearch.alerting.workflow.CompositeWorkflowRunner
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
@@ -79,7 +80,6 @@ import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.monitor.jvm.JvmStats
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
-import org.opensearch.script.TemplateScript
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
@@ -145,6 +145,11 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     fun registerTriggerService(triggerService: TriggerService): MonitorRunnerService {
         this.monitorCtx.triggerService = triggerService
+        return this
+    }
+
+    fun registerMustacheTemplateService(mustacheTemplateService: MustacheTemplateService): MonitorRunnerService {
+        this.monitorCtx.mustacheTemplateService = mustacheTemplateService
         return this
     }
 
@@ -602,8 +607,6 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
     }
 
     internal fun compileTemplate(template: Script, ctx: TriggerExecutionContext): String {
-        return monitorCtx.scriptService!!.compile(template, TemplateScript.CONTEXT)
-            .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
-            .execute()
+        return monitorCtx.mustacheTemplateService!!.renderScript(template, mapOf("ctx" to ctx.asTemplateArg()))
     }
 }

@@ -54,6 +54,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUE
 import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY
 import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.MAX_SEARCH_SIZE
+import org.opensearch.alerting.util.MustacheTemplateService
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.destinationmigration.NotificationActionConfigs
 import org.opensearch.alerting.util.destinationmigration.NotificationApiUtils
@@ -118,7 +119,6 @@ import org.opensearch.monitor.jvm.JvmStats
 import org.opensearch.percolator.PercolateQueryBuilderExt
 import org.opensearch.script.Script
 import org.opensearch.script.ScriptService
-import org.opensearch.script.TemplateScript
 import org.opensearch.search.SearchHit
 import org.opensearch.search.SearchHits
 import org.opensearch.search.builder.SearchSourceBuilder
@@ -1370,10 +1370,10 @@ class TransportDocLevelMonitorFanOutAction
         return DestinationContextFactory(client, xContentRegistry, destinationSettings)
     }
 
+    private val mustacheTemplateService = MustacheTemplateService(scriptService, settings)
+
     private fun compileTemplate(template: Script, ctx: TriggerExecutionContext): String {
-        return scriptService.compile(template, TemplateScript.CONTEXT)
-            .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
-            .execute()
+        return mustacheTemplateService.renderScript(template, mapOf("ctx" to ctx.asTemplateArg()))
     }
 
     private suspend fun onSuccessfulMonitorRun(monitor: Monitor) {

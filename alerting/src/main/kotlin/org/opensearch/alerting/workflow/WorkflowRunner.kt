@@ -18,7 +18,6 @@ import org.opensearch.commons.alerting.model.WorkflowRunResult
 import org.opensearch.commons.alerting.model.action.Action
 import org.opensearch.core.common.Strings
 import org.opensearch.script.Script
-import org.opensearch.script.TemplateScript
 import org.opensearch.transport.TransportService
 import java.time.Instant
 
@@ -79,8 +78,8 @@ abstract class WorkflowRunner {
     }
 
     internal fun compileTemplate(template: Script, ctx: ChainedAlertTriggerExecutionContext): String {
-        return MonitorRunnerService.monitorCtx.scriptService!!.compile(template, TemplateScript.CONTEXT)
-            .newInstance(template.params + mapOf("ctx" to ctx.asTemplateArg()))
-            .execute()
+        return MonitorRunnerService.monitorCtx.mustacheTemplateService!!.renderScript(
+            template, mapOf("ctx" to ctx.asTemplateArg())
+        )
     }
 }
