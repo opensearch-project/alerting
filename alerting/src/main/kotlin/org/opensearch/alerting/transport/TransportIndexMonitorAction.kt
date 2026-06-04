@@ -57,6 +57,7 @@ import org.opensearch.alerting.util.addUserBackendRolesFilter
 import org.opensearch.alerting.util.await
 import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.util.isADMonitor
+import org.opensearch.alerting.util.isClusterMetricsMonitor
 import org.opensearch.alerting.util.isUnsupportedMultiTenantMonitorType
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
@@ -218,13 +219,15 @@ class TransportIndexMonitorAction @Inject constructor(
 
         // Block non-PPL monitors on pluggable dataformat domains
         if (FeatureFlags.isEnabled(FeatureFlags.PLUGGABLE_DATAFORMAT_EXPERIMENTAL_FLAG) &&
-            !transformedRequest.monitor.isPPLMonitor()
+            !transformedRequest.monitor.isPPLMonitor() &&
+            !transformedRequest.monitor.isClusterMetricsMonitor()
         ) {
             actionListener.onFailure(
                 AlertingException.wrap(
                     OpenSearchStatusException(
-                        "Only PPL monitors are supported on this domain." +
-                            " ${transformedRequest.monitor.monitorType} monitors are not allowed.",
+                        "Monitor creation/update failed. ${transformedRequest.monitor.monitorType} type and other DSL-based monitors " +
+                            "are not supported on this domain type. This domain supports PPL as the query language for " +
+                            "alert monitors. It also supports cluster metrics monitors. Please create one of these monitor types instead.",
                         RestStatus.FORBIDDEN
                     )
                 )
