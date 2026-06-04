@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.mockito.Mockito
 import org.opensearch.Version
@@ -213,6 +214,32 @@ class AlertServiceTests : OpenSearchTestCase() {
         assertAlertsExistForBucketKeys(listOf(listOf("a")), categorizedAlerts[AlertCategory.DEDUPED] ?: error("Deduped alerts not found"))
         assertAlertsExistForBucketKeys(emptyList(), categorizedAlerts[AlertCategory.NEW] ?: error("New alerts found"))
         assertAlertsExistForBucketKeys(emptyList(), completedAlerts)
+    }
+
+    fun `test loadCurrentAlertsForQueryLevelMonitor returns empty alerts for dry-run monitor with blank id`() {
+        val trigger = randomQueryLevelTrigger()
+        val monitor = randomQueryLevelMonitor(triggers = listOf(trigger)).copy(id = Monitor.NO_ID)
+
+        val result = runBlocking {
+            alertService.loadCurrentAlertsForQueryLevelMonitor(monitor, null)
+        }
+
+        assertEquals(1, result.size)
+        assertTrue(result.containsKey(trigger))
+        assertNull(result[trigger])
+    }
+
+    fun `test loadCurrentAlertsForBucketLevelMonitor returns empty alerts for dry-run monitor with blank id`() {
+        val trigger = randomBucketLevelTrigger()
+        val monitor = randomBucketLevelMonitor(triggers = listOf(trigger)).copy(id = Monitor.NO_ID)
+
+        val result = runBlocking {
+            alertService.loadCurrentAlertsForBucketLevelMonitor(monitor, null)
+        }
+
+        assertEquals(1, result.size)
+        assertTrue(result.containsKey(trigger))
+        assertTrue(result[trigger]!!.isEmpty())
     }
 
     private fun createCurrentAlertsFromBucketKeys(
