@@ -5,8 +5,11 @@
 
 package org.opensearch.alerting.alerts
 
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import org.apache.logging.log4j.LogManager
@@ -18,6 +21,7 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
+import org.opensearch.common.lifecycle.LifecycleListener
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -51,10 +55,13 @@ class OrphanedAlertSweeper(
     private val client: Client,
     private val threadPool: ThreadPool,
     private val clusterService: ClusterService
-) : ClusterStateListener {
+) : ClusterStateListener, LifecycleListener() {
 
     private val logger = LogManager.getLogger(OrphanedAlertSweeper::class.java)
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val exceptionHandler = CoroutineExceptionHandler { _, exception ->
+        logger.error("Uncaught exception in OrphanedAlertSweeper coroutine", exception)
+    }
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + exceptionHandler)
 
     @Volatile private var sweepPeriod = SWEEP_PERIOD.get(settings)
     @Volatile private var enabled = ENABLED.get(settings)
@@ -63,6 +70,7 @@ class OrphanedAlertSweeper(
 
     init {
         clusterService.addListener(this)
+        clusterService.addLifecycleListener(this)
         clusterService.clusterSettings.addSettingsUpdateConsumer(SWEEP_PERIOD) {
             sweepPeriod = it
             if (clusterService.state().nodes.isLocalNodeElectedClusterManager && enabled) reschedule()
@@ -73,6 +81,22 @@ class OrphanedAlertSweeper(
                 if (enabled) reschedule() else cancel()
             }
         }
+    }
+
+    override fun afterStart() {
+        if (clusterService.state().nodes.isLocalNodeElectedClusterManager && enabled) {
+            isClusterManager = true
+            reschedule()
+        }
+    }
+
+    override fun beforeStop() {
+        cancel()
+        clusterService.removeListener(this)
+    }
+
+    override fun beforeClose() {
+        scope.cancel()
     }
 
     override fun clusterChanged(event: ClusterChangedEvent) {
