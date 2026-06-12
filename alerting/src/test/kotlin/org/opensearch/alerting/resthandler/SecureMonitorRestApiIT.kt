@@ -1089,6 +1089,212 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test update monitor succeeds when filterByAccessStrategy is all`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("all")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1"),
+            false
+        )
+
+        val monitor = randomQueryLevelMonitor(enabled = true)
+        val createdMonitor = createMonitorWithClient(userClient!!, monitor = monitor, listOf("role1"))
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        val getMonitorResponse = userClient?.makeRequest(
+            "GET",
+            "$ALERTING_BASE_URI/${createdMonitor.id}",
+            null,
+            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        )
+        assertEquals("Get monitor failed", RestStatus.OK, getMonitorResponse?.restStatus())
+
+        val updateUser = "updateUser"
+        createUserWithRoles(
+            updateUser,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1"),
+            false
+        )
+        val updateUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            val updatedMonitor = updateMonitorWithClient(updateUserClient, createdMonitor, listOf("role1"))
+        } finally {
+            deleteUser(updateUser)
+            updateUserClient?.close()
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
+    }
+
+    fun `test update monitor fails when filterByAccessStrategy is all`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("all")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1", "role2"),
+            false
+        )
+
+        val monitor = randomQueryLevelMonitor(enabled = true)
+        val createdMonitor = createMonitorWithClient(userClient!!, monitor = monitor, listOf("role1", "role2"))
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        val getMonitorResponse = userClient?.makeRequest(
+            "GET",
+            "$ALERTING_BASE_URI/${createdMonitor.id}",
+            null,
+            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        )
+        assertEquals("Get monitor failed", RestStatus.OK, getMonitorResponse?.restStatus())
+
+        val updateUser = "updateUser"
+        createUserWithRoles(
+            updateUser,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1"),
+            false
+        )
+        val updateUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            val updatedMonitor = updateMonitorWithClient(updateUserClient, createdMonitor, listOf("role1"))
+            fail("Expected Forbidden exception")
+        } catch (e: ResponseException) {
+            assertEquals("Get monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
+        } finally {
+            deleteUser(updateUser)
+            updateUserClient?.close()
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
+    }
+
+    fun `test update monitor succeeds when filterByAccessStrategy is exact`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("exact")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1", "role2"),
+            false
+        )
+
+        val monitor = randomQueryLevelMonitor(enabled = true)
+        val createdMonitor = createMonitorWithClient(userClient!!, monitor = monitor, listOf("role1", "role2"))
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        val getMonitorResponse = userClient?.makeRequest(
+            "GET",
+            "$ALERTING_BASE_URI/${createdMonitor.id}",
+            null,
+            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        )
+        assertEquals("Get monitor failed", RestStatus.OK, getMonitorResponse?.restStatus())
+
+        val updateUser = "updateUser"
+        createUserWithRoles(
+            updateUser,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1", "role2"),
+            false
+        )
+        val updateUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            val updatedMonitor = updateMonitorWithClient(updateUserClient, createdMonitor, listOf("role1", "role2"))
+        } finally {
+            deleteUser(updateUser)
+            updateUserClient?.close()
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
+    }
+
+    fun `test update monitor fails when filterByAccessStrategy is exact`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("exact")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1", "role2"),
+            false
+        )
+
+        val monitor = randomQueryLevelMonitor(enabled = true)
+        val createdMonitor = createMonitorWithClient(userClient!!, monitor = monitor, listOf("role1", "role2"))
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        val getMonitorResponse = userClient?.makeRequest(
+            "GET",
+            "$ALERTING_BASE_URI/${createdMonitor.id}",
+            null,
+            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        )
+        assertEquals("Get monitor failed", RestStatus.OK, getMonitorResponse?.restStatus())
+
+        val updateUser = "updateUser"
+        createUserWithRoles(
+            updateUser,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1", "role2", "role3"),
+            false
+        )
+        val updateUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), updateUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            val updatedMonitor = updateMonitorWithClient(updateUserClient, createdMonitor, listOf("role1"))
+            fail("Expected Forbidden exception")
+        } catch (e: ResponseException) {
+            assertEquals("Get monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
+        } finally {
+            deleteUser(updateUser)
+            updateUserClient?.close()
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
+    }
+
     fun `test update monitor as admin with enable filter by with removing a permission`() {
         enableFilterBy()
         if (!isHttps()) {
