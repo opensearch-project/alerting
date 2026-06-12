@@ -170,6 +170,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
+    protected fun deleteMonitorWithClient(client: RestClient, monitor: Monitor, refresh: Boolean = true): Response {
+        val response = client.makeRequest(
+            "DELETE", "$ALERTING_BASE_URI/${monitor.id}?refresh=$refresh", emptyMap(),
+            monitor.toHttpEntity()
+        )
+        assertEquals("Unable to delete a monitor", RestStatus.OK, response.restStatus())
+
+        return response
+    }
+
     protected fun deleteWorkflow(workflow: Workflow, deleteDelegates: Boolean = false, refresh: Boolean = true): Response {
         val response = client().makeRequest(
             "DELETE",
