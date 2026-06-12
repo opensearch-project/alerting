@@ -111,7 +111,7 @@ interface SecureTransportAction {
         } else if (filterByAccessStrategy == FilterByBackendRolesAccessStrategy.INTERSECT.strategy) {
             return resourceBackendRoles.any { it in userBackendRoles }
         } else if (filterByAccessStrategy == FilterByBackendRolesAccessStrategy.EXACT.strategy) {
-            return resourceBackendRoles.sorted().equals(userBackendRoles.sorted())
+            return resourceBackendRoles.toSet().equals(userBackendRoles.toSet())
         }
         // Not sure if this is necessary, since there is a validator
         // on the setting itself
