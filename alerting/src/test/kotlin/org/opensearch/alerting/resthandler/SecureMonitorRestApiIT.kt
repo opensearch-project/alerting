@@ -1638,7 +1638,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             .build()
 
         try {
-            deleteMonitorWithClient(deleteUserClient, monitor = createdMonitor)
+            deleteMonitor(monitor = createdMonitor)
             fail("Expected Forbidden exception")
         } catch (e: ResponseException) {
             assertEquals("Get monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
@@ -1798,6 +1798,188 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertEquals("Get monitor failed", RestStatus.FORBIDDEN, e.response.restStatus())
         } finally {
             deleteRoleAndRoleMapping(TEST_HR_ROLE)
+        }
+    }
+
+    fun `test execute monitor succeeds when filterByAccessStrategy is all`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("all")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1"),
+            false
+        )
+
+        val monitor = randomQueryLevelMonitor(enabled = true)
+        val createdMonitor = createMonitorWithClient(userClient!!, monitor = monitor, listOf("role1"))
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        val executeUser = "executeUser"
+        createUserWithRoles(
+            executeUser,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            // contains all roles of monitor
+            listOf("role1"),
+            false
+        )
+        val executeUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), executeUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            executeUserClient?.makeRequest(
+                "POST",
+                "$ALERTING_BASE_URI/${createdMonitor.id}/_execute",
+                mutableMapOf()
+            )
+        } finally {
+            executeUserClient?.close()
+        }
+    }
+
+    fun `test execute monitor fails when filterByAccessStrategy is all`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("all")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1", "role2"),
+            false
+        )
+
+        val monitor = randomQueryLevelMonitor(enabled = true)
+        val createdMonitor = createMonitorWithClient(userClient!!, monitor = monitor, listOf("role1", "role2"))
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        val executeUser = "executeUser"
+        createUserWithRoles(
+            executeUser,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            // does not contain all roles of monitor
+            listOf("role1"),
+            false
+        )
+        val executeUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), executeUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            executeUserClient?.makeRequest(
+                "POST",
+                "$ALERTING_BASE_URI/${createdMonitor.id}/_execute",
+                mutableMapOf()
+            )
+            fail("Expected Forbidden exception")
+        } catch (e: ResponseException) {
+            assertEquals("Get monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
+        } finally {
+            executeUserClient?.close()
+        }
+    }
+
+    fun `test execute monitor succeeds when filterByAccessStrategy is exact`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("exact")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1", "role2"),
+            false
+        )
+
+        val monitor = randomQueryLevelMonitor(enabled = true)
+        val createdMonitor = createMonitorWithClient(userClient!!, monitor = monitor, listOf("role1", "role2"))
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        val executeUser = "executeUser"
+        createUserWithRoles(
+            executeUser,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            // matches roles of monitor exactly
+            listOf("role1", "role2"),
+            false
+        )
+        val executeUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), executeUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            executeUserClient?.makeRequest(
+                "POST",
+                "$ALERTING_BASE_URI/${createdMonitor.id}/_execute",
+                mutableMapOf()
+            )
+        } finally {
+            executeUserClient?.close()
+        }
+    }
+
+    fun `test execute monitor fails when filterByAccessStrategy is exact`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("exact")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1", "role2"),
+            false
+        )
+
+        val monitor = randomQueryLevelMonitor(enabled = true)
+        val createdMonitor = createMonitorWithClient(userClient!!, monitor = monitor, listOf("role1", "role2"))
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        val executeUser = "executeUser"
+        createUserWithRoles(
+            executeUser,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            // contains all roles of monitor but does not match them exactly
+            listOf("role1", "role2", "role3"),
+            false
+        )
+        val executeUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), executeUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            executeUserClient?.makeRequest(
+                "POST",
+                "$ALERTING_BASE_URI/${createdMonitor.id}/_execute",
+                mutableMapOf()
+            )
+            fail("Expected Forbidden exception")
+        } catch (e: ResponseException) {
+            assertEquals("Get monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
+        } finally {
+            executeUserClient?.close()
         }
     }
 
