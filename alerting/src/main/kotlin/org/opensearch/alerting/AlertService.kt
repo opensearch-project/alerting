@@ -713,6 +713,7 @@ class AlertService(
         allowUpdatingAcknowledgedAlert: Boolean = false,
         routingId: String // routing is mandatory and set as monitor id. for workflow chained alerts we pass workflow id as routing
     ) {
+        logger.info("Save alerts: alertCount=${alerts.size}, alerts=$alerts")
         val alertsIndex = dataSources.alertsIndex
         val alertsHistoryIndex = dataSources.alertsHistoryIndex
 
@@ -802,7 +803,9 @@ class AlertService(
             val bulkRequest = BulkDataObjectRequest(null)
             putRequests.forEach { bulkRequest.add(it) }
             deleteRequests.forEach { bulkRequest.add(it) }
+            logger.info("AlertService.saveAlerts: tenantId=${currentTenantId()}, putRequests=${putRequests.size}, deleteRequests=${deleteRequests.size}, bulkRequest=$bulkRequest")
             val bulkResponse = sdkClient.bulkDataObjectAsync(bulkRequest).await()
+            logger.info("AlertService.saveAlerts: bulkResponse=$bulkResponse")
             val failedResponses = bulkResponse.responses.filter { it.isFailed }
             val retryableFailures = failedResponses.filter { it.status() == RestStatus.TOO_MANY_REQUESTS }
 

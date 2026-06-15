@@ -61,6 +61,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             logger.error("Error loading alerts for monitor: $id", e)
             return monitorResult.copy(error = e)
         }
+        logger.info("Current alerts loaded for [${monitor.id}], size=${currentAlerts.size}, Alert IDs=${currentAlerts.keys.map { it.id }}")
 
         if (isADMonitor(monitor)) {
             monitorResult = monitorResult.copy(
@@ -103,6 +104,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                 )
             }
         }
+        logger.info("Input results collected for [${monitor.id}], error=${monitorResult.inputResults.error}, resultsSize=${monitorResult.inputResults.results.size}")
 
         val updatedAlerts = mutableListOf<Alert>()
         val triggerResults = mutableMapOf<String, QueryLevelTriggerRunResult>()
@@ -237,6 +239,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             )
             if (updatedAlert != null) updatedAlerts += updatedAlert
         }
+        logger.info("Updated Alerts for [${monitor.id}], size=${updatedAlerts.size}, alerts=$updatedAlerts")
 
         // Don't save alerts if this is a test monitor
         if (!dryrun && monitor.id != Monitor.NO_ID) {
