@@ -2206,11 +2206,11 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             false
         )
 
-        var monitor = createRandomMonitor(refresh = true)
-        val activeAlert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
-
+        val monitor = randomQueryLevelMonitor(enabled = true)
         val createdMonitor = createMonitorWithClient(userClient!!, monitor = monitor, listOf("role1"))
         assertNotNull("The monitor was not created", createdMonitor)
+
+        val activeAlert = createAlert(randomAlert(createdMonitor).copy(state = Alert.State.ACTIVE))
 
         val acknowledgeUser = "acknowledgeUser"
         createUserWithRoles(
