@@ -25,6 +25,7 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.commons.alerting.action.AcknowledgeAlertResponse
 import org.opensearch.commons.alerting.action.AlertingActions
@@ -89,8 +90,23 @@ class TransportAcknowledgeAlertAction @Inject constructor(
         val request = acknowledgeAlertRequest as? AcknowledgeAlertRequest
             ?: recreateObject(acknowledgeAlertRequest) { AcknowledgeAlertRequest(it) }
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        log.info("TransportAcknowledgeAlertAction client: $client")
+
+        val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
+
         client.threadPool().threadContext.stashContext().use {
+            log.info("TransportAcknowledgeAlertAction user: $userStr")
+
             scope.launch(TenantContext(tenantId)) {
+                // Pass the user from the acknowledge alert action client to the
+                // client for getting a monitor so that checks by backend role
+                // can be performed, if enabled.
+                if (userStr.isNotBlank()) {
+                    log.info("passing on user $userStr from acknowledge alert client to client for getting monitor")
+                    transportGetMonitorAction.client.threadPool().threadContext
+                        .putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
+                }
+
                 val getMonitorResponse: GetMonitorResponse =
                     transportGetMonitorAction.client.suspendUntil {
                         val getMonitorRequest = GetMonitorRequest(
