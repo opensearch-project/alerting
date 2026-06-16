@@ -148,10 +148,17 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                 currentAlertContext,
                 monitorCtx.clusterService!!.clusterSettings
             )
-            val triggerResult = if (remoteTriggerResults != null) {
-                // Use pre-computed remote evaluation results
-                remoteTriggerResults[trigger.id]
-                    ?: QueryLevelTriggerRunResult(trigger.name, false, null)
+            val triggerResult = if (monitorCtx.multiTenantTriggerEvalEnabled) {
+                if (remoteTriggerResults != null) {
+                    remoteTriggerResults[trigger.id]
+                        ?: QueryLevelTriggerRunResult(trigger.name, false, null)
+                } else {
+                    logger.warn(
+                        "Monitor ${monitor.id} trigger ${trigger.id}: search input failed, " +
+                            "skipping trigger evaluation. Error: ${monitorResult.error?.message}"
+                    )
+                    QueryLevelTriggerRunResult(trigger.name, !dryrun, monitorResult.error)
+                }
             } else {
                 when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
                     Monitor.MonitorType.QUERY_LEVEL_MONITOR ->
