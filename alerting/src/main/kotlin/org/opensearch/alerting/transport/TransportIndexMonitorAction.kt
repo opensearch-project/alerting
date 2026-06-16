@@ -1107,6 +1107,13 @@ class TransportIndexMonitorAction @Inject constructor(
 
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
 
+            // Preserve metadata from the existing monitor during monitor update.
+            // The update API request doesn't include internal metadata fields
+            if (!currentMonitor.metadata.isNullOrEmpty()) {
+                val updatedMetadata = currentMonitor.metadata.orEmpty() + request.monitor.metadata.orEmpty()
+                request.monitor = request.monitor.copy(metadata = updatedMetadata)
+            }
+
             log.info("Updating monitor, ${currentMonitor.id}")
 
             // Restore the caller's context so the security plugin's persistent auth header is present
