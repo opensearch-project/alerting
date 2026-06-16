@@ -2233,6 +2233,145 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test acknowledge alerts fails when filterByAccessStrategy is all`() {
+        enableFilterBy()
+        putAlertMappings()
+
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("all")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1", "role2"),
+            false
+        )
+
+        val monitor = randomQueryLevelMonitor(enabled = true)
+        val createdMonitor = createMonitorWithClient(userClient!!, monitor = monitor, listOf("role1", "role2"))
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        val activeAlert = createAlert(randomAlert(createdMonitor).copy(state = Alert.State.ACTIVE))
+
+        val acknowledgeUser = "acknowledgeUser"
+        createUserWithRoles(
+            acknowledgeUser,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            // does not contain all roles of monitor
+            listOf("role1"),
+            false
+        )
+        val acknowledgeUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), acknowledgeUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            val response = acknowledgeAlertsWithClient(acknowledgeUserClient, createdMonitor, activeAlert)
+            fail("Expected Forbidden exception")
+        } catch (e: ResponseException) {
+            assertEquals("Get monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
+        } finally {
+            acknowledgeUserClient?.close()
+        }
+    }
+
+    fun `test acknowledge alerts succeeds when filterByAccessStrategy is exact`() {
+        enableFilterBy()
+        putAlertMappings()
+
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("exact")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1", "role2"),
+            false
+        )
+
+        val monitor = randomQueryLevelMonitor(enabled = true)
+        val createdMonitor = createMonitorWithClient(userClient!!, monitor = monitor, listOf("role1", "role2"))
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        val activeAlert = createAlert(randomAlert(createdMonitor).copy(state = Alert.State.ACTIVE))
+
+        val acknowledgeUser = "acknowledgeUser"
+        createUserWithRoles(
+            acknowledgeUser,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            // matches all roles of monitor exactly
+            listOf("role1", "role2"),
+            false
+        )
+        val acknowledgeUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), acknowledgeUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            val response = acknowledgeAlertsWithClient(acknowledgeUserClient, createdMonitor, activeAlert)
+            assertEquals("Acknowledge alert failed", RestStatus.OK, response?.restStatus())
+        } finally {
+            acknowledgeUserClient?.close()
+        }
+    }
+
+    fun `test acknowledge alerts fails when filterByAccessStrategy is exact`() {
+        enableFilterBy()
+        putAlertMappings()
+
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("exact")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf("role1", "role2"),
+            false
+        )
+
+        val monitor = randomQueryLevelMonitor(enabled = true)
+        val createdMonitor = createMonitorWithClient(userClient!!, monitor = monitor, listOf("role1", "role2"))
+        assertNotNull("The monitor was not created", createdMonitor)
+
+        val activeAlert = createAlert(randomAlert(createdMonitor).copy(state = Alert.State.ACTIVE))
+
+        val acknowledgeUser = "acknowledgeUser"
+        createUserWithRoles(
+            acknowledgeUser,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            // does not contain all roles of monitor
+            listOf("role1"),
+            false
+        )
+        val acknowledgeUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), acknowledgeUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            val response = acknowledgeAlertsWithClient(acknowledgeUserClient, createdMonitor, activeAlert)
+            fail("Expected Forbidden exception")
+        } catch (e: ResponseException) {
+            assertEquals("Get monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
+        } finally {
+            acknowledgeUserClient?.close()
+        }
+    }
+
     // Execute Monitor related security tests
 
     fun `test execute monitor with elevate permissions`() {

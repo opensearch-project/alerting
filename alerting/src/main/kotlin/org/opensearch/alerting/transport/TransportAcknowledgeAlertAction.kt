@@ -117,6 +117,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                         )
                         execute(AlertingActions.GET_MONITOR_ACTION_TYPE, getMonitorRequest, it)
                     }
+                log.info("get monitor response: $getMonitorResponse")
                 if (getMonitorResponse.monitor == null) {
                     actionListener.onFailure(
                         AlertingException.wrap(
