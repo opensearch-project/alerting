@@ -774,6 +774,21 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
+    protected fun acknowledgeAlertsWithClient(client: RestClient, monitor: Monitor, vararg alerts: Alert): Response {
+        val request = XContentFactory.jsonBuilder().startObject()
+            .array("alerts", *alerts.map { it.id }.toTypedArray())
+            .endObject()
+            .string()
+            .let { StringEntity(it, APPLICATION_JSON) }
+
+        val response = client.makeRequest(
+            "POST", "${monitor.relativeUrl()}/_acknowledge/alerts?refresh=true",
+            emptyMap(), request
+        )
+        assertEquals("Acknowledge call failed.", RestStatus.OK, response.restStatus())
+        return response
+    }
+
     protected fun acknowledgeChainedAlerts(workflowId: String, vararg alertId: String): Response {
         val request = jsonBuilder().startObject()
             .array("alerts", *alertId.map { it }.toTypedArray())
