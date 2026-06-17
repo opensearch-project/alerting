@@ -145,10 +145,10 @@ configurations.runtimeClasspath {
     exclude group: "org.opensearch", module: "opensearch-telemetry"
     exclude group: "org.opensearch", module: "opensearch-x-content"
 
-    // Jackson 3.x (tools.jackson.*) — shipped in OpenSearch lib/ since 3.7
-    exclude group: "tools.jackson.core"
-    exclude group: "tools.jackson.dataformat"
-    exclude group: "tools.jackson.datatype"
+    // jackson-dataformat-yaml 3.x is shipped in OpenSearch lib/ since 3.7 (used for config parsing).
+    // jackson-core and jackson-databind 3.x are NOT in lib/ — they are needed by
+    // opensearch-remote-metadata-sdk at runtime and must stay in the bundle.
+    exclude group: "tools.jackson.dataformat", module: "jackson-dataformat-yaml"
 }
 
 configurations {
