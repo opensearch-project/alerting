@@ -8,6 +8,8 @@ package org.opensearch.alerting.transport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ResourceNotFoundException
 import org.opensearch.action.ActionRequest
@@ -25,7 +27,6 @@ import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
-import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.commons.alerting.action.AcknowledgeAlertResponse
 import org.opensearch.commons.alerting.action.AlertingActions
@@ -90,48 +91,43 @@ class TransportAcknowledgeAlertAction @Inject constructor(
         val request = acknowledgeAlertRequest as? AcknowledgeAlertRequest
             ?: recreateObject(acknowledgeAlertRequest) { AcknowledgeAlertRequest(it) }
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
-        log.info("TransportAcknowledgeAlertAction client: $client")
-
-        val userStr = client.threadPool().threadContext.getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
 
         client.threadPool().threadContext.stashContext().use {
-            log.info("TransportAcknowledgeAlertAction user: $userStr")
-
             scope.launch(TenantContext(tenantId)) {
-                // Pass the user from the acknowledge alert action client to the
-                // client for getting a monitor so that checks by backend role
-                // can be performed, if enabled.
-                if (userStr.isNotBlank()) {
-                    log.info("passing on user $userStr from acknowledge alert client to client for getting monitor")
-                    transportGetMonitorAction.client.threadPool().threadContext
-                        .putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
-                }
+                val singleThreadContext = newSingleThreadContext("TransportAcknowledgeAlertAction")
+                withContext(singleThreadContext) {
+                    it.restore()
+                    try {
+                        var getMonitorResponse: GetMonitorResponse =
+                            transportGetMonitorAction.client.suspendUntil {
+                                val getMonitorRequest = GetMonitorRequest(
+                                    monitorId = request.monitorId,
+                                    -3L,
+                                    RestRequest.Method.GET,
+                                    FetchSourceContext.FETCH_SOURCE
+                                )
+                                execute(AlertingActions.GET_MONITOR_ACTION_TYPE, getMonitorRequest, it)
+                            }
 
-                val getMonitorResponse: GetMonitorResponse =
-                    transportGetMonitorAction.client.suspendUntil {
-                        val getMonitorRequest = GetMonitorRequest(
-                            monitorId = request.monitorId,
-                            -3L,
-                            RestRequest.Method.GET,
-                            FetchSourceContext.FETCH_SOURCE
-                        )
-                        execute(AlertingActions.GET_MONITOR_ACTION_TYPE, getMonitorRequest, it)
-                    }
-                log.info("get monitor response: $getMonitorResponse")
-                if (getMonitorResponse.monitor == null) {
-                    actionListener.onFailure(
-                        AlertingException.wrap(
-                            ResourceNotFoundException(
-                                String.format(
-                                    Locale.ROOT,
-                                    "No monitor found with id [%s]",
-                                    request.monitorId
+                        if (getMonitorResponse.monitor == null) {
+                            actionListener.onFailure(
+                                AlertingException.wrap(
+                                    ResourceNotFoundException(
+                                        String.format(
+                                            Locale.ROOT,
+                                            "No monitor found with id [%s]",
+                                            request.monitorId
+                                        )
+                                    )
                                 )
                             )
-                        )
-                    )
-                } else {
-                    AcknowledgeHandler(client, actionListener, request).start(getMonitorResponse.monitor!!)
+                        } else {
+                            AcknowledgeHandler(client, actionListener, request).start(getMonitorResponse.monitor!!)
+                        }
+                    } catch (e: Exception) {
+                        log.error("Failed to launch acknowledge handler", e)
+                        actionListener.onFailure(e)
+                    }
                 }
             }
         }

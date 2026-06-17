@@ -2212,7 +2212,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         val activeAlert = createAlert(randomAlert(createdMonitor).copy(state = Alert.State.ACTIVE))
 
-        val acknowledgeUser = "acknowledgeUser"
+        val acknowledgeUser = "acknowledgeUser1"
         createUserWithRoles(
             acknowledgeUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
@@ -2229,6 +2229,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val response = acknowledgeAlertsWithClient(acknowledgeUserClient, createdMonitor, activeAlert)
             assertEquals("Acknowledge alert failed", RestStatus.OK, response?.restStatus())
         } finally {
+            deleteUser(acknowledgeUser)
             acknowledgeUserClient?.close()
         }
     }
@@ -2257,7 +2258,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         val activeAlert = createAlert(randomAlert(createdMonitor).copy(state = Alert.State.ACTIVE))
 
-        val acknowledgeUser = "acknowledgeUser"
+        val acknowledgeUser = "acknowledgeUser2"
         createUserWithRoles(
             acknowledgeUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
@@ -2276,6 +2277,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertEquals("Get monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
         } finally {
+            deleteUser(acknowledgeUser)
             acknowledgeUserClient?.close()
         }
     }
@@ -2304,7 +2306,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         val activeAlert = createAlert(randomAlert(createdMonitor).copy(state = Alert.State.ACTIVE))
 
-        val acknowledgeUser = "acknowledgeUser"
+        val acknowledgeUser = "acknowledgeUser3"
         createUserWithRoles(
             acknowledgeUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
@@ -2321,6 +2323,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val response = acknowledgeAlertsWithClient(acknowledgeUserClient, createdMonitor, activeAlert)
             assertEquals("Acknowledge alert failed", RestStatus.OK, response?.restStatus())
         } finally {
+            deleteUser(acknowledgeUser)
             acknowledgeUserClient?.close()
         }
     }
@@ -2349,7 +2352,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
         val activeAlert = createAlert(randomAlert(createdMonitor).copy(state = Alert.State.ACTIVE))
 
-        val acknowledgeUser = "acknowledgeUser"
+        val acknowledgeUser = "acknowledgeUser4"
         createUserWithRoles(
             acknowledgeUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
@@ -2368,6 +2371,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         } catch (e: ResponseException) {
             assertEquals("Get monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
         } finally {
+            deleteUser(acknowledgeUser)
             acknowledgeUserClient?.close()
         }
     }
