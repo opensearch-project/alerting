@@ -127,7 +127,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                         checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", request.monitorId)
 
                     if (canAccess) {
-                        AcknowledgeHandler(client, actionListener, request).start(monitor)
+                        AcknowledgeHandler(client, actionListener, request, tenantId).start(monitor)
                     } else {
                         actionListener.onFailure(
                             AlertingException(
@@ -167,7 +167,8 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     inner class AcknowledgeHandler(
         private val client: Client,
         private val actionListener: ActionListener<AcknowledgeAlertResponse>,
-        private val request: AcknowledgeAlertRequest
+        private val request: AcknowledgeAlertRequest,
+        private val tenantId: String?
     ) {
         val alerts = mutableMapOf<String, Alert>()
 
@@ -185,6 +186,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
             val sdkSearchRequest = SearchDataObjectRequest.builder()
                 .indices(monitor.dataSources.alertsIndex)
                 .routing(request.monitorId)
+                .tenantId(tenantId)
                 .searchSourceBuilder(searchSourceBuilder)
                 .build()
             try {
@@ -219,6 +221,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                                 .index(monitor.dataSources.alertsIndex)
                                 .id(alert.id)
                                 .routing(request.monitorId)
+                                .tenantId(tenantId)
                                 .ifSeqNo(hit.seqNo)
                                 .ifPrimaryTerm(hit.primaryTerm)
                                 .dataObject(
@@ -238,6 +241,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                                 .index(alertsHistoryIndex)
                                 .id(alert.id)
                                 .routing(request.monitorId)
+                                .tenantId(tenantId)
                                 .overwriteIfExists(true)
                                 .dataObject(ToXContentObject { builder, _ -> ackedAlert.toXContentWithUser(builder) })
                                 .build()
@@ -302,6 +306,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                             .index(monitor.dataSources.alertsIndex)
                             .id(item.id())
                             .routing(request.monitorId)
+                            .tenantId(tenantId)
                             .build()
                     )
                 }
