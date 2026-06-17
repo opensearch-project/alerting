@@ -801,6 +801,64 @@ class TransportDocLevelMonitorFanOutAction
         docIdToOriginalSource: MutableMap<String, OriginalDocContext> = mutableMapOf(),
         updateLastRunContext: (String, Long) -> Unit
     ) {
+        // When shouldCreateSingleAlertForFindings=true and docIds is non-empty, the monitor must
+        // process a specific set of documents identified by the upstream bucket-level findings.
+        // Those documents were ingested in a prior execution window and their _seq_no values are
+        // below prevSeqNo — the seq_no cursor would skip them entirely. Bypass the cursor and
+        // fetch the documents directly by ID across all shards on this node.
+        if (monitor.shouldCreateSingleAlertForFindings == true && !indexExecutionCtx.docIds.isNullOrEmpty()) {
+            try {
+                val hits = searchByDocIds(
+                    indexExecutionCtx.concreteIndexName,
+                    indexExecutionCtx.docIds!!,
+                    fieldsToBeQueried
+                )
+                if (hits.hits.isNotEmpty()) {
+                    hits.hits.forEach { hit ->
+                        val sourceMap: Map<String, Any?> = if (hit.hasSource()) {
+                            deepCopyMap(hit.sourceAsMap)
+                        } else {
+                            deepCopyMap(constructSourceMapFromFieldsInHit(hit))
+                        }
+                        if (sourceMap.isNotEmpty()) {
+                            docIdToOriginalSource["${hit.id}|${indexExecutionCtx.concreteIndexName}"] =
+                                OriginalDocContext(
+                                    id = hit.id,
+                                    index = indexExecutionCtx.concreteIndexName,
+                                    source = sourceMap
+                                )
+                        }
+                    }
+                    val newDocs = transformSearchHitsAndReconstructDocs(
+                        hits,
+                        indexExecutionCtx.indexName,
+                        indexExecutionCtx.concreteIndexName,
+                        monitor.id,
+                        indexExecutionCtx.conflictingFields,
+                    )
+                    transformedDocs.addAll(newDocs)
+                    if (transformedDocs.isNotEmpty()) {
+                        performPercolateQueryAndResetCounters(
+                            monitor,
+                            monitorMetadata,
+                            monitorInputIndices,
+                            concreteIndices,
+                            inputRunResults,
+                            docsToQueries,
+                            transformedDocs
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                log.error(
+                    "Monitor ${monitor.id}: Failed to fetch finding docs by ID " +
+                        "from index [${indexExecutionCtx.concreteIndexName}]. Error: ${e.message}",
+                    e
+                )
+            }
+            return
+        }
+
         for (shardId in shardList) {
             val shard = shardId.toString()
             try {
@@ -820,7 +878,7 @@ class TransportDocLevelMonitorFanOutAction
                     monitor,
                     indexExecutionCtx.concreteIndexName,
                     shard,
-                    indexExecutionCtx.docIds
+                    null
                 )
 
                 if (maxSeqNo == null || maxSeqNo <= from) {
@@ -861,7 +919,7 @@ class TransportDocLevelMonitorFanOutAction
                         shard,
                         currentSeqNo,
                         maxSeqNo,
-                        indexExecutionCtx.docIds,
+                        null,
                         fieldsToBeQueried
                     )
 
@@ -996,12 +1054,6 @@ class TransportDocLevelMonitorFanOutAction
             if (!docIds.isNullOrEmpty()) {
                 boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIds))
             }
-        } else if (monitor.shouldCreateSingleAlertForFindings == true) {
-            val docIdsParam = mutableListOf<String>()
-            if (docIds != null) {
-                docIdsParam.addAll(docIds)
-            }
-            boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIdsParam))
         }
 
         val request = SearchRequest()
@@ -1128,12 +1180,6 @@ class TransportDocLevelMonitorFanOutAction
             if (!docIds.isNullOrEmpty()) {
                 boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIds))
             }
-        } else if (monitor.shouldCreateSingleAlertForFindings == true) {
-            val docIdsParam = mutableListOf<String>()
-            if (docIds != null) {
-                docIdsParam.addAll(docIds)
-            }
-            boolQueryBuilder.filter(QueryBuilders.termsQuery("_id", docIdsParam))
         }
 
         val request: SearchRequest = SearchRequest()
@@ -1162,6 +1208,44 @@ class TransportDocLevelMonitorFanOutAction
         val response: SearchResponse = client.suspendUntil { client.search(request, it) }
         if (response.status() !== RestStatus.OK) {
             throw IOException("Failed to search shard: [$shard] in index [$index]. Response status is ${response.status()}")
+        }
+        nonPercolateSearchesTimeTakenStat += response.took.millis
+        return response.hits
+    }
+
+    private suspend fun searchByDocIds(
+        index: String,
+        docIds: List<String>,
+        fieldsToFetch: List<String>,
+    ): SearchHits {
+        val boolQueryBuilder = BoolQueryBuilder()
+            .filter(QueryBuilders.termsQuery("_id", docIds))
+
+        val request: SearchRequest = SearchRequest()
+            .indices(index)
+            .source(
+                SearchSourceBuilder()
+                    .version(true)
+                    .seqNoAndPrimaryTerm(true)
+                    .query(boolQueryBuilder)
+                    .size(docIds.size)
+            )
+
+        val cancelTimeout = getCancelAfterTimeInterval()
+        if (cancelTimeout != -1L) {
+            request.cancelAfterTimeInterval = TimeValue.timeValueMinutes(cancelTimeout)
+        }
+
+        if (fieldsToFetch.isNotEmpty() && fetchOnlyQueryFieldNames) {
+            request.source().fetchSource(false)
+            for (field in fieldsToFetch) {
+                request.source().fetchField(field)
+            }
+        }
+
+        val response: SearchResponse = client.suspendUntil { client.search(request, it) }
+        if (response.status() !== RestStatus.OK) {
+            throw IOException("Failed to search by doc IDs in index [$index]. Response status is ${response.status()}")
         }
         nonPercolateSearchesTimeTakenStat += response.took.millis
         return response.hits
