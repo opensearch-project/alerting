@@ -125,6 +125,11 @@ configurations.testImplementation {
     exclude module: "securemock"
 }
 
+configurations.runtimeClasspath {
+    // opensearch-agent-policy is shipped in OpenSearch lib/ — exclude from plugin bundle to avoid jar hell
+    exclude group: "org.opensearch", module: "opensearch-agent-policy"
+}
+
 configurations {
     opensearchPlugin
     zipArchive
