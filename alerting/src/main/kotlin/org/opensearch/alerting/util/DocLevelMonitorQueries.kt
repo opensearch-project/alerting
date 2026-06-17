@@ -556,7 +556,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             return Pair(updateMappingResponse, targetQueryIndex)
         } catch (e: Exception) {
             val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
-            log.warn("PUT mapping failed on queryIndex $targetQueryIndex [${unwrappedException.javaClass.simpleName}]: ${unwrappedException.message}")
+            log.warn(
+                "PUT mapping failed on queryIndex $targetQueryIndex " +
+                    "[${unwrappedException.javaClass.simpleName}]: ${unwrappedException.message}"
+            )
             // If we reached limit for total number of fields in mappings, do a rollover here
             if (unwrappedException.message?.contains("Limit of total fields") == true) {
                 try {
