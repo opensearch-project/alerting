@@ -417,6 +417,43 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        val CLOUDWATCH_METRICS_ENABLED = Setting.boolSetting(
+            "plugins.alerting.cloudwatch_metrics.enabled",
+            false,
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
+        val CLOUDWATCH_METRICS_NAMESPACE = Setting.simpleString(
+            "plugins.alerting.cloudwatch_metrics.namespace",
+            "ObservabilityOasis/Alerting",
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
+        val CLOUDWATCH_METRICS_FLUSH_INTERVAL_SECONDS = Setting.intSetting(
+            "plugins.alerting.cloudwatch_metrics.flush_interval_seconds",
+            60,
+            10,
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
+        val CLOUDWATCH_METRICS_STAGE = Setting.simpleString(
+            "plugins.alerting.cloudwatch_metrics.stage",
+            "",
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
+        val CLOUDWATCH_METRICS_CELL_ID = Setting.simpleString(
+            "plugins.alerting.cloudwatch_metrics.cell_id",
+            "",
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
+        val CLOUDWATCH_METRICS_LOG_ONLY = Setting.boolSetting(
+            "plugins.alerting.cloudwatch_metrics.log_only",
+            false,
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
         /**
          * Default AWS account that owns the EventBridge schedules. May be overridden per-request
          * by a transient ThreadContext value under [ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY].

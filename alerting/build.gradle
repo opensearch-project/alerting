@@ -212,6 +212,7 @@ dependencies {
     implementation(platform("software.amazon.awssdk:bom:${versions.aws}"))
     implementation "software.amazon.awssdk:sqs:${versions.aws}"
     implementation "software.amazon.awssdk:scheduler:${versions.aws}"
+    implementation "software.amazon.awssdk:cloudwatch:${versions.aws}"
     implementation "software.amazon.awssdk:sts:${versions.aws}"
     implementation "software.amazon.awssdk:auth:${versions.aws}"
     implementation "software.amazon.awssdk:identity-spi:${versions.aws}"

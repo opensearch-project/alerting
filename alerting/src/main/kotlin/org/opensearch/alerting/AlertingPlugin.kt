@@ -52,6 +52,7 @@ import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
 import org.opensearch.alerting.script.TriggerScript
+import org.opensearch.alerting.service.AlertingMetricsService
 import org.opensearch.alerting.service.AssumeRoleCredentialsCache
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.service.ExternalSchedulerService
@@ -368,6 +369,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         this.threadPool = threadPool
         this.clusterService = clusterService
 
+        AlertingMetricsService.initialize(settings, threadPool)
+
         MonitorMetadataService.initialize(
             client,
             clusterService,
@@ -532,6 +535,12 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH,
             AlertingSettings.MULTI_TENANT_TRIGGER_EVAL_ENABLED,
             AlertingSettings.EXTERNAL_SCHEDULER_ENABLED,
+            AlertingSettings.CLOUDWATCH_METRICS_ENABLED,
+            AlertingSettings.CLOUDWATCH_METRICS_NAMESPACE,
+            AlertingSettings.CLOUDWATCH_METRICS_FLUSH_INTERVAL_SECONDS,
+            AlertingSettings.CLOUDWATCH_METRICS_STAGE,
+            AlertingSettings.CLOUDWATCH_METRICS_CELL_ID,
+            AlertingSettings.CLOUDWATCH_METRICS_LOG_ONLY,
             AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID,
             AlertingSettings.JOB_QUEUE_NAME,
             AlertingSettings.JOB_QUEUE_MESSAGE_GROUP_KEY_NAME,
