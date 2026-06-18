@@ -237,6 +237,7 @@ class TransportDocLevelMonitorFanOutAction
             val docsToQueries = mutableMapOf<String, MutableList<String>>()
             val transformedDocs = mutableListOf<Pair<String, TransformedDocDto>>()
             val findingIdToDocSource = mutableMapOf<String, MultiGetItemResponse>()
+            val docIdToOriginalSource = mutableMapOf<String, OriginalDocContext>()
             val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
 
             val docLevelMonitorInput = request.monitor.inputs[0] as DocLevelMonitorInput
@@ -275,7 +276,8 @@ class TransportDocLevelMonitorFanOutAction
                 concreteIndicesSeenSoFar,
                 ArrayList(fieldsToBeQueried),
                 shardIds.map { it.id },
-                transformedDocs
+                transformedDocs,
+                docIdToOriginalSource
             ) { shard, maxSeqNo -> // function passed to update last run context with new max sequence number
                 indexExecutionContext.updatedLastRunContext[shard] = maxSeqNo
             }
@@ -328,7 +330,8 @@ class TransportDocLevelMonitorFanOutAction
                             dryrun,
                             executionId = executionId,
                             findingIdToDocSource,
-                            workflowRunContext = workflowRunContext
+                            workflowRunContext = workflowRunContext,
+                            docIdToOriginalSource = docIdToOriginalSource
                         )
                     }
                 } else if (monitor.shouldCreateSingleAlertForFindings == true) {
@@ -449,7 +452,8 @@ class TransportDocLevelMonitorFanOutAction
         dryrun: Boolean,
         executionId: String,
         findingIdToDocSource: MutableMap<String, MultiGetItemResponse>,
-        workflowRunContext: WorkflowRunContext?
+        workflowRunContext: WorkflowRunContext?,
+        docIdToOriginalSource: Map<String, OriginalDocContext> = emptyMap()
     ): DocumentLevelTriggerRunResult {
         val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger, clusterSettings = clusterService.clusterSettings)
         val triggerResult = triggerService.runDocLevelTrigger(monitor, trigger, queryToDocIds)
@@ -478,12 +482,26 @@ class TransportDocLevelMonitorFanOutAction
             error = monitorResult.error ?: triggerResult.error
         )
 
-        if (printsSampleDocData(trigger) && triggerFindingDocPairs.isNotEmpty())
-            getDocSources(
-                findingToDocPairs = findingToDocPairs,
-                monitor = monitor,
-                findingIdToDocSource = findingIdToDocSource
-            )
+        val findingIdToPreFetchedSource = mutableMapOf<String, Map<String, Any?>>()
+        if (printsSampleDocData(trigger) && triggerFindingDocPairs.isNotEmpty()) {
+            val missingPairs = mutableListOf<Pair<String, String>>()
+            triggerFindingDocPairs.forEach { (findingId, docIdAndIndex) ->
+                val originalDoc = docIdToOriginalSource[docIdAndIndex]
+                if (originalDoc != null) {
+                    findingIdToPreFetchedSource[findingId] = buildStableSampleDoc(originalDoc)
+                } else {
+                    missingPairs.add(Pair(findingId, docIdAndIndex))
+                }
+            }
+            // Fall back to mGet only for docs not captured during searchShard
+            if (missingPairs.isNotEmpty()) {
+                getDocSources(
+                    findingToDocPairs = missingPairs,
+                    monitor = monitor,
+                    findingIdToDocSource = findingIdToDocSource
+                )
+            }
+        }
 
         val alerts = mutableListOf<Alert>()
         val alertContexts = mutableListOf<AlertContext>()
@@ -498,7 +516,8 @@ class TransportDocLevelMonitorFanOutAction
             )
             alerts.add(alert)
 
-            val docSource = findingIdToDocSource[alert.findingIds.first()]?.response?.convertToMap()
+            val docSource = findingIdToPreFetchedSource[alert.findingIds.first()]
+                ?: findingIdToDocSource[alert.findingIds.first()]?.let { buildStableSampleDocFromMget(it) }
 
             alertContexts.add(
                 AlertContext(
@@ -779,6 +798,7 @@ class TransportDocLevelMonitorFanOutAction
         fieldsToBeQueried: List<String>,
         shardList: List<Int>,
         transformedDocs: MutableList<Pair<String, TransformedDocDto>>,
+        docIdToOriginalSource: MutableMap<String, OriginalDocContext> = mutableMapOf(),
         updateLastRunContext: (String, Long) -> Unit
     ) {
         for (shardId in shardList) {
@@ -847,6 +867,25 @@ class TransportDocLevelMonitorFanOutAction
 
                     if (hits.hits.isEmpty()) {
                         break
+                    }
+
+                    // Capture original document sources before field-name transformation.
+                    // This avoids a follow-up mGet that would fail on indices with _routing:required:true
+                    // (e.g. Security Analytics hidden alerts index where routing = monitor_id).
+                    hits.hits.forEach { hit ->
+                        val sourceMap: Map<String, Any?> = if (hit.hasSource()) {
+                            deepCopyMap(hit.sourceAsMap)
+                        } else {
+                            deepCopyMap(constructSourceMapFromFieldsInHit(hit))
+                        }
+                        if (sourceMap.isNotEmpty()) {
+                            docIdToOriginalSource["${hit.id}|${indexExecutionCtx.concreteIndexName}"] =
+                                OriginalDocContext(
+                                    id = hit.id,
+                                    index = indexExecutionCtx.concreteIndexName,
+                                    source = sourceMap
+                                )
+                        }
                     }
 
                     val startTime = System.currentTimeMillis()
@@ -1404,6 +1443,53 @@ class TransportDocLevelMonitorFanOutAction
         }
         return errorMessage
     }
+
+    private fun buildStableSampleDoc(originalDoc: OriginalDocContext): Map<String, Any?> {
+        val cleanSource = deepCopyMap(originalDoc.source)
+        return mapOf(
+            "_id" to originalDoc.id,
+            "_index" to originalDoc.index,
+            "_source" to cleanSource
+        )
+    }
+
+    private fun buildStableSampleDocFromMget(item: MultiGetItemResponse): Map<String, Any?>? {
+        val response = item.response ?: return null
+        val cleanSource = deepCopyMap(response.convertToMap())
+        return mapOf(
+            "_id" to response.id,
+            "_index" to response.index,
+            "_source" to cleanSource
+        )
+    }
+
+    private fun deepCopyMap(input: Map<String, Any?>): Map<String, Any?> {
+        return input.entries.associate { (key, value) ->
+            key to deepCopyValue(value)
+        }
+    }
+
+    private fun deepCopyValue(value: Any?): Any? {
+        return when (value) {
+            is Map<*, *> -> {
+                value.entries.associate { (k, v) ->
+                    k.toString() to deepCopyValue(v)
+                }
+            }
+            is List<*> -> value.map { deepCopyValue(it) }
+            else -> value
+        }
+    }
+
+    /**
+     * POJO holding information about each doc's original id, index and clean source before
+     * field-name transformation for percolation.
+     */
+    data class OriginalDocContext(
+        var id: String,
+        var index: String,
+        var source: Map<String, Any?>
+    )
 
     /**
      * POJO holding information about each doc's concrete index, id, input index pattern/alias/datastream name
