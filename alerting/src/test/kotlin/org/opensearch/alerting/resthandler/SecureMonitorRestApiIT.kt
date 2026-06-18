@@ -1638,7 +1638,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             .build()
 
         try {
-            deleteMonitor(monitor = createdMonitor)
+            deleteMonitorWithClient(deleteUserClient, monitor = createdMonitor)
             fail("Expected Forbidden exception")
         } catch (e: ResponseException) {
             assertEquals("Get monitor failed", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
