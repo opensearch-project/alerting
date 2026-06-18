@@ -308,6 +308,7 @@ class JobSweeper(
 
         // sweep the shard for new and updated jobs. Uses a search after query to paginate, assuming that any concurrent
         // updates and deletes are handled by the index operation listener.
+        val seenJobIds = mutableSetOf<String>()
         var searchAfter: Long? = startAfter
         while (searchAfter != null) {
             val boolQueryBuilder = BoolQueryBuilder()
@@ -342,6 +343,7 @@ class JobSweeper(
             }
             for (hit in response.hits) {
                 if (shardNodes.isOwningNode(hit.id)) {
+                    seenJobIds.add(hit.id)
                     val xcp = XContentHelper.createParser(
                         xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                         hit.sourceRef, XContentType.JSON
@@ -350,6 +352,13 @@ class JobSweeper(
                 }
             }
             searchAfter = response.hits.lastOrNull()?.seqNo
+        }
+
+        // Deschedule any jobs that are in sweptJobs but no longer exist in the config index
+        currentJobs.keys.filter { shardNodes.isOwningNode(it) && !seenJobIds.contains(it) }.forEach {
+            logger.info("Descheduling orphaned job $it — no longer in config index")
+            scheduler.deschedule(it)
+            currentJobs.remove(it)
         }
     }
 

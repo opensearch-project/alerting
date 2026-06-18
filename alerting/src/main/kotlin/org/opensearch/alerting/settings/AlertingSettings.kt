@@ -210,6 +210,18 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        val ORPHANED_ALERT_SWEEP_PERIOD = Setting.positiveTimeSetting(
+            "plugins.alerting.orphaned_alert_sweep_period",
+            TimeValue(5, TimeUnit.MINUTES),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        val ORPHANED_ALERT_SWEEP_ENABLED = Setting.boolSetting(
+            "plugins.alerting.orphaned_alert_sweep_enabled",
+            true,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val REQUEST_TIMEOUT = Setting.positiveTimeSetting(
             "plugins.alerting.request_timeout",
             LegacyOpenDistroAlertingSettings.REQUEST_TIMEOUT,

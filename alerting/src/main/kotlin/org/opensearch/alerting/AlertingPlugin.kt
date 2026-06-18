@@ -16,6 +16,7 @@ import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
+import org.opensearch.alerting.alerts.OrphanedAlertSweeper
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.comments.CommentsIndices.Companion.ALL_COMMENTS_INDEX_PATTERN
 import org.opensearch.alerting.core.JobSweeper
@@ -196,6 +197,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     lateinit var runner: MonitorRunnerService
     lateinit var scheduler: JobScheduler
     lateinit var sweeper: JobSweeper
+    lateinit var orphanedAlertSweeper: OrphanedAlertSweeper
     lateinit var scheduledJobIndices: ScheduledJobIndices
     lateinit var commentsIndices: CommentsIndices
     lateinit var docLevelMonitorQueries: DocLevelMonitorQueries
@@ -359,6 +361,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         docLevelMonitorQueries = DocLevelMonitorQueries(client, clusterService)
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
+        orphanedAlertSweeper = OrphanedAlertSweeper(environment.settings(), client, threadPool, clusterService)
         destinationMigrationCoordinator = DestinationMigrationCoordinator(client, clusterService, threadPool, scheduledJobIndices)
         this.threadPool = threadPool
         this.clusterService = clusterService
@@ -421,7 +424,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             alertService,
             triggerService,
             sdkClient,
-            monitorJobPoller
+            monitorJobPoller,
+            orphanedAlertSweeper
         )
     }
 
@@ -527,7 +531,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE,
             AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME,
             AlertingSettings.TENANT_ACCOUNT_ID_HEADER,
-            AlertingSettings.TENANT_RESOURCE_ID_HEADER
+            AlertingSettings.TENANT_RESOURCE_ID_HEADER,
+            AlertingSettings.ORPHANED_ALERT_SWEEP_PERIOD,
+            AlertingSettings.ORPHANED_ALERT_SWEEP_ENABLED
         )
     }
 
