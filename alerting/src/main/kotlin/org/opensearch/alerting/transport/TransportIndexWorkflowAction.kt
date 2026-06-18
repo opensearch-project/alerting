@@ -750,7 +750,7 @@ class TransportIndexWorkflowAction @Inject constructor(
         val compositeInput = request.workflow.inputs[0] as CompositeInput
         val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())
         val query = QueryBuilders.boolQuery().filter(QueryBuilders.termsQuery("_id", monitorIds))
-        val searchSource = SearchSourceBuilder().query(query)
+        val searchSource = SearchSourceBuilder().query(query).size(monitorIds.size)
         val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
 
         if (user != null && !isAdmin(user) && filterByEnabled) {
