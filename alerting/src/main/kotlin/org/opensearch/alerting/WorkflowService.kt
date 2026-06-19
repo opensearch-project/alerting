@@ -81,10 +81,18 @@ class WorkflowService(
                 val finding = Finding.parse(xcp)
                 findings.add(finding)
             }
-            // Based on the findings get the document ids
+            // Based on the findings get the document ids.
+            // Key by both the source index name (for backward-compat consumers) and by the
+            // bucket-level monitor's trigger ID (= the OpenSearch rule doc ID) so that the
+            // chained findings fan-out can retrieve per-rule doc IDs in Change 3.
+            val monitorIdToRuleId = chainedMonitors.associateBy({ it.id }, { it.triggers.firstOrNull()?.id })
             val indexToRelatedDocIdsMap = mutableMapOf<String, MutableList<String>>()
             for (finding in findings) {
                 indexToRelatedDocIdsMap.getOrPut(finding.index) { mutableListOf() }.addAll(finding.relatedDocIds)
+                val ruleId = monitorIdToRuleId[finding.monitorId]
+                if (ruleId != null) {
+                    indexToRelatedDocIdsMap.getOrPut(ruleId) { mutableListOf() }.addAll(finding.relatedDocIds)
+                }
             }
             return Pair(indexToRelatedDocIdsMap, findings.map { it.id })
         } catch (t: Exception) {

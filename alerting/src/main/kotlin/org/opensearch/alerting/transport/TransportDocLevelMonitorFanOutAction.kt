@@ -277,7 +277,8 @@ class TransportDocLevelMonitorFanOutAction
                 ArrayList(fieldsToBeQueried),
                 shardIds.map { it.id },
                 transformedDocs,
-                docIdToOriginalSource
+                docIdToOriginalSource,
+                workflowRunContext
             ) { shard, maxSeqNo -> // function passed to update last run context with new max sequence number
                 indexExecutionContext.updatedLastRunContext[shard] = maxSeqNo
             }
@@ -799,66 +800,68 @@ class TransportDocLevelMonitorFanOutAction
         shardList: List<Int>,
         transformedDocs: MutableList<Pair<String, TransformedDocDto>>,
         docIdToOriginalSource: MutableMap<String, OriginalDocContext> = mutableMapOf(),
+        workflowRunContext: WorkflowRunContext? = null,
         updateLastRunContext: (String, Long) -> Unit
     ) {
         // When shouldCreateSingleAlertForFindings=true the monitor must only process documents
         // identified by upstream bucket-level findings. Those documents were ingested in a prior
         // execution window so their _seq_no is below prevSeqNo — the seq_no cursor would skip
         // them entirely. Bypass the cursor entirely for this monitor type:
-        //   • docIds non-empty → fetch the specific finding documents directly by ID.
+        //   • docIds non-empty → for each DocLevelQuery, fetch only that rule's docs by ID and
+        //     populate inputRunResults keyed by the rule's DocLevelQuery ID directly (no percolate).
         //   • docIds empty/null → no upstream findings exist for this execution; do nothing.
         // In both cases we must NOT fall through to the seq_no cursor path, because the cursor
         // passes null for the doc-ID filter and would scan every document in the index.
         if (monitor.shouldCreateSingleAlertForFindings == true) {
             if (!indexExecutionCtx.docIds.isNullOrEmpty()) {
-                try {
-                    val hits = searchByDocIds(
-                        indexExecutionCtx.concreteIndexName,
-                        indexExecutionCtx.docIds!!,
-                        fieldsToBeQueried
-                    )
-                    if (hits.hits.isNotEmpty()) {
-                        hits.hits.forEach { hit ->
-                            val sourceMap: Map<String, Any?> = if (hit.hasSource()) {
-                                deepCopyMap(hit.sourceAsMap)
-                            } else {
-                                deepCopyMap(constructSourceMapFromFieldsInHit(hit))
-                            }
-                            if (sourceMap.isNotEmpty()) {
-                                docIdToOriginalSource["${hit.id}|${indexExecutionCtx.concreteIndexName}"] =
-                                    OriginalDocContext(
-                                        id = hit.id,
-                                        index = indexExecutionCtx.concreteIndexName,
-                                        source = sourceMap
-                                    )
-                            }
-                        }
-                        val newDocs = transformSearchHitsAndReconstructDocs(
-                            hits,
-                            indexExecutionCtx.indexName,
+                for (dlq in indexExecutionCtx.queries) {
+                    // Look up the doc IDs scoped to this specific rule using the ruleId key
+                    // populated in WorkflowService.getFindingDocIdsByExecutionId (Change 1).
+                    // If the key is absent, this rule produced no upstream finding → skip.
+                    val ruleDocIds = workflowRunContext?.matchingDocIdsPerIndex?.get(dlq.id)
+                        ?: continue
+                    if (ruleDocIds.isEmpty()) continue
+                    try {
+                        val hits = searchByDocIds(
                             indexExecutionCtx.concreteIndexName,
-                            monitor.id,
-                            indexExecutionCtx.conflictingFields,
+                            ruleDocIds,
+                            fieldsToBeQueried
                         )
-                        transformedDocs.addAll(newDocs)
-                        if (transformedDocs.isNotEmpty()) {
-                            performPercolateQueryAndResetCounters(
-                                monitor,
-                                monitorMetadata,
-                                monitorInputIndices,
-                                concreteIndices,
-                                inputRunResults,
-                                docsToQueries,
-                                transformedDocs
-                            )
+                        if (hits.hits.isNotEmpty()) {
+                            hits.hits.forEach { hit ->
+                                val sourceMap: Map<String, Any?> = if (hit.hasSource()) {
+                                    deepCopyMap(hit.sourceAsMap)
+                                } else {
+                                    deepCopyMap(constructSourceMapFromFieldsInHit(hit))
+                                }
+                                if (sourceMap.isNotEmpty()) {
+                                    docIdToOriginalSource["${hit.id}|${indexExecutionCtx.concreteIndexName}"] =
+                                        OriginalDocContext(
+                                            id = hit.id,
+                                            index = indexExecutionCtx.concreteIndexName,
+                                            source = sourceMap
+                                        )
+                                }
+                            }
+                            // Populate inputRunResults directly with the rule's DocLevelQuery ID
+                            // as the key. The _id:* percolate query adds no discrimination here —
+                            // all docs match — so we bypass it and set the mapping explicitly.
+                            val docSet = hits.hits.mapTo(mutableSetOf()) {
+                                "${it.id}|${indexExecutionCtx.concreteIndexName}"
+                            }
+                            inputRunResults.getOrPut(dlq.id) { mutableSetOf() }.addAll(docSet)
+                            docSet.forEach { docIndex ->
+                                docsToQueries.getOrPut(docIndex) { mutableListOf() }.add(dlq.id)
+                            }
                         }
+                    } catch (e: Exception) {
+                        log.error(
+                            "Monitor ${monitor.id}: Failed to fetch finding docs by ID " +
+                                "for rule [${dlq.id}] from index [${indexExecutionCtx.concreteIndexName}]. " +
+                                "Error: ${e.message}",
+                            e
+                        )
                     }
-                } catch (e: Exception) {
-                    log.error(
-                        "Monitor ${monitor.id}: Failed to fetch finding docs by ID " +
-                            "from index [${indexExecutionCtx.concreteIndexName}]. Error: ${e.message}",
-                        e
-                    )
                 }
             }
             return
