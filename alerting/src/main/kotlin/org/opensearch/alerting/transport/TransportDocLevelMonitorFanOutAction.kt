@@ -801,60 +801,65 @@ class TransportDocLevelMonitorFanOutAction
         docIdToOriginalSource: MutableMap<String, OriginalDocContext> = mutableMapOf(),
         updateLastRunContext: (String, Long) -> Unit
     ) {
-        // When shouldCreateSingleAlertForFindings=true and docIds is non-empty, the monitor must
-        // process a specific set of documents identified by the upstream bucket-level findings.
-        // Those documents were ingested in a prior execution window and their _seq_no values are
-        // below prevSeqNo — the seq_no cursor would skip them entirely. Bypass the cursor and
-        // fetch the documents directly by ID across all shards on this node.
-        if (monitor.shouldCreateSingleAlertForFindings == true && !indexExecutionCtx.docIds.isNullOrEmpty()) {
-            try {
-                val hits = searchByDocIds(
-                    indexExecutionCtx.concreteIndexName,
-                    indexExecutionCtx.docIds!!,
-                    fieldsToBeQueried
-                )
-                if (hits.hits.isNotEmpty()) {
-                    hits.hits.forEach { hit ->
-                        val sourceMap: Map<String, Any?> = if (hit.hasSource()) {
-                            deepCopyMap(hit.sourceAsMap)
-                        } else {
-                            deepCopyMap(constructSourceMapFromFieldsInHit(hit))
-                        }
-                        if (sourceMap.isNotEmpty()) {
-                            docIdToOriginalSource["${hit.id}|${indexExecutionCtx.concreteIndexName}"] =
-                                OriginalDocContext(
-                                    id = hit.id,
-                                    index = indexExecutionCtx.concreteIndexName,
-                                    source = sourceMap
-                                )
-                        }
-                    }
-                    val newDocs = transformSearchHitsAndReconstructDocs(
-                        hits,
-                        indexExecutionCtx.indexName,
+        // When shouldCreateSingleAlertForFindings=true the monitor must only process documents
+        // identified by upstream bucket-level findings. Those documents were ingested in a prior
+        // execution window so their _seq_no is below prevSeqNo — the seq_no cursor would skip
+        // them entirely. Bypass the cursor entirely for this monitor type:
+        //   • docIds non-empty → fetch the specific finding documents directly by ID.
+        //   • docIds empty/null → no upstream findings exist for this execution; do nothing.
+        // In both cases we must NOT fall through to the seq_no cursor path, because the cursor
+        // passes null for the doc-ID filter and would scan every document in the index.
+        if (monitor.shouldCreateSingleAlertForFindings == true) {
+            if (!indexExecutionCtx.docIds.isNullOrEmpty()) {
+                try {
+                    val hits = searchByDocIds(
                         indexExecutionCtx.concreteIndexName,
-                        monitor.id,
-                        indexExecutionCtx.conflictingFields,
+                        indexExecutionCtx.docIds!!,
+                        fieldsToBeQueried
                     )
-                    transformedDocs.addAll(newDocs)
-                    if (transformedDocs.isNotEmpty()) {
-                        performPercolateQueryAndResetCounters(
-                            monitor,
-                            monitorMetadata,
-                            monitorInputIndices,
-                            concreteIndices,
-                            inputRunResults,
-                            docsToQueries,
-                            transformedDocs
+                    if (hits.hits.isNotEmpty()) {
+                        hits.hits.forEach { hit ->
+                            val sourceMap: Map<String, Any?> = if (hit.hasSource()) {
+                                deepCopyMap(hit.sourceAsMap)
+                            } else {
+                                deepCopyMap(constructSourceMapFromFieldsInHit(hit))
+                            }
+                            if (sourceMap.isNotEmpty()) {
+                                docIdToOriginalSource["${hit.id}|${indexExecutionCtx.concreteIndexName}"] =
+                                    OriginalDocContext(
+                                        id = hit.id,
+                                        index = indexExecutionCtx.concreteIndexName,
+                                        source = sourceMap
+                                    )
+                            }
+                        }
+                        val newDocs = transformSearchHitsAndReconstructDocs(
+                            hits,
+                            indexExecutionCtx.indexName,
+                            indexExecutionCtx.concreteIndexName,
+                            monitor.id,
+                            indexExecutionCtx.conflictingFields,
                         )
+                        transformedDocs.addAll(newDocs)
+                        if (transformedDocs.isNotEmpty()) {
+                            performPercolateQueryAndResetCounters(
+                                monitor,
+                                monitorMetadata,
+                                monitorInputIndices,
+                                concreteIndices,
+                                inputRunResults,
+                                docsToQueries,
+                                transformedDocs
+                            )
+                        }
                     }
+                } catch (e: Exception) {
+                    log.error(
+                        "Monitor ${monitor.id}: Failed to fetch finding docs by ID " +
+                            "from index [${indexExecutionCtx.concreteIndexName}]. Error: ${e.message}",
+                        e
+                    )
                 }
-            } catch (e: Exception) {
-                log.error(
-                    "Monitor ${monitor.id}: Failed to fetch finding docs by ID " +
-                        "from index [${indexExecutionCtx.concreteIndexName}]. Error: ${e.message}",
-                    e
-                )
             }
             return
         }
