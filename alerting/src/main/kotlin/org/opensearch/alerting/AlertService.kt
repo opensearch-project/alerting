@@ -79,7 +79,7 @@ class AlertService(
 ) {
 
     companion object {
-        const val MAX_BUCKET_LEVEL_MONITOR_ALERT_SEARCH_COUNT = 500
+        const val MAX_BUCKET_LEVEL_MONITOR_ALERT_SEARCH_COUNT = 100
         const val ERROR_ALERT_ID_PREFIX = "error-alert"
 
         val ALERTS_SEARCH_TIMEOUT = TimeValue(5, TimeUnit.MINUTES)
