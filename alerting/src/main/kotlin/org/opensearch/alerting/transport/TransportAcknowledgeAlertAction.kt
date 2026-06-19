@@ -102,6 +102,9 @@ class TransportAcknowledgeAlertAction @Inject constructor(
 
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         client.threadPool().threadContext.stashContext().use {
+            if (!tenantId.isNullOrEmpty()) {
+                client.threadPool().threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, tenantId)
+            }
             scope.launch(TenantContext(tenantId)) {
                 try {
                     val monitor = getMonitor(request.monitorId)
