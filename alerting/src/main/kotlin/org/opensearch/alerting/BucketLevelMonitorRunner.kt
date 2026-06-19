@@ -21,6 +21,7 @@ import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.BucketLevelTriggerExecutionContext
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.CommentsUtils
+import org.opensearch.alerting.util.MAX_SEARCH_SIZE
 import org.opensearch.alerting.util.defaultToPerExecutionAction
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getBucketKeysHash
@@ -499,7 +500,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             val queryBuilder = if (input.query.query() == null) BoolQueryBuilder()
                             else QueryBuilders.boolQuery().must(source.query())
                             queryBuilder.filter(QueryBuilders.termsQuery(fieldName, bucketValues))
-                            sr.source().query(queryBuilder).sort("_seq_no", SortOrder.DESC)
+                            sr.source().query(queryBuilder).size(MAX_SEARCH_SIZE).sort("_seq_no", SortOrder.DESC)
                         }
                     sr.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
                         getCancelAfterTimeInterval()

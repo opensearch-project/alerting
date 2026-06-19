@@ -12,6 +12,7 @@ import org.opensearch.action.admin.indices.exists.indices.IndicesExistsResponse
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.alerting.util.MAX_SEARCH_SIZE
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.Finding
@@ -64,6 +65,7 @@ class WorkflowService(
                 .source(
                     SearchSourceBuilder()
                         .query(bqb)
+                        .size(MAX_SEARCH_SIZE)
                         .version(true)
                         .seqNoAndPrimaryTerm(true)
                 )
