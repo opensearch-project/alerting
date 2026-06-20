@@ -374,6 +374,7 @@ integTest {
     systemProperty "security", System.getProperty("security")
     systemProperty "user", System.getProperty("user", "admin")
     systemProperty "password", System.getProperty("password", "admin")
+    systemProperty "resource_sharing.enabled", System.getProperty("resource_sharing.enabled")
 
     // The 'doFirst' delays till execution time.
     doFirst {

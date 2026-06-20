@@ -6,12 +6,12 @@
 package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
-import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService

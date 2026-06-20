@@ -185,4 +185,40 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
         verify(sdkClient).searchDataObjectAsync(captor.capture())
         assertNull(captor.value.tenantId())
     }
+
+    fun `test resolve with resource sharing client skips filterby`() {
+        val mockRsc = Mockito.mock(org.opensearch.security.spi.resources.client.ResourceSharingClient::class.java)
+        org.opensearch.alerting.ResourceSharingClientAccessor.setResourceSharingClient(mockRsc)
+
+        try {
+            val future: CompletionStage<SearchDataObjectResponse> =
+                CompletableFuture.completedFuture(SearchDataObjectResponse(null as org.opensearch.action.search.SearchResponse?))
+            whenever(sdkClient.searchDataObjectAsync(any(SearchDataObjectRequest::class.java))).thenReturn(future)
+
+            val action = TransportGetDestinationsAction(
+                Mockito.mock(TransportService::class.java),
+                client,
+                clusterService,
+                Mockito.mock(ActionFilters::class.java),
+                Settings.EMPTY,
+                Mockito.mock(NamedXContentRegistry::class.java),
+                sdkClient
+            )
+
+            // User with backend roles that would normally trigger filterBy
+            threadContext.putTransient(
+                "opendistro_security_user_info",
+                "testuser|role1|backend_role1"
+            )
+
+            @Suppress("UNCHECKED_CAST")
+            val listener = Mockito.mock(ActionListener::class.java) as ActionListener<GetDestinationsResponse>
+            action.resolve(SearchSourceBuilder(), listener, null)
+
+            // Should still call search (resource sharing handles access control)
+            verify(sdkClient).searchDataObjectAsync(any(SearchDataObjectRequest::class.java))
+        } finally {
+            org.opensearch.alerting.ResourceSharingClientAccessor.clear()
+        }
+    }
 }
