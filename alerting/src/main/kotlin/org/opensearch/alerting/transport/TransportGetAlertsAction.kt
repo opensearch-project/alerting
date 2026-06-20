@@ -13,6 +13,7 @@ import org.opensearch.action.ActionRequest
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
@@ -240,6 +241,9 @@ class TransportGetAlertsAction @Inject constructor(
         // user is null when: 1/ security is disabled. 2/when user is super-admin.
         if (user == null) {
             // user is null when: 1/ security is disabled. 2/when user is super-admin.
+            search(alertIndex, searchSourceBuilder, actionListener, tenantId)
+        } else if (ResourceSharingClientAccessor.getResourceSharingClient() != null) {
+            // resource sharing framework is enabled - access control handled by security plugin
             search(alertIndex, searchSourceBuilder, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.

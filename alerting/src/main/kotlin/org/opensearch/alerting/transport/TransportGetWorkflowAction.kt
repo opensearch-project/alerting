@@ -6,6 +6,7 @@
 package org.opensearch.alerting.transport
 
 import org.apache.logging.log4j.LogManager
+import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
@@ -72,7 +73,8 @@ class TransportGetWorkflowAction @Inject constructor(
 
         val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, getWorkflowRequest.workflowId)
 
-        if (!validateUserBackendRoles(user, actionListener)) {
+        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+        if (rsc == null && !validateUserBackendRoles(user, actionListener)) {
             return
         }
 

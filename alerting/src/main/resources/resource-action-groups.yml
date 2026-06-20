@@ -1,0 +1,65 @@
+# For resource-access-management
+resource_types:
+  monitor:
+    alerting_read_only:
+      allowed_actions:
+        - 'cluster:admin/opendistro/alerting/monitor/get'
+        - 'cluster:admin/opendistro/alerting/monitor/search'
+        - 'cluster:admin/opendistro/alerting/alerts/get'
+        - 'cluster:admin/opensearch/alerting/workflow/get'
+        - 'cluster:admin/opensearch/alerting/workflow_alerts/get'
+        - 'cluster:admin/opensearch/alerting/findings/get'
+        - 'cluster:admin/opendistro/alerting/destination/get'
+
+    alerting_read_write:
+      allowed_actions:
+        - 'cluster:admin/opendistro/alerting/monitor/*'
+        - 'cluster:admin/opensearch/alerting/workflow/*'
+        - 'cluster:admin/opendistro/alerting/alerts/*'
+        - 'cluster:admin/opensearch/alerting/workflow_alerts/*'
+        - 'cluster:admin/opensearch/alerting/findings/*'
+        - 'cluster:admin/opendistro/alerting/destination/*'
+        - 'cluster:admin/opensearch/alerting/comments/*'
+
+    alerting_full_access:
+      allowed_actions:
+        - 'cluster:admin/opendistro/alerting/monitor/*'
+        - 'cluster:admin/opensearch/alerting/workflow/*'
+        - 'cluster:admin/opendistro/alerting/alerts/*'
+        - 'cluster:admin/opensearch/alerting/workflow_alerts/*'
+        - 'cluster:admin/opensearch/alerting/findings/*'
+        - 'cluster:admin/opendistro/alerting/destination/*'
+        - 'cluster:admin/opensearch/alerting/comments/*'
+        - 'cluster:admin/opensearch/alerting/remote/indexes/get'
+        - 'cluster:admin/security/resource/share'
+
+  alert:
+    alerting_read_only:
+      allowed_actions:
+        - 'cluster:admin/opendistro/alerting/alerts/get'
+        - 'cluster:admin/opensearch/alerting/workflow_alerts/get'
+
+    alerting_read_write:
+      allowed_actions:
+        - 'cluster:admin/opendistro/alerting/alerts/*'
+        - 'cluster:admin/opensearch/alerting/workflow_alerts/*'
+
+    alerting_full_access:
+      allowed_actions:
+        - 'cluster:admin/opendistro/alerting/alerts/*'
+        - 'cluster:admin/opensearch/alerting/workflow_alerts/*'
+        - 'cluster:admin/security/resource/share'
+
+  comment:
+    alerting_read_only:
+      allowed_actions:
+        - 'cluster:admin/opensearch/alerting/comments/search'
+
+    alerting_read_write:
+      allowed_actions:
+        - 'cluster:admin/opensearch/alerting/comments/*'
+
+    alerting_full_access:
+      allowed_actions:
+        - 'cluster:admin/opensearch/alerting/comments/*'
+        - 'cluster:admin/security/resource/share'

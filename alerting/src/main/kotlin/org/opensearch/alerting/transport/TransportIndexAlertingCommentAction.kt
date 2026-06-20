@@ -14,6 +14,7 @@ import org.opensearch.action.ActionRequest
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.comments.CommentsIndices.Companion.COMMENTS_HISTORY_WRITE_INDEX
@@ -181,8 +182,11 @@ constructor(
                 return
             }
 
-            log.debug("checking user permissions in index comment")
-            checkUserPermissionsWithResource(user, alert.monitorUser, actionListener, "monitor", alert.monitorId)
+            val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+            if (rsc == null) {
+                log.debug("checking user permissions in index comment")
+                checkUserPermissionsWithResource(user, alert.monitorUser, actionListener, "monitor", alert.monitorId)
+            }
 
             val comment = Comment(
                 entityId = request.entityId,

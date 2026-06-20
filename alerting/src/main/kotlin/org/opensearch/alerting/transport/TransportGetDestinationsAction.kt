@@ -10,6 +10,7 @@ import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.GetDestinationsResponse
@@ -135,6 +136,9 @@ class TransportGetDestinationsAction @Inject constructor(
         tenantId: String? = null,
     ) {
         if (user == null) {
+            search(searchSourceBuilder, actionListener, tenantId)
+        } else if (ResourceSharingClientAccessor.getResourceSharingClient() != null) {
+            // resource sharing framework is enabled - access control handled by security plugin
             search(searchSourceBuilder, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
             search(searchSourceBuilder, actionListener, tenantId)

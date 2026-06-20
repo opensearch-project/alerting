@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.logging.log4j.LogManager
 import org.apache.lucene.search.join.ScoreMode
+import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.ActionRequest
 import org.opensearch.action.search.SearchRequest
@@ -87,7 +88,8 @@ class TransportGetMonitorAction @Inject constructor(
 
         val user = readUserFromThreadContext(client)
 
-        if (!validateUserBackendRoles(user, actionListener)) {
+        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+        if (rsc == null && !validateUserBackendRoles(user, actionListener)) {
             return
         }
 
