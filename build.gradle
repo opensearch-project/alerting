@@ -95,6 +95,7 @@ task ktlint(type: JavaExec, group: "verification") {
     mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
     args "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+    jvmArgs "--add-opens=java.base/java.lang=ALL-UNNAMED"
     
     // Skip on JDK 25
     onlyIf {
@@ -107,6 +108,7 @@ task ktlintFormat(type: JavaExec, group: "formatting") {
     mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
     args "-F", "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+    jvmArgs "--add-opens=java.base/java.lang=ALL-UNNAMED"
     
     // Skip on JDK 25 until ktlint fully supports it
     onlyIf {

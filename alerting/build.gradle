@@ -54,7 +54,7 @@ opensearchplugin {
     name 'opensearch-alerting'
     description 'Amazon OpenSearch alerting plugin'
     classname 'org.opensearch.alerting.AlertingPlugin'
-    extendedPlugins = ['lang-painless']
+    extendedPlugins = ['lang-painless', 'opensearch-security;optional=true']
 }
 
 publishing {
@@ -169,6 +169,10 @@ dependencies {
 
     compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
     api "org.opensearch.plugin:percolator-client:${opensearch_version}"
+
+    // Resource sharing
+    compileOnly group: 'org.opensearch', name:'opensearch-security-spi', version:"${opensearch_build}"
+    opensearchPlugin "org.opensearch.plugin:opensearch-security:${opensearch_build}@zip"
 
     // OpenSearch Nanny state
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
@@ -355,6 +359,9 @@ testClusters.integTest.nodes.each { node ->
         node.setting("plugins.security.restapi.roles_enabled", "[\"all_access\", \"security_rest_api_access\"]")
         node.setting("plugins.security.system_indices.enabled", "true")
         node.setting("plugins.security.user_attribute_serialization.enabled", "true")
+        if (System.getProperty("resource_sharing.enabled") == "true") {
+            node.setting "plugins.security.experimental.resource_sharing.enabled", "true"
+        }
     }
 }
 
@@ -367,6 +374,7 @@ integTest {
     systemProperty "security", System.getProperty("security")
     systemProperty "user", System.getProperty("user", "admin")
     systemProperty "password", System.getProperty("password", "admin")
+    systemProperty "resource_sharing.enabled", System.getProperty("resource_sharing.enabled")
 
     // The 'doFirst' delays till execution time.
     doFirst {

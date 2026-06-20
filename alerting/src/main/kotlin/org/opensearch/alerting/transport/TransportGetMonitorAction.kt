@@ -17,6 +17,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
@@ -87,7 +88,8 @@ class TransportGetMonitorAction @Inject constructor(
 
         val user = readUserFromThreadContext(client)
 
-        if (!validateUserBackendRoles(user, actionListener)) {
+        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+        if (rsc == null && !validateUserBackendRoles(user, actionListener)) {
             return
         }
 

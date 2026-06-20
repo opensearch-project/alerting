@@ -167,6 +167,41 @@ class TransportGetMonitorActionTests : OpenSearchTestCase() {
         verify(client, never()).search(any(SearchRequest::class.java), any())
     }
 
+    fun `test resource sharing client set skips backend role validation`() {
+        // Set up resource sharing client
+        val mockRsc = Mockito.mock(org.opensearch.security.spi.resources.client.ResourceSharingClient::class.java)
+        org.opensearch.alerting.ResourceSharingClientAccessor.setResourceSharingClient(mockRsc)
+
+        try {
+            // User with no backend roles - would normally fail validateUserBackendRoles
+            val settings = Settings.builder()
+                .put("plugins.alerting.filter_by_backend_roles", true)
+                .build()
+            val action = createAction(settings)
+
+            // Set user info with empty backend roles
+            threadContext.putTransient(
+                "opendistro_security_user_info",
+                "testuser||"
+            )
+
+            val future: CompletionStage<GetDataObjectResponse> =
+                CompletableFuture.completedFuture(GetDataObjectResponse.builder().id("test").source(null).build())
+            whenever(sdkClient.getDataObjectAsync(any(GetDataObjectRequest::class.java))).thenReturn(future)
+
+            val request = GetMonitorRequest("test-monitor-id", 0L, RestRequest.Method.GET, null)
+            @Suppress("UNCHECKED_CAST")
+            val listener = Mockito.mock(ActionListener::class.java) as ActionListener<GetMonitorResponse>
+
+            invokeDoExecute(action, request, listener)
+
+            // Should NOT fail with forbidden - it should proceed to SDK call
+            verify(sdkClient).getDataObjectAsync(any(GetDataObjectRequest::class.java))
+        } finally {
+            org.opensearch.alerting.ResourceSharingClientAccessor.clear()
+        }
+    }
+
     private fun invokeDoExecute(
         action: TransportGetMonitorAction,
         request: GetMonitorRequest,
