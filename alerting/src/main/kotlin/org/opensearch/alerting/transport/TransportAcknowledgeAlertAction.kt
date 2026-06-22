@@ -94,14 +94,15 @@ class TransportAcknowledgeAlertAction @Inject constructor(
 
         client.threadPool().threadContext.stashContext().use {
             scope.launch(TenantContext(tenantId)) {
-                val singleThreadContext = newSingleThreadContext("TransportAcknowledgeAlertAction")
-                withContext(singleThreadContext) {
-                    // in the case where filter by backend role is enabled, we need the user context
-                    // which is stashed via `stashContext()` above  to be restored here so that it will be
-                    // used in the get monitor request.
-                    it.restore()
-                    try {
-                        var getMonitorResponse: GetMonitorResponse =
+                try {
+                    val singleThreadContext = newSingleThreadContext("TransportAcknowledgeAlertAction")
+                    var getMonitorResponse: GetMonitorResponse? = null
+                    withContext(singleThreadContext) {
+                        // in the case where filter by backend role is enabled, we need the user context
+                        // which is stashed via `stashContext()` above  to be restored here so that it will be
+                        // used in the get monitor request.
+                        it.restore()
+                        getMonitorResponse =
                             transportGetMonitorAction.client.suspendUntil {
                                 val getMonitorRequest = GetMonitorRequest(
                                     monitorId = request.monitorId,
@@ -111,29 +112,27 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                                 )
                                 execute(AlertingActions.GET_MONITOR_ACTION_TYPE, getMonitorRequest, it)
                             }
-                        if (getMonitorResponse.monitor == null) {
-                            actionListener.onFailure(
-                                AlertingException.wrap(
-                                    ResourceNotFoundException(
-                                        String.format(
-                                            Locale.ROOT,
-                                            "No monitor found with id [%s]",
-                                            request.monitorId
-                                        )
+                    }
+                    if (getMonitorResponse == null || getMonitorResponse?.monitor == null) {
+                        actionListener.onFailure(
+                            AlertingException.wrap(
+                                ResourceNotFoundException(
+                                    String.format(
+                                        Locale.ROOT,
+                                        "No monitor found with id [%s]",
+                                        request.monitorId
                                     )
                                 )
                             )
-                        } else {
-                            // explicitly stash the context, including user information, since AcknowledgeHandler
-                            // should NOT act as the authenticated user, if any
-                            client.threadPool().threadContext.stashContext().use {
-                                AcknowledgeHandler(client, actionListener, request).start(getMonitorResponse.monitor!!)
-                            }
+                        )
+                    } else {
+                        getMonitorResponse?.let { getMonitorResponseSafe ->
+                            AcknowledgeHandler(client, actionListener, request).start(getMonitorResponseSafe.monitor!!)
                         }
-                    } catch (e: Exception) {
-                        log.error("Failed to launch acknowledge handler", e)
-                        actionListener.onFailure(e)
                     }
+                } catch (e: Exception) {
+                    log.error("Failed to launch acknowledge handler", e)
+                    actionListener.onFailure(e)
                 }
             }
         }
