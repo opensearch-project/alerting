@@ -336,6 +336,11 @@ class TransportDocLevelMonitorFanOutAction
                         )
                     }
                 } else if (monitor.shouldCreateSingleAlertForFindings == true) {
+                    // Load existing active/acknowledged alerts keyed by triggerId so we can reuse their
+                    // IDs and deduplicate across executions (same trigger → same alert ID → update in place).
+                    val existingAlertsByTriggerId = if (!isTempMonitor) {
+                        alertService.loadCurrentAlertsForSingleGroupedDocLevelMonitor(monitor, workflowRunContext)
+                    } else emptyMap()
                     monitor.triggers.forEach {
                         triggerResults[it.id] = runForEachDocTriggerCreateSingleGroupedAlert(
                             monitorResult,
@@ -344,7 +349,8 @@ class TransportDocLevelMonitorFanOutAction
                             queryToDocIds,
                             dryrun,
                             executionId,
-                            workflowRunContext
+                            workflowRunContext,
+                            existingAlertsByTriggerId[it.id]
                         )
                     }
                 }
@@ -401,24 +407,76 @@ class TransportDocLevelMonitorFanOutAction
         queryToDocIds: Map<DocLevelQuery, Set<String>>,
         dryrun: Boolean,
         executionId: String,
-        workflowRunContext: WorkflowRunContext?
+        workflowRunContext: WorkflowRunContext?,
+        existingAlert: Alert? = null
     ): DocumentLevelTriggerRunResult {
+        log.info(
+            "Monitor ${monitor.id} trigger [${trigger.name}]: queryToDocIds keys=[${queryToDocIds.keys.map { it.id }}] " +
+                "triggeredDocCounts=[${queryToDocIds.entries.map { "${it.key.id}:${it.value.size}" }}] " +
+                "workflowRunContext.findingIds=[${workflowRunContext?.findingIds}] " +
+                "matchingDocIdsPerIndex.keys=[${workflowRunContext?.matchingDocIdsPerIndex?.keys}]"
+        )
         val triggerResult = triggerService.runDocLevelTrigger(monitor, trigger, queryToDocIds)
+        log.info(
+            "Monitor ${monitor.id} trigger [${trigger.name}]: triggeredDocs.size=[${triggerResult.triggeredDocs.size}]"
+        )
         if (triggerResult.triggeredDocs.isNotEmpty()) {
-            val findingIds = if (workflowRunContext?.findingIds != null) {
-                workflowRunContext.findingIds
+            // Extract the ruleId deterministically from the trigger condition.
+            // convertToConditionForChainedFindings() always produces "(query[tag=<ruleId>])" so we
+            // can parse it reliably rather than scanning queryToDocIds which may have multiple
+            // non-empty entries when several rules fire in the same execution.
+            val conditionRuleId = Regex("query\\[tag=([^\\]]+)\\]")
+                .find(trigger.condition.idOrCode)?.groupValues?.get(1)
+            log.info(
+                "Monitor ${monitor.id} trigger [${trigger.name}]: condition=[${trigger.condition.idOrCode}] " +
+                    "conditionRuleId=[$conditionRuleId]"
+            )
+
+            // Look up only this trigger's finding ID from matchingDocIdsPerIndex["finding:<ruleId>"].
+            // Falls back to the full findingIds list if the per-rule key is absent (e.g. non-workflow run).
+            val findingIds: List<String> = if (conditionRuleId != null &&
+                workflowRunContext?.matchingDocIdsPerIndex != null
+            ) {
+                val perRuleFindingIds = workflowRunContext.matchingDocIdsPerIndex["finding:$conditionRuleId"]
+                log.info(
+                    "Monitor ${monitor.id} trigger [${trigger.name}]: " +
+                        "perRuleFindingIds=[$perRuleFindingIds] (key=finding:$conditionRuleId)"
+                )
+                perRuleFindingIds ?: (workflowRunContext.findingIds ?: listOf())
             } else {
-                listOf()
+                workflowRunContext?.findingIds ?: listOf()
             }
+            log.info(
+                "Monitor ${monitor.id} trigger [${trigger.name}]: final findingIds=[$findingIds]"
+            )
+
             val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger, clusterSettings = clusterService.clusterSettings)
-            val alert = alertService.composeDocLevelAlert(
-                findingIds!!,
+            val composedAlert = alertService.composeDocLevelAlert(
+                findingIds,
                 triggerResult.triggeredDocs,
                 triggerCtx,
                 monitorResult.alertError() ?: triggerResult.alertError(),
                 executionId = executionId,
                 workflorwRunContext = workflowRunContext
             )
+            // When an existing ACTIVE alert is found for this trigger, merge it with the newly
+            // composed alert so that:
+            //   • startTime is preserved from the first detection
+            //   • finding_ids and related_doc_ids accumulate across runs
+            //   • id is reused so saveAlerts updates in-place (deduplication)
+            // ACKNOWLEDGED alerts are intentionally excluded: the acknowledge action moves them to
+            // the history index and deletes them from the active index, so a new ACTIVE alert is
+            // the correct response when the trigger fires again after acknowledgement.
+            val alert = if (existingAlert != null && existingAlert.state == Alert.State.ACTIVE) {
+                val mergedFindingIds = (existingAlert.findingIds + composedAlert.findingIds).distinct()
+                val mergedRelatedDocIds = (existingAlert.relatedDocIds + composedAlert.relatedDocIds).distinct()
+                composedAlert.copy(
+                    id = existingAlert.id,
+                    startTime = existingAlert.startTime,
+                    findingIds = mergedFindingIds,
+                    relatedDocIds = mergedRelatedDocIds
+                )
+            } else composedAlert
             for (action in trigger.actions) {
                 this.runAction(action, triggerCtx.copy(alerts = listOf(AlertContext(alert))), monitor, dryrun)
             }

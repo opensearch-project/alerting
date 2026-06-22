@@ -92,8 +92,19 @@ class WorkflowService(
                 val ruleId = monitorIdToRuleId[finding.monitorId]
                 if (ruleId != null) {
                     indexToRelatedDocIdsMap.getOrPut(ruleId) { mutableListOf() }.addAll(finding.relatedDocIds)
+                    // Store finding ID under "finding:<ruleId>" so the chained findings monitor
+                    // can look up the per-rule finding ID deterministically via the trigger condition.
+                    indexToRelatedDocIdsMap.getOrPut("finding:$ruleId") { mutableListOf() }.add(finding.id)
                 }
+                log.info(
+                    "WorkflowService: finding [${finding.id}] monitorId=[${finding.monitorId}] " +
+                        "ruleId=[$ruleId] relatedDocIds.size=[${finding.relatedDocIds.size}]"
+                )
             }
+            log.info(
+                "WorkflowService: matchingDocIdsPerIndex keys=[${indexToRelatedDocIdsMap.keys}] " +
+                    "findingIds=[${findings.map { it.id }}]"
+            )
             return Pair(indexToRelatedDocIdsMap, findings.map { it.id })
         } catch (t: Exception) {
             log.error("Error getting finding doc ids: ${t.message}", t)
