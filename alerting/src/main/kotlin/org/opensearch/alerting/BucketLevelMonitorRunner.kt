@@ -200,7 +200,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             executionId
                         )
                     } else {
-                        emptyList()
+                        emptyMap()
                     }
                 // TODO: Should triggerResult's aggregationResultBucket be a list? If not, getCategorizedAlertsForBucketLevelMonitor can
                 //  be refactored to use a map instead
@@ -453,7 +453,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         periodEnd: Instant,
         shouldCreateFinding: Boolean,
         executionId: String,
-    ): List<String> {
+    ): Map<String, List<String>> {
         monitor.inputs.forEach { input ->
             if (input is SearchInput) {
                 val bucketValues: Set<String> = triggerResult.aggregationResultBuckets.keys
@@ -468,7 +468,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             for (source in sources) {
                                 if (groupByFields > 0) {
                                     logger.error("grouByFields > 0. not generating findings for bucket level monitor ${monitor.id}")
-                                    return listOf()
+                                    return emptyMap()
                                 }
                                 groupByFields++
                                 fieldName = source.field()
@@ -481,7 +481,7 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                             logger.error(
                                 "Bucket level monitor findings supported only for composite and term aggs. Found [{${aggFactory.type}}]"
                             )
-                            return listOf()
+                            return emptyMap()
                         }
                     }
                 }
@@ -490,29 +490,39 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         "period_start" to periodStart.toEpochMilli(),
                         "period_end" to periodEnd.toEpochMilli()
                     )
-                    val searchSource = monitorCtx.mustacheTemplateService!!.renderTemplate(
-                        query.toString(), searchParams
-                    )
-                    val sr = SearchRequest(*input.indices.toTypedArray())
-                    XContentType.JSON.xContent().createParser(monitorCtx.xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource)
-                        .use {
+                    // Run one search per bucket value so each bucket gets its own finding
+                    // containing only the documents that belong to that specific bucket key.
+                    val bucketToFindingIds = mutableMapOf<String, List<String>>()
+                    for (bucketValue in bucketValues) {
+                        val searchSource = monitorCtx.mustacheTemplateService!!.renderTemplate(
+                            query.toString(), searchParams
+                        )
+                        val sr = SearchRequest(*input.indices.toTypedArray())
+                        XContentType.JSON.xContent().createParser(
+                            monitorCtx.xContentRegistry, LoggingDeprecationHandler.INSTANCE, searchSource
+                        ).use {
                             val source = SearchSourceBuilder.fromXContent(it)
                             val queryBuilder = if (input.query.query() == null) BoolQueryBuilder()
                             else QueryBuilders.boolQuery().must(source.query())
-                            queryBuilder.filter(QueryBuilders.termsQuery(fieldName, bucketValues))
+                            queryBuilder.filter(QueryBuilders.termQuery(fieldName, bucketValue))
                             sr.source().query(queryBuilder).size(MAX_SEARCH_SIZE).sort("_seq_no", SortOrder.DESC)
                         }
-                    sr.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
-                        getCancelAfterTimeInterval()
-                    )
-                    val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
-                    return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, executionId)
+                        sr.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
+                            getCancelAfterTimeInterval()
+                        )
+                        val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
+                        val findingIds = createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, executionId)
+                        if (findingIds.isNotEmpty()) {
+                            bucketToFindingIds[bucketValue] = findingIds
+                        }
+                    }
+                    return bucketToFindingIds
                 } else {
                     logger.error("Couldn't resolve groupBy field. Not generating bucket level monitor findings for monitor %${monitor.id}")
                 }
             }
         }
-        return listOf()
+        return emptyMap()
     }
 
     private suspend fun createFindingPerIndex(
