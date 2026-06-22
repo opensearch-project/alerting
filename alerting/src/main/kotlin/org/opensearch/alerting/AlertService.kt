@@ -106,6 +106,28 @@ class AlertService(
         }
     }
 
+    /**
+     * Loads existing ACTIVE/ACKNOWLEDGED alerts for a shouldCreateSingleAlertForFindings doc-level monitor
+     * (i.e. the chained findings monitor). Returns a map of triggerId → Alert so callers can reuse the
+     * existing alert ID and avoid creating a duplicate alert on every execution.
+     */
+    suspend fun loadCurrentAlertsForSingleGroupedDocLevelMonitor(
+        monitor: Monitor,
+        workflowRunContext: WorkflowRunContext?
+    ): Map<String, Alert> {
+        if (monitor.id.isBlank()) return emptyMap()
+        val searchAlertsResponse: SearchResponse = searchAlerts(
+            monitor = monitor,
+            size = monitor.triggers.size * 2,
+            workflowRunContext = workflowRunContext
+        )
+        val foundAlerts = searchAlertsResponse.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
+        foundAlerts.groupBy { it.triggerId }.values.forEach { alerts ->
+            if (alerts.size > 1) logger.warn("Found multiple active alerts for same trigger on chained findings monitor: $alerts")
+        }
+        return foundAlerts.associateBy { it.triggerId }
+    }
+
     suspend fun loadCurrentAlertsForQueryLevelMonitor(monitor: Monitor, workflowRunContext: WorkflowRunContext?): Map<Trigger, Alert?> {
         // Return early for dry-run
         if (monitor.id.isBlank()) {
