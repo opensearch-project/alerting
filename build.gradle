@@ -8,26 +8,25 @@ buildscript {
 
     ext {
         opensearch_version = System.getProperty("opensearch.version", "3.7.0-SNAPSHOT")
-        plugin_build = opensearch_version
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         // 3.0.0-SNAPSHOT -> 3.0.0.0-SNAPSHOT
         version_tokens = opensearch_version.tokenize('-')
         opensearch_build = version_tokens[0] + '.0'
         plugin_no_snapshot = opensearch_build
+        plugin_build = opensearch_build
         if (buildVersionQualifier) {
             // opensearch_build += "-${buildVersionQualifier}"
             plugin_no_snapshot += "-${buildVersionQualifier}"
+            plugin_build += "-${buildVersionQualifier}"
         }
         if (isSnapshot) {
             opensearch_build += "-SNAPSHOT"
+            plugin_build += "-SNAPSHOT"
         }
         opensearch_no_snapshot = opensearch_version.replace("-SNAPSHOT","")
         common_utils_version = System.getProperty("common_utils.version", opensearch_no_snapshot + ".0")
         kotlin_version = '2.2.0'
-        if (buildVersionQualifier) {
-            plugin_build += "-${buildVersionQualifier}"
-        }
     }
 
     repositories {
