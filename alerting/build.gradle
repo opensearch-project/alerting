@@ -50,6 +50,8 @@ ext {
     }
 }
 
+version = "${plugin_build}"
+
 opensearchplugin {
     name 'opensearch-alerting'
     description 'Amazon OpenSearch alerting plugin'
