@@ -467,7 +467,9 @@ class TransportDocLevelMonitorFanOutAction
             // ACKNOWLEDGED alerts are intentionally excluded: the acknowledge action moves them to
             // the history index and deletes them from the active index, so a new ACTIVE alert is
             // the correct response when the trigger fires again after acknowledgement.
-            val alert = if (existingAlert != null && existingAlert.state == Alert.State.ACTIVE) {
+            val alert = if (existingAlert != null &&
+                (existingAlert.state == Alert.State.ACTIVE || existingAlert.state == Alert.State.ACKNOWLEDGED)
+            ) {
                 val mergedFindingIds = (existingAlert.findingIds + composedAlert.findingIds).distinct()
                 val mergedRelatedDocIds = (existingAlert.relatedDocIds + composedAlert.relatedDocIds).distinct()
                 composedAlert.copy(
@@ -493,9 +495,32 @@ class TransportDocLevelMonitorFanOutAction
                         monitor.dataSources,
                         listOf(updatedAlert),
                         it,
+                        allowUpdatingAcknowledgedAlert = existingAlert?.state == Alert.State.ACKNOWLEDGED,
                         routingId = monitor.id
                     )
                 }
+            }
+        } else if (!dryrun && monitor.id != Monitor.NO_ID && existingAlert != null &&
+            (existingAlert.state == Alert.State.ACTIVE || existingAlert.state == Alert.State.ACKNOWLEDGED)
+        ) {
+            // Trigger no longer fires but an open alert exists — complete it.
+            // This mirrors the bucket-level monitor's convertToCompletedAlerts logic and
+            // is correct for shouldCreateSingleAlertForFindings alerts because the flag's
+            // design intent is "one alert representing an ongoing condition." When the
+            // condition clears, the alert should close automatically, not linger forever.
+            val completedAlert = existingAlert.copy(
+                state = Alert.State.COMPLETED,
+                endTime = Instant.now(),
+                errorMessage = null
+            )
+            retryPolicy.let {
+                alertService.saveAlerts(
+                    monitor.dataSources,
+                    listOf(completedAlert),
+                    it,
+                    allowUpdatingAcknowledgedAlert = existingAlert.state == Alert.State.ACKNOWLEDGED,
+                    routingId = monitor.id
+                )
             }
         }
         return DocumentLevelTriggerRunResult(trigger.name, listOf(), monitorResult.error)
