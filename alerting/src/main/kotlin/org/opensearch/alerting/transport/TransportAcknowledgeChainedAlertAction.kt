@@ -205,23 +205,38 @@ class TransportAcknowledgeChainedAlertAction @Inject constructor(
                 alerts[alert.id] = alert
 
                 if (alert.state == Alert.State.ACTIVE) {
-                    // For shouldCreateSingleAlertForFindings alerts (findingIds non-empty), always
-                    // update in-place rather than copying to history. The flag's design intent is
-                    // "one persistent alert accumulating multiple findings" — moving it to history
-                    // on ACK would cause the next execution to create a new alert, defeating the
-                    // single-alert contract. ACKNOWLEDGED means "in progress", not "resolved".
-                    // Use the chained findings monitor ID as routing to match how saveAlerts stored it.
-                    val updateRequest = UpdateRequest(dataSources.alertsIndex, alert.id)
-                        .routing(alert.monitorId)
-                        .setIfSeqNo(hit.seqNo)
-                        .setIfPrimaryTerm(hit.primaryTerm)
-                        .doc(
-                            XContentFactory.jsonBuilder().startObject()
-                                .field(Alert.STATE_FIELD, Alert.State.ACKNOWLEDGED.toString())
-                                .optionalTimeField(Alert.ACKNOWLEDGED_TIME_FIELD, Instant.now())
-                                .endObject()
-                        )
-                    updateRequests.add(updateRequest)
+                    // shouldCreateSingleAlertForFindings alerts are identified by having both a
+                    // non-empty workflowId and non-empty findingIds. For these alerts ACK means
+                    // "in progress" — keep the document in the active index so the next execution
+                    // can continue appending findings to the same alert. For all other alerts the
+                    // existing copy-to-history semantics are preserved.
+                    val isPersistentWorkflowAlert = alert.workflowId.isNotEmpty() && alert.findingIds.isNotEmpty()
+                    if (
+                        alert.findingIds.isEmpty() ||
+                        !isAlertHistoryEnabled ||
+                        isPersistentWorkflowAlert
+                    ) {
+                        val updateRequest = UpdateRequest(dataSources.alertsIndex, alert.id)
+                            .routing(alert.monitorId)
+                            .setIfSeqNo(hit.seqNo)
+                            .setIfPrimaryTerm(hit.primaryTerm)
+                            .doc(
+                                XContentFactory.jsonBuilder().startObject()
+                                    .field(Alert.STATE_FIELD, Alert.State.ACKNOWLEDGED.toString())
+                                    .optionalTimeField(Alert.ACKNOWLEDGED_TIME_FIELD, Instant.now())
+                                    .endObject()
+                            )
+                        updateRequests.add(updateRequest)
+                    } else {
+                        val copyRequest = IndexRequest(alertsHistoryIndex)
+                            .routing(request.workflowId)
+                            .id(alert.id)
+                            .source(
+                                alert.copy(state = Alert.State.ACKNOWLEDGED, acknowledgedTime = Instant.now())
+                                    .toXContentWithUser(XContentFactory.jsonBuilder())
+                            )
+                        copyRequests.add(copyRequest)
+                    }
                 }
             }
 

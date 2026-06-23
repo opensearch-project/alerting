@@ -166,9 +166,18 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                 alerts[alert.id] = alert
 
                 if (alert.state == Alert.State.ACTIVE) {
+                    // shouldCreateSingleAlertForFindings alerts are identified by having both a
+                    // non-empty workflowId (they only exist inside a workflow execution) and
+                    // non-empty findingIds (they accumulate findings across runs). For these alerts
+                    // ACK means "in progress" — keep the document in the active index so the next
+                    // execution can continue appending findings to the same alert. For all other
+                    // alerts (per-event doc-level, bucket-level) the existing copy-to-history
+                    // semantics are preserved: ACK means "reviewed and resolved".
+                    val isPersistentWorkflowAlert = alert.workflowId.isNotEmpty() && alert.findingIds.isNotEmpty()
                     if (
                         alert.findingIds.isEmpty() ||
-                        !isAlertHistoryEnabled
+                        !isAlertHistoryEnabled ||
+                        isPersistentWorkflowAlert
                     ) {
                         updateRequests.add(
                             UpdateDataObjectRequest.builder()
