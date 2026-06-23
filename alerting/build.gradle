@@ -117,7 +117,6 @@ configurations.all {
         // This is required because kotlin-coroutines-core 1.1.1 still requires kotlin stdlib 1.3.20 and we're using a higher kotlin version
         force "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
         force "org.jetbrains.kotlin:kotlin-stdlib-common:${kotlin_version}"
-        force "io.projectreactor:reactor-core:3.8.6"
     }
 }
 
@@ -184,14 +183,14 @@ def bwcPluginVersion = bwcVersion + "-SNAPSHOT"
 
 dependencies {
     // Needed for integ tests
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-notifications-core', version: "${upstream_build}"
-    zipArchive group: 'org.opensearch.plugin', name:'notifications', version: "${upstream_build}"
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${upstream_build}"
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${upstream_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-notifications-core', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'notifications', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${opensearch_build}"
 
     // Needed for security tests
     if (securityEnabled) {
-        opensearchPlugin "org.opensearch.plugin:opensearch-security:${upstream_build}@zip"
+        opensearchPlugin "org.opensearch.plugin:opensearch-security:${opensearch_build}@zip"
     }
 
     // Needed for BWC tests
@@ -214,7 +213,7 @@ dependencies {
     implementation "com.github.spullara.mustache.java:compiler:0.9.14"
     implementation project(path: ":alerting-spi", configuration: 'shadow')
 
-    implementation "org.opensearch:opensearch-remote-metadata-sdk:${upstream_build}"
+    implementation "org.opensearch:opensearch-remote-metadata-sdk:${opensearch_build}"
 
     implementation(platform("software.amazon.awssdk:bom:${versions.aws}"))
     implementation "software.amazon.awssdk:sqs:${versions.aws}"

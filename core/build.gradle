@@ -22,10 +22,10 @@ def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
 
 task addJarsToClasspath(type: Copy) {
     from(fileTree(dir: sqlJarDirectory)) {
-        include "opensearch-sql-${upstream_build}.jar"
-        include "ppl-${upstream_build}.jar"
-        include "protocol-${upstream_build}.jar"
-        include "core-${upstream_build}.jar"
+        include "opensearch-sql-${opensearch_build}.jar"
+        include "ppl-${opensearch_build}.jar"
+        include "protocol-${opensearch_build}.jar"
+        include "core-${opensearch_build}.jar"
     }
     into("$buildDir/classes")
 }
@@ -41,9 +41,9 @@ dependencies {
     implementation 'commons-validator:commons-validator:1.7'
     implementation 'org.json:json:20240303'
 
-    api fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-thin-${upstream_build}.jar", "ppl-${upstream_build}.jar", "protocol-${upstream_build}.jar", "core-${upstream_build}.jar"])
+    api fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-thin-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar", "core-${opensearch_build}.jar"])
 
-    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${upstream_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${opensearch_build}"
 
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
@@ -57,17 +57,17 @@ task extractSqlJar(type: Copy) {
 }
 
 task extractSqlClass(type: Copy, dependsOn: [extractSqlJar]) {
-    from zipTree("${sqlJarDirectory}/opensearch-sql-${upstream_build}.jar")
+    from zipTree("${sqlJarDirectory}/opensearch-sql-${opensearch_build}.jar")
     into("$buildDir/opensearch-sql")
     include 'org/opensearch/sql/**'
 }
 
 task replaceSqlJar(type: Jar, dependsOn: [extractSqlClass]) {
     from("$buildDir/opensearch-sql")
-    archiveFileName = "opensearch-sql-thin-${upstream_build}.jar"
+    archiveFileName = "opensearch-sql-thin-${opensearch_build}.jar"
     destinationDirectory = file(sqlJarDirectory)
     doLast {
-        file("${sqlJarDirectory}/opensearch-sql-${upstream_build}.jar").delete()
+        file("${sqlJarDirectory}/opensearch-sql-${opensearch_build}.jar").delete()
     }
 }
 
