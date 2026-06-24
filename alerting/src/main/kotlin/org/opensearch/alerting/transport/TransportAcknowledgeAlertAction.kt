@@ -8,8 +8,6 @@ package org.opensearch.alerting.transport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.newSingleThreadContext
-import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ResourceNotFoundException
 import org.opensearch.action.ActionRequest
@@ -17,7 +15,6 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.await
 import org.opensearch.alerting.util.use
@@ -30,13 +27,13 @@ import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
 import org.opensearch.commons.alerting.action.AcknowledgeAlertResponse
 import org.opensearch.commons.alerting.action.AlertingActions
-import org.opensearch.commons.alerting.action.GetMonitorRequest
-import org.opensearch.commons.alerting.action.GetMonitorResponse
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.alerting.util.optionalTimeField
 import org.opensearch.commons.utils.TenantContext
+import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
@@ -47,13 +44,12 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.remote.metadata.client.BulkDataObjectRequest
 import org.opensearch.remote.metadata.client.BulkDataObjectResponse
 import org.opensearch.remote.metadata.client.DeleteDataObjectRequest
+import org.opensearch.remote.metadata.client.GetDataObjectRequest
 import org.opensearch.remote.metadata.client.PutDataObjectRequest
 import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.remote.metadata.client.SearchDataObjectRequest
 import org.opensearch.remote.metadata.client.UpdateDataObjectRequest
-import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
-import org.opensearch.search.fetch.subphase.FetchSourceContext
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
@@ -74,13 +70,18 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     val sdkClient: SdkClient
 ) : HandledTransportAction<ActionRequest, AcknowledgeAlertResponse>(
     AlertingActions.ACKNOWLEDGE_ALERTS_ACTION_NAME, transportService, actionFilters, ::AcknowledgeAlertRequest
-) {
+),
+    SecureTransportAction {
+
+    @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile override var filterByAccessStrategy = AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.get(settings)
 
     @Volatile
     private var isAlertHistoryEnabled = AlertingSettings.ALERT_HISTORY_ENABLED.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_HISTORY_ENABLED) { isAlertHistoryEnabled = it }
+        listenFilterBySettingChange(clusterService)
     }
 
     override fun doExecute(
@@ -90,30 +91,18 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     ) {
         val request = acknowledgeAlertRequest as? AcknowledgeAlertRequest
             ?: recreateObject(acknowledgeAlertRequest) { AcknowledgeAlertRequest(it) }
-        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        val user = readUserFromThreadContext(client)
 
+        if (!validateUserBackendRoles(user, actionListener)) {
+            return
+        }
+
+        val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         client.threadPool().threadContext.stashContext().use {
             scope.launch(TenantContext(tenantId)) {
                 try {
-                    val singleThreadContext = newSingleThreadContext("TransportAcknowledgeAlertAction")
-                    var getMonitorResponse: GetMonitorResponse? = null
-                    withContext(singleThreadContext) {
-                        // in the case where filter by backend role is enabled, we need the user context
-                        // which is stashed via `stashContext()` above  to be restored here so that it will be
-                        // used in the get monitor request.
-                        it.restore()
-                        getMonitorResponse =
-                            transportGetMonitorAction.client.suspendUntil {
-                                val getMonitorRequest = GetMonitorRequest(
-                                    monitorId = request.monitorId,
-                                    -3L,
-                                    RestRequest.Method.GET,
-                                    FetchSourceContext.FETCH_SOURCE
-                                )
-                                execute(AlertingActions.GET_MONITOR_ACTION_TYPE, getMonitorRequest, it)
-                            }
-                    }
-                    if (getMonitorResponse == null || getMonitorResponse?.monitor == null) {
+                    val monitor = getMonitor(request.monitorId)
+                    if (monitor == null) {
                         actionListener.onFailure(
                             AlertingException.wrap(
                                 ResourceNotFoundException(
@@ -125,10 +114,14 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                                 )
                             )
                         )
-                    } else {
-                        getMonitorResponse?.let { getMonitorResponseSafe ->
-                            AcknowledgeHandler(client, actionListener, request).start(getMonitorResponseSafe.monitor!!)
-                        }
+                        return@launch
+                    }
+
+                    val canAccess = user == null || !doFilterForUser(user) ||
+                        checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", request.monitorId)
+
+                    if (canAccess) {
+                        AcknowledgeHandler(client, actionListener, request).start(monitor)
                     }
                 } catch (e: Exception) {
                     log.error("Failed to launch acknowledge handler", e)
@@ -136,6 +129,25 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                 }
             }
         }
+    }
+
+    private suspend fun getMonitor(monitorId: String): Monitor? {
+        val tenantId = currentTenantId()
+        val getRequest = GetDataObjectRequest.builder()
+            .index(ScheduledJob.SCHEDULED_JOBS_INDEX)
+            .id(monitorId)
+            .tenantId(tenantId)
+            .build()
+        val response = sdkClient.getDataObject(getRequest)
+        val getResponse = response.getResponse()
+        if (getResponse == null || !getResponse.isExists) {
+            return null
+        }
+        val xcp = XContentHelper.createParser(
+            xContentRegistry, LoggingDeprecationHandler.INSTANCE,
+            getResponse.sourceAsBytesRef, XContentType.JSON
+        )
+        return ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
     }
 
     inner class AcknowledgeHandler(
