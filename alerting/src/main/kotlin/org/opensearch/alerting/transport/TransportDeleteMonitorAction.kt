@@ -68,6 +68,7 @@ class TransportDeleteMonitorAction @Inject constructor(
     @Volatile private var externalSchedulerAccountId = AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID.get(settings)
     @Volatile private var externalSchedulerRoleName = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(settings)
     @Volatile override var filterByAccessStrategy = AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.get(settings)
+    @Volatile private var allowedSchedulerAccountIds = AlertingSettings.EXTERNAL_SCHEDULER_ALLOWED_ACCOUNT_IDS.get(settings)
 
     init {
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED) {
@@ -78,6 +79,9 @@ class TransportDeleteMonitorAction @Inject constructor(
         }
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME) {
             externalSchedulerRoleName = it
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ALLOWED_ACCOUNT_IDS) {
+            allowedSchedulerAccountIds = it
         }
         listenFilterBySettingChange(clusterService)
     }
@@ -177,7 +181,8 @@ class TransportDeleteMonitorAction @Inject constructor(
             val routing = SchedulerRoutingResolver.resolveForDelete(
                 settingsAccountId = externalSchedulerAccountId,
                 settingsRoleName = externalSchedulerRoleName,
-                threadContextAccountIdOverride = accountIdOverride
+                threadContextAccountIdOverride = accountIdOverride,
+                allowedAccountIds = allowedSchedulerAccountIds
             )
             ExternalSchedulerService.deleteSchedule(monitor.id, routing)
         }

@@ -6,6 +6,7 @@
 package org.opensearch.alerting.service
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.fail
 import org.junit.Test
 
 class SchedulerRoutingResolverTests {
@@ -95,5 +96,44 @@ class SchedulerRoutingResolverTests {
     @Test fun `resolveForDelete does not require queueName`() {
         val r = SchedulerRoutingResolver.resolveForDelete(acct, roleName, threadContextAccountIdOverride = null)
         assertEquals(acct, r.accountId)
+    }
+
+    // ---------- allow-list validation ----------
+
+    @Test fun `resolve succeeds when accountId is in allow-list`() {
+        val allowList = listOf(acct, override)
+        val r = SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = null, allowedAccountIds = allowList)
+        assertEquals(acct, r.accountId)
+    }
+
+    @Test fun `resolve succeeds when override is in allow-list`() {
+        val allowList = listOf(acct, override)
+        val r = SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = override, allowedAccountIds = allowList)
+        assertEquals(override, r.accountId)
+    }
+
+    @Test fun `resolve rejects override not in allow-list`() {
+        val allowList = listOf(acct)
+        try {
+            SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = override, allowedAccountIds = allowList)
+            fail("Expected IllegalArgumentException")
+        } catch (e: IllegalArgumentException) {
+            assert(e.message!!.contains("not in the allowed account list"))
+        }
+    }
+
+    @Test fun `resolve skips allow-list validation when list is empty`() {
+        val r = SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = override, allowedAccountIds = emptyList())
+        assertEquals(override, r.accountId)
+    }
+
+    @Test fun `resolveForDelete rejects accountId not in allow-list`() {
+        val allowList = listOf(acct)
+        try {
+            SchedulerRoutingResolver.resolveForDelete(acct, roleName, threadContextAccountIdOverride = override, allowedAccountIds = allowList)
+            fail("Expected IllegalArgumentException")
+        } catch (e: IllegalArgumentException) {
+            assert(e.message!!.contains("not in the allowed account list"))
+        }
     }
 }

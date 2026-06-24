@@ -475,6 +475,20 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        /** External ID passed in the cross-account AssumeRole call to prevent confused-deputy attacks. Must match the condition in the target role's trust policy. */
+        val EXTERNAL_SCHEDULER_EXTERNAL_ID = Setting.simpleString(
+            "plugins.alerting.external_scheduler.external_id",
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
+        /** Comma-separated allow-list of AWS account IDs that the external scheduler may route to. ThreadContext overrides are validated against this list. */
+        val EXTERNAL_SCHEDULER_ALLOWED_ACCOUNT_IDS: Setting<List<String>> = Setting.listSetting(
+            "plugins.alerting.external_scheduler.allowed_account_ids",
+            listOf(),
+            Function.identity(),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         /** AWS account ID that hosts the job queues available for polling. */
         val JOB_QUEUE_ACCOUNT_ID = Setting.simpleString(
             "plugins.alerting.external_scheduler.job_queue_account_id",

@@ -159,6 +159,7 @@ class TransportIndexMonitorAction @Inject constructor(
     @Volatile private var externalSchedulerRoleName = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(settings)
     @Volatile private var externalSchedulerExecutionRoleName = AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME.get(settings)
     @Volatile override var filterByAccessStrategy = AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.get(settings)
+    @Volatile private var allowedSchedulerAccountIds = AlertingSettings.EXTERNAL_SCHEDULER_ALLOWED_ACCOUNT_IDS.get(settings)
 
     private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
 
@@ -197,6 +198,9 @@ class TransportIndexMonitorAction @Inject constructor(
         }
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME) {
             externalSchedulerExecutionRoleName = it
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ALLOWED_ACCOUNT_IDS) {
+            allowedSchedulerAccountIds = it
         }
 
         listenFilterBySettingChange(clusterService)
@@ -1291,7 +1295,8 @@ class TransportIndexMonitorAction @Inject constructor(
             settingsQueueName = jobQueueName,
             settingsRoleName = externalSchedulerRoleName,
             settingsExecutionRoleName = externalSchedulerExecutionRoleName,
-            threadContextAccountIdOverride = accountIdOverride
+            threadContextAccountIdOverride = accountIdOverride,
+            allowedAccountIds = allowedSchedulerAccountIds
         )
     }
 }

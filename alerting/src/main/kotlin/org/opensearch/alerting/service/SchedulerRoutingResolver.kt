@@ -23,9 +23,10 @@ object SchedulerRoutingResolver {
         settingsQueueName: String,
         settingsRoleName: String,
         settingsExecutionRoleName: String? = null,
-        threadContextAccountIdOverride: String?
+        threadContextAccountIdOverride: String?,
+        allowedAccountIds: List<String> = emptyList()
     ): Routing {
-        val accountId = pickAccountId(settingsAccountId, threadContextAccountIdOverride)
+        val accountId = pickAccountId(settingsAccountId, threadContextAccountIdOverride, allowedAccountIds)
             ?: error("External scheduler account ID is not configured and no override was provided")
         val queueName = settingsQueueName.takeIf { it.isNotBlank() }
             ?: error("External scheduler queue name is not configured")
@@ -40,19 +41,25 @@ object SchedulerRoutingResolver {
     fun resolveForDelete(
         settingsAccountId: String,
         settingsRoleName: String,
-        threadContextAccountIdOverride: String?
+        threadContextAccountIdOverride: String?,
+        allowedAccountIds: List<String> = emptyList()
     ): Routing {
-        val accountId = pickAccountId(settingsAccountId, threadContextAccountIdOverride)
+        val accountId = pickAccountId(settingsAccountId, threadContextAccountIdOverride, allowedAccountIds)
             ?: error("External scheduler account ID is not configured and no override was provided")
         val roleName = settingsRoleName.takeIf { it.isNotBlank() }
             ?: error("External scheduler role name is not configured")
         return Routing(accountId, "", buildRoleArn(accountId, roleName), "")
     }
 
-    /** ThreadContext override wins; falls back to plugin setting; null if both are blank. */
-    private fun pickAccountId(settingValue: String, override: String?): String? {
-        if (!override.isNullOrBlank()) return override
-        return settingValue.takeIf { it.isNotBlank() }
+    /** ThreadContext override wins; falls back to plugin setting; null if both are blank. Validates against allow-list. */
+    private fun pickAccountId(settingValue: String, override: String?, allowedAccountIds: List<String>): String? {
+        val accountId = if (!override.isNullOrBlank()) override else settingValue.takeIf { it.isNotBlank() }
+        if (accountId != null && allowedAccountIds.isNotEmpty()) {
+            require(accountId in allowedAccountIds) {
+                "Account ID $accountId is not in the allowed account list for external scheduler routing"
+            }
+        }
+        return accountId
     }
 
     /** Constructs an IAM role ARN from account ID and role name. */

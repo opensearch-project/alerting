@@ -409,10 +409,12 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         if (AlertingSettings.EXTERNAL_SCHEDULER_ENABLED.get(settings)) {
             val region = REMOTE_METADATA_REGION.get(settings)
             val roleName = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(settings)
-            if (!region.isNullOrBlank() && roleName.isNotBlank()) {
+            val externalId = AlertingSettings.EXTERNAL_SCHEDULER_EXTERNAL_ID.get(settings)
+            if (!region.isNullOrBlank() && roleName.isNotBlank() && !externalId.isNullOrBlank()) {
                 ExternalSchedulerService.credentialsCache = AssumeRoleCredentialsCache(
                     region,
-                    "arn:aws:iam::%s:role/$roleName"
+                    "arn:aws:iam::%s:role/$roleName",
+                    externalId
                 )
             }
         }
@@ -546,6 +548,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.JOB_QUEUE_MESSAGE_GROUP_KEY_NAME,
             AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME,
             AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME,
+            AlertingSettings.EXTERNAL_SCHEDULER_EXTERNAL_ID,
+            AlertingSettings.EXTERNAL_SCHEDULER_ALLOWED_ACCOUNT_IDS,
             AlertingSettings.JOB_QUEUE_ACCOUNT_ID,
             AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE,
             AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME,
