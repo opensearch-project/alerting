@@ -124,7 +124,11 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                         AcknowledgeHandler(client, actionListener, request).start(monitor)
                     } else {
                         actionListener.onFailure(
-                            AlertingException("Not allowed to acknowledge alerts for this monitor", RestStatus.FORBIDDEN, IllegalStateException())
+                            AlertingException(
+                                "Not allowed to acknowledge alerts for this monitor",
+                                RestStatus.FORBIDDEN,
+                                IllegalStateException()
+                            )
                         )
                     }
                 } catch (e: Exception) {
