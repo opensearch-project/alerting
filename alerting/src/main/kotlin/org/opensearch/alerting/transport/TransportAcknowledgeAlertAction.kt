@@ -36,6 +36,7 @@ import org.opensearch.commons.utils.TenantContext
 import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
+import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContentObject
 import org.opensearch.core.xcontent.XContentParser
