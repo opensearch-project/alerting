@@ -51,15 +51,18 @@ object SchedulerRoutingResolver {
         return Routing(accountId, "", buildRoleArn(accountId, roleName), "")
     }
 
-    /** ThreadContext override wins; falls back to plugin setting; null if both are blank. Validates against allow-list. */
+    /** ThreadContext override wins; falls back to plugin setting; null if both are blank. Validates overrides against allow-list (fail-closed). */
     private fun pickAccountId(settingValue: String, override: String?, allowedAccountIds: List<String>): String? {
-        val accountId = if (!override.isNullOrBlank()) override else settingValue.takeIf { it.isNotBlank() }
-        if (accountId != null && allowedAccountIds.isNotEmpty()) {
-            require(accountId in allowedAccountIds) {
-                "Account ID $accountId is not in the allowed account list for external scheduler routing"
+        if (!override.isNullOrBlank()) {
+            require(allowedAccountIds.isNotEmpty()) {
+                "Rejected scheduler account override '$override': allowed_account_ids is not configured"
             }
+            require(override in allowedAccountIds) {
+                "Rejected scheduler account override '$override': not in allowed_account_ids"
+            }
+            return override
         }
-        return accountId
+        return settingValue.takeIf { it.isNotBlank() }
     }
 
     /** Constructs an IAM role ARN from account ID and role name. */

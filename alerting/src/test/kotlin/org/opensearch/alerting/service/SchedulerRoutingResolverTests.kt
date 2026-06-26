@@ -16,6 +16,7 @@ class SchedulerRoutingResolverTests {
     private val queue = "my-queue"
     private val roleName = "eb-role"
     private val execRoleName = "eb-exec-role"
+    private val allowList = listOf(acct, override)
 
     // ---------- resolve() — create/update path ----------
 
@@ -28,7 +29,7 @@ class SchedulerRoutingResolverTests {
     }
 
     @Test fun `resolve applies ThreadContext override for accountId and constructs ARN with override`() {
-        val r = SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = override)
+        val r = SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = override, allowedAccountIds = allowList)
         assertEquals(override, r.accountId)
         assertEquals("arn:aws:iam::$override:role/$roleName", r.roleArn)
         assertEquals("arn:aws:iam::$override:role/$execRoleName", r.executionRoleArn)
@@ -45,7 +46,7 @@ class SchedulerRoutingResolverTests {
     }
 
     @Test fun `resolve still succeeds when setting blank but override provided`() {
-        val r = SchedulerRoutingResolver.resolve("", queue, roleName, execRoleName, threadContextAccountIdOverride = override)
+        val r = SchedulerRoutingResolver.resolve("", queue, roleName, execRoleName, threadContextAccountIdOverride = override, allowedAccountIds = allowList)
         assertEquals(override, r.accountId)
     }
 
@@ -78,7 +79,7 @@ class SchedulerRoutingResolverTests {
     }
 
     @Test fun `resolveForDelete applies ThreadContext override and constructs ARN with override`() {
-        val r = SchedulerRoutingResolver.resolveForDelete(acct, roleName, threadContextAccountIdOverride = override)
+        val r = SchedulerRoutingResolver.resolveForDelete(acct, roleName, threadContextAccountIdOverride = override, allowedAccountIds = allowList)
         assertEquals(override, r.accountId)
         assertEquals("arn:aws:iam::$override:role/$roleName", r.roleArn)
     }
@@ -100,40 +101,54 @@ class SchedulerRoutingResolverTests {
 
     // ---------- allow-list validation ----------
 
-    @Test fun `resolve succeeds when accountId is in allow-list`() {
-        val allowList = listOf(acct, override)
-        val r = SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = null, allowedAccountIds = allowList)
-        assertEquals(acct, r.accountId)
-    }
-
     @Test fun `resolve succeeds when override is in allow-list`() {
-        val allowList = listOf(acct, override)
         val r = SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = override, allowedAccountIds = allowList)
         assertEquals(override, r.accountId)
     }
 
+    @Test fun `resolve does not validate settings-based account against allow-list`() {
+        val r = SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = null, allowedAccountIds = listOf(override))
+        assertEquals(acct, r.accountId)
+    }
+
     @Test fun `resolve rejects override not in allow-list`() {
-        val allowList = listOf(acct)
         try {
-            SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = override, allowedAccountIds = allowList)
+            SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = override, allowedAccountIds = listOf(acct))
             fail("Expected IllegalArgumentException")
         } catch (e: IllegalArgumentException) {
-            assert(e.message!!.contains("not in the allowed account list"))
+            assert(e.message!!.contains("not in allowed_account_ids"))
         }
     }
 
-    @Test fun `resolve skips allow-list validation when list is empty`() {
-        val r = SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = override, allowedAccountIds = emptyList())
-        assertEquals(override, r.accountId)
-    }
-
-    @Test fun `resolveForDelete rejects accountId not in allow-list`() {
-        val allowList = listOf(acct)
+    @Test fun `resolve rejects override when allow-list is empty (fail-closed)`() {
         try {
-            SchedulerRoutingResolver.resolveForDelete(acct, roleName, threadContextAccountIdOverride = override, allowedAccountIds = allowList)
+            SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = override, allowedAccountIds = emptyList())
             fail("Expected IllegalArgumentException")
         } catch (e: IllegalArgumentException) {
-            assert(e.message!!.contains("not in the allowed account list"))
+            assert(e.message!!.contains("allowed_account_ids is not configured"))
+        }
+    }
+
+    @Test fun `resolve allows settings-based account when allow-list is empty and no override`() {
+        val r = SchedulerRoutingResolver.resolve(acct, queue, roleName, execRoleName, threadContextAccountIdOverride = null, allowedAccountIds = emptyList())
+        assertEquals(acct, r.accountId)
+    }
+
+    @Test fun `resolveForDelete rejects override not in allow-list`() {
+        try {
+            SchedulerRoutingResolver.resolveForDelete(acct, roleName, threadContextAccountIdOverride = override, allowedAccountIds = listOf(acct))
+            fail("Expected IllegalArgumentException")
+        } catch (e: IllegalArgumentException) {
+            assert(e.message!!.contains("not in allowed_account_ids"))
+        }
+    }
+
+    @Test fun `resolveForDelete rejects override when allow-list is empty (fail-closed)`() {
+        try {
+            SchedulerRoutingResolver.resolveForDelete(acct, roleName, threadContextAccountIdOverride = override, allowedAccountIds = emptyList())
+            fail("Expected IllegalArgumentException")
+        } catch (e: IllegalArgumentException) {
+            assert(e.message!!.contains("allowed_account_ids is not configured"))
         }
     }
 }
