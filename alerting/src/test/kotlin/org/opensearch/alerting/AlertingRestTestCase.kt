@@ -170,6 +170,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return response
     }
 
+    protected fun deleteMonitorWithClient(client: RestClient, monitor: Monitor, refresh: Boolean = true): Response {
+        val response = client.makeRequest(
+            "DELETE", "$ALERTING_BASE_URI/${monitor.id}?refresh=$refresh", emptyMap(),
+            monitor.toHttpEntity()
+        )
+        assertEquals("Unable to delete a monitor", RestStatus.OK, response.restStatus())
+
+        return response
+    }
+
     protected fun deleteWorkflow(workflow: Workflow, deleteDelegates: Boolean = false, refresh: Boolean = true): Response {
         val response = client().makeRequest(
             "DELETE",
@@ -757,6 +767,21 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             .let { StringEntity(it, APPLICATION_JSON) }
 
         val response = client().makeRequest(
+            "POST", "${monitor.relativeUrl()}/_acknowledge/alerts?refresh=true",
+            emptyMap(), request
+        )
+        assertEquals("Acknowledge call failed.", RestStatus.OK, response.restStatus())
+        return response
+    }
+
+    protected fun acknowledgeAlertsWithClient(client: RestClient, monitor: Monitor, vararg alerts: Alert): Response {
+        val request = XContentFactory.jsonBuilder().startObject()
+            .array("alerts", *alerts.map { it.id }.toTypedArray())
+            .endObject()
+            .string()
+            .let { StringEntity(it, APPLICATION_JSON) }
+
+        val response = client.makeRequest(
             "POST", "${monitor.relativeUrl()}/_acknowledge/alerts?refresh=true",
             emptyMap(), request
         )
@@ -1493,6 +1518,20 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             StringEntity(
                 XContentFactory.jsonBuilder().startObject().field("persistent")
                     .startObject().field(AlertingSettings.FILTER_BY_BACKEND_ROLES.key, true).endObject()
+                    .endObject().string(),
+                ContentType.APPLICATION_JSON
+            )
+        )
+        assertEquals(updateResponse.statusLine.toString(), 200, updateResponse.statusLine.statusCode)
+    }
+
+    fun setFilterByBackendRolesStrategy(strategy: String) {
+        val updateResponse = client().makeRequest(
+            "PUT", "_cluster/settings",
+            emptyMap(),
+            StringEntity(
+                XContentFactory.jsonBuilder().startObject().field("persistent")
+                    .startObject().field(AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.key, strategy).endObject()
                     .endObject().string(),
                 ContentType.APPLICATION_JSON
             )
