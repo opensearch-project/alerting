@@ -459,14 +459,13 @@ class TransportDocLevelMonitorFanOutAction
                 executionId = executionId,
                 workflorwRunContext = workflowRunContext
             )
-            // When an existing ACTIVE alert is found for this trigger, merge it with the newly
-            // composed alert so that:
+            // When an existing ACTIVE or ACKNOWLEDGED alert is found for this trigger, merge it
+            // with the newly composed alert so that:
             //   • startTime is preserved from the first detection
             //   • finding_ids and related_doc_ids accumulate across runs
             //   • id is reused so saveAlerts updates in-place (deduplication)
-            // ACKNOWLEDGED alerts are intentionally excluded: the acknowledge action moves them to
-            // the history index and deletes them from the active index, so a new ACTIVE alert is
-            // the correct response when the trigger fires again after acknowledgement.
+            //   • state is preserved — ACKNOWLEDGED stays ACKNOWLEDGED so analysts are not
+            //     forced to re-acknowledge the same ongoing condition on every monitor execution.
             val alert = if (existingAlert != null &&
                 (existingAlert.state == Alert.State.ACTIVE || existingAlert.state == Alert.State.ACKNOWLEDGED)
             ) {
@@ -498,18 +497,21 @@ class TransportDocLevelMonitorFanOutAction
                         listOf(updatedAlert),
                         it,
                         allowUpdatingAcknowledgedAlert = existingAlert?.state == Alert.State.ACKNOWLEDGED,
-                        routingId = monitor.id
+                        routingId = monitor.id,
+                        refreshAfterWrite = true
                     )
                 }
             }
         } else if (!dryrun && monitor.id != Monitor.NO_ID && existingAlert != null &&
-            (existingAlert.state == Alert.State.ACTIVE || existingAlert.state == Alert.State.ACKNOWLEDGED)
+            (existingAlert.state == Alert.State.ACTIVE || existingAlert.state == Alert.State.ACKNOWLEDGED) &&
+            existingAlert.executionId != executionId
         ) {
-            // Trigger no longer fires but an open alert exists — complete it.
-            // This mirrors the bucket-level monitor's convertToCompletedAlerts logic and
-            // is correct for shouldCreateSingleAlertForFindings alerts because the flag's
-            // design intent is "one alert representing an ongoing condition." When the
-            // condition clears, the alert should close automatically, not linger forever.
+            // Trigger no longer fires for this concrete index — but only complete the existing
+            // alert if no sibling fan-out (processing another backing index of the same datastream
+            // in this execution) has already updated it. We detect that via executionId: if the
+            // existing alert was written in this execution, a sibling found triggered docs and the
+            // alert is still valid. Completing it here would close an alert that another index
+            // just activated, producing fragmented alert history within a single execution.
             val completedAlert = existingAlert.copy(
                 state = Alert.State.COMPLETED,
                 endTime = Instant.now(),
@@ -521,7 +523,8 @@ class TransportDocLevelMonitorFanOutAction
                     listOf(completedAlert),
                     it,
                     allowUpdatingAcknowledgedAlert = existingAlert.state == Alert.State.ACKNOWLEDGED,
-                    routingId = monitor.id
+                    routingId = monitor.id,
+                    refreshAfterWrite = true
                 )
             }
         }

@@ -7,11 +7,14 @@ package org.opensearch.alerting
 
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
+import org.opensearch.action.admin.indices.refresh.RefreshAction
+import org.opensearch.action.admin.indices.refresh.RefreshRequest
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.firstFailureOrNull
 import org.opensearch.alerting.opensearchapi.retry
+import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.script.ChainedAlertTriggerExecutionContext
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
@@ -119,7 +122,8 @@ class AlertService(
         val searchAlertsResponse: SearchResponse = searchAlerts(
             monitor = monitor,
             size = monitor.triggers.size * 2,
-            workflowRunContext = workflowRunContext
+            workflowRunContext = workflowRunContext,
+            stateFilter = listOf(Alert.State.ACTIVE, Alert.State.ACKNOWLEDGED)
         )
         val foundAlerts = searchAlertsResponse.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
         foundAlerts.groupBy { it.triggerId }.values.forEach { alerts ->
@@ -736,7 +740,8 @@ class AlertService(
         alerts: List<Alert>,
         retryPolicy: BackoffPolicy,
         allowUpdatingAcknowledgedAlert: Boolean = false,
-        routingId: String // routing is mandatory and set as monitor id. for workflow chained alerts we pass workflow id as routing
+        routingId: String, // routing is mandatory and set as monitor id. for workflow chained alerts we pass workflow id as routing
+        refreshAfterWrite: Boolean = false
     ) {
         val alertsIndex = dataSources.alertsIndex
         val alertsHistoryIndex = dataSources.alertsHistoryIndex
@@ -839,6 +844,10 @@ class AlertService(
 
         // delete all the comments of any Alerts that were deleted
         CommentsUtils.deleteComments(client, commentIdsToDelete)
+
+        if (refreshAfterWrite) {
+            client.suspendUntil { execute(RefreshAction.INSTANCE, RefreshRequest(alertsIndex), it) }
+        }
     }
 
     /**
@@ -928,7 +937,12 @@ class AlertService(
      * @param monitorId The Monitor to get Alerts for
      * @param size The number of search hits (Alerts) to return
      */
-    private suspend fun searchAlerts(monitor: Monitor, size: Int, workflowRunContext: WorkflowRunContext?): SearchResponse {
+    private suspend fun searchAlerts(
+        monitor: Monitor,
+        size: Int,
+        workflowRunContext: WorkflowRunContext?,
+        stateFilter: List<Alert.State> = emptyList()
+    ): SearchResponse {
         val monitorId = monitor.id
         val alertIndex = monitor.dataSources.alertsIndex
 
@@ -936,6 +950,9 @@ class AlertService(
             .must(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitorId))
         if (workflowRunContext != null) {
             queryBuilder.must(QueryBuilders.termQuery(Alert.WORKFLOW_ID_FIELD, workflowRunContext.workflowId))
+        }
+        if (stateFilter.isNotEmpty()) {
+            queryBuilder.must(QueryBuilders.termsQuery(Alert.STATE_FIELD, stateFilter.map { it.name }))
         }
         val searchSourceBuilder = SearchSourceBuilder()
             .size(size)
