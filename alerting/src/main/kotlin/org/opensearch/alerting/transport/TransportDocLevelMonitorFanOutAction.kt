@@ -528,7 +528,7 @@ class TransportDocLevelMonitorFanOutAction
                 )
             }
         }
-        return DocumentLevelTriggerRunResult(trigger.name, listOf(), monitorResult.error)
+        return DocumentLevelTriggerRunResult(trigger.name, triggerResult.triggeredDocs, monitorResult.error)
     }
 
     private suspend fun runForEachDocTrigger(
