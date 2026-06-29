@@ -1482,7 +1482,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             .build()
 
         try {
-            deleteMonitor(monitor = createdMonitor)
+            deleteMonitorWithClient(deleteUserClient, monitor = createdMonitor)
         } finally {
             deleteUser(deleteUser)
             deleteUserClient?.close()
@@ -1587,7 +1587,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             .build()
 
         try {
-            deleteMonitor(monitor = createdMonitor)
+            deleteMonitorWithClient(deleteUserClient, monitor = createdMonitor)
         } finally {
             deleteUser(deleteUser)
             deleteUserClient?.close()
@@ -1835,11 +1835,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             .build()
 
         try {
-            executeUserClient?.makeRequest(
+            val executeMonitorResponse = executeUserClient?.makeRequest(
                 "POST",
                 "$ALERTING_BASE_URI/${createdMonitor.id}/_execute",
                 mutableMapOf()
             )
+            assertEquals("Execute monitor failed", RestStatus.OK, executeMonitorResponse?.restStatus())
         } finally {
             executeUserClient?.close()
         }
@@ -1926,11 +1927,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             .build()
 
         try {
-            executeUserClient?.makeRequest(
+            val executeMonitorResponse = executeUserClient?.makeRequest(
                 "POST",
                 "$ALERTING_BASE_URI/${createdMonitor.id}/_execute",
                 mutableMapOf()
             )
+            assertEquals("Execute monitor failed", RestStatus.OK, executeMonitorResponse?.restStatus())
         } finally {
             executeUserClient?.close()
         }
@@ -2356,8 +2358,8 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         createUserWithRoles(
             acknowledgeUser,
             listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
-            // does not contain all roles of monitor
-            listOf("role1"),
+            // does not match roles of monitor exactly
+            listOf("role1", "role2", "role3"),
             false
         )
         val acknowledgeUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), acknowledgeUser, password)
