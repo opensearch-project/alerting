@@ -336,11 +336,6 @@ class TransportDocLevelMonitorFanOutAction
                         )
                     }
                 } else if (monitor.shouldCreateSingleAlertForFindings == true) {
-                    // Load existing active/acknowledged alerts keyed by triggerId so we can reuse their
-                    // IDs and deduplicate across executions (same trigger → same alert ID → update in place).
-                    val existingAlertsByTriggerId = if (!isTempMonitor) {
-                        alertService.loadCurrentAlertsForSingleGroupedDocLevelMonitor(monitor, workflowRunContext)
-                    } else emptyMap()
                     monitor.triggers.forEach {
                         triggerResults[it.id] = runForEachDocTriggerCreateSingleGroupedAlert(
                             monitorResult,
@@ -350,7 +345,7 @@ class TransportDocLevelMonitorFanOutAction
                             dryrun,
                             executionId,
                             workflowRunContext,
-                            existingAlertsByTriggerId[it.id]
+                            isTempMonitor
                         )
                     }
                 }
@@ -398,7 +393,13 @@ class TransportDocLevelMonitorFanOutAction
     }
 
     /**
-     * run doc-level triggers ignoring findings and alerts and generating a single alert.
+     * Evaluates a doc-level trigger and, when triggered, creates or merges the single grouped alert.
+     * Alert completion (when the trigger clears) is handled by the coordinator in
+     * DocumentLevelMonitorRunner after all fan-out responses are aggregated — a fan-out only sees
+     * one concrete backing index at a time and cannot decide whether the trigger is globally clear.
+     * Moving alert creation here (rather than to the coordinator) is intentional: actions/notifications
+     * must fire on the triggering fan-out node, and moving runAction to the coordinator would require
+     * DocumentLevelTriggerRunResult (in opensearch-alerting-commons) to carry the composed alert back.
      */
     private suspend fun runForEachDocTriggerCreateSingleGroupedAlert(
         monitorResult: MonitorRunResult<DocumentLevelTriggerRunResult>,
@@ -408,7 +409,7 @@ class TransportDocLevelMonitorFanOutAction
         dryrun: Boolean,
         executionId: String,
         workflowRunContext: WorkflowRunContext?,
-        existingAlert: Alert? = null
+        isTempMonitor: Boolean
     ): DocumentLevelTriggerRunResult {
         log.info(
             "Monitor ${monitor.id} trigger [${trigger.name}]: queryToDocIds keys=[${queryToDocIds.keys.map { it.id }}] " +
@@ -421,6 +422,11 @@ class TransportDocLevelMonitorFanOutAction
             "Monitor ${monitor.id} trigger [${trigger.name}]: triggeredDocs.size=[${triggerResult.triggeredDocs.size}]"
         )
         if (triggerResult.triggeredDocs.isNotEmpty()) {
+            // Load the existing alert only when the trigger fired — skipping this search when
+            // triggeredDocs is empty avoids an unnecessary index round-trip per backing index.
+            val existingAlert = if (!isTempMonitor) {
+                alertService.loadCurrentAlertsForSingleGroupedDocLevelMonitor(monitor, workflowRunContext)[trigger.id]
+            } else null
             // Extract the ruleId deterministically from the trigger condition.
             // convertToConditionForChainedFindings() always produces "(query[tag=<ruleId>])" so we
             // can parse it reliably rather than scanning queryToDocIds which may have multiple

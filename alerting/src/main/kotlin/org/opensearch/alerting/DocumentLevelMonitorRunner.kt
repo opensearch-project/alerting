@@ -468,11 +468,17 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
 
     /**
      * After all fan-out responses are aggregated, decide whether open alerts should be completed.
+     *
      * A fan-out only sees one concrete backing index at a time and cannot distinguish "no docs on
      * this index" from "the trigger is globally clear." This coordinator check runs once per
      * execution, after all fan-outs, using the fully-merged triggeredDocs to make the right call:
      *   - triggeredDocs non-empty → trigger still fires somewhere; leave the alert open.
      *   - triggeredDocs empty + open alert exists → condition has cleared; complete it.
+     *
+     * Alert creation stays in the fan-out (TransportDocLevelMonitorFanOutAction) because
+     * actions/notifications must fire on the node that evaluated the trigger. Moving creation
+     * here would require DocumentLevelTriggerRunResult (opensearch-alerting-commons) to carry the
+     * composed alert back — a commons change outside the scope of this fix.
      */
     private suspend fun completeOpenAlertsIfTriggerCleared(
         monitor: Monitor,
@@ -481,14 +487,18 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         alertService: AlertService,
         retryPolicy: BackoffPolicy
     ) {
+        // All triggers fired — nothing to complete. Avoid the search entirely.
+        val clearedTriggerIds = triggerResults.entries
+            .filter { it.value.triggeredDocs.isEmpty() }
+            .map { it.key }
+        if (clearedTriggerIds.isEmpty()) return
+
         val existingAlerts = alertService.loadCurrentAlertsForSingleGroupedDocLevelMonitor(monitor, workflowRunContext)
-        for (trigger in monitor.triggers) {
-            val triggered = triggerResults[trigger.id]?.triggeredDocs?.isNotEmpty() == true
-            if (triggered) continue
-            val existing = existingAlerts[trigger.id] ?: continue
+        for (triggerId in clearedTriggerIds) {
+            val existing = existingAlerts[triggerId] ?: continue
             if (existing.state != Alert.State.ACTIVE && existing.state != Alert.State.ACKNOWLEDGED) continue
             logger.info(
-                "Monitor ${monitor.id} trigger [${trigger.name}]: trigger cleared, completing alert ${existing.id}"
+                "Monitor ${monitor.id} trigger [$triggerId]: trigger cleared, completing alert ${existing.id}"
             )
             alertService.saveAlerts(
                 monitor.dataSources,
