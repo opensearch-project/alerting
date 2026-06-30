@@ -502,31 +502,6 @@ class TransportDocLevelMonitorFanOutAction
                     )
                 }
             }
-        } else if (!dryrun && monitor.id != Monitor.NO_ID && existingAlert != null &&
-            (existingAlert.state == Alert.State.ACTIVE || existingAlert.state == Alert.State.ACKNOWLEDGED) &&
-            existingAlert.executionId != executionId
-        ) {
-            // Trigger no longer fires for this concrete index — but only complete the existing
-            // alert if no sibling fan-out (processing another backing index of the same datastream
-            // in this execution) has already updated it. We detect that via executionId: if the
-            // existing alert was written in this execution, a sibling found triggered docs and the
-            // alert is still valid. Completing it here would close an alert that another index
-            // just activated, producing fragmented alert history within a single execution.
-            val completedAlert = existingAlert.copy(
-                state = Alert.State.COMPLETED,
-                endTime = Instant.now(),
-                errorMessage = null
-            )
-            retryPolicy.let {
-                alertService.saveAlerts(
-                    monitor.dataSources,
-                    listOf(completedAlert),
-                    it,
-                    allowUpdatingAcknowledgedAlert = existingAlert.state == Alert.State.ACKNOWLEDGED,
-                    routingId = monitor.id,
-                    refreshAfterWrite = true
-                )
-            }
         }
         return DocumentLevelTriggerRunResult(trigger.name, triggerResult.triggeredDocs, monitorResult.error)
     }

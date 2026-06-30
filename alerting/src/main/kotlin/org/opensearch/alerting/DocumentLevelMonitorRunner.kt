@@ -9,6 +9,7 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.Version
 import org.opensearch.action.ActionListenerResponseHandler
+import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.support.GroupedActionListener
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.cluster.metadata.IndexMetadata
@@ -19,6 +20,7 @@ import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutAction
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutRequest
 import org.opensearch.commons.alerting.action.DocLevelMonitorFanOutResponse
 import org.opensearch.commons.alerting.model.ActionRunResult
+import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.DocumentLevelTriggerRunResult
@@ -429,6 +431,16 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 monitorCtx.docLevelMonitorQueries!!.deleteDocLevelQueriesOnDryRun(monitorMetadata)
             }
 
+            if (!isTempMonitor && monitor.shouldCreateSingleAlertForFindings == true) {
+                completeOpenAlertsIfTriggerCleared(
+                    monitor,
+                    triggerResults,
+                    workflowRunContext,
+                    monitorCtx.alertService!!,
+                    monitorCtx.retryPolicy!!
+                )
+            }
+
             // TODO: Update the Document as part of the Trigger and return back the trigger action result
             return monitorResult.copy(triggerResults = triggerResults, inputResults = inputRunResults)
         } catch (e: Exception) {
@@ -450,6 +462,40 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 "Monitor {} Time spent on monitor run: {}",
                 monitor.id,
                 totalTimeTakenStat
+            )
+        }
+    }
+
+    /**
+     * After all fan-out responses are aggregated, decide whether open alerts should be completed.
+     * A fan-out only sees one concrete backing index at a time and cannot distinguish "no docs on
+     * this index" from "the trigger is globally clear." This coordinator check runs once per
+     * execution, after all fan-outs, using the fully-merged triggeredDocs to make the right call:
+     *   - triggeredDocs non-empty → trigger still fires somewhere; leave the alert open.
+     *   - triggeredDocs empty + open alert exists → condition has cleared; complete it.
+     */
+    private suspend fun completeOpenAlertsIfTriggerCleared(
+        monitor: Monitor,
+        triggerResults: Map<String, DocumentLevelTriggerRunResult>,
+        workflowRunContext: WorkflowRunContext?,
+        alertService: AlertService,
+        retryPolicy: BackoffPolicy
+    ) {
+        val existingAlerts = alertService.loadCurrentAlertsForSingleGroupedDocLevelMonitor(monitor, workflowRunContext)
+        for (trigger in monitor.triggers) {
+            val triggered = triggerResults[trigger.id]?.triggeredDocs?.isNotEmpty() == true
+            if (triggered) continue
+            val existing = existingAlerts[trigger.id] ?: continue
+            if (existing.state != Alert.State.ACTIVE && existing.state != Alert.State.ACKNOWLEDGED) continue
+            logger.info(
+                "Monitor ${monitor.id} trigger [${trigger.name}]: trigger cleared, completing alert ${existing.id}"
+            )
+            alertService.saveAlerts(
+                monitor.dataSources,
+                listOf(existing.copy(state = Alert.State.COMPLETED, endTime = Instant.now(), errorMessage = null)),
+                retryPolicy,
+                allowUpdatingAcknowledgedAlert = existing.state == Alert.State.ACKNOWLEDGED,
+                routingId = monitor.id
             )
         }
     }
