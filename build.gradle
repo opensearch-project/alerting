@@ -29,14 +29,14 @@ buildscript {
 
     repositories {
         mavenLocal()
+        maven { url "https://ci.opensearch.org/maven2/" }
+        mavenCentral()
         maven {
             url "https://ci.opensearch.org/ci/dbc/snapshots/maven/"
             mavenContent {
                 snapshotsOnly()
             }
         }
-        maven { url "https://ci.opensearch.org/maven2/" }
-        mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
     }
 
