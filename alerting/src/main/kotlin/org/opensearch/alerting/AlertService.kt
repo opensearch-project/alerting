@@ -87,6 +87,17 @@ class AlertService(
 
     private val logger = LogManager.getLogger(AlertService::class.java)
 
+    /**
+     * Whether an alert is in a terminal (resolved) state. In OSS, COMPLETED/DELETED alerts are moved
+     * out of the active alert index (to the history index) on completion, so a monitor's "current
+     * alerts" search never returns them. The Neo Data Service backed store keeps them in the same
+     * partition as active alerts, so the runner must exclude terminal alerts when loading current
+     * alerts; otherwise it re-loads already-resolved alerts every cycle and re-writes them as
+     * COMPLETED, producing redundant BulkUpdateAlerts writes against the shared metadata domain.
+     */
+    private fun Alert.isTerminalState(): Boolean =
+        state == Alert.State.COMPLETED || state == Alert.State.DELETED
+
     suspend fun loadCurrentAlertsForWorkflow(workflow: Workflow, dataSources: DataSources): Map<Trigger, Alert?> {
         val searchAlertsResponse: SearchResponse = searchAlerts(
             workflow = workflow,
@@ -95,6 +106,7 @@ class AlertService(
         )
 
         val foundAlerts = searchAlertsResponse.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
+            .filterNot { it.isTerminalState() }
             .groupBy { it.triggerId }
         foundAlerts.values.forEach { alerts ->
             if (alerts.size > 1) {
@@ -120,6 +132,7 @@ class AlertService(
         )
 
         val foundAlerts = searchAlertsResponse.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
+            .filterNot { it.isTerminalState() }
             .groupBy { it.triggerId }
         foundAlerts.values.forEach { alerts ->
             if (alerts.size > 1) {
@@ -149,6 +162,7 @@ class AlertService(
         )
 
         val foundAlerts = searchAlertsResponse.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
+            .filterNot { it.isTerminalState() }
             .groupBy { it.triggerId }
 
         return monitor.triggers.associateWith { trigger ->
