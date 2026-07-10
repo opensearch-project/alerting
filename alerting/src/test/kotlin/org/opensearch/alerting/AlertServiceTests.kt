@@ -291,6 +291,22 @@ class AlertServiceTests : OpenSearchTestCase() {
         assertNull("Terminal-state alerts must be excluded from current alerts", result[trigger])
     }
 
+    fun `test searchAlerts emits server-side must_not excluding terminal states`() {
+        val trigger = randomQueryLevelTrigger()
+        val monitor = randomQueryLevelMonitor(triggers = listOf(trigger))
+        stubSearchAlerts(emptyList())
+
+        runBlocking { alertService.loadCurrentAlertsForQueryLevelMonitor(monitor, null) }
+
+        val captor = ArgumentCaptor.forClass(SearchDataObjectRequest::class.java)
+        verify(sdkClient).searchDataObjectAsync(captor.capture())
+        val query = captor.value.searchSourceBuilder().query().toString()
+        assertTrue("query should exclude terminal states via must_not", query.contains("must_not"))
+        assertTrue("must_not should target the state field", query.contains(Alert.STATE_FIELD))
+        assertTrue("COMPLETED should be excluded server-side", query.contains(Alert.State.COMPLETED.name))
+        assertTrue("DELETED should be excluded server-side", query.contains(Alert.State.DELETED.name))
+    }
+
     private fun stubSearchAlerts(alerts: List<Alert>) {
         val hits = alerts.map { alert ->
             val builder = XContentFactory.jsonBuilder()

@@ -926,6 +926,9 @@ class AlertService(
 
         val queryBuilder = QueryBuilders.boolQuery()
             .must(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitorId))
+            // Exclude terminal alerts server-side so the size-limited fetch is spent only on
+            // in-progress states and active alerts are never crowded out of the results.
+            .mustNot(QueryBuilders.termsQuery(Alert.STATE_FIELD, Alert.State.COMPLETED.name, Alert.State.DELETED.name))
         if (workflowRunContext != null) {
             queryBuilder.must(QueryBuilders.termQuery(Alert.WORKFLOW_ID_FIELD, workflowRunContext.workflowId))
         }
@@ -965,6 +968,8 @@ class AlertService(
         val queryBuilder = QueryBuilders.boolQuery()
             .must(QueryBuilders.termQuery(Alert.WORKFLOW_ID_FIELD, workflowId))
             .must(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, ""))
+            // Exclude terminal chained alerts server-side (see searchAlerts(monitor)).
+            .mustNot(QueryBuilders.termsQuery(Alert.STATE_FIELD, Alert.State.COMPLETED.name, Alert.State.DELETED.name))
         val searchSourceBuilder = SearchSourceBuilder()
             .size(size)
             .query(queryBuilder)
