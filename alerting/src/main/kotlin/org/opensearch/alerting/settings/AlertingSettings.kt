@@ -489,7 +489,8 @@ class AlertingSettings {
             FilterByBackendRolesAccessStrategy.INTERSECT.strategy,
             FilterByBackendRolesAccessStrategyValidator(),
             Setting.Property.NodeScope,
-            Setting.Property.Dynamic
+            Setting.Property.Dynamic,
+            Setting.Property.Sensitive
         )
     }
 }
