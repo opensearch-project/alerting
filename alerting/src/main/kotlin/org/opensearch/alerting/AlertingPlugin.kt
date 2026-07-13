@@ -462,6 +462,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.REQUEST_TIMEOUT,
             AlertingSettings.MAX_ACTION_THROTTLE_VALUE,
             AlertingSettings.FILTER_BY_BACKEND_ROLES,
+            AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY,
             AlertingSettings.MAX_ACTIONABLE_ALERT_COUNT,
             LegacyOpenDistroAlertingSettings.INPUT_TIMEOUT,
             LegacyOpenDistroAlertingSettings.INDEX_TIMEOUT,
@@ -527,8 +528,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE,
             AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME,
             AlertingSettings.TENANT_ACCOUNT_ID_HEADER,
-            AlertingSettings.TENANT_RESOURCE_ID_HEADER,
-            AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY
+            AlertingSettings.TENANT_RESOURCE_ID_HEADER
         )
     }
 
