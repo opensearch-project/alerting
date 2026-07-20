@@ -172,7 +172,6 @@ dependencies {
 
     // Resource sharing
     compileOnly group: 'org.opensearch', name:'opensearch-security-spi', version:"${opensearch_build}"
-    opensearchPlugin "org.opensearch.plugin:opensearch-security:${opensearch_build}@zip"
 
     // OpenSearch Nanny state
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlin_version}"
