@@ -108,6 +108,11 @@ configurations.all {
         force "com.fasterxml.jackson.dataformat:jackson-dataformat-smile:${versions.jackson}"
         force "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${versions.jackson}"
         force "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${versions.jackson}"
+        eachDependency { details ->
+            if (details.requested.group.startsWith('tools.jackson')) {
+                details.useVersion versions.jackson3
+            }
+        }
         force "commons-logging:commons-logging:${versions.commonslogging}"
         // force the version until OpenSearch upgrade to an invulnerable one, https://www.whitesourcesoftware.com/vulnerability-database/WS-2019-0379
         force "commons-codec:commons-codec:1.13"
