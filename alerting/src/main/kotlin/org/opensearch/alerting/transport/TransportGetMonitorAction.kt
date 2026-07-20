@@ -135,7 +135,7 @@ class TransportGetMonitorAction @Inject constructor(
                         }
                     }
                     // when resource sharing is enabled, security plugin gates access at the index layer
-                    if (rsc == null &&
+                    if (ResourceSharingClientAccessor.getResourceSharingClient() == null &&
                         !checkUserPermissionsWithResource(user, monitor?.user, actionListener, "monitor", transformedRequest.monitorId)
                     ) {
                         return@whenComplete
