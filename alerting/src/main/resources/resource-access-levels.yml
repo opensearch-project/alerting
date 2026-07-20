@@ -2,6 +2,7 @@
 resource_types:
   monitor:
     alerting_read_only:
+      default: true
       allowed_actions:
         - 'cluster:admin/opendistro/alerting/monitor/get'
         - 'cluster:admin/opendistro/alerting/monitor/search'
