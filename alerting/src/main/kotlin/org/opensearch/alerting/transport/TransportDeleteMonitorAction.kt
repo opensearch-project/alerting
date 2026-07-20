@@ -15,6 +15,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.service.ExternalSchedulerService
 import org.opensearch.alerting.service.SchedulerRoutingResolver
@@ -85,7 +86,8 @@ class TransportDeleteMonitorAction @Inject constructor(
             ?: recreateObject(request) { DeleteMonitorRequest(it) }
         val user = readUserFromThreadContext(client)
 
-        if (!validateUserBackendRoles(user, actionListener)) {
+        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+        if (rsc == null && !validateUserBackendRoles(user, actionListener)) {
             return
         }
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
@@ -109,7 +111,10 @@ class TransportDeleteMonitorAction @Inject constructor(
             try {
                 val monitor = getMonitor()
 
-                val canDelete = user == null || !doFilterForUser(user) ||
+                // when resource sharing is enabled, security plugin gates access at the index layer
+                val canDelete = user == null ||
+                    ResourceSharingClientAccessor.getResourceSharingClient() != null ||
+                    !doFilterForUser(user) ||
                     checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)
 
                 if (!multiTenancyEnabled && DeleteMonitorService.monitorIsWorkflowDelegate(monitor.id)) {

@@ -134,7 +134,10 @@ class TransportGetMonitorAction @Inject constructor(
                             monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
                         }
                     }
-                    if (!checkUserPermissionsWithResource(user, monitor?.user, actionListener, "monitor", transformedRequest.monitorId)) {
+                    // when resource sharing is enabled, security plugin gates access at the index layer
+                    if (rsc == null &&
+                        !checkUserPermissionsWithResource(user, monitor?.user, actionListener, "monitor", transformedRequest.monitorId)
+                    ) {
                         return@whenComplete
                     }
                     scope.launch(TenantContext(tenantId)) {

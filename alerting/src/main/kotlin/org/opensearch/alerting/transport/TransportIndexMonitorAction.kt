@@ -32,6 +32,7 @@ import org.opensearch.alerting.PPLUtils.appendCustomCondition
 import org.opensearch.alerting.PPLUtils.appendDataRowsLimit
 import org.opensearch.alerting.PPLUtils.customConditionIsValid
 import org.opensearch.alerting.PPLUtils.executePplQuery
+import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.service.DeleteMonitorService
@@ -238,7 +239,8 @@ class TransportIndexMonitorAction @Inject constructor(
 
         val user = readUserFromThreadContext(client)
 
-        if (!validateUserBackendRoles(user, actionListener)) {
+        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+        if (rsc == null && !validateUserBackendRoles(user, actionListener)) {
             return
         }
 
@@ -1015,7 +1017,10 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         private suspend fun onGetResponse(currentMonitor: Monitor) {
-            if (!checkUserPermissionsWithResource(user, currentMonitor.user, actionListener, "monitor", request.monitorId)) {
+            // when resource sharing is enabled, security plugin gates access at the index layer
+            if (ResourceSharingClientAccessor.getResourceSharingClient() == null &&
+                !checkUserPermissionsWithResource(user, currentMonitor.user, actionListener, "monitor", request.monitorId)
+            ) {
                 return
             }
 

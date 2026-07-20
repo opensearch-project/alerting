@@ -15,6 +15,7 @@ import org.opensearch.action.search.ShardSearchFailure
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use
@@ -111,6 +112,9 @@ class TransportSearchMonitorAction @Inject constructor(
     ) {
         if (user == null) {
             // user header is null when: 1/ security is disabled. 2/when user is super-admin.
+            search(searchMonitorRequest.searchRequest, actionListener, tenantId)
+        } else if (ResourceSharingClientAccessor.getResourceSharingClient() != null) {
+            // resource sharing is enabled - security plugin filters results at index layer
             search(searchMonitorRequest.searchRequest, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.

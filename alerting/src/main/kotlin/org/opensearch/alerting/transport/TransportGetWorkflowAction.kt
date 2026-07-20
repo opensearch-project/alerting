@@ -119,14 +119,15 @@ class TransportGetWorkflowAction @Inject constructor(
                                     return
                                 }
 
-                                // security is enabled and filterby is enabled
-                                if (!checkUserPermissionsWithResource(
-                                        user,
-                                        workflow?.user,
-                                        actionListener,
-                                        "workflow",
-                                        getWorkflowRequest.workflowId
-                                    )
+                                // when resource sharing is enabled, security plugin gates access at the index layer
+                                if (rsc == null &&
+                                    !checkUserPermissionsWithResource(
+                                            user,
+                                            workflow?.user,
+                                            actionListener,
+                                            "workflow",
+                                            getWorkflowRequest.workflowId
+                                        )
                                 ) {
                                     return
                                 }

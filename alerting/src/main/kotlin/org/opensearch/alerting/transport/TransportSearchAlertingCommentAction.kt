@@ -16,6 +16,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -51,6 +52,9 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.io.IOException
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 private val log = LogManager.getLogger(TransportSearchAlertingCommentAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
@@ -117,6 +121,14 @@ class TransportSearchAlertingCommentAction @Inject constructor(
         val tenantId = currentTenantId()
         if (user == null) {
             // user is null when: 1/ security is disabled. 2/when user is super-admin.
+            search(searchCommentRequest.searchRequest, actionListener, tenantId)
+        } else if (ResourceSharingClientAccessor.getResourceSharingClient() != null) {
+            // resource sharing is enabled - filter comments by alerts on accessible monitors
+            val accessibleAlertIds = getAccessibleAlertIDs()
+            val queryBuilder = searchCommentRequest.searchRequest.source().query() as BoolQueryBuilder
+            searchCommentRequest.searchRequest.source().query(
+                queryBuilder.filter(QueryBuilders.termsQuery(Comment.ENTITY_ID_FIELD, accessibleAlertIds))
+            )
             search(searchCommentRequest.searchRequest, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.
@@ -199,5 +211,41 @@ class TransportSearchAlertingCommentAction @Inject constructor(
         }
 
         return alertIDs
+    }
+
+    // retrieve the IDs of Alerts belonging to monitors the current user has resource-sharing access to
+    private suspend fun getAccessibleAlertIDs(): List<String> {
+        val rsc = ResourceSharingClientAccessor.getResourceSharingClient() ?: return emptyList()
+        val accessibleMonitorIds: Set<String> = suspendCoroutine { cont ->
+            rsc.getAccessibleResourceIds(
+                "monitor",
+                object : ActionListener<Set<String>> {
+                    override fun onResponse(ids: Set<String>) = cont.resume(ids)
+                    override fun onFailure(e: Exception) = cont.resumeWithException(e)
+                }
+            )
+        }
+
+        val queryBuilder = QueryBuilders.boolQuery()
+            .filter(QueryBuilders.termsQuery("monitor_id", accessibleMonitorIds))
+        val searchSourceBuilder = SearchSourceBuilder()
+            .version(true)
+            .seqNoAndPrimaryTerm(true)
+            .query(queryBuilder)
+        val searchRequest = SearchRequest()
+            .source(searchSourceBuilder)
+            .indices(ALL_ALERT_INDEX_PATTERN)
+
+        val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+        return searchResponse.hits.map { hit ->
+            val xcp = XContentHelper.createParser(
+                NamedXContentRegistry.EMPTY,
+                LoggingDeprecationHandler.INSTANCE,
+                hit.sourceRef,
+                XContentType.JSON
+            )
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            Alert.parse(xcp, hit.id, hit.version).id
+        }
     }
 }

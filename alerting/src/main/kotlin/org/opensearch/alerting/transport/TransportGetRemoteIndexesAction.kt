@@ -21,6 +21,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.alerting.action.GetRemoteIndexesAction
 import org.opensearch.alerting.action.GetRemoteIndexesRequest
 import org.opensearch.alerting.action.GetRemoteIndexesResponse
@@ -102,7 +103,8 @@ class TransportGetRemoteIndexesAction @Inject constructor(
         }
 
         val user = readUserFromThreadContext(client)
-        if (!validateUserBackendRoles(user, actionListener)) return
+        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+        if (rsc == null && !validateUserBackendRoles(user, actionListener)) return
 
         if (!request.isValid()) {
             actionListener.onFailure(
