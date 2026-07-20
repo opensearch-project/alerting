@@ -48,17 +48,17 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
     fun setupUsers() {
         if (aliceClient != null) return
 
-        createUser(aliceUser, arrayOf("engineering"))
-        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(aliceUser))
-        createUserRolesMapping(ALL_ACCESS_ROLE, arrayOf(aliceUser))
+        createUserWithAdmin(aliceUser, arrayOf("engineering"))
+        createUserRolesMappingWithAdmin(ALERTING_FULL_ACCESS_ROLE, arrayOf(aliceUser))
+        createUserRolesMappingWithAdmin(ALL_ACCESS_ROLE, arrayOf(aliceUser))
         aliceClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), aliceUser, password)
             .setSocketTimeout(60000)
             .setConnectionRequestTimeout(180000)
             .build()
 
-        createUser(bobUser, arrayOf("marketing"))
-        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(bobUser))
-        createUserRolesMapping(ALL_ACCESS_ROLE, arrayOf(bobUser))
+        createUserWithAdmin(bobUser, arrayOf("marketing"))
+        createUserRolesMappingWithAdmin(ALERTING_FULL_ACCESS_ROLE, arrayOf(bobUser))
+        createUserRolesMappingWithAdmin(ALL_ACCESS_ROLE, arrayOf(bobUser))
         bobClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), bobUser, password)
             .setSocketTimeout(60000)
             .setConnectionRequestTimeout(180000)
@@ -71,8 +71,45 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         bobClient?.close()
         aliceClient = null
         bobClient = null
-        deleteUser(aliceUser)
-        deleteUser(bobUser)
+        deleteUserWithAdmin(aliceUser)
+        deleteUserWithAdmin(bobUser)
+    }
+
+    private fun createUserWithAdmin(name: String, backendRoles: Array<String>) {
+        val request = Request("PUT", "/_plugins/_security/api/internalusers/$name")
+        val broles = backendRoles.joinToString { "\"$it\"" }
+        request.setJsonEntity(
+            """
+            {
+                "password": "$password",
+                "backend_roles": [$broles],
+                "attributes": {}
+            }
+            """.trimIndent()
+        )
+        adminClient().performRequest(request)
+    }
+
+    private fun createUserRolesMappingWithAdmin(role: String, users: Array<String>) {
+        val request = Request("PUT", "/_plugins/_security/api/rolesmapping/$role")
+        val usersStr = users.joinToString { "\"$it\"" }
+        request.setJsonEntity(
+            """
+            {
+                "backend_roles": [],
+                "hosts": [],
+                "users": [$usersStr]
+            }
+            """.trimIndent()
+        )
+        adminClient().performRequest(request)
+    }
+
+    private fun deleteUserWithAdmin(name: String) {
+        try {
+            adminClient().performRequest(Request("DELETE", "/_plugins/_security/api/internalusers/$name"))
+        } catch (_: Exception) {
+        }
     }
 
     fun `test monitor created by alice is not visible to bob`() {

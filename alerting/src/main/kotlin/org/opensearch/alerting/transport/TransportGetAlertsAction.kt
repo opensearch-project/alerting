@@ -240,13 +240,24 @@ class TransportGetAlertsAction @Inject constructor(
     ) {
         // user is null when: 1/ security is disabled. 2/when user is super-admin.
         if (user == null) {
-            // user is null when: 1/ security is disabled. 2/when user is super-admin.
             search(alertIndex, searchSourceBuilder, actionListener, tenantId)
         } else if (ResourceSharingClientAccessor.getResourceSharingClient() != null) {
-            // resource sharing framework is enabled - access control handled by security plugin
-            search(alertIndex, searchSourceBuilder, actionListener, tenantId)
+            // resource sharing is enabled - filter alerts by accessible monitor IDs
+            ResourceSharingClientAccessor.getResourceSharingClient()!!.getAccessibleResourceIds(
+                "monitor",
+                object : ActionListener<Set<String>> {
+                    override fun onResponse(accessibleMonitorIds: Set<String>) {
+                        val query = searchSourceBuilder.query() as BoolQueryBuilder
+                        query.filter(QueryBuilders.termsQuery("monitor_id", accessibleMonitorIds))
+                        search(alertIndex, searchSourceBuilder, actionListener, tenantId)
+                    }
+
+                    override fun onFailure(e: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(e))
+                    }
+                }
+            )
         } else if (!doFilterForUser(user)) {
-            // security is enabled and filterby is disabled.
             search(alertIndex, searchSourceBuilder, actionListener, tenantId)
         } else {
             // security is enabled and filterby is enabled.

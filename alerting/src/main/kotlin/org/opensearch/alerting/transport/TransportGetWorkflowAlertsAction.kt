@@ -42,6 +42,7 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
+import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.remote.metadata.client.SdkClient
@@ -203,13 +204,27 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
     ) {
         // user is null when: 1/ security is disabled. 2/when user is super-admin.
         if (user == null) {
-            // user is null when: 1/ security is disabled. 2/when user is super-admin.
             search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
         } else if (ResourceSharingClientAccessor.getResourceSharingClient() != null) {
-            // resource sharing framework is enabled - access control handled by security plugin
-            search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
+            // resource sharing is enabled - filter alerts by accessible monitor IDs
+            val tenantId = currentTenantId()
+            ResourceSharingClientAccessor.getResourceSharingClient()!!.getAccessibleResourceIds(
+                "monitor",
+                object : ActionListener<Set<String>> {
+                    override fun onResponse(accessibleMonitorIds: Set<String>) {
+                        val query = searchSourceBuilder.query() as BoolQueryBuilder
+                        query.filter(QueryBuilders.termsQuery("monitor_id", accessibleMonitorIds))
+                        scope.launch(TenantContext(tenantId)) {
+                            search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
+                        }
+                    }
+
+                    override fun onFailure(e: Exception) {
+                        actionListener.onFailure(AlertingException.wrap(e))
+                    }
+                }
+            )
         } else if (!doFilterForUser(user)) {
-            // security is enabled and filterby is disabled.
             search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
         } else {
             // security is enabled and filterby is enabled.
