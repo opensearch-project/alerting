@@ -156,6 +156,7 @@ class TransportIndexMonitorAction @Inject constructor(
     @Volatile private var jobQueueName = AlertingSettings.JOB_QUEUE_NAME.get(settings)
     @Volatile private var externalSchedulerRoleName = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(settings)
     @Volatile private var externalSchedulerExecutionRoleName = AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME.get(settings)
+    @Volatile override var filterByAccessStrategy = AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.get(settings)
 
     private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
 
