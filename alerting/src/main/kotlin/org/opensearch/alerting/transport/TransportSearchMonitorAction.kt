@@ -112,7 +112,7 @@ class TransportSearchMonitorAction @Inject constructor(
         user: User?,
         tenantId: String? = null,
     ) {
-        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
         if (useRsc) {
             // resource sharing is enabled - security plugin filters results at index layer
             search(searchMonitorRequest.searchRequest, actionListener, tenantId)
@@ -167,7 +167,7 @@ class TransportSearchMonitorAction @Inject constructor(
     fun search(searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>, tenantId: String? = null) {
         // When resource sharing is enabled, route search through PluginClient so it runs as the plugin subject
         // and the security plugin's DLS on the shared-resource index can filter results.
-        if (ResourceSharingUtils.shouldUseResourceAuthz()) {
+        if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)) {
             pluginClient.search(
                 searchRequest,
                 object : ActionListener<SearchResponse> {

@@ -206,7 +206,7 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
         actionListener: ActionListener<GetWorkflowAlertsResponse>,
         user: User?,
     ) {
-        if (ResourceSharingUtils.shouldUseResourceAuthz()) {
+        if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)) {
             // resource sharing is enabled - filter alerts by accessible monitor IDs
             val tenantId = currentTenantId()
             val rsc = ResourceSharingClientAccessor.getResourceSharingClient()

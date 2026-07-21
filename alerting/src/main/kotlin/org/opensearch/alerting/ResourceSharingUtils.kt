@@ -24,7 +24,7 @@ internal object ResourceSharingUtils {
      * for [resourceType]. A non-null accessor client alone is insufficient — the plugin may be present
      * with the RSC feature flag disabled.
      */
-    fun shouldUseResourceAuthz(resourceType: String = MONITOR_RESOURCE_TYPE): Boolean {
+    fun shouldUseResourceAuthz(resourceType: String): Boolean {
         val client = ResourceSharingClientAccessor.getResourceSharingClient() ?: return false
         return (client as ResourceSharingClient).isFeatureEnabledForType(resourceType)
     }

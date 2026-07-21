@@ -239,7 +239,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
         val user = readUserFromThreadContext(client)
 
-        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
         if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
@@ -1017,7 +1017,7 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         private suspend fun onGetResponse(currentMonitor: Monitor) {
-            val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+            val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
             // when resource sharing is enabled, security plugin gates access at the index layer
             if (!useRsc &&
                 !checkUserPermissionsWithResource(user, currentMonitor.user, actionListener, "monitor", request.monitorId)

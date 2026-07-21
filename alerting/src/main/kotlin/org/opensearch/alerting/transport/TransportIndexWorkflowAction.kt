@@ -180,7 +180,7 @@ class TransportIndexWorkflowAction @Inject constructor(
 
         val user = readUserFromThreadContext(client)
 
-        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
         if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
@@ -508,7 +508,7 @@ class TransportIndexWorkflowAction @Inject constructor(
         }
 
         private suspend fun onGetResponse(currentWorkflow: Workflow) {
-            val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+            val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
             // when resource sharing is enabled, security plugin gates access at the index layer
             if (!useRsc &&
                 !checkUserPermissionsWithResource(

@@ -86,7 +86,7 @@ class TransportDeleteMonitorAction @Inject constructor(
             ?: recreateObject(request) { DeleteMonitorRequest(it) }
         val user = readUserFromThreadContext(client)
 
-        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
         if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
@@ -111,7 +111,7 @@ class TransportDeleteMonitorAction @Inject constructor(
             try {
                 val monitor = getMonitor()
 
-                val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+                val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
                 // when resource sharing is enabled, security plugin gates access at the index layer
                 val canDelete = useRsc ||
                     user == null ||

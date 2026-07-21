@@ -120,7 +120,7 @@ class TransportSearchAlertingCommentAction @Inject constructor(
 
     suspend fun resolve(searchCommentRequest: SearchCommentRequest, actionListener: ActionListener<SearchResponse>, user: User?) {
         val tenantId = currentTenantId()
-        if (ResourceSharingUtils.shouldUseResourceAuthz()) {
+        if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)) {
             // resource sharing is enabled - filter comments by alerts on accessible monitors
             val accessibleAlertIds = getAccessibleAlertIDs()
             val queryBuilder = searchCommentRequest.searchRequest.source().query() as BoolQueryBuilder

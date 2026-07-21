@@ -183,7 +183,7 @@ constructor(
                 return
             }
 
-            val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+            val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
             // when resource sharing is enabled, security plugin gates access at the alert fetch layer
             if (!useRsc) {
                 log.debug("checking user permissions in index comment")

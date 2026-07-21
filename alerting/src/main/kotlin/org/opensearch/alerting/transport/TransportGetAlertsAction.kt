@@ -240,7 +240,7 @@ class TransportGetAlertsAction @Inject constructor(
         user: User?,
         tenantId: String? = null,
     ) {
-        if (ResourceSharingUtils.shouldUseResourceAuthz()) {
+        if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)) {
             // resource sharing is enabled - filter alerts by accessible monitor IDs
             val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
                 as org.opensearch.security.spi.resources.client.ResourceSharingClient

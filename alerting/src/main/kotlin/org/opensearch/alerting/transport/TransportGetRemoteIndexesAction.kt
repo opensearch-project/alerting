@@ -103,7 +103,7 @@ class TransportGetRemoteIndexesAction @Inject constructor(
         }
 
         val user = readUserFromThreadContext(client)
-        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
         if (!useRsc && !validateUserBackendRoles(user, actionListener)) return
 
         if (!request.isValid()) {

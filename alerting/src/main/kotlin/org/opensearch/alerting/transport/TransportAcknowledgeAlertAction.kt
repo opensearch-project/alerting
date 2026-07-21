@@ -95,7 +95,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
             ?: recreateObject(acknowledgeAlertRequest) { AcknowledgeAlertRequest(it) }
         val user = readUserFromThreadContext(client)
 
-        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
         if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }

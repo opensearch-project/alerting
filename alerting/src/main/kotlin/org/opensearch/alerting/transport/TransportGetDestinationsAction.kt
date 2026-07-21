@@ -138,7 +138,7 @@ class TransportGetDestinationsAction @Inject constructor(
         user: User?,
         tenantId: String? = null,
     ) {
-        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
         if (useRsc) {
             // resource sharing framework is enabled - access control handled by security plugin
             search(searchSourceBuilder, actionListener, tenantId)
@@ -164,7 +164,7 @@ class TransportGetDestinationsAction @Inject constructor(
     ) {
         // When resource sharing is enabled, route search through PluginClient so it runs as the plugin subject
         // and the security plugin's DLS on the shared-resource index can filter results.
-        if (ResourceSharingUtils.shouldUseResourceAuthz()) {
+        if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)) {
             val searchRequest = org.opensearch.action.search.SearchRequest()
                 .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
                 .source(searchSourceBuilder)

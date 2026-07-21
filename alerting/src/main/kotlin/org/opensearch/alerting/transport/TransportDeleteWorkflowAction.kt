@@ -114,7 +114,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
         val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, transformedRequest.workflowId)
             .setRefreshPolicy(RefreshPolicy.IMMEDIATE)
 
-        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
         if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
@@ -144,7 +144,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
             try {
                 val workflow: Workflow = getWorkflow() ?: return
 
-                val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+                val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
                 // when resource sharing is enabled, security plugin gates access at the index layer
                 val canDelete = useRsc ||
                     user == null ||
