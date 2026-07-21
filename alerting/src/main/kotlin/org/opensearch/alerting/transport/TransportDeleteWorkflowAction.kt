@@ -144,9 +144,10 @@ class TransportDeleteWorkflowAction @Inject constructor(
             try {
                 val workflow: Workflow = getWorkflow() ?: return
 
+                val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
                 // when resource sharing is enabled, security plugin gates access at the index layer
-                val canDelete = user == null ||
-                    ResourceSharingClientAccessor.getResourceSharingClient() != null ||
+                val canDelete = rsc != null ||
+                    user == null ||
                     !doFilterForUser(user) ||
                     checkUserPermissionsWithResource(
                         user,

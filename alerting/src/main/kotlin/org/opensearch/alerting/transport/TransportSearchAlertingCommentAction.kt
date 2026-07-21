@@ -119,16 +119,17 @@ class TransportSearchAlertingCommentAction @Inject constructor(
 
     suspend fun resolve(searchCommentRequest: SearchCommentRequest, actionListener: ActionListener<SearchResponse>, user: User?) {
         val tenantId = currentTenantId()
-        if (user == null) {
-            // user is null when: 1/ security is disabled. 2/when user is super-admin.
-            search(searchCommentRequest.searchRequest, actionListener, tenantId)
-        } else if (ResourceSharingClientAccessor.getResourceSharingClient() != null) {
+        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+        if (rsc != null) {
             // resource sharing is enabled - filter comments by alerts on accessible monitors
             val accessibleAlertIds = getAccessibleAlertIDs()
             val queryBuilder = searchCommentRequest.searchRequest.source().query() as BoolQueryBuilder
             searchCommentRequest.searchRequest.source().query(
                 queryBuilder.filter(QueryBuilders.termsQuery(Comment.ENTITY_ID_FIELD, accessibleAlertIds))
             )
+            search(searchCommentRequest.searchRequest, actionListener, tenantId)
+        } else if (user == null) {
+            // user is null when: 1/ security is disabled. 2/when user is super-admin.
             search(searchCommentRequest.searchRequest, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.

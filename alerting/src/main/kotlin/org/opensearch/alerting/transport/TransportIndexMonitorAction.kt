@@ -1017,8 +1017,9 @@ class TransportIndexMonitorAction @Inject constructor(
         }
 
         private suspend fun onGetResponse(currentMonitor: Monitor) {
+            val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
             // when resource sharing is enabled, security plugin gates access at the index layer
-            if (ResourceSharingClientAccessor.getResourceSharingClient() == null &&
+            if (rsc == null &&
                 !checkUserPermissionsWithResource(user, currentMonitor.user, actionListener, "monitor", request.monitorId)
             ) {
                 return

@@ -18,6 +18,7 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.ResourceSharingClientAccessor
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.PluginClient
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -58,7 +59,8 @@ class TransportSearchMonitorAction @Inject constructor(
     clusterService: ClusterService,
     actionFilters: ActionFilters,
     val namedWriteableRegistry: NamedWriteableRegistry,
-    val sdkClient: SdkClient
+    val sdkClient: SdkClient,
+    private val pluginClient: PluginClient
 ) : HandledTransportAction<ActionRequest, SearchResponse>(
     AlertingActions.SEARCH_MONITORS_ACTION_NAME, transportService, actionFilters, ::SearchMonitorRequest
 ),
@@ -110,11 +112,12 @@ class TransportSearchMonitorAction @Inject constructor(
         user: User?,
         tenantId: String? = null,
     ) {
-        if (user == null) {
-            // user header is null when: 1/ security is disabled. 2/when user is super-admin.
-            search(searchMonitorRequest.searchRequest, actionListener, tenantId)
-        } else if (ResourceSharingClientAccessor.getResourceSharingClient() != null) {
+        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+        if (rsc != null) {
             // resource sharing is enabled - security plugin filters results at index layer
+            search(searchMonitorRequest.searchRequest, actionListener, tenantId)
+        } else if (user == null) {
+            // user header is null when: 1/ security is disabled. 2/when user is super-admin.
             search(searchMonitorRequest.searchRequest, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.
@@ -162,6 +165,26 @@ class TransportSearchMonitorAction @Inject constructor(
     }
 
     fun search(searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>, tenantId: String? = null) {
+        // When resource sharing is enabled, route search through PluginClient so it runs as the plugin subject
+        // and the security plugin's DLS on the shared-resource index can filter results.
+        if (ResourceSharingClientAccessor.getResourceSharingClient() != null) {
+            pluginClient.search(
+                searchRequest,
+                object : ActionListener<SearchResponse> {
+                    override fun onResponse(response: SearchResponse) = actionListener.onResponse(response)
+                    override fun onFailure(e: Exception) {
+                        if (isIndexNotFoundException(e)) {
+                            actionListener.onResponse(getEmptySearchResponse())
+                        } else {
+                            log.error("Unexpected error while searching monitor", e)
+                            actionListener.onFailure(AlertingException.wrap(e))
+                        }
+                    }
+                }
+            )
+            return
+        }
+
         val sdkSearchRequest = SearchDataObjectRequest.builder()
             .indices(*searchRequest.indices())
             .tenantId(tenantId)

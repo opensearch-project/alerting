@@ -164,10 +164,9 @@ dependencies {
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${opensearch_build}"
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${opensearch_build}"
 
-    // Needed for security tests
-    if (securityEnabled) {
-        opensearchPlugin "org.opensearch.plugin:opensearch-security:${opensearch_build}@zip"
-    }
+    // Needed for security tests and to provide ResourceSharingClient class at runtime
+    // for the resource-sharing framework (matches pattern used in reporting plugin)
+    opensearchPlugin "org.opensearch.plugin:opensearch-security:${opensearch_build}@zip"
 
     // Needed for BWC tests
     opensearchPlugin "org.opensearch.plugin:alerting:${bwcPluginVersion}@zip"

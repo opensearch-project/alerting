@@ -93,6 +93,7 @@ import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.MustacheTemplateService
+import org.opensearch.alerting.util.PluginClient
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.node.DiscoveryNodes
@@ -128,6 +129,7 @@ import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.env.Environment
 import org.opensearch.env.NodeEnvironment
+import org.opensearch.identity.PluginSubject
 import org.opensearch.index.IndexModule
 import org.opensearch.indices.SystemIndexDescriptor
 import org.opensearch.monitor.jvm.JvmStats
@@ -137,6 +139,7 @@ import org.opensearch.painless.spi.PainlessExtension
 import org.opensearch.percolator.PercolatorPluginExt
 import org.opensearch.plugins.ActionPlugin
 import org.opensearch.plugins.ExtensiblePlugin
+import org.opensearch.plugins.IdentityAwarePlugin
 import org.opensearch.plugins.ReloadablePlugin
 import org.opensearch.plugins.ScriptPlugin
 import org.opensearch.plugins.SearchPlugin
@@ -165,7 +168,9 @@ import java.util.function.Supplier
  * [BucketLevelTrigger.XCONTENT_REGISTRY], [ClusterMetricsInput.XCONTENT_REGISTRY] to the [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
  */
 internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin,
-    SearchPlugin, SystemIndexPlugin, PercolatorPluginExt() {
+    SearchPlugin, SystemIndexPlugin, IdentityAwarePlugin, PercolatorPluginExt() {
+
+    private var pluginClient: PluginClient? = null
 
     override fun getContextAllowlists(): Map<ScriptContext<*>, List<Allowlist>> {
         val whitelist = AllowlistLoader.loadFromResourceFiles(javaClass, "org.opensearch.alerting.txt")
@@ -409,6 +414,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             }
         }
 
+        val pluginClientInstance = PluginClient(client)
+        this.pluginClient = pluginClientInstance
+
         return listOf(
             sweeper,
             scheduler,
@@ -421,8 +429,13 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             alertService,
             triggerService,
             sdkClient,
-            monitorJobPoller
+            monitorJobPoller,
+            pluginClientInstance
         )
+    }
+
+    override fun assignSubject(pluginSubject: PluginSubject) {
+        pluginClient?.setSubject(pluginSubject)
     }
 
     override fun getSettings(): List<Setting<*>> {

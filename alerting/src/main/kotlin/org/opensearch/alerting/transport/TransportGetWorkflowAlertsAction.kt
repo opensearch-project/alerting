@@ -205,13 +205,11 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
         actionListener: ActionListener<GetWorkflowAlertsResponse>,
         user: User?,
     ) {
-        // user is null when: 1/ security is disabled. 2/when user is super-admin.
-        if (user == null) {
-            search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
-        } else if (ResourceSharingClientAccessor.getResourceSharingClient() != null) {
+        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+        if (rsc != null) {
             // resource sharing is enabled - filter alerts by accessible monitor IDs
             val tenantId = currentTenantId()
-            ResourceSharingClientAccessor.getResourceSharingClient()!!.getAccessibleResourceIds(
+            rsc.getAccessibleResourceIds(
                 "monitor",
                 object : ActionListener<Set<String>> {
                     override fun onResponse(accessibleMonitorIds: Set<String>) {
@@ -227,6 +225,9 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
                     }
                 }
             )
+        } else if (user == null) {
+            // user is null when: 1/ security is disabled. 2/when user is super-admin.
+            search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
         } else if (!doFilterForUser(user)) {
             search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
         } else {

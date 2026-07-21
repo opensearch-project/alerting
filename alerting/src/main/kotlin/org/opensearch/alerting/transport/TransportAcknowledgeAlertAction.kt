@@ -121,8 +121,8 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                     }
 
                     // when resource sharing is enabled, security plugin gates access at the index layer
-                    val canAccess = user == null ||
-                        ResourceSharingClientAccessor.getResourceSharingClient() != null ||
+                    val canAccess = rsc != null ||
+                        user == null ||
                         !doFilterForUser(user) ||
                         checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", request.monitorId)
 

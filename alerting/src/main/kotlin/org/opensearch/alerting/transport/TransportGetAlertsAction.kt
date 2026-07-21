@@ -239,12 +239,10 @@ class TransportGetAlertsAction @Inject constructor(
         user: User?,
         tenantId: String? = null,
     ) {
-        // user is null when: 1/ security is disabled. 2/when user is super-admin.
-        if (user == null) {
-            search(alertIndex, searchSourceBuilder, actionListener, tenantId)
-        } else if (ResourceSharingClientAccessor.getResourceSharingClient() != null) {
+        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+        if (rsc != null) {
             // resource sharing is enabled - filter alerts by accessible monitor IDs
-            ResourceSharingClientAccessor.getResourceSharingClient()!!.getAccessibleResourceIds(
+            rsc.getAccessibleResourceIds(
                 "monitor",
                 object : ActionListener<Set<String>> {
                     override fun onResponse(accessibleMonitorIds: Set<String>) {
@@ -258,6 +256,9 @@ class TransportGetAlertsAction @Inject constructor(
                     }
                 }
             )
+        } else if (user == null) {
+            // user is null when: 1/ security is disabled. 2/when user is super-admin.
+            search(alertIndex, searchSourceBuilder, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
             search(alertIndex, searchSourceBuilder, actionListener, tenantId)
         } else {

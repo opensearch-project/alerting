@@ -184,6 +184,7 @@ constructor(
             }
 
             val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+            // when resource sharing is enabled, security plugin gates access at the alert fetch layer
             if (rsc == null) {
                 log.debug("checking user permissions in index comment")
                 checkUserPermissionsWithResource(user, alert.monitorUser, actionListener, "monitor", alert.monitorId)

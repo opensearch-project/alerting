@@ -120,7 +120,7 @@ class TransportGetWorkflowAction @Inject constructor(
                                 }
 
                                 // when resource sharing is enabled, security plugin gates access at the index layer
-                                if (ResourceSharingClientAccessor.getResourceSharingClient() == null &&
+                                if (rsc == null &&
                                     !checkUserPermissionsWithResource(
                                             user,
                                             workflow?.user,
