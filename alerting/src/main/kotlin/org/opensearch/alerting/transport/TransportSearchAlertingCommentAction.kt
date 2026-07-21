@@ -218,7 +218,7 @@ class TransportSearchAlertingCommentAction @Inject constructor(
     private suspend fun getAccessibleAlertIDs(): List<String> {
         val rsc = ResourceSharingClientAccessor.getResourceSharingClient() ?: return emptyList()
         val accessibleMonitorIds: Set<String> = suspendCoroutine { cont ->
-            rsc.getAccessibleResourceIds(
+            (rsc as org.opensearch.security.spi.resources.client.ResourceSharingClient).getAccessibleResourceIds(
                 "monitor",
                 object : ActionListener<Set<String>> {
                     override fun onResponse(ids: Set<String>) = cont.resume(ids)

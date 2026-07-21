@@ -242,7 +242,7 @@ class TransportGetAlertsAction @Inject constructor(
         val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
         if (rsc != null) {
             // resource sharing is enabled - filter alerts by accessible monitor IDs
-            rsc.getAccessibleResourceIds(
+            (rsc as org.opensearch.security.spi.resources.client.ResourceSharingClient).getAccessibleResourceIds(
                 "monitor",
                 object : ActionListener<Set<String>> {
                     override fun onResponse(accessibleMonitorIds: Set<String>) {
