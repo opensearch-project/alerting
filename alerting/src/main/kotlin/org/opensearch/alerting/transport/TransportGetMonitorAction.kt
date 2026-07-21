@@ -17,7 +17,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.ResourceSharingClientAccessor
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
@@ -89,8 +89,8 @@ class TransportGetMonitorAction @Inject constructor(
 
         val user = readUserFromThreadContext(client)
 
-        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
-        if (rsc == null && !validateUserBackendRoles(user, actionListener)) {
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+        if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
 
@@ -135,7 +135,7 @@ class TransportGetMonitorAction @Inject constructor(
                         }
                     }
                     // when resource sharing is enabled, security plugin gates access at the index layer
-                    if (rsc == null &&
+                    if (!useRsc &&
                         !checkUserPermissionsWithResource(user, monitor?.user, actionListener, "monitor", transformedRequest.monitorId)
                     ) {
                         return@whenComplete

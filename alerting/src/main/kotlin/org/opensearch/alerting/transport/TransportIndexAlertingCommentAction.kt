@@ -14,7 +14,7 @@ import org.opensearch.action.ActionRequest
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.ResourceSharingClientAccessor
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.comments.CommentsIndices.Companion.COMMENTS_HISTORY_WRITE_INDEX
@@ -183,9 +183,9 @@ constructor(
                 return
             }
 
-            val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+            val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
             // when resource sharing is enabled, security plugin gates access at the alert fetch layer
-            if (rsc == null) {
+            if (!useRsc) {
                 log.debug("checking user permissions in index comment")
                 checkUserPermissionsWithResource(user, alert.monitorUser, actionListener, "monitor", alert.monitorId)
             }

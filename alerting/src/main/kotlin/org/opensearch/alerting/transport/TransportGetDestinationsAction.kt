@@ -10,7 +10,7 @@ import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.ResourceSharingClientAccessor
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.GetDestinationsResponse
@@ -138,8 +138,8 @@ class TransportGetDestinationsAction @Inject constructor(
         user: User?,
         tenantId: String? = null,
     ) {
-        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
-        if (rsc != null) {
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+        if (useRsc) {
             // resource sharing framework is enabled - access control handled by security plugin
             search(searchSourceBuilder, actionListener, tenantId)
         } else if (user == null) {
@@ -164,7 +164,7 @@ class TransportGetDestinationsAction @Inject constructor(
     ) {
         // When resource sharing is enabled, route search through PluginClient so it runs as the plugin subject
         // and the security plugin's DLS on the shared-resource index can filter results.
-        if (ResourceSharingClientAccessor.getResourceSharingClient() != null) {
+        if (ResourceSharingUtils.shouldUseResourceAuthz()) {
             val searchRequest = org.opensearch.action.search.SearchRequest()
                 .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
                 .source(searchSourceBuilder)

@@ -14,6 +14,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.ResourceSharingClientAccessor
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
@@ -239,10 +240,11 @@ class TransportGetAlertsAction @Inject constructor(
         user: User?,
         tenantId: String? = null,
     ) {
-        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
-        if (rsc != null) {
+        if (ResourceSharingUtils.shouldUseResourceAuthz()) {
             // resource sharing is enabled - filter alerts by accessible monitor IDs
-            (rsc as org.opensearch.security.spi.resources.client.ResourceSharingClient).getAccessibleResourceIds(
+            val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+                as org.opensearch.security.spi.resources.client.ResourceSharingClient
+            rsc.getAccessibleResourceIds(
                 "monitor",
                 object : ActionListener<Set<String>> {
                     override fun onResponse(accessibleMonitorIds: Set<String>) {

@@ -14,7 +14,7 @@ class AlertingResourceSharingExtension : ResourceSharingExtension {
     override fun getResourceProviders(): Set<ResourceProvider> {
         return setOf(
             object : ResourceProvider {
-                override fun resourceType(): String = "monitor"
+                override fun resourceType(): String = ResourceSharingUtils.MONITOR_RESOURCE_TYPE
                 override fun resourceIndexName(): String = SCHEDULED_JOBS_INDEX
             }
         )

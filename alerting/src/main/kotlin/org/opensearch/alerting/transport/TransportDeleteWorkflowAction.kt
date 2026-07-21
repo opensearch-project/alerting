@@ -24,7 +24,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.ResourceSharingClientAccessor
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.core.lock.LockModel
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.opensearchapi.addFilter
@@ -114,8 +114,8 @@ class TransportDeleteWorkflowAction @Inject constructor(
         val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, transformedRequest.workflowId)
             .setRefreshPolicy(RefreshPolicy.IMMEDIATE)
 
-        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
-        if (rsc == null && !validateUserBackendRoles(user, actionListener)) {
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+        if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
 
@@ -144,9 +144,9 @@ class TransportDeleteWorkflowAction @Inject constructor(
             try {
                 val workflow: Workflow = getWorkflow() ?: return
 
-                val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+                val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
                 // when resource sharing is enabled, security plugin gates access at the index layer
-                val canDelete = rsc != null ||
+                val canDelete = useRsc ||
                     user == null ||
                     !doFilterForUser(user) ||
                     checkUserPermissionsWithResource(

@@ -30,7 +30,7 @@ import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.MonitorRunnerService.monitorCtx
-import org.opensearch.alerting.ResourceSharingClientAccessor
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.WorkflowMetadataService
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
@@ -180,8 +180,8 @@ class TransportIndexWorkflowAction @Inject constructor(
 
         val user = readUserFromThreadContext(client)
 
-        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
-        if (rsc == null && !validateUserBackendRoles(user, actionListener)) {
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+        if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
 
@@ -508,9 +508,9 @@ class TransportIndexWorkflowAction @Inject constructor(
         }
 
         private suspend fun onGetResponse(currentWorkflow: Workflow) {
-            val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+            val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
             // when resource sharing is enabled, security plugin gates access at the index layer
-            if (rsc == null &&
+            if (!useRsc &&
                 !checkUserPermissionsWithResource(
                         user,
                         currentWorkflow.user,

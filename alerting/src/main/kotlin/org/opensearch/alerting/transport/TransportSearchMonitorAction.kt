@@ -15,7 +15,7 @@ import org.opensearch.action.search.ShardSearchFailure
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
-import org.opensearch.alerting.ResourceSharingClientAccessor
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.PluginClient
@@ -112,8 +112,8 @@ class TransportSearchMonitorAction @Inject constructor(
         user: User?,
         tenantId: String? = null,
     ) {
-        val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
-        if (rsc != null) {
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz()
+        if (useRsc) {
             // resource sharing is enabled - security plugin filters results at index layer
             search(searchMonitorRequest.searchRequest, actionListener, tenantId)
         } else if (user == null) {
@@ -167,7 +167,7 @@ class TransportSearchMonitorAction @Inject constructor(
     fun search(searchRequest: SearchRequest, actionListener: ActionListener<SearchResponse>, tenantId: String? = null) {
         // When resource sharing is enabled, route search through PluginClient so it runs as the plugin subject
         // and the security plugin's DLS on the shared-resource index can filter results.
-        if (ResourceSharingClientAccessor.getResourceSharingClient() != null) {
+        if (ResourceSharingUtils.shouldUseResourceAuthz()) {
             pluginClient.search(
                 searchRequest,
                 object : ActionListener<SearchResponse> {
