@@ -107,6 +107,18 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("renamed-by-bob", updated.name)
     }
 
+    fun `test alice sees bob's edits after read-write share`() {
+        val monitor = aliceCreatesMonitor()
+        shareResource(aliceClient!!, monitor.id, "alerting_read_write", bobUser)
+
+        updateMonitorWithClient(bobClient!!, monitor.copy(name = "renamed-by-bob"))
+
+        // Owner alice re-reads and sees bob's change
+        val response = aliceClient!!.makeRequest("GET", "$ALERTING_BASE_URI/${monitor.id}")
+        val body = EntityUtils.toString(response.entity)
+        assertTrue("Owner should see edits made by shared user: $body", body.contains("renamed-by-bob"))
+    }
+
     // ─── DELETE monitor ──────────────────────────────────────────────────────────
 
     fun `test bob cannot delete alice's monitor with read-only share`() {
@@ -116,12 +128,30 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         assertForbidden { deleteMonitorWithClient(bobClient!!, monitor) }
     }
 
+    fun `test bob can delete alice's monitor with read-write share`() {
+        val monitor = aliceCreatesMonitor()
+        shareResource(aliceClient!!, monitor.id, "alerting_read_write", bobUser)
+
+        val response = deleteMonitorWithClient(bobClient!!, monitor)
+        assertEquals(RestStatus.OK.status, response.statusLine.statusCode)
+    }
+
     fun `test bob can delete alice's monitor with full-access share`() {
         val monitor = aliceCreatesMonitor()
         shareResource(aliceClient!!, monitor.id, "alerting_full_access", bobUser)
 
         val response = deleteMonitorWithClient(bobClient!!, monitor)
         assertEquals(RestStatus.OK.status, response.statusLine.statusCode)
+    }
+
+    fun `test alice can no longer get her monitor after bob deletes it with full-access`() {
+        val monitor = aliceCreatesMonitor()
+        shareResource(aliceClient!!, monitor.id, "alerting_full_access", bobUser)
+
+        deleteMonitorWithClient(bobClient!!, monitor)
+
+        // Owner alice sees the delete propagated
+        assertNotFound { aliceClient!!.makeRequest("GET", "$ALERTING_BASE_URI/${monitor.id}") }
     }
 
     // ─── SEARCH monitors ─────────────────────────────────────────────────────────
@@ -171,6 +201,14 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
     fun `test bob cannot re-share alice's monitor with only read-only access`() {
         val monitorId = aliceCreatesMonitor().id
         shareResource(aliceClient!!, monitorId, "alerting_read_only", bobUser)
+
+        assertForbidden { shareResource(bobClient!!, monitorId, "alerting_read_only", "someone_else") }
+    }
+
+    fun `test bob cannot re-share alice's monitor with only read-write access`() {
+        // read-write grants monitor CRUD but NOT the resource-share permission
+        val monitorId = aliceCreatesMonitor().id
+        shareResource(aliceClient!!, monitorId, "alerting_read_write", bobUser)
 
         assertForbidden { shareResource(bobClient!!, monitorId, "alerting_read_only", "someone_else") }
     }
@@ -226,6 +264,11 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
             status == RestStatus.FORBIDDEN.status ||
                 exception.message?.contains("no permissions") == true
         )
+    }
+
+    private fun assertNotFound(block: () -> Any?) {
+        val exception = expectThrows(ResponseException::class.java) { block() }
+        assertEquals(RestStatus.NOT_FOUND.status, exception.response.statusLine.statusCode)
     }
 
     private fun buildClient(user: String): RestClient =
