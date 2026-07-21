@@ -5,12 +5,15 @@
 
 package org.opensearch.alerting.resthandler
 
+import org.apache.hc.core5.http.ContentType
 import org.apache.hc.core5.http.io.entity.EntityUtils
+import org.apache.hc.core5.http.io.entity.StringEntity
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
+import org.opensearch.alerting.AlertingPlugin.Companion.COMMENTS_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.randomAlert
@@ -27,9 +30,14 @@ import org.opensearch.test.junit.annotations.TestLogging
 /**
  * Integration tests that exercise the security plugin's transport-level interception on the resource-sharing framework.
  *
- * Each test drives an alerting transport action (via REST) as a non-admin user without a share entry on the target
- * monitor. The security plugin's ActionFilter (using DocRequest.id) is expected to reject those requests with 403.
- * When the resource is explicitly shared, the same requests should succeed.
+ * The suite drives alerting transport actions (via REST) as non-admin users to verify:
+ *  - default deny: a user with the alerting role but no share entry gets 403 on read/update/delete/re-share
+ *  - graduated access: read-only < read-write < full-access, where each level unlocks progressively more actions
+ *  - non-owner mutations propagate back to the owner (alice sees bob's edits, sees bob's deletes)
+ *  - subordinate resources (alerts, comments) inherit access from the parent monitor
+ *  - revoke removes access
+ *  - cross-resource isolation: a share on monitor A does not grant access to monitor B
+ *  - third-party isolation: a share to bob does not grant access to carol
  *
  * Runs only when both `security` and `resource_sharing.enabled` system properties are true.
  */
@@ -44,194 +52,310 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
             org.junit.Assume.assumeTrue(System.getProperty("security", "false")!!.toBoolean())
             org.junit.Assume.assumeTrue(System.getProperty("resource_sharing.enabled", "false")!!.toBoolean())
         }
+
+        private const val RS_ALICE = "rs_alice"
+        private const val RS_BOB = "rs_bob"
+        private const val RS_CAROL = "rs_carol"
+
+        private const val READ_ONLY = "alerting_read_only"
+        private const val READ_WRITE = "alerting_read_write"
+        private const val FULL_ACCESS = "alerting_full_access"
     }
 
-    private val aliceUser = "rs_alice"
-    private val bobUser = "rs_bob"
     private var aliceClient: RestClient? = null
     private var bobClient: RestClient? = null
+    private var carolClient: RestClient? = null
 
     @Before
     fun setupUsers() {
         if (aliceClient != null) return
-
         // Only ALERTING_FULL_ACCESS_ROLE — no all_access — so RSC is the sole gate.
-        createRsUser(aliceUser, arrayOf("engineering"))
-        aliceClient = buildClient(aliceUser)
-
-        createRsUser(bobUser, arrayOf("marketing"))
-        bobClient = buildClient(bobUser)
+        createRsUser(RS_ALICE, arrayOf("engineering"))
+        createRsUser(RS_BOB, arrayOf("marketing"))
+        createRsUser(RS_CAROL, arrayOf("finance"))
+        aliceClient = buildClient(RS_ALICE)
+        bobClient = buildClient(RS_BOB)
+        carolClient = buildClient(RS_CAROL)
     }
 
     @After
     fun cleanupClients() {
         aliceClient?.close()
         bobClient?.close()
+        carolClient?.close()
         aliceClient = null
         bobClient = null
-        deleteRsUser(aliceUser)
-        deleteRsUser(bobUser)
+        carolClient = null
+        deleteRsUser(RS_ALICE)
+        deleteRsUser(RS_BOB)
+        deleteRsUser(RS_CAROL)
     }
 
-    // ─── GET monitor ─────────────────────────────────────────────────────────────
+    // ─── Owner can always operate on their own resource ──────────────────────────
+
+    fun `test owner can get their own monitor`() {
+        val monitorId = aliceCreatesMonitor().id
+        assertOk { aliceClient!!.makeRequest("GET", "$ALERTING_BASE_URI/$monitorId") }
+    }
+
+    fun `test owner can update their own monitor`() {
+        val monitor = aliceCreatesMonitor()
+        updateMonitorWithClient(aliceClient!!, monitor.copy(name = "renamed"))
+    }
+
+    fun `test owner can delete their own monitor`() {
+        val monitor = aliceCreatesMonitor()
+        deleteMonitorWithClient(aliceClient!!, monitor)
+    }
+
+    // ─── Default deny (no share) ─────────────────────────────────────────────────
 
     fun `test bob cannot get alice's monitor without share`() {
         val monitorId = aliceCreatesMonitor().id
         assertForbidden { bobClient!!.makeRequest("GET", "$ALERTING_BASE_URI/$monitorId") }
     }
 
-    fun `test bob can get alice's monitor after read-only share`() {
+    fun `test bob cannot update alice's monitor without share`() {
+        val monitor = aliceCreatesMonitor()
+        assertForbidden { updateMonitorWithClient(bobClient!!, monitor.copy(name = "hijacked")) }
+    }
+
+    fun `test bob cannot delete alice's monitor without share`() {
+        val monitor = aliceCreatesMonitor()
+        assertForbidden { deleteMonitorWithClient(bobClient!!, monitor) }
+    }
+
+    fun `test bob cannot re-share alice's monitor without share`() {
         val monitorId = aliceCreatesMonitor().id
-        shareResource(aliceClient!!, monitorId, "alerting_read_only", bobUser)
-
-        val response = bobClient!!.makeRequest("GET", "$ALERTING_BASE_URI/$monitorId")
-        assertEquals(RestStatus.OK.status, response.statusLine.statusCode)
+        assertForbidden { shareResource(bobClient!!, monitorId, READ_ONLY, RS_CAROL) }
     }
 
-    // ─── UPDATE monitor ──────────────────────────────────────────────────────────
+    // ─── read-only share ─────────────────────────────────────────────────────────
 
-    fun `test bob cannot update alice's monitor with read-only share`() {
-        val monitor = aliceCreatesMonitor()
-        shareResource(aliceClient!!, monitor.id, "alerting_read_only", bobUser)
-
-        assertForbidden {
-            updateMonitorWithClient(bobClient!!, monitor.copy(name = "renamed-by-bob"))
-        }
+    fun `test read-only share grants get`() {
+        val monitorId = aliceCreatesMonitor().id
+        shareResource(aliceClient!!, monitorId, READ_ONLY, RS_BOB)
+        assertOk { bobClient!!.makeRequest("GET", "$ALERTING_BASE_URI/$monitorId") }
     }
 
-    fun `test bob can update alice's monitor with read-write share`() {
+    fun `test read-only share denies update`() {
         val monitor = aliceCreatesMonitor()
-        shareResource(aliceClient!!, monitor.id, "alerting_read_write", bobUser)
+        shareResource(aliceClient!!, monitor.id, READ_ONLY, RS_BOB)
+        assertForbidden { updateMonitorWithClient(bobClient!!, monitor.copy(name = "renamed-by-bob")) }
+    }
 
+    fun `test read-only share denies delete`() {
+        val monitor = aliceCreatesMonitor()
+        shareResource(aliceClient!!, monitor.id, READ_ONLY, RS_BOB)
+        assertForbidden { deleteMonitorWithClient(bobClient!!, monitor) }
+    }
+
+    fun `test read-only share denies re-share`() {
+        val monitorId = aliceCreatesMonitor().id
+        shareResource(aliceClient!!, monitorId, READ_ONLY, RS_BOB)
+        assertForbidden { shareResource(bobClient!!, monitorId, READ_ONLY, RS_CAROL) }
+    }
+
+    // ─── read-write share ────────────────────────────────────────────────────────
+
+    fun `test read-write share grants update`() {
+        val monitor = aliceCreatesMonitor()
+        shareResource(aliceClient!!, monitor.id, READ_WRITE, RS_BOB)
         val updated = updateMonitorWithClient(bobClient!!, monitor.copy(name = "renamed-by-bob"))
         assertEquals("renamed-by-bob", updated.name)
     }
 
-    fun `test alice sees bob's edits after read-write share`() {
+    fun `test read-write share grants delete`() {
         val monitor = aliceCreatesMonitor()
-        shareResource(aliceClient!!, monitor.id, "alerting_read_write", bobUser)
+        shareResource(aliceClient!!, monitor.id, READ_WRITE, RS_BOB)
+        assertOk { deleteMonitorWithClient(bobClient!!, monitor) }
+    }
 
+    fun `test read-write share denies re-share`() {
+        // share permission belongs only to full-access
+        val monitorId = aliceCreatesMonitor().id
+        shareResource(aliceClient!!, monitorId, READ_WRITE, RS_BOB)
+        assertForbidden { shareResource(bobClient!!, monitorId, READ_ONLY, RS_CAROL) }
+    }
+
+    fun `test owner sees edits made by read-write shared user`() {
+        val monitor = aliceCreatesMonitor()
+        shareResource(aliceClient!!, monitor.id, READ_WRITE, RS_BOB)
         updateMonitorWithClient(bobClient!!, monitor.copy(name = "renamed-by-bob"))
 
-        // Owner alice re-reads and sees bob's change
-        val response = aliceClient!!.makeRequest("GET", "$ALERTING_BASE_URI/${monitor.id}")
-        val body = EntityUtils.toString(response.entity)
-        assertTrue("Owner should see edits made by shared user: $body", body.contains("renamed-by-bob"))
+        val body = getBody(aliceClient!!, "$ALERTING_BASE_URI/${monitor.id}")
+        assertTrue("Owner should see edits by shared user: $body", body.contains("renamed-by-bob"))
     }
 
-    // ─── DELETE monitor ──────────────────────────────────────────────────────────
-
-    fun `test bob cannot delete alice's monitor with read-only share`() {
+    fun `test owner sees delete performed by read-write shared user`() {
         val monitor = aliceCreatesMonitor()
-        shareResource(aliceClient!!, monitor.id, "alerting_read_only", bobUser)
-
-        assertForbidden { deleteMonitorWithClient(bobClient!!, monitor) }
-    }
-
-    fun `test bob can delete alice's monitor with read-write share`() {
-        val monitor = aliceCreatesMonitor()
-        shareResource(aliceClient!!, monitor.id, "alerting_read_write", bobUser)
-
-        val response = deleteMonitorWithClient(bobClient!!, monitor)
-        assertEquals(RestStatus.OK.status, response.statusLine.statusCode)
-    }
-
-    fun `test bob can delete alice's monitor with full-access share`() {
-        val monitor = aliceCreatesMonitor()
-        shareResource(aliceClient!!, monitor.id, "alerting_full_access", bobUser)
-
-        val response = deleteMonitorWithClient(bobClient!!, monitor)
-        assertEquals(RestStatus.OK.status, response.statusLine.statusCode)
-    }
-
-    fun `test alice can no longer get her monitor after bob deletes it with full-access`() {
-        val monitor = aliceCreatesMonitor()
-        shareResource(aliceClient!!, monitor.id, "alerting_full_access", bobUser)
-
+        shareResource(aliceClient!!, monitor.id, READ_WRITE, RS_BOB)
         deleteMonitorWithClient(bobClient!!, monitor)
 
-        // Owner alice sees the delete propagated
         assertNotFound { aliceClient!!.makeRequest("GET", "$ALERTING_BASE_URI/${monitor.id}") }
     }
 
-    // ─── SEARCH monitors ─────────────────────────────────────────────────────────
+    // ─── full-access share ───────────────────────────────────────────────────────
 
-    fun `test bob's monitor search excludes alice's monitors`() {
+    fun `test full-access share grants re-share`() {
+        val monitorId = aliceCreatesMonitor().id
+        shareResource(aliceClient!!, monitorId, FULL_ACCESS, RS_BOB)
+        // Bob re-shares to carol
+        shareResource(bobClient!!, monitorId, READ_ONLY, RS_CAROL)
+        assertOk { carolClient!!.makeRequest("GET", "$ALERTING_BASE_URI/$monitorId") }
+    }
+
+    fun `test full-access share grants delete`() {
+        val monitor = aliceCreatesMonitor()
+        shareResource(aliceClient!!, monitor.id, FULL_ACCESS, RS_BOB)
+        assertOk { deleteMonitorWithClient(bobClient!!, monitor) }
+    }
+
+    // ─── Third-party isolation ───────────────────────────────────────────────────
+
+    fun `test share to bob does not grant access to carol`() {
+        val monitorId = aliceCreatesMonitor().id
+        shareResource(aliceClient!!, monitorId, READ_ONLY, RS_BOB)
+        assertForbidden { carolClient!!.makeRequest("GET", "$ALERTING_BASE_URI/$monitorId") }
+    }
+
+    // ─── Cross-resource isolation ────────────────────────────────────────────────
+
+    fun `test share on one monitor does not grant access to another`() {
+        val sharedMonitorId = aliceCreatesMonitor().id
+        val unsharedMonitorId = aliceCreatesMonitor().id
+        shareResource(aliceClient!!, sharedMonitorId, READ_ONLY, RS_BOB)
+
+        assertOk { bobClient!!.makeRequest("GET", "$ALERTING_BASE_URI/$sharedMonitorId") }
+        assertForbidden { bobClient!!.makeRequest("GET", "$ALERTING_BASE_URI/$unsharedMonitorId") }
+    }
+
+    // ─── Search DLS ──────────────────────────────────────────────────────────────
+
+    fun `test search excludes monitors not owned or shared`() {
         val aliceMonitorId = aliceCreatesMonitor().id
         val bobMonitorId = bobCreatesMonitor().id
 
-        val body = bobSearchMonitors()
+        val body = searchMonitors(bobClient!!)
         assertTrue("Bob's own monitor missing: $body", body.contains(bobMonitorId))
-        assertFalse("Alice's monitor leaked to bob: $body", body.contains(aliceMonitorId))
+        assertFalse("Alice's monitor leaked: $body", body.contains(aliceMonitorId))
     }
 
-    fun `test bob's monitor search includes shared monitor`() {
+    fun `test search includes shared monitor`() {
         val aliceMonitorId = aliceCreatesMonitor().id
-        shareResource(aliceClient!!, aliceMonitorId, "alerting_read_only", bobUser)
+        shareResource(aliceClient!!, aliceMonitorId, READ_ONLY, RS_BOB)
 
-        val body = bobSearchMonitors()
-        assertTrue("Shared monitor missing from bob's search: $body", body.contains(aliceMonitorId))
+        val body = searchMonitors(bobClient!!)
+        assertTrue("Shared monitor missing from search: $body", body.contains(aliceMonitorId))
     }
 
-    // ─── GET alerts (subordinate resource) ───────────────────────────────────────
+    // ─── Subordinate resource: alerts ────────────────────────────────────────────
 
-    fun `test bob cannot see alice's monitor alerts without share`() {
+    fun `test alerts inherit denial when monitor is not shared`() {
         val monitor = aliceCreatesMonitor()
         putAlertMappings()
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE, monitorId = monitor.id))
 
-        val response = bobClient!!.makeRequest("GET", "$ALERTING_BASE_URI/alerts?monitorId=${monitor.id}")
-        val body = EntityUtils.toString(response.entity)
-        assertFalse("Alert leaked to bob without share: $body", body.contains(alert.id))
+        val body = getBody(bobClient!!, "$ALERTING_BASE_URI/alerts?monitorId=${monitor.id}")
+        assertFalse("Alert leaked without share: $body", body.contains(alert.id))
     }
 
-    fun `test bob can see alice's monitor alerts after share`() {
+    fun `test alerts inherit access when monitor is shared read-only`() {
         val monitor = aliceCreatesMonitor()
         putAlertMappings()
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE, monitorId = monitor.id))
-        shareResource(aliceClient!!, monitor.id, "alerting_read_only", bobUser)
+        shareResource(aliceClient!!, monitor.id, READ_ONLY, RS_BOB)
 
-        val response = bobClient!!.makeRequest("GET", "$ALERTING_BASE_URI/alerts?monitorId=${monitor.id}")
-        val body = EntityUtils.toString(response.entity)
+        val body = getBody(bobClient!!, "$ALERTING_BASE_URI/alerts?monitorId=${monitor.id}")
         assertTrue("Shared alert missing: $body", body.contains(alert.id))
     }
 
-    // ─── SHARE permission checks ─────────────────────────────────────────────────
+    fun `test acknowledge alert denied without share`() {
+        val monitor = aliceCreatesMonitor()
+        putAlertMappings()
+        val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE, monitorId = monitor.id))
 
-    fun `test bob cannot re-share alice's monitor with only read-only access`() {
-        val monitorId = aliceCreatesMonitor().id
-        shareResource(aliceClient!!, monitorId, "alerting_read_only", bobUser)
-
-        assertForbidden { shareResource(bobClient!!, monitorId, "alerting_read_only", "someone_else") }
+        assertForbidden { acknowledgeAlertsWithClient(bobClient!!, monitor, alert) }
     }
 
-    fun `test bob cannot re-share alice's monitor with only read-write access`() {
-        // read-write grants monitor CRUD but NOT the resource-share permission
-        val monitorId = aliceCreatesMonitor().id
-        shareResource(aliceClient!!, monitorId, "alerting_read_write", bobUser)
+    fun `test acknowledge alert allowed with read-write share`() {
+        val monitor = aliceCreatesMonitor()
+        putAlertMappings()
+        val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE, monitorId = monitor.id))
+        shareResource(aliceClient!!, monitor.id, READ_WRITE, RS_BOB)
 
-        assertForbidden { shareResource(bobClient!!, monitorId, "alerting_read_only", "someone_else") }
+        acknowledgeAlertsWithClient(bobClient!!, monitor, alert)
     }
 
-    fun `test bob can re-share alice's monitor with full-access`() {
-        val monitorId = aliceCreatesMonitor().id
-        shareResource(aliceClient!!, monitorId, "alerting_full_access", bobUser)
+    // ─── Subordinate resource: comments ──────────────────────────────────────────
 
-        // Bob re-shares back to alice (must succeed with full_access)
-        shareResource(bobClient!!, monitorId, "alerting_read_only", aliceUser)
+    fun `test comment on alert denied without share`() {
+        val monitor = aliceCreatesMonitor()
+        putAlertMappings()
+        val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE, monitorId = monitor.id))
+
+        assertForbidden {
+            val body = """{"content":"hi from bob"}"""
+            bobClient!!.makeRequest(
+                "POST",
+                "$COMMENTS_BASE_URI/${alert.id}",
+                emptyMap(),
+                StringEntity(body, ContentType.APPLICATION_JSON)
+            )
+        }
     }
 
-    // ─── REVOKE ──────────────────────────────────────────────────────────────────
+    fun `test comment on alert allowed with read-write share`() {
+        val monitor = aliceCreatesMonitor()
+        putAlertMappings()
+        val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE, monitorId = monitor.id))
+        shareResource(aliceClient!!, monitor.id, READ_WRITE, RS_BOB)
 
-    fun `test bob loses access after alice revokes share`() {
+        val body = """{"content":"hi from bob"}"""
+        val response = bobClient!!.makeRequest(
+            "POST",
+            "$COMMENTS_BASE_URI/${alert.id}",
+            emptyMap(),
+            StringEntity(body, ContentType.APPLICATION_JSON)
+        )
+        assertEquals(RestStatus.CREATED.status, response.statusLine.statusCode)
+    }
+
+    // ─── Access-level downgrade ──────────────────────────────────────────────────
+
+    fun `test re-sharing with lower access level narrows permissions`() {
+        val monitor = aliceCreatesMonitor()
+        shareResource(aliceClient!!, monitor.id, READ_WRITE, RS_BOB)
+        // Confirm bob can update at first
+        updateMonitorWithClient(bobClient!!, monitor.copy(name = "renamed-once"))
+
+        // Alice downgrades bob to read-only
+        shareResource(aliceClient!!, monitor.id, READ_ONLY, RS_BOB)
+        assertForbidden {
+            updateMonitorWithClient(bobClient!!, monitor.copy(name = "renamed-again"))
+        }
+    }
+
+    // ─── Revoke ──────────────────────────────────────────────────────────────────
+
+    fun `test revoke removes access`() {
         val monitorId = aliceCreatesMonitor().id
-        shareResource(aliceClient!!, monitorId, "alerting_read_only", bobUser)
+        shareResource(aliceClient!!, monitorId, READ_ONLY, RS_BOB)
+        assertOk { bobClient!!.makeRequest("GET", "$ALERTING_BASE_URI/$monitorId") }
 
-        val ok = bobClient!!.makeRequest("GET", "$ALERTING_BASE_URI/$monitorId")
-        assertEquals(RestStatus.OK.status, ok.statusLine.statusCode)
-
-        revokeResource(aliceClient!!, monitorId, bobUser)
+        revokeResource(aliceClient!!, monitorId, RS_BOB)
         assertForbidden { bobClient!!.makeRequest("GET", "$ALERTING_BASE_URI/$monitorId") }
+    }
+
+    fun `test revoke on one user does not affect other user's access`() {
+        val monitorId = aliceCreatesMonitor().id
+        shareResource(aliceClient!!, monitorId, READ_ONLY, RS_BOB)
+        shareResource(aliceClient!!, monitorId, READ_ONLY, RS_CAROL)
+
+        revokeResource(aliceClient!!, monitorId, RS_BOB)
+
+        assertForbidden { bobClient!!.makeRequest("GET", "$ALERTING_BASE_URI/$monitorId") }
+        assertOk { carolClient!!.makeRequest("GET", "$ALERTING_BASE_URI/$monitorId") }
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -246,14 +370,26 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger()))
     )
 
-    private fun bobSearchMonitors(): String {
+    private fun searchMonitors(client: RestClient): String {
         val body = """{"query":{"match_all":{}}}"""
-        val entity = org.apache.hc.core5.http.io.entity.StringEntity(
-            body,
-            org.apache.hc.core5.http.ContentType.APPLICATION_JSON
+        val response = client.makeRequest(
+            "POST",
+            "$ALERTING_BASE_URI/_search",
+            emptyMap(),
+            StringEntity(body, ContentType.APPLICATION_JSON)
         )
-        val response = bobClient!!.makeRequest("POST", "$ALERTING_BASE_URI/_search", emptyMap(), entity)
         return EntityUtils.toString(response.entity)
+    }
+
+    private fun getBody(client: RestClient, path: String): String {
+        val response = client.makeRequest("GET", path)
+        return EntityUtils.toString(response.entity)
+    }
+
+    private fun assertOk(block: () -> org.opensearch.client.Response) {
+        val response = block()
+        val status = response.statusLine.statusCode
+        assertTrue("Expected 2xx but got $status", status in 200..299)
     }
 
     private fun assertForbidden(block: () -> Any?) {
