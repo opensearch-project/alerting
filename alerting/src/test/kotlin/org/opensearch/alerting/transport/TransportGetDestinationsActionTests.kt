@@ -73,7 +73,8 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
             Mockito.mock(ActionFilters::class.java),
             Settings.EMPTY,
             Mockito.mock(NamedXContentRegistry::class.java),
-            sdkClient
+            sdkClient,
+            Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
         )
 
         @Suppress("UNCHECKED_CAST")
@@ -100,7 +101,8 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
             Mockito.mock(ActionFilters::class.java),
             Settings.EMPTY,
             Mockito.mock(NamedXContentRegistry::class.java),
-            sdkClient
+            sdkClient,
+            Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
         )
 
         @Suppress("UNCHECKED_CAST")
@@ -124,7 +126,8 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
             Mockito.mock(ActionFilters::class.java),
             Settings.EMPTY,
             Mockito.mock(NamedXContentRegistry::class.java),
-            sdkClient
+            sdkClient,
+            Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
         )
 
         @Suppress("UNCHECKED_CAST")
@@ -150,7 +153,8 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
             Mockito.mock(ActionFilters::class.java),
             Settings.EMPTY,
             Mockito.mock(NamedXContentRegistry::class.java),
-            sdkClient
+            sdkClient,
+            Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
         )
 
         @Suppress("UNCHECKED_CAST")
@@ -174,7 +178,8 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
             Mockito.mock(ActionFilters::class.java),
             Settings.EMPTY,
             Mockito.mock(NamedXContentRegistry::class.java),
-            sdkClient
+            sdkClient,
+            Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
         )
 
         @Suppress("UNCHECKED_CAST")
@@ -202,7 +207,8 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
                 Mockito.mock(ActionFilters::class.java),
                 Settings.EMPTY,
                 Mockito.mock(NamedXContentRegistry::class.java),
-                sdkClient
+                sdkClient,
+                Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
             )
 
             // User with backend roles that would normally trigger filterBy
