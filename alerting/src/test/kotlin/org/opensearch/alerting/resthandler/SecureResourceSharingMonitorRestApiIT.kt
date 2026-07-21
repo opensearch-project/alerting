@@ -60,6 +60,9 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         private const val READ_ONLY = "alerting_read_only"
         private const val READ_WRITE = "alerting_read_write"
         private const val FULL_ACCESS = "alerting_full_access"
+
+        private const val TEST_INDEX = "rs_test_index"
+        private const val TEST_INDEX_ROLE = "rs_test_index_role"
     }
 
     private var aliceClient: RestClient? = null
@@ -69,10 +72,19 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
     @Before
     fun setupUsers() {
         if (aliceClient != null) return
+
+        // Test index alerting monitors will query. All three users get index-level read access to it.
+        createTestIndex(TEST_INDEX)
+        createIndexRole(TEST_INDEX_ROLE, TEST_INDEX)
+
         // Only ALERTING_FULL_ACCESS_ROLE — no all_access — so RSC is the sole gate.
-        createRsUser(RS_ALICE, arrayOf("engineering"))
-        createRsUser(RS_BOB, arrayOf("marketing"))
-        createRsUser(RS_CAROL, arrayOf("finance"))
+        createInternalUser(RS_ALICE, arrayOf("engineering"))
+        createInternalUser(RS_BOB, arrayOf("marketing"))
+        createInternalUser(RS_CAROL, arrayOf("finance"))
+        // Single mapping call for all three; PUT replaces so we must map them together.
+        mapUsersToRole(ALERTING_FULL_ACCESS_ROLE, arrayOf(RS_ALICE, RS_BOB, RS_CAROL))
+        mapUsersToRole(TEST_INDEX_ROLE, arrayOf(RS_ALICE, RS_BOB, RS_CAROL))
+
         aliceClient = buildClient(RS_ALICE)
         bobClient = buildClient(RS_BOB)
         carolClient = buildClient(RS_CAROL)
@@ -89,6 +101,18 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         deleteRsUser(RS_ALICE)
         deleteRsUser(RS_BOB)
         deleteRsUser(RS_CAROL)
+        try {
+            adminClient().performRequest(Request("DELETE", "/_plugins/_security/api/roles/$TEST_INDEX_ROLE"))
+        } catch (_: Exception) {
+        }
+        try {
+            adminClient().performRequest(Request("DELETE", "/_plugins/_security/api/rolesmapping/$TEST_INDEX_ROLE"))
+        } catch (_: Exception) {
+        }
+        try {
+            adminClient().performRequest(Request("DELETE", "/$TEST_INDEX"))
+        } catch (_: Exception) {
+        }
     }
 
     // ─── Owner can always operate on their own resource ──────────────────────────
@@ -360,14 +384,19 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
 
     // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-    private fun aliceCreatesMonitor() = createMonitorWithClient(
-        aliceClient!!,
-        randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger()))
-    )
+    private fun aliceCreatesMonitor() = createMonitorWithClient(aliceClient!!, sampleMonitor())
 
-    private fun bobCreatesMonitor() = createMonitorWithClient(
-        bobClient!!,
-        randomQueryLevelMonitor(triggers = listOf(randomQueryLevelTrigger()))
+    private fun bobCreatesMonitor() = createMonitorWithClient(bobClient!!, sampleMonitor())
+
+    private fun sampleMonitor() = randomQueryLevelMonitor(
+        inputs = listOf(
+            org.opensearch.commons.alerting.model.SearchInput(
+                indices = listOf(TEST_INDEX),
+                query = org.opensearch.search.builder.SearchSourceBuilder()
+                    .query(org.opensearch.index.query.QueryBuilders.matchAllQuery())
+            )
+        ),
+        triggers = listOf(randomQueryLevelTrigger())
     )
 
     private fun searchMonitors(client: RestClient): String {
@@ -413,19 +442,20 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
             .setConnectionRequestTimeout(180000)
             .build()
 
-    private fun createRsUser(name: String, backendRoles: Array<String>) {
+    private fun createInternalUser(name: String, backendRoles: Array<String>) {
         val broles = backendRoles.joinToString { "\"$it\"" }
         val userReq = Request("PUT", "/_plugins/_security/api/internalusers/$name")
         userReq.setJsonEntity(
             """{ "password": "$password", "backend_roles": [$broles], "attributes": {} }"""
         )
         adminClient().performRequest(userReq)
+    }
 
-        val mappingReq = Request("PUT", "/_plugins/_security/api/rolesmapping/$ALERTING_FULL_ACCESS_ROLE")
-        mappingReq.setJsonEntity(
-            """{ "backend_roles": [], "hosts": [], "users": ["$name"] }"""
-        )
-        adminClient().performRequest(mappingReq)
+    private fun mapUsersToRole(role: String, users: Array<String>) {
+        val usersJson = users.joinToString { "\"$it\"" }
+        val req = Request("PUT", "/_plugins/_security/api/rolesmapping/$role")
+        req.setJsonEntity("""{ "backend_roles": [], "hosts": [], "users": [$usersJson] }""")
+        adminClient().performRequest(req)
     }
 
     private fun deleteRsUser(name: String) {
