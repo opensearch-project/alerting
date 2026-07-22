@@ -60,6 +60,7 @@ import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isClusterMetricsMonitor
 import org.opensearch.alerting.util.isUnsupportedMultiTenantMonitorType
+import org.opensearch.alerting.util.putDataObjectStashed
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -244,7 +245,10 @@ class TransportIndexMonitorAction @Inject constructor(
             return
         }
 
+        // Under resource-sharing authz the caller's backend roles no longer gate updates —
+        // the sharing entry does. Skip the legacy rbac_roles validation in that mode.
         if (
+            !useRsc &&
             user != null &&
             !isAdmin(user) &&
             transformedRequest.rbacRoles != null
@@ -329,8 +333,13 @@ class TransportIndexMonitorAction @Inject constructor(
                     val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
                     val schedulerAccountId = client.threadPool().threadContext
                         .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
+                    // Capture the pre-stash context so the write path can restore the auth-user transient;
+                    // the security plugin's ResourceIndexListener requires it to record the resource share.
+                    val storedContext = client.threadPool().threadContext.newStoredContext(false)
                     client.threadPool().threadContext.stashContext().use {
-                        IndexMonitorHandler(client, actionListener, request, user, tenantId, schedulerAccountId).resolveUserAndStart()
+                        IndexMonitorHandler(
+                            client, actionListener, request, user, tenantId, schedulerAccountId, storedContext
+                        ).resolveUserAndStart()
                     }
                 }
 
@@ -380,6 +389,9 @@ class TransportIndexMonitorAction @Inject constructor(
             // we would get permissions errors trying to search the alerting-config
             // index as the user. pass the user object itself so backend
             // roles can be matched and checked downstream
+            // Capture the pre-stash context so the write path can restore the auth-user transient;
+            // the security plugin's ResourceIndexListener requires it to record the resource share.
+            val storedContext = client.threadPool().threadContext.newStoredContext(false)
             client.threadPool().threadContext.stashContext().use {
                 val pplMonitor = indexMonitorRequest.monitor
                 if (user == null) {
@@ -395,7 +407,8 @@ class TransportIndexMonitorAction @Inject constructor(
                     indexMonitorRequest,
                     user,
                     tenantId,
-                    schedulerAccountId
+                    schedulerAccountId,
+                    storedContext
                 ).resolveUserAndStart()
             }
         }
@@ -585,8 +598,13 @@ class TransportIndexMonitorAction @Inject constructor(
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         val schedulerAccountId = client.threadPool().threadContext
             .getTransient<String>(ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY)
+        // Capture the pre-stash context so the write path can restore the auth-user transient;
+        // the security plugin's ResourceIndexListener requires it to record the resource share.
+        val storedContext = client.threadPool().threadContext.newStoredContext(false)
         client.threadPool().threadContext.stashContext().use {
-            IndexMonitorHandler(client, actionListener, request, user, tenantId, schedulerAccountId).resolveUserAndStartForAD()
+            IndexMonitorHandler(
+                client, actionListener, request, user, tenantId, schedulerAccountId, storedContext
+            ).resolveUserAndStartForAD()
         }
     }
 
@@ -597,6 +615,13 @@ class TransportIndexMonitorAction @Inject constructor(
         private val user: User?,
         private val tenantId: String?,
         private val schedulerAccountId: String?,
+        /**
+         * Captured before the surrounding [ThreadContext.stashContext] call so that the auth-user
+         * transient can be restored on the thread that ultimately writes to [SCHEDULED_JOBS_INDEX].
+         * The security plugin's [ResourceIndexListener] requires the auth user to record a share
+         * entry for the created resource.
+         */
+        private val storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
     ) {
 
         fun resolveUserAndStart() {
@@ -867,17 +892,29 @@ class TransportIndexMonitorAction @Inject constructor(
                 request.monitor = request.monitor.copy(metadata = updatedMetadata)
             }
 
-            val monitorObj = ToXContentObject { builder, params ->
-                request.monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
-            }
+            // Coroutine dispatchers hop the work onto a fresh pool thread, which does not inherit the
+            // ThreadContext stashed at the transport entry point. Restore the caller's context here so the
+            // security plugin's persistent auth header is present for the shard-level
+            // ResourceIndexListener. Every subsequent sdkClient write below runs through
+            // [putDataObjectStashed] / [deleteDataObjectStashed], which stash transients per-call to keep
+            // internal-index operations off the caller's privileges (mirrors flow-framework / ml-commons).
+            storedThreadContext?.restore()
+
             val putRequest = PutDataObjectRequest.builder()
                 .index(SCHEDULED_JOBS_INDEX)
                 .tenantId(tenantId)
-                .dataObject(monitorObj)
+                .dataObject(
+                    ToXContentObject { builder, params ->
+                        request.monitor.toXContentWithUser(
+                            builder,
+                            ToXContent.MapParams(mapOf("with_type" to "true", "with_resource_type" to "true"))
+                        )
+                    }
+                )
                 .build()
 
             try {
-                val putResponse = sdkClient.putDataObjectAsync(putRequest).await()
+                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
                 if (putResponse.isFailed) {
                     actionListener.onFailure(
                         AlertingException.wrap(
@@ -1070,9 +1107,12 @@ class TransportIndexMonitorAction @Inject constructor(
 
             log.info("Updating monitor, ${currentMonitor.id}")
 
-            val monitorObj = ToXContentObject { builder, params ->
-                request.monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
-            }
+            // Restore the caller's context so the security plugin's persistent auth header is present
+            // for the shard-level ResourceIndexListener. Every sdkClient call below uses
+            // [putDataObjectStashed] which stashes transients per-call, keeping internal-index writes
+            // off the caller's privileges.
+            storedThreadContext?.restore()
+
             val putRequest = PutDataObjectRequest.builder()
                 .index(SCHEDULED_JOBS_INDEX)
                 .id(request.monitorId)
@@ -1080,11 +1120,18 @@ class TransportIndexMonitorAction @Inject constructor(
                 .ifSeqNo(request.seqNo)
                 .ifPrimaryTerm(request.primaryTerm)
                 .overwriteIfExists(true)
-                .dataObject(monitorObj)
+                .dataObject(
+                    ToXContentObject { builder, params ->
+                        request.monitor.toXContentWithUser(
+                            builder,
+                            ToXContent.MapParams(mapOf("with_type" to "true", "with_resource_type" to "true"))
+                        )
+                    }
+                )
                 .build()
 
             try {
-                val putResponse = sdkClient.putDataObjectAsync(putRequest).await()
+                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
                 if (putResponse.isFailed) {
                     actionListener.onFailure(
                         AlertingException.wrap(
@@ -1216,7 +1263,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
         private suspend fun updateMonitorMetadata(monitor: Monitor, tenantId: String?) {
             val monitorObj = ToXContentObject { builder, params ->
-                monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
+                monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true", "with_resource_type" to "true")))
             }
             val putRequest = PutDataObjectRequest.builder()
                 .index(SCHEDULED_JOBS_INDEX)
@@ -1225,7 +1272,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .overwriteIfExists(true)
                 .dataObject(monitorObj)
                 .build()
-            sdkClient.putDataObjectAsync(putRequest).await()
+            sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
         }
 
         private fun resolveRouting(accountIdOverride: String?): SchedulerRoutingResolver.Routing = SchedulerRoutingResolver.resolve(

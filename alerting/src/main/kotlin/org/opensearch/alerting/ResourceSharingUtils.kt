@@ -16,8 +16,11 @@ import org.opensearch.security.spi.resources.client.ResourceSharingClient
  */
 internal object ResourceSharingUtils {
 
-    /** Resource type registered by [AlertingResourceSharingExtension] for monitors and workflows. */
+    /** Resource type registered by [AlertingResourceSharingExtension] for monitors. */
     const val MONITOR_RESOURCE_TYPE = "monitor"
+
+    /** Resource type registered by [AlertingResourceSharingExtension] for workflows. */
+    const val WORKFLOW_RESOURCE_TYPE = "workflow"
 
     /**
      * Returns true only when the security plugin is loaded AND the resource-sharing feature is enabled

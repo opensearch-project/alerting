@@ -74,7 +74,7 @@ class TransportGetWorkflowAction @Inject constructor(
 
         val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, getWorkflowRequest.workflowId)
 
-        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE)
         if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }

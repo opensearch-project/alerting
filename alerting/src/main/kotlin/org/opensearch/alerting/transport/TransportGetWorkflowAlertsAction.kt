@@ -206,17 +206,17 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
         actionListener: ActionListener<GetWorkflowAlertsResponse>,
         user: User?,
     ) {
-        if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)) {
-            // resource sharing is enabled - filter alerts by accessible monitor IDs
+        if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE)) {
+            // resource sharing is enabled - filter alerts by accessible workflow IDs
             val tenantId = currentTenantId()
             val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
                 as org.opensearch.security.spi.resources.client.ResourceSharingClient
             rsc.getAccessibleResourceIds(
-                "monitor",
+                ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE,
                 object : ActionListener<Set<String>> {
-                    override fun onResponse(accessibleMonitorIds: Set<String>) {
+                    override fun onResponse(accessibleWorkflowIds: Set<String>) {
                         val query = searchSourceBuilder.query() as BoolQueryBuilder
-                        query.filter(QueryBuilders.termsQuery("monitor_id", accessibleMonitorIds))
+                        query.filter(QueryBuilders.termsQuery("workflow_id", accessibleWorkflowIds))
                         scope.launch(TenantContext(tenantId)) {
                             search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
                         }

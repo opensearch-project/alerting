@@ -45,6 +45,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_TRIGGERS_
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.indexStashed
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isQueryLevelMonitor
 import org.opensearch.alerting.util.use
@@ -180,12 +181,15 @@ class TransportIndexWorkflowAction @Inject constructor(
 
         val user = readUserFromThreadContext(client)
 
-        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE)
         if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
 
+        // Under resource-sharing authz the caller's backend roles no longer gate updates —
+        // the sharing entry does. Skip the legacy rbac_roles validation in that mode.
         if (
+            !useRsc &&
             user != null &&
             !isAdmin(user) &&
             transformedRequest.rbacRoles != null
@@ -241,9 +245,14 @@ class TransportIndexWorkflowAction @Inject constructor(
                     client,
                     object : ActionListener<AcknowledgedResponse> {
                         override fun onResponse(response: AcknowledgedResponse) {
-                            // Stash the context and start the workflow creation
+                            // Capture pre-stash context so the write path can restore the auth-user
+                            // transient — the security plugin's ResourceIndexListener needs it to
+                            // record the workflow's resource-share entry with createdBy=<caller>.
+                            val storedContext = client.threadPool().threadContext.newStoredContext(false)
                             client.threadPool().threadContext.stashContext().use {
-                                IndexWorkflowHandler(client, actionListener, transformedRequest, user, tenantId).resolveUserAndStart()
+                                IndexWorkflowHandler(
+                                    client, actionListener, transformedRequest, user, tenantId, storedContext
+                                ).resolveUserAndStart()
                             }
                         }
 
@@ -275,6 +284,7 @@ class TransportIndexWorkflowAction @Inject constructor(
         private val request: IndexWorkflowRequest,
         private val user: User?,
         private val tenantId: String?,
+        private val storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
     ) {
         fun resolveUserAndStart() {
             scope.launch(TenantContext(tenantId)) {
@@ -414,15 +424,19 @@ class TransportIndexWorkflowAction @Inject constructor(
                 .source(
                     request.workflow.toXContentWithUser(
                         jsonBuilder(),
-                        ToXContent.MapParams(mapOf("with_type" to "true"))
+                        ToXContent.MapParams(mapOf("with_type" to "true", "with_resource_type" to "true"))
                     )
                 )
                 .setIfSeqNo(request.seqNo)
                 .setIfPrimaryTerm(request.primaryTerm)
                 .timeout(indexTimeout)
 
+            // Restore the caller's persistent auth header so the shard-level ResourceIndexListener sees
+            // the caller when recording the workflow's share entry. [Client.indexStashed] stashes
+            // per-call so the internal-index write isn't gated by the caller's privileges.
+            storedThreadContext?.restore()
             try {
-                val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
+                val indexResponse: IndexResponse = client.indexStashed(indexRequest)
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
                     log.error("Failed to create workflow: $failureReasons")
@@ -508,7 +522,7 @@ class TransportIndexWorkflowAction @Inject constructor(
         }
 
         private suspend fun onGetResponse(currentWorkflow: Workflow) {
-            val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
+            val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE)
             // when resource sharing is enabled, security plugin gates access at the index layer
             if (!useRsc &&
                 !checkUserPermissionsWithResource(
@@ -577,7 +591,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 .source(
                     request.workflow.toXContentWithUser(
                         jsonBuilder(),
-                        ToXContent.MapParams(mapOf("with_type" to "true"))
+                        ToXContent.MapParams(mapOf("with_type" to "true", "with_resource_type" to "true"))
                     )
                 )
                 .id(request.workflowId)
@@ -585,8 +599,11 @@ class TransportIndexWorkflowAction @Inject constructor(
                 .setIfPrimaryTerm(request.primaryTerm)
                 .timeout(indexTimeout)
 
+            // Restore the caller's persistent auth header for the shard-level ResourceIndexListener;
+            // [Client.indexStashed] stashes per-call so the internal-index write isn't gated by the caller.
+            storedThreadContext?.restore()
             try {
-                val indexResponse: IndexResponse = client.suspendUntil { client.index(indexRequest, it) }
+                val indexResponse: IndexResponse = client.indexStashed(indexRequest)
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
                     actionListener.onFailure(

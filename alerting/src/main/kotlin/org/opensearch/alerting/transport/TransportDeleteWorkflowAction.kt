@@ -114,13 +114,18 @@ class TransportDeleteWorkflowAction @Inject constructor(
         val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, transformedRequest.workflowId)
             .setRefreshPolicy(RefreshPolicy.IMMEDIATE)
 
-        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE)
         if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
 
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        // Coroutine dispatch drops the ThreadContext ThreadLocal. Restore the caller's persistent auth
+        // header for the shard-level ResourceIndexListener; downstream sdkClient calls each stash
+        // per-call via the stashed helpers to keep internal-index writes off the caller.
+        val storedContext = client.threadPool().threadContext.newStoredContext(false)
         scope.launch(TenantContext(tenantId)) {
+            storedContext.restore()
             DeleteWorkflowHandler(
                 client,
                 actionListener,
@@ -144,7 +149,7 @@ class TransportDeleteWorkflowAction @Inject constructor(
             try {
                 val workflow: Workflow = getWorkflow() ?: return
 
-                val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
+                val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE)
                 // when resource sharing is enabled, security plugin gates access at the index layer
                 val canDelete = useRsc ||
                     user == null ||

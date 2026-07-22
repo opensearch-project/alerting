@@ -20,6 +20,7 @@ import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.service.ExternalSchedulerService
 import org.opensearch.alerting.service.SchedulerRoutingResolver
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.getDataObjectStashed
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -91,7 +92,12 @@ class TransportDeleteMonitorAction @Inject constructor(
             return
         }
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        // Coroutine dispatch drops the ThreadContext ThreadLocal. Restore the caller's persistent auth
+        // header for the shard-level ResourceIndexListener; DeleteMonitorService's sdkClient calls each
+        // stash per-call via [deleteDataObjectStashed] to keep internal-index writes off the caller.
+        val storedContext = client.threadPool().threadContext.newStoredContext(false)
         scope.launch(TenantContext(tenantId)) {
+            storedContext.restore()
             DeleteMonitorHandler(
                 client,
                 actionListener,
@@ -185,7 +191,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                 .build()
 
             try {
-                val response = sdkClient.getDataObject(getRequest)
+                val response = sdkClient.getDataObjectStashed(getRequest, client.threadPool().threadContext)
                 val getResponse = response.getResponse()
                 if (getResponse == null || !getResponse.isExists) {
                     throw OpenSearchStatusException("Monitor with $monitorId is not found", RestStatus.NOT_FOUND)

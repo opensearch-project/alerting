@@ -33,3 +33,21 @@ resource_types:
         - 'cluster:admin/opensearch/alerting/comments/*'
         - 'cluster:admin/opensearch/alerting/remote/indexes/get'
         - 'cluster:admin/security/resource/share'
+
+  workflow:
+    alerting_read_only:
+      default: true
+      allowed_actions:
+        - 'cluster:admin/opensearch/alerting/workflow/get'
+        - 'cluster:admin/opensearch/alerting/workflow_alerts/get'
+
+    alerting_read_write:
+      allowed_actions:
+        - 'cluster:admin/opensearch/alerting/workflow/*'
+        - 'cluster:admin/opensearch/alerting/workflow_alerts/*'
+
+    alerting_full_access:
+      allowed_actions:
+        - 'cluster:admin/opensearch/alerting/workflow/*'
+        - 'cluster:admin/opensearch/alerting/workflow_alerts/*'
+        - 'cluster:admin/security/resource/share'

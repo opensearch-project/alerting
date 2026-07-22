@@ -245,7 +245,7 @@ class TransportGetAlertsAction @Inject constructor(
             val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
                 as org.opensearch.security.spi.resources.client.ResourceSharingClient
             rsc.getAccessibleResourceIds(
-                "monitor",
+                ResourceSharingUtils.MONITOR_RESOURCE_TYPE,
                 object : ActionListener<Set<String>> {
                     override fun onResponse(accessibleMonitorIds: Set<String>) {
                         val query = searchSourceBuilder.query() as BoolQueryBuilder

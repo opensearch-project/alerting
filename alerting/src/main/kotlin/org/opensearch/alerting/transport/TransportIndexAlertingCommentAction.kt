@@ -25,6 +25,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_COMMENTS_PER_ALERT
 import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.await
+import org.opensearch.alerting.util.putDataObjectStashed
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -145,10 +146,13 @@ constructor(
         val user = readUserFromThreadContext(client)
 
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
-        client.threadPool().threadContext.stashContext().use {
-            scope.launch(TenantContext(tenantId)) {
-                IndexCommentHandler(client, actionListener, transformedRequest, user).start()
-            }
+        // Coroutine dispatch drops the ThreadContext ThreadLocal on hop. Capture the current context so
+        // the coroutine body can restore the caller's persistent auth header for the shard-level
+        // ResourceIndexListener. Individual sdkClient writes below use [putDataObjectStashed] to run under
+        // a clean context per call.
+        val storedContext = client.threadPool().threadContext.newStoredContext(false)
+        scope.launch(TenantContext(tenantId)) {
+            IndexCommentHandler(client, actionListener, transformedRequest, user, storedContext).start()
         }
     }
 
@@ -157,8 +161,12 @@ constructor(
         private val actionListener: ActionListener<IndexCommentResponse>,
         private val request: IndexCommentRequest,
         private val user: User?,
+        private val storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
     ) {
         suspend fun start() {
+            // Restore the caller's persistent auth header for downstream ResourceIndexListener
+            // callbacks. Each sdkClient write below stashes per-call via [putDataObjectStashed].
+            storedThreadContext?.restore()
             commentsIndices.createOrUpdateInitialCommentsHistoryIndex()
             if (request.method == RestRequest.Method.PUT) {
                 updateComment()
@@ -211,7 +219,7 @@ constructor(
             log.debug("Creating new comment")
 
             try {
-                val putResponse = sdkClient.putDataObjectAsync(putRequest).await()
+                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
                 val seqNo = putResponse.indexResponse()?.seqNo ?: 0L
                 val primaryTerm = putResponse.indexResponse()?.primaryTerm ?: 0L
                 actionListener.onResponse(
@@ -261,7 +269,7 @@ constructor(
             log.debug("Updating comment, ${currentComment.id}")
 
             try {
-                val putResponse = sdkClient.putDataObjectAsync(putRequest).await()
+                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
                 actionListener.onResponse(
                     IndexCommentResponse(
                         putResponse.id(),
