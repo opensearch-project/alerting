@@ -122,7 +122,7 @@ class MigrateToRscRestApiIT : AlertingRestTestCase() {
         assertEquals("carol", migrated["_migration_user_name"])
     }
 
-    fun `test migrate leaves metadata-only docs untouched`() {
+    fun `test migrate deletes non-shareable metadata docs`() {
         val docId = "some-monitor-id-metadata"
         val metadata = """
             {
@@ -133,11 +133,19 @@ class MigrateToRscRestApiIT : AlertingRestTestCase() {
 
         adminClient().makeRequest("POST", "/_plugins/_alerting/_migrate_to_rsc")
 
-        val stored = readRawDoc(docId)
-        assertFalse(
-            "Metadata doc must not gain resource_type: $stored",
-            stored.containsKey("resource_type"),
-        )
+        // Metadata docs are deleted because the downstream security plugin's `resources/migrate`
+        // fails if it encounters any doc without `resource_type`. Metadata is regenerated on the
+        // next monitor execution, so deletion is safe.
+        try {
+            readRawDoc(docId)
+            fail("Expected metadata doc to be deleted after migrate, but it still exists")
+        } catch (e: org.opensearch.client.ResponseException) {
+            assertEquals(
+                "Expected 404 for deleted metadata doc",
+                RestStatus.NOT_FOUND.status,
+                e.response.statusLine.statusCode,
+            )
+        }
     }
 
     private fun indexRawDoc(id: String, source: String) {

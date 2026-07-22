@@ -16,6 +16,8 @@ import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JO
 import org.opensearch.core.action.ActionListener
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
+import org.opensearch.index.reindex.DeleteByQueryAction
+import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.index.reindex.UpdateByQueryAction
 import org.opensearch.index.reindex.UpdateByQueryRequestBuilder
 import org.opensearch.script.Script
@@ -55,6 +57,38 @@ class TransportMigrateToRscAction @Inject constructor(
 ) {
 
     override fun doExecute(task: Task, request: MigrateToRscRequest, actionListener: ActionListener<MigrateToRscResponse>) {
+        // Step 1: purge metadata (`<monitorId>-metadata`) docs. They're not shareable resources and
+        // the security plugin's `resources/migrate` endpoint scans the entire source index — if any
+        // doc's `resource_type` is null it fails the whole call. Metadata is regenerated on next
+        // monitor execution, so deletion is safe.
+        deleteMetadataDocs(
+            onSuccess = { runResourceBackfill(actionListener) },
+            onFailure = { e ->
+                log.error("Migrate-to-RSC failed while purging metadata docs", e)
+                actionListener.onFailure(e)
+            },
+        )
+    }
+
+    private fun deleteMetadataDocs(onSuccess: () -> Unit, onFailure: (Exception) -> Unit) {
+        DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE)
+            .source(SCHEDULED_JOBS_INDEX)
+            .filter(QueryBuilders.existsQuery("metadata"))
+            .refresh(true)
+            .abortOnVersionConflict(false)
+            .execute(
+                object : ActionListener<BulkByScrollResponse> {
+                    override fun onResponse(response: BulkByScrollResponse) {
+                        log.info("Migrate-to-RSC purged {} metadata docs before backfill", response.deleted)
+                        onSuccess()
+                    }
+
+                    override fun onFailure(e: Exception) = onFailure(e)
+                },
+            )
+    }
+
+    private fun runResourceBackfill(actionListener: ActionListener<MigrateToRscResponse>) {
         val script = Script(ScriptType.INLINE, "painless", MIGRATION_SCRIPT, emptyMap())
 
         UpdateByQueryRequestBuilder(client, UpdateByQueryAction.INSTANCE)
