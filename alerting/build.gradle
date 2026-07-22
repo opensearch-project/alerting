@@ -364,6 +364,7 @@ testClusters.integTest.nodes.each { node ->
         node.setting("plugins.security.user_attribute_serialization.enabled", "true")
         if (System.getProperty("resource_sharing.enabled") == "true") {
             node.setting "plugins.security.experimental.resource_sharing.enabled", "true"
+            node.setting "plugins.security.experimental.resource_sharing.protected_types", "[\"monitor\"]"
         }
     }
 }
