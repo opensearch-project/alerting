@@ -424,7 +424,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 .source(
                     request.workflow.toXContentWithUser(
                         jsonBuilder(),
-                        ToXContent.MapParams(mapOf("with_type" to "true", "with_resource_type" to "true"))
+                        ToXContent.MapParams(mapOf("with_type" to "true"))
                     )
                 )
                 .setIfSeqNo(request.seqNo)
@@ -591,7 +591,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 .source(
                     request.workflow.toXContentWithUser(
                         jsonBuilder(),
-                        ToXContent.MapParams(mapOf("with_type" to "true", "with_resource_type" to "true"))
+                        ToXContent.MapParams(mapOf("with_type" to "true"))
                     )
                 )
                 .id(request.workflowId)

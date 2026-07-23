@@ -3,9 +3,6 @@
     "schema_version": 9
   },
   "properties": {
-    "resource_type": {
-      "type": "keyword"
-    },
     "all_shared_principals": {
       "type": "keyword"
     },

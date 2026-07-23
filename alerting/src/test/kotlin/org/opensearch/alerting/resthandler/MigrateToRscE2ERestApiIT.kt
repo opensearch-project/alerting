@@ -85,11 +85,9 @@ class MigrateToRscE2ERestApiIT : AlertingRestTestCase() {
                 legacyGet.statusLine.statusCode,
             )
 
-            // Alerting always writes `resource_type` at the top level from this PR onwards. To
-            // simulate a doc written by a pre-RSC alerting build, strip it back out via admin
-            // update-by-query. This is the shape the migration endpoint expects to encounter on
-            // an upgraded cluster.
-            stripRscFieldsFromDoc(monitorId)
+            // Delete any auto-generated sharing entry that may have been created while RSC was
+            // (momentarily) enabled — we want a truly-pre-RSC shape for the rest of the flow.
+            deleteSharingEntry(monitorId)
 
             // ─── Phase 2: enable RSC — reads break because no sharing entry ──────
             setClusterSetting("plugins.security.experimental.resource_sharing.enabled", true)
@@ -181,29 +179,13 @@ class MigrateToRscE2ERestApiIT : AlertingRestTestCase() {
     )
 
     /**
-     * Remove `resource_type` and the scratch owner fields from a doc so it looks like it was
-     * written by a pre-RSC alerting build. Also delete any sharing entry the security plugin
-     * might have auto-created during phase 1 (harmless if none exists).
+     * Delete the auto-generated sharing entry so the doc looks like it was written by a pre-RSC
+     * alerting build (no sharing record exists). Harmless if none exists.
      */
-    private fun stripRscFieldsFromDoc(monitorId: String) {
-        val updateRequest = Request("POST", "/.opendistro-alerting-config/_update/$monitorId?refresh=true")
-        updateRequest.setJsonEntity(
-            """
-            {
-              "script": {
-                "source": "ctx._source.remove('resource_type'); ctx._source.remove('_migration_user_name'); ctx._source.remove('_migration_backend_roles');",
-                "lang": "painless"
-              }
-            }
-            """.trimIndent(),
-        )
-        val opts = org.opensearch.client.RequestOptions.DEFAULT.toBuilder()
-        opts.setWarningsHandler(org.opensearch.client.WarningsHandler.PERMISSIVE)
-        updateRequest.setOptions(opts.build())
-        adminClient().performRequest(updateRequest)
-
-        // Best-effort delete of any auto-generated sharing entry.
+    private fun deleteSharingEntry(monitorId: String) {
         try {
+            val opts = org.opensearch.client.RequestOptions.DEFAULT.toBuilder()
+            opts.setWarningsHandler(org.opensearch.client.WarningsHandler.PERMISSIVE)
             val delRequest = Request(
                 "DELETE",
                 "/.opendistro-alerting-config-sharing/_doc/$monitorId?refresh=true",

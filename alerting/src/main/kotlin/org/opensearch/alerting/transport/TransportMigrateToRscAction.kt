@@ -29,20 +29,20 @@ import org.opensearch.transport.client.Client
 private val log = LogManager.getLogger(TransportMigrateToRscAction::class.java)
 
 /**
- * Runs an update-by-query on `.opendistro-alerting-config` that:
+ * Runs an update-by-query on `.opendistro-alerting-config` that copies
+ * `<wrapper>.user.name` and `<wrapper>.user.backend_roles` up to top-level
+ * `_migration_user_name` / `_migration_backend_roles` fields, so the security plugin's
+ * `POST /_plugins/_security/api/resources/migrate` — which takes a single JSON pointer
+ * for the owner path — can address monitors and workflows in one call.
  *
- *  1. Adds the top-level `resource_type` discriminator ("monitor" or "workflow") to every
- *     shareable resource doc, so the security plugin's [ResourceProvider.typeField] contract
- *     can classify them post-upgrade.
- *  2. Copies `<wrapper>.user.name` / `<wrapper>.user.backend_roles` up to top-level
- *     `_migration_user_name` / `_migration_backend_roles` fields so the security plugin's
- *     `POST /_plugins/_security/api/resources/migrate` — which takes a single JSON pointer
- *     for the owner path — can address monitors and workflows in one call.
+ * Discrimination between monitor and workflow docs is handled by the security plugin
+ * iterating type-specific providers (`monitor.type` / `workflow.type` typeField paths);
+ * no top-level discriminator is written by this endpoint.
  *
- * The script `noop`s docs that already have `resource_type` (idempotent re-run) and docs that
- * lack both a `monitor` and `workflow` wrapper (metadata records that aren't shareable).
- * The query pre-filters to docs missing `resource_type` so the noop branch only runs on rare
- * concurrent-write windows.
+ * The script `noop`s docs that already have `_migration_user_name` (idempotent re-run) and
+ * docs that lack both a `monitor` and `workflow` wrapper (metadata records that aren't
+ * shareable). Metadata docs are deleted up front — the security migrate call would 400 on
+ * any doc it can't classify, and metadata is regenerated on next monitor execution.
  *
  * This is a one-shot admin operation. Downstream flow:
  *   POST /_plugins/_alerting/_migrate_to_rsc
@@ -93,7 +93,7 @@ class TransportMigrateToRscAction @Inject constructor(
 
         UpdateByQueryRequestBuilder(client, UpdateByQueryAction.INSTANCE)
             .source(SCHEDULED_JOBS_INDEX)
-            .filter(QueryBuilders.boolQuery().mustNot(QueryBuilders.existsQuery("resource_type")))
+            .filter(QueryBuilders.boolQuery().mustNot(QueryBuilders.existsQuery("_migration_user_name")))
             .refresh(true)
             .abortOnVersionConflict(false)
             .script(script)
@@ -129,16 +129,17 @@ class TransportMigrateToRscAction @Inject constructor(
 
     companion object {
         /**
-         * Painless script executed per doc. Reads the wrapper key, sets `resource_type` and copies
-         * scratch owner fields; skips docs already migrated or without a shareable wrapper.
+         * Painless script executed per doc. Locates the wrapper (monitor/workflow) and copies
+         * its `user.name` / `user.backend_roles` to top-level scratch fields for the security
+         * plugin's migrate endpoint. Skips docs already carrying `_migration_user_name`
+         * (idempotent re-run) and docs without a shareable wrapper.
          */
         private val MIGRATION_SCRIPT = """
-            if (ctx._source.containsKey('resource_type')) { ctx.op = 'noop'; return; }
+            if (ctx._source.containsKey('_migration_user_name')) { ctx.op = 'noop'; return; }
             def wrapperKey = null;
             if (ctx._source.containsKey('monitor')) { wrapperKey = 'monitor'; }
             else if (ctx._source.containsKey('workflow')) { wrapperKey = 'workflow'; }
             else { ctx.op = 'noop'; return; }
-            ctx._source.resource_type = wrapperKey;
             def wrapper = ctx._source[wrapperKey];
             if (wrapper != null && wrapper.user != null) {
                 if (wrapper.user.name != null) {

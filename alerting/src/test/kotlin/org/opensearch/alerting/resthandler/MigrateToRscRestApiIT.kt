@@ -15,15 +15,17 @@ import org.opensearch.core.rest.RestStatus
  * `security` / `resource_sharing.enabled`) — the migration endpoint is a plain UBQ operation and
  * has value even when the resource-sharing feature isn't enabled yet.
  *
- * Test strategy: bypass the alerting REST layer and write legacy-shape docs (no `resource_type`)
- * directly to `.opendistro-alerting-config` via admin. Then call the migrate endpoint and query
- * the docs back to confirm they gained `resource_type` and the scratch owner fields.
+ * Test strategy: bypass the alerting REST layer and write legacy-shape docs (no owner scratch
+ * fields) directly to `.opendistro-alerting-config` via admin. Then call the migrate endpoint and
+ * query the docs back to confirm they gained `_migration_user_name` / `_migration_backend_roles`.
+ * The security plugin identifies monitor vs workflow at index-op time via type-specific typeField
+ * paths (`monitor.type` / `workflow.type`), so no top-level discriminator field is written.
  */
 class MigrateToRscRestApiIT : AlertingRestTestCase() {
 
     private val configIndex = ".opendistro-alerting-config"
 
-    fun `test migrate backfills resource_type and owner fields on a legacy monitor doc`() {
+    fun `test migrate backfills owner scratch fields on a legacy monitor doc`() {
         val docId = "legacy-monitor-1"
         val legacyMonitor = """
             {
@@ -50,7 +52,6 @@ class MigrateToRscRestApiIT : AlertingRestTestCase() {
         assertTrue("Expected at least one doc updated, got $updated", updated >= 1L)
 
         val migrated = readRawDoc(docId)
-        assertEquals("monitor", migrated["resource_type"])
         assertEquals("alice", migrated["_migration_user_name"])
         assertEquals(listOf("engineering", "ops"), migrated["_migration_backend_roles"])
     }
@@ -79,7 +80,6 @@ class MigrateToRscRestApiIT : AlertingRestTestCase() {
         adminClient().makeRequest("POST", "/_plugins/_alerting/_migrate_to_rsc")
 
         val migrated = readRawDoc(docId)
-        assertEquals("workflow", migrated["resource_type"])
         assertEquals("bob", migrated["_migration_user_name"])
         assertEquals(listOf("ml"), migrated["_migration_backend_roles"])
     }
@@ -88,7 +88,6 @@ class MigrateToRscRestApiIT : AlertingRestTestCase() {
         val docId = "already-migrated"
         val alreadyMigrated = """
             {
-              "resource_type": "monitor",
               "_migration_user_name": "carol",
               "_migration_backend_roles": ["sec"],
               "monitor": {
@@ -118,7 +117,6 @@ class MigrateToRscRestApiIT : AlertingRestTestCase() {
         assertEquals("Second run must be a full noop", 0L, updated)
 
         val migrated = readRawDoc(docId)
-        assertEquals("monitor", migrated["resource_type"])
         assertEquals("carol", migrated["_migration_user_name"])
     }
 
@@ -134,7 +132,7 @@ class MigrateToRscRestApiIT : AlertingRestTestCase() {
         adminClient().makeRequest("POST", "/_plugins/_alerting/_migrate_to_rsc")
 
         // Metadata docs are deleted because the downstream security plugin's `resources/migrate`
-        // fails if it encounters any doc without `resource_type`. Metadata is regenerated on the
+        // fails if it encounters any doc it can't classify by type. Metadata is regenerated on the
         // next monitor execution, so deletion is safe.
         try {
             readRawDoc(docId)

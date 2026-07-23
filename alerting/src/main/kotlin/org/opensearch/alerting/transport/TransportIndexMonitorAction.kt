@@ -907,7 +907,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     ToXContentObject { builder, params ->
                         request.monitor.toXContentWithUser(
                             builder,
-                            ToXContent.MapParams(mapOf("with_type" to "true", "with_resource_type" to "true"))
+                            ToXContent.MapParams(mapOf("with_type" to "true"))
                         )
                     }
                 )
@@ -1124,7 +1124,7 @@ class TransportIndexMonitorAction @Inject constructor(
                     ToXContentObject { builder, params ->
                         request.monitor.toXContentWithUser(
                             builder,
-                            ToXContent.MapParams(mapOf("with_type" to "true", "with_resource_type" to "true"))
+                            ToXContent.MapParams(mapOf("with_type" to "true"))
                         )
                     }
                 )
@@ -1263,7 +1263,7 @@ class TransportIndexMonitorAction @Inject constructor(
 
         private suspend fun updateMonitorMetadata(monitor: Monitor, tenantId: String?) {
             val monitorObj = ToXContentObject { builder, params ->
-                monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true", "with_resource_type" to "true")))
+                monitor.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
             }
             val putRequest = PutDataObjectRequest.builder()
                 .index(SCHEDULED_JOBS_INDEX)
