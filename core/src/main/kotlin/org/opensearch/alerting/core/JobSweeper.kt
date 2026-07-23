@@ -460,10 +460,10 @@ class JobSweeper(
 
     private fun isSweepableJobType(xcp: XContentParser): Boolean {
         XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-        // Scan top-level fields until we find one that names a sweepable job type. Docs written
-        // under resource-sharing may prefix the wrapper with ancillary fields (`resource_type`,
-        // `all_shared_principals`, `_migration_user_name`, `_migration_backend_roles`); skip past
-        // any such extras so callers using `typeIsParsed=true` see the wrapper at currentName.
+        // Scan top-level fields until we find one that names a sweepable job type. Docs stored on
+        // a resource-sharing-protected index may carry security-injected top-level fields (for
+        // example `all_shared_principals` for DLS) alongside the wrapper; skip past any such
+        // extras so callers using `typeIsParsed=true` see the wrapper at currentName.
         var token = xcp.nextToken()
         while (token != null && token != XContentParser.Token.END_OBJECT) {
             if (token == XContentParser.Token.FIELD_NAME && sweepableJobTypes.contains(xcp.currentName())) {

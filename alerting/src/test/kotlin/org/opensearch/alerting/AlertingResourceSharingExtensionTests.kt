@@ -21,15 +21,26 @@ class AlertingResourceSharingExtensionTests : OpenSearchTestCase() {
         ResourceSharingClientAccessor.clear()
     }
 
-    fun `test getResourceProviders returns one provider`() {
+    fun `test getResourceProviders registers monitor and workflow`() {
         val providers = extension.getResourceProviders()
-        assertEquals(1, providers.size)
+        val types = providers.map { it.resourceType() }.toSet()
+        assertEquals(setOf("monitor", "workflow"), types)
     }
 
-    fun `test monitor provider has correct type and index`() {
-        val providers = extension.getResourceProviders()
-        val monitorProvider = providers.first { it.resourceType() == "monitor" }
+    fun `test monitor provider declares nested typeField and owner paths`() {
+        val monitorProvider = extension.getResourceProviders().first { it.resourceType() == "monitor" }
         assertEquals(ScheduledJob.SCHEDULED_JOBS_INDEX, monitorProvider.resourceIndexName())
+        assertEquals("monitor.type", monitorProvider.typeField())
+        assertEquals("/monitor/user/name", monitorProvider.ownerNamePath())
+        assertEquals("/monitor/user/backend_roles", monitorProvider.ownerBackendRolesPath())
+    }
+
+    fun `test workflow provider declares nested typeField and owner paths`() {
+        val workflowProvider = extension.getResourceProviders().first { it.resourceType() == "workflow" }
+        assertEquals(ScheduledJob.SCHEDULED_JOBS_INDEX, workflowProvider.resourceIndexName())
+        assertEquals("workflow.type", workflowProvider.typeField())
+        assertEquals("/workflow/user/name", workflowProvider.ownerNamePath())
+        assertEquals("/workflow/user/backend_roles", workflowProvider.ownerBackendRolesPath())
     }
 
     fun `test assignResourceSharingClient sets client in accessor`() {
