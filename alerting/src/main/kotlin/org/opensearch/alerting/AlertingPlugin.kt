@@ -12,7 +12,6 @@ import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetEmailAccountAction
 import org.opensearch.alerting.action.GetEmailGroupAction
 import org.opensearch.alerting.action.GetRemoteIndexesAction
-import org.opensearch.alerting.action.MigrateToRscAction
 import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.alerts.AlertIndices
@@ -48,7 +47,6 @@ import org.opensearch.alerting.resthandler.RestGetWorkflowAlertsAction
 import org.opensearch.alerting.resthandler.RestIndexAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestIndexMonitorAction
 import org.opensearch.alerting.resthandler.RestIndexWorkflowAction
-import org.opensearch.alerting.resthandler.RestMigrateToRscAction
 import org.opensearch.alerting.resthandler.RestSearchAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
@@ -89,7 +87,6 @@ import org.opensearch.alerting.transport.TransportGetWorkflowAlertsAction
 import org.opensearch.alerting.transport.TransportIndexAlertingCommentAction
 import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportIndexWorkflowAction
-import org.opensearch.alerting.transport.TransportMigrateToRscAction
 import org.opensearch.alerting.transport.TransportSearchAlertingCommentAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
@@ -247,7 +244,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestIndexAlertingCommentAction(),
             RestSearchAlertingCommentAction(),
             RestDeleteAlertingCommentAction(),
-            RestMigrateToRscAction(),
         )
     }
 
@@ -280,7 +276,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(ExecuteWorkflowAction.INSTANCE, TransportExecuteWorkflowAction::class.java),
             ActionPlugin.ActionHandler(GetRemoteIndexesAction.INSTANCE, TransportGetRemoteIndexesAction::class.java),
             ActionPlugin.ActionHandler(DocLevelMonitorFanOutAction.INSTANCE, TransportDocLevelMonitorFanOutAction::class.java),
-            ActionPlugin.ActionHandler(MigrateToRscAction.INSTANCE, TransportMigrateToRscAction::class.java),
         )
     }
 

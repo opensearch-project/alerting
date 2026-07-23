@@ -31,7 +31,7 @@ import org.opensearch.core.rest.RestStatus
  * because that setting is also dynamic and its default (empty) list would leave the framework
  * inert even with the feature enabled — we set it during the "enable" phase.
  */
-class MigrateToRscE2ERestApiIT : AlertingRestTestCase() {
+class RscMigrateE2ERestApiIT : AlertingRestTestCase() {
 
     companion object {
         @BeforeClass
@@ -112,24 +112,21 @@ class MigrateToRscE2ERestApiIT : AlertingRestTestCase() {
                 brokenGet!!.response.statusLine.statusCode,
             )
 
-            // ─── Phase 3: run alerting-side migration (backfills scratch fields) ─
-            val alertingMigrate = adminClient().makeRequest("POST", "/_plugins/_alerting/_migrate_to_rsc")
-            assertEquals(RestStatus.OK.status, alertingMigrate.statusLine.statusCode)
-            val alertingMigrateBody = alertingMigrate.asMap()
-            assertTrue(
-                "Alerting migrate should update at least alice's legacy monitor",
-                (alertingMigrateBody["updated"] as Number).toLong() >= 1L,
-            )
-
-            // ─── Phase 4: run security-side migration (seeds sharing entries) ────
+            // ─── Phase 3: run security-side migration (seeds sharing entries) ────
+            //
+            // The security plugin classifies each doc by trying each registered provider's
+            // typeField (`monitor.type` / `workflow.type`) and reads owner metadata via each
+            // provider's `ownerNamePath` / `ownerBackendRolesPath`. The request-level paths are
+            // still required by the schema but only used as fallbacks — for alerting they aren't
+            // referenced because every provider declares its own.
             val securityMigrate = adminClient().performRequest(
                 Request("POST", "/_plugins/_security/api/resources/migrate").apply {
                     setJsonEntity(
                         """
                         {
                           "source_index": ".opendistro-alerting-config",
-                          "username_path": "/_migration_user_name",
-                          "backend_roles_path": "/_migration_backend_roles",
+                          "username_path": "/monitor/user/name",
+                          "backend_roles_path": "/monitor/user/backend_roles",
                           "default_owner": "$RS_ALICE",
                           "default_access_level": {
                             "monitor": "alerting_full_access",
