@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting
 
+import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
@@ -26,6 +27,8 @@ import org.opensearch.transport.TransportService
 import java.time.Instant
 
 abstract class MonitorRunner {
+
+    private val logger = LogManager.getLogger(javaClass)
 
     abstract suspend fun runMonitor(
         monitor: Monitor,
@@ -97,8 +100,20 @@ abstract class MonitorRunner {
         if (threadContext.getHeader(MonitorJobPoller.IS_BACKGROUND_JOB_HEADER) == null) {
             threadContext.putHeader(MonitorJobPoller.IS_BACKGROUND_JOB_HEADER, "true")
         }
-        if (threadContext.getHeader(MonitorJobPoller.OPENSEARCH_ENDPOINT_HEADER) == null) {
+        val existingEndpoint = threadContext.getHeader(MonitorJobPoller.OPENSEARCH_ENDPOINT_HEADER)
+        if (existingEndpoint == null) {
             threadContext.putHeader(MonitorJobPoller.OPENSEARCH_ENDPOINT_HEADER, target.endpoint)
+        } else if (existingEndpoint != target.endpoint) {
+            // Defense-in-depth: the endpoint header is write-once, so a stale value left on this pooled
+            // worker thread by a previous monitor run would silently route this monitor's search to the
+            // wrong data source. Callers stash a fresh context before reinjecting, so this should never
+            // happen; log loudly (rather than throw, which would fail the run open) if context isolation
+            // ever regresses so the misrouting is visible instead of silent.
+            logger.error(
+                "Monitor ${monitor.id}: thread context already carries endpoint [$existingEndpoint] which differs " +
+                    "from the monitor target endpoint [${target.endpoint}]. Search may be routed to the wrong data " +
+                    "source; this indicates leaked thread-context state across monitor runs."
+            )
         }
         if (threadContext.getHeader(MonitorJobPoller.SERVICE_NAME_HEADER) == null) {
             val serviceNameMap = AlertingSettings.TARGET_TYPE_TO_SERVICE_NAME.get(settings)

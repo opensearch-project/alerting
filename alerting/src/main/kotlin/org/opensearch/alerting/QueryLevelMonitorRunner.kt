@@ -14,6 +14,7 @@ import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.trigger.RemoteQueryLevelTriggerEvaluator
 import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.isADMonitor
+import org.opensearch.alerting.util.use
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.MonitorRunResult
@@ -25,6 +26,7 @@ import org.opensearch.commons.alerting.model.QueryLevelTriggerRunResult
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.WorkflowRunContext
 import org.opensearch.commons.alerting.util.isPPLMonitor
+import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.transport.TransportService
 import java.time.Instant
 import java.util.Locale
@@ -68,40 +70,66 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                 inputResults = monitorCtx.inputService!!.collectInputResultsForADMonitor(monitor, periodStart, periodEnd)
             )
         } else if (monitor.isPPLMonitor()) {
-            withClosableContext(
-                InjectorContextElement(
-                    monitor.id,
-                    monitorCtx.settings!!,
-                    monitorCtx.threadPool!!.threadContext,
-                    monitor.user?.roles,
-                    monitor.user
-                )
-            ) {
-                reinjectHeaders(monitor, monitorCtx)
-                monitorResult = monitorResult.copy(
-                    inputResults = monitorCtx.inputService!!.collectInputResultsForPPLMonitor(monitor, monitorCtx)
-                )
+            // Stash a fresh ThreadContext before reinjecting the routing headers so the write-once
+            // remote routing headers set by reinjectHeaders (notably the AOSS collection endpoint) are
+            // always written for THIS monitor, rather than being skipped because a previous run left a
+            // stale value on this pooled coroutine worker thread. See the standard branch below for details.
+            val tenantId = currentTenantId()
+            monitorCtx.client!!.threadPool().threadContext.stashContext().use {
+                // Stashing clears the tenant_id header too, and reinjectHeaders does not restore it, so
+                // re-set it here (as MonitorRunner.runAction does) to preserve tenant routing for the query.
+                tenantId?.let {
+                    monitorCtx.client!!.threadPool().threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, it)
+                }
+                withClosableContext(
+                    InjectorContextElement(
+                        monitor.id,
+                        monitorCtx.settings!!,
+                        monitorCtx.threadPool!!.threadContext,
+                        monitor.user?.roles,
+                        monitor.user
+                    )
+                ) {
+                    reinjectHeaders(monitor, monitorCtx)
+                    monitorResult = monitorResult.copy(
+                        inputResults = monitorCtx.inputService!!.collectInputResultsForPPLMonitor(monitor, monitorCtx)
+                    )
+                }
             }
         } else {
-            withClosableContext(
-                InjectorContextElement(
-                    monitor.id,
-                    monitorCtx.settings!!,
-                    monitorCtx.threadPool!!.threadContext,
-                    roles,
-                    monitor.user
-                )
-            ) {
-                reinjectHeaders(monitor, monitorCtx)
-                monitorResult = monitorResult.copy(
-                    inputResults = monitorCtx.inputService!!.collectInputResults(
-                        monitor,
-                        periodStart,
-                        periodEnd,
-                        null,
-                        workflowRunContext
+            // Stash a fresh ThreadContext before reinjecting the routing headers so the write-once
+            // remote-search headers set by reinjectHeaders (notably the AOSS collection endpoint) are
+            // always written for THIS monitor. Monitor runs share a pool of coroutine worker threads,
+            // and a stale endpoint left on the thread by a previous run would otherwise cause
+            // reinjectHeaders to skip its `putHeader` (write-once + its `== null` guard) and route this
+            // monitor's search to the wrong collection. Mirrors the stash pattern in MonitorRunner.runAction.
+            val tenantId = currentTenantId()
+            monitorCtx.client!!.threadPool().threadContext.stashContext().use {
+                // Stashing clears the tenant_id header too, and reinjectHeaders does not restore it, so
+                // re-set it here (as MonitorRunner.runAction does) to preserve tenant routing for the search.
+                tenantId?.let {
+                    monitorCtx.client!!.threadPool().threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, it)
+                }
+                withClosableContext(
+                    InjectorContextElement(
+                        monitor.id,
+                        monitorCtx.settings!!,
+                        monitorCtx.threadPool!!.threadContext,
+                        roles,
+                        monitor.user
                     )
-                )
+                ) {
+                    reinjectHeaders(monitor, monitorCtx)
+                    monitorResult = monitorResult.copy(
+                        inputResults = monitorCtx.inputService!!.collectInputResults(
+                            monitor,
+                            periodStart,
+                            periodEnd,
+                            null,
+                            workflowRunContext
+                        )
+                    )
+                }
             }
         }
         logger.info("Input results collected for [${monitor.id}], error=${monitorResult.inputResults.error}, resultsSize=${monitorResult.inputResults.results.size}")
@@ -116,15 +144,41 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT)) == Monitor.MonitorType.QUERY_LEVEL_MONITOR &&
             monitorResult.inputResults.results.isNotEmpty()
         ) {
-            reinjectHeaders(monitor, monitorCtx)
-            val searchInput = monitor.inputs[0] as SearchInput
-            val queryLevelTriggers = monitor.triggers.filterIsInstance<QueryLevelTrigger>()
-            RemoteQueryLevelTriggerEvaluator.evaluate(
-                monitorCtx.client!!,
-                searchInput.indices,
-                queryLevelTriggers,
-                monitorResult.inputResults.results[0]
-            )
+            // The remote trigger evaluation issues its own search against the user's collection, so it needs
+            // the same routing headers as input collection. The input-collection stash above has already
+            // closed by this point, so stash a fresh context again before reinjecting to guarantee the
+            // write-once endpoint header is set for THIS monitor rather than skipped because a stale value
+            // from a previous run lingers on this pooled worker thread.
+            val tenantId = currentTenantId()
+            monitorCtx.client!!.threadPool().threadContext.stashContext().use {
+                // Stashing clears the tenant_id header too, and reinjectHeaders does not restore it, so
+                // re-set it here (as MonitorRunner.runAction does) to preserve tenant routing for the search.
+                tenantId?.let {
+                    monitorCtx.client!!.threadPool().threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, it)
+                }
+                // Stashing also clears the security user-info transient; the remote evaluation searches the
+                // user's collection, so re-establish the user/roles context (as the input-collection branches
+                // above do) before reinjecting the routing headers and issuing the search.
+                withClosableContext(
+                    InjectorContextElement(
+                        monitor.id,
+                        monitorCtx.settings!!,
+                        monitorCtx.threadPool!!.threadContext,
+                        monitor.user?.roles,
+                        monitor.user
+                    )
+                ) {
+                    reinjectHeaders(monitor, monitorCtx)
+                    val searchInput = monitor.inputs[0] as SearchInput
+                    val queryLevelTriggers = monitor.triggers.filterIsInstance<QueryLevelTrigger>()
+                    RemoteQueryLevelTriggerEvaluator.evaluate(
+                        monitorCtx.client!!,
+                        searchInput.indices,
+                        queryLevelTriggers,
+                        monitorResult.inputResults.results[0]
+                    )
+                }
+            }
         } else {
             null
         }
