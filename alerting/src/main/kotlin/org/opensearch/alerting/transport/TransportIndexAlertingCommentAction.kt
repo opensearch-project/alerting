@@ -146,13 +146,15 @@ constructor(
         val user = readUserFromThreadContext(client)
 
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
-        // Coroutine dispatch drops the ThreadContext ThreadLocal on hop. Capture the current context so
-        // the coroutine body can restore the caller's persistent auth header for the shard-level
-        // ResourceIndexListener. Individual sdkClient writes below use [putDataObjectStashed] to run under
-        // a clean context per call.
-        val storedContext = client.threadPool().threadContext.newStoredContext(false)
-        scope.launch(TenantContext(tenantId)) {
-            IndexCommentHandler(client, actionListener, transformedRequest, user, storedContext).start()
+        // Stash the caller's transient auth so the alert-fetch and comment-write flow runs under
+        // the plugin subject — comments target system indices where callers rarely have direct
+        // permissions. When resource-sharing is enabled the shard-level ResourceIndexListener
+        // still sees the caller via the persistent auth header (persistents survive stashContext),
+        // so it can record the comment share entry with createdBy=<caller>.
+        client.threadPool().threadContext.stashContext().use {
+            scope.launch(TenantContext(tenantId)) {
+                IndexCommentHandler(client, actionListener, transformedRequest, user).start()
+            }
         }
     }
 
@@ -161,12 +163,8 @@ constructor(
         private val actionListener: ActionListener<IndexCommentResponse>,
         private val request: IndexCommentRequest,
         private val user: User?,
-        private val storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
     ) {
         suspend fun start() {
-            // Restore the caller's persistent auth header for downstream ResourceIndexListener
-            // callbacks. Each sdkClient write below stashes per-call via [putDataObjectStashed].
-            storedThreadContext?.restore()
             commentsIndices.createOrUpdateInitialCommentsHistoryIndex()
             if (request.method == RestRequest.Method.PUT) {
                 updateComment()
