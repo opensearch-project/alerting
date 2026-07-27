@@ -7,13 +7,17 @@ package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.ThreadFilter
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters
+import org.apache.lucene.search.TotalHits
 import org.junit.Before
 import org.mockito.Mockito
 import org.mockito.Mockito.verify
 import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
+import org.opensearch.action.search.SearchResponseSections
+import org.opensearch.action.search.ShardSearchFailure
 import org.opensearch.action.support.ActionFilters
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
@@ -65,7 +69,10 @@ import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
+import org.opensearch.remote.metadata.client.SearchDataObjectResponse
 import org.opensearch.rest.RestRequest
+import org.opensearch.search.SearchHits
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.threadpool.ThreadPool
@@ -513,6 +520,10 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
             org.mockito.ArgumentMatchers.any()
         )
 
+        // Mock the tenant-scoped monitor count search (countTenantMonitorsAndExecute) to return zero
+        // existing monitors so the per-tenant limit check passes and creation proceeds.
+        stubTenantMonitorCount(sdkClient, 0L)
+
         // Mock sdkClient.putDataObjectAsync for the monitor index
         val putResponse = org.opensearch.remote.metadata.client.PutDataObjectResponse.builder()
             .id("test-monitor-id")
@@ -570,7 +581,239 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
         )
     }
 
+    // --- Per-tenant monitor limit tests (multi-tenancy) ---
+
+    fun `test create monitor rejected when tenant is at monitor limit`() {
+        val sdkClient = Mockito.mock(SdkClient::class.java)
+        val settings = Settings.builder()
+            .put("plugins.alerting.multi_tenancy_enabled", true)
+            .put("plugins.alerting.monitor.max_monitors", 2)
+            .build()
+        val action = createMultiTenantAction(sdkClient, settings)
+
+        threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, "tenant-at-limit")
+
+        // Tenant already has 2 monitors, which equals the configured max — the create must be rejected.
+        stubTenantMonitorCount(sdkClient, 2L)
+
+        val listener = queryLevelCreateRequest(action)
+
+        // The limit rejection is an IllegalArgumentException wrapped in AlertingException.
+        val captor = org.mockito.ArgumentCaptor.forClass(Exception::class.java)
+        verify(listener, Mockito.timeout(2000)).onFailure(captor.capture())
+        val exception = captor.value
+        assertTrue(exception is org.opensearch.commons.alerting.util.AlertingException)
+        val cause = (exception as org.opensearch.commons.alerting.util.AlertingException).cause ?: exception
+        assertTrue(cause is IllegalArgumentException)
+        assertTrue(cause.message!!.contains("more than the allowed monitors [2]"))
+
+        // A rejected create must never be written to the store.
+        verify(sdkClient, Mockito.after(500).never()).putDataObjectAsync(org.mockito.ArgumentMatchers.any())
+    }
+
+    fun `test create monitor allowed when tenant is below monitor limit`() {
+        val sdkClient = Mockito.mock(SdkClient::class.java)
+        val settings = Settings.builder()
+            .put("plugins.alerting.multi_tenancy_enabled", true)
+            .put("plugins.alerting.monitor.max_monitors", 5)
+            .build()
+        val action = createMultiTenantAction(sdkClient, settings)
+
+        threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, "tenant-below-limit")
+
+        // Tenant has 3 monitors, below the max of 5 — creation should proceed to the store.
+        stubTenantMonitorCount(sdkClient, 3L)
+        val putResponse = org.opensearch.remote.metadata.client.PutDataObjectResponse.builder()
+            .id("new-monitor-id")
+            .build()
+        whenever(sdkClient.putDataObjectAsync(org.mockito.ArgumentMatchers.any()))
+            .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(putResponse))
+
+        val listener = queryLevelCreateRequest(action)
+
+        // Creation must proceed to writing the monitor and must not be rejected with a limit error.
+        verify(sdkClient, Mockito.timeout(2000)).putDataObjectAsync(org.mockito.ArgumentMatchers.any())
+        verify(listener, Mockito.never()).onFailure(
+            org.mockito.ArgumentMatchers.argThat { ex ->
+                val cause = (ex as? org.opensearch.commons.alerting.util.AlertingException)?.cause ?: ex
+                cause is IllegalArgumentException && cause.message!!.contains("allowed monitors")
+            }
+        )
+    }
+
+    fun `test create monitor uses tenant-scoped count search`() {
+        val sdkClient = Mockito.mock(SdkClient::class.java)
+        val settings = Settings.builder()
+            .put("plugins.alerting.multi_tenancy_enabled", true)
+            .put("plugins.alerting.monitor.max_monitors", 5)
+            .build()
+        val action = createMultiTenantAction(sdkClient, settings)
+
+        threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, "tenant-abc")
+        stubTenantMonitorCount(sdkClient, 0L)
+        whenever(sdkClient.putDataObjectAsync(org.mockito.ArgumentMatchers.any()))
+            .thenReturn(
+                java.util.concurrent.CompletableFuture.completedFuture(
+                    org.opensearch.remote.metadata.client.PutDataObjectResponse.builder().id("id").build()
+                )
+            )
+
+        queryLevelCreateRequest(action)
+
+        // The count search must target the scheduled-jobs index scoped to the request's tenant id.
+        val captor = org.mockito.ArgumentCaptor.forClass(SearchDataObjectRequest::class.java)
+        verify(sdkClient, Mockito.timeout(2000)).searchDataObjectAsync(captor.capture())
+        val searchRequest = captor.value
+        assertEquals("tenant-abc", searchRequest.tenantId())
+        assertTrue(
+            searchRequest.indices().contains(
+                org.opensearch.commons.alerting.model.ScheduledJob.SCHEDULED_JOBS_INDEX
+            )
+        )
+    }
+
+    fun `test create monitor surfaces failure from tenant count search`() {
+        val sdkClient = Mockito.mock(SdkClient::class.java)
+        val settings = Settings.builder()
+            .put("plugins.alerting.multi_tenancy_enabled", true)
+            .put("plugins.alerting.monitor.max_monitors", 5)
+            .build()
+        val action = createMultiTenantAction(sdkClient, settings)
+
+        threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, "tenant-err")
+
+        // The count search fails — the error must be surfaced and creation must not proceed.
+        val failed = java.util.concurrent.CompletableFuture<SearchDataObjectResponse>()
+        failed.completeExceptionally(OpenSearchStatusException("neo down", RestStatus.INTERNAL_SERVER_ERROR))
+        whenever(sdkClient.searchDataObjectAsync(org.mockito.ArgumentMatchers.any(SearchDataObjectRequest::class.java)))
+            .thenReturn(failed)
+
+        val listener = queryLevelCreateRequest(action)
+
+        verify(listener, Mockito.timeout(2000)).onFailure(org.mockito.ArgumentMatchers.any(Exception::class.java))
+        verify(sdkClient, Mockito.after(500).never()).putDataObjectAsync(org.mockito.ArgumentMatchers.any())
+    }
+
+    fun `test create monitor fails closed on null tenant count response`() {
+        val sdkClient = Mockito.mock(SdkClient::class.java)
+        val settings = Settings.builder()
+            .put("plugins.alerting.multi_tenancy_enabled", true)
+            .put("plugins.alerting.monitor.max_monitors", 5)
+            .build()
+        val action = createMultiTenantAction(sdkClient, settings)
+
+        threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, "tenant-null")
+
+        // A null search response must fail the request rather than bypass the limit check,
+        // otherwise a tenant could create unlimited monitors on any SDK/serialization glitch.
+        val nullResponseFuture: java.util.concurrent.CompletionStage<SearchDataObjectResponse> =
+            java.util.concurrent.CompletableFuture.completedFuture(
+                SearchDataObjectResponse(null as SearchResponse?)
+            )
+        whenever(sdkClient.searchDataObjectAsync(org.mockito.ArgumentMatchers.any(SearchDataObjectRequest::class.java)))
+            .thenReturn(nullResponseFuture)
+
+        val listener = queryLevelCreateRequest(action)
+
+        val captor = org.mockito.ArgumentCaptor.forClass(Exception::class.java)
+        verify(listener, Mockito.timeout(2000)).onFailure(captor.capture())
+        val cause = (captor.value as? org.opensearch.commons.alerting.util.AlertingException)?.cause ?: captor.value
+        assertTrue(cause is OpenSearchStatusException)
+        assertEquals(RestStatus.INTERNAL_SERVER_ERROR, (cause as OpenSearchStatusException).status())
+
+        // The monitor must not be written when the count could not be determined.
+        verify(sdkClient, Mockito.after(500).never()).putDataObjectAsync(org.mockito.ArgumentMatchers.any())
+    }
+
     // --- Helpers ---
+
+    private fun createMultiTenantAction(sdkClient: SdkClient, settings: Settings): TransportIndexMonitorAction {
+        val settingSet = hashSetOf<Setting<*>>()
+        settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
+        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
+        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
+        settingSet.add(AlertingSettings.ALERT_HISTORY_ENABLED)
+        settingSet.add(AlertingSettings.ALERTING_MAX_MONITORS)
+        settingSet.add(AlertingSettings.MAX_TRIGGERS_PER_MONITOR)
+        settingSet.add(AlertingSettings.REQUEST_TIMEOUT)
+        settingSet.add(AlertingSettings.INDEX_TIMEOUT)
+        settingSet.add(AlertingSettings.MAX_ACTION_THROTTLE_VALUE)
+        settingSet.add(DestinationSettings.ALLOW_LIST)
+        settingSet.add(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
+        settingSet.add(AlertingSettings.JOB_QUEUE_NAME)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME)
+        whenever(clusterService.clusterSettings).thenReturn(ClusterSettings(settings, settingSet))
+
+        return TransportIndexMonitorAction(
+            transportService, client, actionFilters,
+            scheduledJobIndices,
+            docLevelMonitorQueries,
+            clusterService, settings, xContentRegistry,
+            Mockito.mock(NamedWriteableRegistry::class.java),
+            sdkClient
+        )
+    }
+
+    /**
+     * Submits a POST (create) request for a query-level monitor through the action and returns the mocked listener.
+     * Query-level monitors are allowed under multi-tenancy, so they exercise the per-tenant limit check.
+     */
+    private fun queryLevelCreateRequest(action: TransportIndexMonitorAction): ActionListener<IndexMonitorResponse> {
+        // Mock cluster state for index resolution in checkIndicesAndExecute
+        val metadata = org.opensearch.cluster.metadata.Metadata.builder().build()
+        val clusterState = org.opensearch.cluster.ClusterState.builder(
+            org.opensearch.cluster.ClusterName("test")
+        ).metadata(metadata).build()
+        whenever(clusterService.state()).thenReturn(clusterState)
+
+        // Mock the search for index validation (checkIndicesAndExecute)
+        Mockito.doAnswer { invocation ->
+            @Suppress("UNCHECKED_CAST")
+            val searchListener = invocation.arguments[1] as ActionListener<SearchResponse>
+            searchListener.onResponse(Mockito.mock(SearchResponse::class.java))
+            null
+        }.`when`(client).search(
+            org.mockito.ArgumentMatchers.any(SearchRequest::class.java),
+            org.mockito.ArgumentMatchers.any()
+        )
+
+        val monitor = Monitor(
+            name = "test", monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR.value,
+            enabled = false, schedule = IntervalSchedule(5, ChronoUnit.MINUTES),
+            lastUpdateTime = Instant.now(), enabledTime = null, user = null,
+            inputs = listOf(SearchInput(listOf("test-index"), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))),
+            triggers = emptyList(), uiMetadata = mapOf()
+        )
+        val request = IndexMonitorRequest(
+            Monitor.NO_ID, SequenceNumbers.UNASSIGNED_SEQ_NO, SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
+            org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE, RestRequest.Method.POST, monitor
+        )
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<IndexMonitorResponse>
+
+        invokeDoExecute(action, request, listener)
+        return listener
+    }
+
+    /**
+     * Stubs sdkClient.searchDataObjectAsync to return a SearchResponse whose totalHits equals [count],
+     * mirroring the tenant-scoped monitor count returned by Neo Data Service's FindMonitors path.
+     */
+    private fun stubTenantMonitorCount(sdkClient: SdkClient, count: Long) {
+        val searchHits = SearchHits(arrayOf(), TotalHits(count, TotalHits.Relation.EQUAL_TO), 1.0f)
+        val sections = SearchResponseSections(searchHits, null, null, false, false, null, 0)
+        val searchResponse = SearchResponse(
+            sections, null, 1, 1, 0, 0,
+            ShardSearchFailure.EMPTY_ARRAY, SearchResponse.Clusters.EMPTY
+        )
+        val future: java.util.concurrent.CompletionStage<SearchDataObjectResponse> =
+            java.util.concurrent.CompletableFuture.completedFuture(SearchDataObjectResponse(searchResponse))
+        whenever(sdkClient.searchDataObjectAsync(org.mockito.ArgumentMatchers.any(SearchDataObjectRequest::class.java)))
+            .thenReturn(future)
+    }
 
     private fun assertMethodNotAllowed(listener: ActionListener<*>) {
         val captor = org.mockito.ArgumentCaptor.forClass(Exception::class.java)
