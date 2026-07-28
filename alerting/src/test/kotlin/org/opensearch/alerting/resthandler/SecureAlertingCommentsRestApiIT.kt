@@ -52,6 +52,11 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
                 .build()
         }
         client().updateSettings(ALERTING_COMMENTS_ENABLED.key, "true")
+        // Create the alerts index with the real mapping (monitor_id as keyword) before any test
+        // writes alerts via the raw _doc API. Otherwise the index auto-creates with a dynamic
+        // text mapping, and the RSC comment-search filter's term query on monitor_id matches
+        // nothing -- so a shared monitor's comments would appear invisible.
+        putAlertMappings()
     }
 
     @After
