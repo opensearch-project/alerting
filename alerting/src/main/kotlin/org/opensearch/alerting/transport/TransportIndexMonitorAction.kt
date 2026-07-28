@@ -20,6 +20,7 @@ import org.opensearch.action.admin.cluster.health.ClusterHealthRequest
 import org.opensearch.action.admin.cluster.health.ClusterHealthResponse
 import org.opensearch.action.admin.indices.create.CreateIndexResponse
 import org.opensearch.action.index.IndexResponse
+import org.opensearch.action.search.SearchPhaseExecutionException
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
@@ -98,6 +99,7 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.ToXContentObject
+import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.reindex.BulkByScrollResponse
 import org.opensearch.index.reindex.DeleteByQueryAction
@@ -747,7 +749,17 @@ class TransportIndexMonitorAction @Inject constructor(
                         }
 
                         override fun onFailure(t: Exception) {
-                            actionListener.onFailure(AlertingException.wrap(t))
+                            val cause = ExceptionsHelper.unwrapCause(t)
+                            if (cause is IndexNotFoundException ||
+                                cause is SearchPhaseExecutionException
+                            ) {
+                                log.info("$SCHEDULED_JOBS_INDEX index not available for monitor count validation, proceeding with indexing.")
+                                scope.launch(TenantContext(tenantId)) {
+                                    indexMonitor()
+                                }
+                            } else {
+                                actionListener.onFailure(AlertingException.wrap(t))
+                            }
                         }
                     }
                 )
