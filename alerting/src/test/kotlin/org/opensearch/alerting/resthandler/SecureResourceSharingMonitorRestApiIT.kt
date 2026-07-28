@@ -490,24 +490,6 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         return response
     }
 
-    private fun waitForResourceSharingEntry(resourceId: String, timeoutMs: Long = 10_000) {
-        val deadline = System.nanoTime() + timeoutMs * 1_000_000
-        var lastException: Exception? = null
-        while (System.nanoTime() < deadline) {
-            try {
-                adminClient().performRequest(Request("POST", "/.opendistro-alerting-config-sharing/_refresh"))
-                val resp = adminClient().performRequest(
-                    Request("GET", "/.opendistro-alerting-config-sharing/_doc/$resourceId")
-                )
-                if (resp.statusLine.statusCode == 200) return
-            } catch (e: Exception) {
-                lastException = e
-            }
-            Thread.sleep(100)
-        }
-        throw IllegalStateException("Sharing entry for $resourceId never appeared within ${timeoutMs}ms", lastException)
-    }
-
     private fun sampleMonitor() = randomQueryLevelMonitor(
         inputs = listOf(
             org.opensearch.commons.alerting.model.SearchInput(

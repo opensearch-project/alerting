@@ -60,6 +60,18 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
         userBClient?.close()
         deleteUser(userA)
         deleteUser(userB)
+        // These roles are shared/reserved, so their role-mappings persist cluster-wide until
+        // explicitly removed. A test that fails before its own finally-block cleanup would leak a
+        // mapping and grant a later test's user unexpected access (e.g. a "no roles" user inheriting
+        // alerting_full_access), producing order-dependent flakiness. Tear them all down here so
+        // every test starts from a clean role-mapping state.
+        listOf(ALERTING_READ_ONLY_ACCESS, ALERTING_ACK_ALERTS_ROLE, ALERTING_FULL_ACCESS_ROLE).forEach {
+            try {
+                deleteRoleMapping(it)
+            } catch (_: Exception) {
+                // mapping may not exist for this test; ignore
+            }
+        }
     }
 
     fun `test user with alerting full access can create comment`() {
@@ -87,6 +99,11 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
             false
         )
         val monitor = createRandomMonitor(refresh = true)
+        // Viewing a monitor's comments is a read gated by resource authz, so the (admin-created)
+        // monitor must be shared with the viewing user under RSC.
+        if (isResourceSharingEnabled()) {
+            shareMonitorWithUser(client(), monitor.id, userA)
+        }
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
         val alertId = alert.id
         val comment1Content = "test comment 1"
@@ -169,6 +186,11 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
             false
         )
         val monitor = createRandomMonitor(refresh = true)
+        // Viewing a monitor's comments is a read gated by resource authz, so the (admin-created)
+        // monitor must be shared with the viewing user under RSC.
+        if (isResourceSharingEnabled()) {
+            shareMonitorWithUser(client(), monitor.id, userA)
+        }
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
         val alertId = alert.id
         val comment1Content = "test comment 1"
@@ -263,6 +285,13 @@ class SecureAlertingCommentsRestApiIT : AlertingRestTestCase() {
             false
         )
         val monitor = createRandomMonitor(refresh = true)
+        // userB (full access) creates the comments and userA (read-only) views them; under RSC both
+        // need resource access to the admin-created monitor (create-comment fetches the alert, view
+        // filters by accessible monitors).
+        if (isResourceSharingEnabled()) {
+            shareMonitorWithUser(client(), monitor.id, userA)
+            shareMonitorWithUser(client(), monitor.id, userB)
+        }
         val alert = createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
         val alertId = alert.id
         val comment1Content = "test comment 1"
