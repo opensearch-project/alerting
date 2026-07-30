@@ -123,6 +123,9 @@ abstract class MonitorRunner {
         if (threadContext.getHeader(MonitorJobPoller.REGION_HEADER) == null) {
             threadContext.putHeader(MonitorJobPoller.REGION_HEADER, AlertingSettings.REMOTE_METADATA_REGION.get(settings) ?: "")
         }
+        if (threadContext.getHeader(MonitorJobPoller.X_OPAQUE_ID_HEADER) == null) {
+            threadContext.putHeader(MonitorJobPoller.X_OPAQUE_ID_HEADER, MonitorJobPoller.buildRequestOrigin(monitor))
+        }
 
         if (target.arn.isNotBlank()) {
             val (accountId, resourceId) = ArnHelper.parseArn(target.arn)

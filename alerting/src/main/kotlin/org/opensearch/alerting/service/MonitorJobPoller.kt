@@ -206,6 +206,40 @@ class MonitorJobPoller(
         const val SERVICE_NAME_HEADER = "aws-service-name"
         const val OPENSEARCH_ENDPOINT_HEADER = "opensearch-url"
         const val REGION_HEADER = "aws-region"
+
+        // Request-origin header: Oasis forwards this verbatim as X-Opaque-Id on outbound
+        // data-source requests so the AOSS gateway can publish the originating monitor
+        // context to the resource owner's CloudTrail data events.
+        const val X_OPAQUE_ID_HEADER = "X-Opaque-Id"
+        private const val REQUEST_ORIGIN_SERVICE = "alerting"
+
+        /**
+         * Composes the request-origin identifier for a background monitor execution in the
+         * agreed key=value format: `service=alerting,appId=...,workspaceId=...,monitorId=...`.
+         *
+         * The appId and workspaceId are extracted from the monitor's tenant_id metadata
+         * (format: `accountId:appId:workspaceId`); fields that are unavailable are omitted.
+         */
+        fun buildRequestOrigin(monitor: Monitor): String {
+            val parts = mutableListOf("service=$REQUEST_ORIGIN_SERVICE")
+
+            val tenantId = monitor.metadata?.get(AlertingPlugin.TENANT_ID_METADATA_KEY)
+            if (!tenantId.isNullOrEmpty()) {
+                val tenantParts = tenantId.split(":")
+                if (tenantParts.size >= 2 && tenantParts[1].isNotBlank()) {
+                    parts.add("appId=${tenantParts[1]}")
+                }
+                if (tenantParts.size >= 3 && tenantParts[2].isNotBlank()) {
+                    parts.add("workspaceId=${tenantParts[2]}")
+                }
+            }
+
+            if (monitor.id.isNotBlank()) {
+                parts.add("monitorId=${monitor.id}")
+            }
+
+            return parts.joinToString(",")
+        }
     }
 
     // populates thread context with KVs that downstream interception will
@@ -252,6 +286,11 @@ class MonitorJobPoller(
         if (!tenantId.isNullOrEmpty()) {
             threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, tenantId)
         }
+
+        // Request-origin identifier: forwarded by Oasis as X-Opaque-Id on outbound
+        // data-source requests so the AOSS gateway can publish the originating monitor
+        // context to the resource owner's CloudTrail data events.
+        threadContext.putHeader(X_OPAQUE_ID_HEADER, buildRequestOrigin(monitor))
 
         // Set transient headers for account ID and resource ID parsed from target ARN.
         // to route the search request to the correct remote data source.

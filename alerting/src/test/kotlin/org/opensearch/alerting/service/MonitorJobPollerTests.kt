@@ -9,6 +9,7 @@ import com.carrotsearch.randomizedtesting.ThreadFilter
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.util.ArnHelper
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Monitor
@@ -395,6 +396,84 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         assertEquals("us-east-1", mockThreadContext.getHeader(MonitorJobPoller.REGION_HEADER))
 
         poller.close()
+    }
+
+    fun `test populateThreadContext sets request origin header with tenant metadata`() {
+        val mockClient = mockClient()
+        val mockThreadPool = mock(org.opensearch.threadpool.ThreadPool::class.java)
+        val mockThreadContext = org.opensearch.common.util.concurrent.ThreadContext(Settings.EMPTY)
+
+        `when`(mockClient.threadPool()).thenReturn(mockThreadPool)
+        `when`(mockThreadPool.threadContext).thenReturn(mockThreadContext)
+
+        val poller = MonitorJobPoller(
+            testXContentRegistry(), mockClient, true,
+            testAccountIdProvider(), "us-east-1", "test-queue",
+            mappingProvider()
+        )
+
+        val mockTargetType = mappingProvider().entries.first().key
+        val target = Target(
+            type = mockTargetType,
+            endpoint = "https://my-domain.us-west-2.es.amazonaws.com",
+            arn = "arn:aws:es:us-west-2:123456789012:domain/my-domain"
+        )
+        val monitor = org.opensearch.alerting.randomQueryLevelMonitor().copy(
+            id = "monitor-1",
+            target = target,
+            metadata = mapOf(AlertingPlugin.TENANT_ID_METADATA_KEY to "123456789012:app-1:default")
+        )
+
+        poller.populateThreadContext(monitor)
+
+        assertEquals(
+            "service=alerting,appId=app-1,workspaceId=default,monitorId=monitor-1",
+            mockThreadContext.getHeader(MonitorJobPoller.X_OPAQUE_ID_HEADER)
+        )
+
+        poller.close()
+    }
+
+    fun `test buildRequestOrigin without tenant metadata`() {
+        val monitor = org.opensearch.alerting.randomQueryLevelMonitor().copy(
+            id = "monitor-2",
+            metadata = null
+        )
+
+        assertEquals("service=alerting,monitorId=monitor-2", MonitorJobPoller.buildRequestOrigin(monitor))
+    }
+
+    fun `test buildRequestOrigin with malformed tenant id`() {
+        val monitor = org.opensearch.alerting.randomQueryLevelMonitor().copy(
+            id = "monitor-3",
+            metadata = mapOf(AlertingPlugin.TENANT_ID_METADATA_KEY to "account-only")
+        )
+
+        assertEquals("service=alerting,monitorId=monitor-3", MonitorJobPoller.buildRequestOrigin(monitor))
+    }
+
+    fun `test buildRequestOrigin with account and app but no workspace`() {
+        val monitor = org.opensearch.alerting.randomQueryLevelMonitor().copy(
+            id = "monitor-4",
+            metadata = mapOf(AlertingPlugin.TENANT_ID_METADATA_KEY to "123456789012:app-2")
+        )
+
+        assertEquals(
+            "service=alerting,appId=app-2,monitorId=monitor-4",
+            MonitorJobPoller.buildRequestOrigin(monitor)
+        )
+    }
+
+    fun `test buildRequestOrigin with blank monitor id`() {
+        val monitor = org.opensearch.alerting.randomQueryLevelMonitor().copy(
+            id = "",
+            metadata = mapOf(AlertingPlugin.TENANT_ID_METADATA_KEY to "123456789012:app-3:ws-1")
+        )
+
+        assertEquals(
+            "service=alerting,appId=app-3,workspaceId=ws-1",
+            MonitorJobPoller.buildRequestOrigin(monitor)
+        )
     }
 
     fun `test thread context population rejects invalid target type`() {
