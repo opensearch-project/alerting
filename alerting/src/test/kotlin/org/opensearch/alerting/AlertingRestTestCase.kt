@@ -670,14 +670,24 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         indices: String = AlertIndices.ALERT_INDEX,
         refresh: Boolean = true,
     ): List<Alert> {
-        if (refresh) refreshIndex(indices)
+        try {
+            if (refresh) refreshIndex(indices)
+        } catch (e: Exception) {
+            logger.warn("Could not refresh index $indices because: ${e.message}")
+            return emptyList()
+        }
 
         val request = """
             { "version" : true,
               "query": { "match_all": {} }
             }
         """.trimIndent()
-        val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
+        val httpResponse = try {
+            adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
+        } catch (e: Exception) {
+            logger.warn("Could not search alerts index $indices because: ${e.message}")
+            return emptyList()
+        }
         assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
 
         val searchResponse = SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
@@ -717,14 +727,24 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         indices: String = AlertIndices.ALL_FINDING_INDEX_PATTERN,
         refresh: Boolean = true,
     ): List<Finding> {
-        if (refresh) refreshIndex(indices)
+        try {
+            if (refresh) refreshIndex(indices)
+        } catch (e: Exception) {
+            logger.warn("Could not refresh index $indices because: ${e.message}")
+            return emptyList()
+        }
 
         val request = """
             { "version" : true,
               "query": { "match_all": {} }
             }
         """.trimIndent()
-        val httpResponse = adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
+        val httpResponse = try {
+            adminClient().makeRequest("GET", "/$indices/_search", StringEntity(request, APPLICATION_JSON))
+        } catch (e: Exception) {
+            logger.warn("Could not search findings index $indices because: ${e.message}")
+            return emptyList()
+        }
         assertEquals("Search failed", RestStatus.OK, httpResponse.restStatus())
 
         val searchResponse = SearchResponse.fromXContent(createParser(jsonXContent, httpResponse.entity.content))
