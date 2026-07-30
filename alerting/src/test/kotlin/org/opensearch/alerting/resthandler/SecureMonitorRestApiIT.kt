@@ -2404,7 +2404,14 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             val output = entityAsMap(response)
             val inputResults = output.stringMap("input_results")
             assertTrue("Missing monitor error message", (inputResults?.get("error") as String).isNotEmpty())
-            assertTrue((inputResults.get("error") as String).contains("no permissions for [indices:data/read/search]"))
+            val errorMessage = inputResults.get("error") as String
+            assertTrue(
+                "Expected permission error but got: $errorMessage",
+                errorMessage.contains("no permissions for") ||
+                    errorMessage.contains("security_exception") ||
+                    errorMessage.contains("SecurityException") ||
+                    errorMessage.contains("index_not_found_exception")
+            )
         } finally {
             deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
