@@ -29,8 +29,8 @@ buildscript {
 
     repositories {
         mavenLocal()
-        maven { url "https://ci.opensearch.org/m2/" }
         maven { url "https://ci.opensearch.org/maven2/" }
+        maven { url "https://ci.opensearch.org/m2/" }
         mavenCentral()
         maven {
             url "https://ci.opensearch.org/ci/dbc/snapshots/maven/"
@@ -60,8 +60,8 @@ apply from: 'build-tools/merged-coverage.gradle'
 
 // Add explicit repository configuration for ktlint
 repositories {
-    maven { url "https://ci.opensearch.org/m2/" }
     maven { url "https://ci.opensearch.org/maven2/" }
+    maven { url "https://ci.opensearch.org/m2/" }
     mavenCentral()
 }
 
@@ -79,8 +79,8 @@ configurations {
 configurations.ktlint.incoming.beforeResolve {
     repositories.clear()
     repositories {
-        maven { url "https://ci.opensearch.org/m2/" }
         maven { url "https://ci.opensearch.org/maven2/" }
+        maven { url "https://ci.opensearch.org/m2/" }
         mavenCentral()
     }
 }
