@@ -154,8 +154,8 @@ static def fetchVersionProperties() {
 }
 String bwcVersionShort = fetchVersionProperties()
 def bwcVersion = bwcVersionShort + ".0"
-def bwcOpenSearchVersion = bwcVersionShort + "-SNAPSHOT"
-def bwcPluginVersion = bwcVersion + "-SNAPSHOT"
+def bwcOpenSearchVersion = bwcVersionShort + (isSnapshot ? "-SNAPSHOT" : "")
+def bwcPluginVersion = bwcVersion + (isSnapshot ? "-SNAPSHOT" : "")
 
 dependencies {
     // Needed for integ tests
