@@ -19,8 +19,12 @@ internal object ResourceSharingUtils {
     /** Resource type registered by [AlertingResourceSharingExtension] for monitors. */
     const val MONITOR_RESOURCE_TYPE = "monitor"
 
-    /** Resource type registered by [AlertingResourceSharingExtension] for workflows. */
-    const val WORKFLOW_RESOURCE_TYPE = "workflow"
+    /**
+     * Resource type registered by [AlertingResourceSharingExtension] for workflows. Named
+     * "alerting-workflow" (not "workflow") to avoid colliding with the "workflow" resource type
+     * flow-framework registers in the same shared resource-sharing registry.
+     */
+    const val WORKFLOW_RESOURCE_TYPE = "alerting-workflow"
 
     /**
      * Returns true only when the security plugin is loaded AND the resource-sharing feature is enabled

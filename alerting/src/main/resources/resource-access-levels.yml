@@ -34,7 +34,7 @@ resource_types:
         - 'cluster:admin/opensearch/alerting/remote/indexes/get'
         - 'cluster:admin/security/resource/share'
 
-  workflow:
+  alerting-workflow:
     alerting_read_only:
       default: true
       allowed_actions:

@@ -24,7 +24,7 @@ class AlertingResourceSharingExtensionTests : OpenSearchTestCase() {
     fun `test getResourceProviders registers monitor and workflow`() {
         val providers = extension.getResourceProviders()
         val types = providers.map { it.resourceType() }.toSet()
-        assertEquals(setOf("monitor", "workflow"), types)
+        assertEquals(setOf("monitor", "alerting-workflow"), types)
     }
 
     fun `test monitor provider declares nested typeField and owner paths`() {
@@ -36,7 +36,7 @@ class AlertingResourceSharingExtensionTests : OpenSearchTestCase() {
     }
 
     fun `test workflow provider declares nested typeField and owner paths`() {
-        val workflowProvider = extension.getResourceProviders().first { it.resourceType() == "workflow" }
+        val workflowProvider = extension.getResourceProviders().first { it.resourceType() == "alerting-workflow" }
         assertEquals(ScheduledJob.SCHEDULED_JOBS_INDEX, workflowProvider.resourceIndexName())
         assertEquals("workflow.type", workflowProvider.typeField())
         assertEquals("/workflow/user/name", workflowProvider.ownerNamePath())

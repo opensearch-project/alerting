@@ -93,7 +93,7 @@ class RscMigrateE2ERestApiIT : AlertingRestTestCase() {
             setClusterSetting("plugins.security.experimental.resource_sharing.enabled", true)
             setClusterSetting(
                 "plugins.security.experimental.resource_sharing.protected_types",
-                listOf("monitor", "workflow"),
+                listOf("monitor", "alerting-workflow"),
             )
 
             val brokenGet = try {
@@ -130,7 +130,7 @@ class RscMigrateE2ERestApiIT : AlertingRestTestCase() {
                           "default_owner": "$RS_ALICE",
                           "default_access_level": {
                             "monitor": "alerting_full_access",
-                            "workflow": "alerting_full_access"
+                            "alerting-workflow": "alerting_full_access"
                           }
                         }
                         """.trimIndent(),
@@ -159,7 +159,7 @@ class RscMigrateE2ERestApiIT : AlertingRestTestCase() {
             setClusterSetting("plugins.security.experimental.resource_sharing.enabled", true)
             setClusterSetting(
                 "plugins.security.experimental.resource_sharing.protected_types",
-                listOf("monitor", "workflow"),
+                listOf("monitor", "alerting-workflow"),
             )
         }
     }
