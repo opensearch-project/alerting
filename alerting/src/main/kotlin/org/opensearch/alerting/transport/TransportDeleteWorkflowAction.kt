@@ -120,12 +120,13 @@ class TransportDeleteWorkflowAction @Inject constructor(
         }
 
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
-        // Coroutine dispatch drops the ThreadContext ThreadLocal. Restore the caller's persistent auth
-        // header for the shard-level ResourceIndexListener; downstream sdkClient calls each stash
-        // per-call via the stashed helpers to keep internal-index writes off the caller.
-        val storedContext = client.threadPool().threadContext.newStoredContext(false)
+        // The handler's config (system/resource) index reads and deletes run on the plugin subject.
+        // We intentionally do NOT restore the caller's context here: the security plugin's
+        // ResourceIndexListener.postDelete cleans up the deleted resource's share entry by resource id
+        // only (it does not read the caller), and restoring the caller would instead make these
+        // internal-index operations run as the caller -- which the security plugin denies when
+        // resource-sharing is off, spuriously yielding 404/403.
         scope.launch(TenantContext(tenantId)) {
-            storedContext.restore()
             DeleteWorkflowHandler(
                 client,
                 actionListener,
