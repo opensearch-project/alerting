@@ -15,10 +15,12 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.service.DeleteMonitorService
 import org.opensearch.alerting.service.ExternalSchedulerService
 import org.opensearch.alerting.service.SchedulerRoutingResolver
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.getDataObjectStashed
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -85,11 +87,17 @@ class TransportDeleteMonitorAction @Inject constructor(
             ?: recreateObject(request) { DeleteMonitorRequest(it) }
         val user = readUserFromThreadContext(client)
 
-        if (!validateUserBackendRoles(user, actionListener)) {
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
+        if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        // Coroutine dispatch drops the ThreadContext ThreadLocal. Restore the caller's persistent auth
+        // header for the shard-level ResourceIndexListener; DeleteMonitorService's sdkClient calls each
+        // stash per-call via [deleteDataObjectStashed] to keep internal-index writes off the caller.
+        val storedContext = client.threadPool().threadContext.newStoredContext(false)
         scope.launch(TenantContext(tenantId)) {
+            storedContext.restore()
             DeleteMonitorHandler(
                 client,
                 actionListener,
@@ -109,7 +117,11 @@ class TransportDeleteMonitorAction @Inject constructor(
             try {
                 val monitor = getMonitor()
 
-                val canDelete = user == null || !doFilterForUser(user) ||
+                val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
+                // when resource sharing is enabled, security plugin gates access at the index layer
+                val canDelete = useRsc ||
+                    user == null ||
+                    !doFilterForUser(user) ||
                     checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", monitorId)
 
                 if (!multiTenancyEnabled && DeleteMonitorService.monitorIsWorkflowDelegate(monitor.id)) {
@@ -179,7 +191,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                 .build()
 
             try {
-                val response = sdkClient.getDataObject(getRequest)
+                val response = sdkClient.getDataObjectStashed(getRequest, client.threadPool().threadContext)
                 val getResponse = response.getResponse()
                 if (getResponse == null || !getResponse.isExists) {
                     throw OpenSearchStatusException("Monitor with $monitorId is not found", RestStatus.NOT_FOUND)

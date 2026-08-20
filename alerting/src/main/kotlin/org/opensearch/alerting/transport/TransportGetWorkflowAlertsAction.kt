@@ -16,6 +16,8 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingClientAccessor
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
@@ -41,6 +43,7 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
+import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.Operator
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.remote.metadata.client.SdkClient
@@ -163,11 +166,15 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
             .from(from)
 
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        // Capture the caller's context before stashing. Under resource sharing, the accessible-workflow
+        // lookup resolves the caller from the authenticated-user header in ThreadContext; run under the
+        // stashed (empty) context it would see no user and return no workflows, yielding zero alerts.
+        val storedContext = client.threadPool().threadContext.newStoredContext(false)
         client.threadPool().threadContext.stashContext().use {
             scope.launch(TenantContext(tenantId)) {
                 try {
                     val alertIndex = resolveAlertsIndexName(getWorkflowAlertsRequest)
-                    getAlerts(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener, user)
+                    getAlerts(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener, user, storedContext)
                 } catch (t: Exception) {
                     log.error("Failed to get alerts", t)
                     if (t is AlertingException) {
@@ -202,13 +209,39 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
         searchSourceBuilder: SearchSourceBuilder,
         actionListener: ActionListener<GetWorkflowAlertsResponse>,
         user: User?,
+        storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
     ) {
-        // user is null when: 1/ security is disabled. 2/when user is super-admin.
-        if (user == null) {
+        if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE)) {
+            // resource sharing is enabled - filter alerts by accessible workflow IDs
+            val tenantId = currentTenantId()
+            val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+                as org.opensearch.security.spi.resources.client.ResourceSharingClient
+            // getAccessibleResourceIds resolves the caller from the authenticated-user header in
+            // ThreadContext, so it must run under the caller's context (restored here) rather than
+            // the stashed plugin context; otherwise it sees no user and returns no accessible workflows.
+            client.threadPool().threadContext.stashContext().use {
+                storedThreadContext?.restore()
+                rsc.getAccessibleResourceIds(
+                    ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE,
+                    object : ActionListener<Set<String>> {
+                        override fun onResponse(accessibleWorkflowIds: Set<String>) {
+                            val query = searchSourceBuilder.query() as BoolQueryBuilder
+                            query.filter(QueryBuilders.termsQuery("workflow_id", accessibleWorkflowIds))
+                            scope.launch(TenantContext(tenantId)) {
+                                search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
+                            }
+                        }
+
+                        override fun onFailure(e: Exception) {
+                            actionListener.onFailure(AlertingException.wrap(e))
+                        }
+                    }
+                )
+            }
+        } else if (user == null) {
             // user is null when: 1/ security is disabled. 2/when user is super-admin.
             search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
         } else if (!doFilterForUser(user)) {
-            // security is enabled and filterby is disabled.
             search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
         } else {
             // security is enabled and filterby is enabled.

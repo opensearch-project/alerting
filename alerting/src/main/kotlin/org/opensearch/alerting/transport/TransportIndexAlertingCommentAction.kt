@@ -14,6 +14,7 @@ import org.opensearch.action.ActionRequest
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.comments.CommentsIndices.Companion.COMMENTS_HISTORY_WRITE_INDEX
@@ -24,6 +25,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_COMMENTS_PER_ALERT
 import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.await
+import org.opensearch.alerting.util.putDataObjectStashed
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
@@ -144,6 +146,11 @@ constructor(
         val user = readUserFromThreadContext(client)
 
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        // Stash the caller's transient auth so the alert-fetch and comment-write flow runs under
+        // the plugin subject — comments target system indices where callers rarely have direct
+        // permissions. When resource-sharing is enabled the shard-level ResourceIndexListener
+        // still sees the caller via the persistent auth header (persistents survive stashContext),
+        // so it can record the comment share entry with createdBy=<caller>.
         client.threadPool().threadContext.stashContext().use {
             scope.launch(TenantContext(tenantId)) {
                 IndexCommentHandler(client, actionListener, transformedRequest, user).start()
@@ -182,8 +189,12 @@ constructor(
                 return
             }
 
-            log.debug("checking user permissions in index comment")
-            checkUserPermissionsWithResource(user, alert.monitorUser, actionListener, "monitor", alert.monitorId)
+            val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
+            // when resource sharing is enabled, security plugin gates access at the alert fetch layer
+            if (!useRsc) {
+                log.debug("checking user permissions in index comment")
+                checkUserPermissionsWithResource(user, alert.monitorUser, actionListener, "monitor", alert.monitorId)
+            }
 
             val comment = Comment(
                 entityId = request.entityId,
@@ -206,7 +217,7 @@ constructor(
             log.debug("Creating new comment")
 
             try {
-                val putResponse = sdkClient.putDataObjectAsync(putRequest).await()
+                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
                 val seqNo = putResponse.indexResponse()?.seqNo ?: 0L
                 val primaryTerm = putResponse.indexResponse()?.primaryTerm ?: 0L
                 actionListener.onResponse(
@@ -256,7 +267,7 @@ constructor(
             log.debug("Updating comment, ${currentComment.id}")
 
             try {
-                val putResponse = sdkClient.putDataObjectAsync(putRequest).await()
+                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
                 actionListener.onResponse(
                     IndexCommentResponse(
                         putResponse.id(),

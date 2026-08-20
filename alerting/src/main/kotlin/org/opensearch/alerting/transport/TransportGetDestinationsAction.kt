@@ -10,12 +10,14 @@ import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.action.GetDestinationsAction
 import org.opensearch.alerting.action.GetDestinationsRequest
 import org.opensearch.alerting.action.GetDestinationsResponse
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.addFilter
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.PluginClient
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -53,7 +55,8 @@ class TransportGetDestinationsAction @Inject constructor(
     actionFilters: ActionFilters,
     val settings: Settings,
     val xContentRegistry: NamedXContentRegistry,
-    val sdkClient: SdkClient
+    val sdkClient: SdkClient,
+    private val pluginClient: PluginClient
 ) : HandledTransportAction<GetDestinationsRequest, GetDestinationsResponse> (
     GetDestinationsAction.NAME, transportService, actionFilters, ::GetDestinationsRequest
 ),
@@ -135,7 +138,11 @@ class TransportGetDestinationsAction @Inject constructor(
         user: User?,
         tenantId: String? = null,
     ) {
-        if (user == null) {
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
+        if (useRsc) {
+            // resource sharing framework is enabled - access control handled by security plugin
+            search(searchSourceBuilder, actionListener, tenantId)
+        } else if (user == null) {
             search(searchSourceBuilder, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
             search(searchSourceBuilder, actionListener, tenantId)
@@ -155,6 +162,29 @@ class TransportGetDestinationsAction @Inject constructor(
         actionListener: ActionListener<GetDestinationsResponse>,
         tenantId: String? = null,
     ) {
+        // When resource sharing is enabled, route search through PluginClient so it runs as the plugin subject
+        // and the security plugin's DLS on the shared-resource index can filter results.
+        if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)) {
+            val searchRequest = org.opensearch.action.search.SearchRequest()
+                .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
+                .source(searchSourceBuilder)
+            pluginClient.search(
+                searchRequest,
+                object : ActionListener<org.opensearch.action.search.SearchResponse> {
+                    override fun onResponse(response: org.opensearch.action.search.SearchResponse) {
+                        try {
+                            actionListener.onResponse(buildResponse(response))
+                        } catch (e: Exception) {
+                            actionListener.onFailure(AlertingException.wrap(e))
+                        }
+                    }
+                    override fun onFailure(e: Exception) =
+                        actionListener.onFailure(AlertingException.wrap(e))
+                }
+            )
+            return
+        }
+
         val sdkSearchRequest = SearchDataObjectRequest.builder()
             .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
             .tenantId(tenantId)
@@ -172,24 +202,28 @@ class TransportGetDestinationsAction @Inject constructor(
                     actionListener.onResponse(GetDestinationsResponse(RestStatus.OK, 0, emptyList()))
                     return@whenComplete
                 }
-                val totalDestinationCount = searchResponse.hits.totalHits?.value?.toInt()
-                val destinations = mutableListOf<Destination>()
-                for (hit in searchResponse.hits) {
-                    val id = hit.id
-                    val version = hit.version
-                    val seqNo = hit.seqNo.toInt()
-                    val primaryTerm = hit.primaryTerm.toInt()
-                    val xcp = XContentType.JSON.xContent()
-                        .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
-                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
-                    XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-                    destinations.add(Destination.parse(xcp, id, version, seqNo, primaryTerm))
-                }
-                actionListener.onResponse(GetDestinationsResponse(RestStatus.OK, totalDestinationCount, destinations))
+                actionListener.onResponse(buildResponse(searchResponse))
             } catch (e: Exception) {
                 actionListener.onFailure(AlertingException.wrap(e))
             }
         }
+    }
+
+    private fun buildResponse(searchResponse: org.opensearch.action.search.SearchResponse): GetDestinationsResponse {
+        val totalDestinationCount = searchResponse.hits.totalHits?.value?.toInt()
+        val destinations = mutableListOf<Destination>()
+        for (hit in searchResponse.hits) {
+            val id = hit.id
+            val version = hit.version
+            val seqNo = hit.seqNo.toInt()
+            val primaryTerm = hit.primaryTerm.toInt()
+            val xcp = XContentType.JSON.xContent()
+                .createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, hit.sourceAsString)
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            destinations.add(Destination.parse(xcp, id, version, seqNo, primaryTerm))
+        }
+        return GetDestinationsResponse(RestStatus.OK, totalDestinationCount, destinations)
     }
 }

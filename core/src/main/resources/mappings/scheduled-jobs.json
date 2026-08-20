@@ -1,8 +1,11 @@
 {
   "_meta" : {
-    "schema_version": 8
+    "schema_version": 9
   },
   "properties": {
+    "all_shared_principals": {
+      "type": "keyword"
+    },
     "monitor": {
       "dynamic": "false",
       "properties": {

@@ -16,6 +16,8 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingClientAccessor
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -51,6 +53,9 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.io.IOException
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 private val log = LogManager.getLogger(TransportSearchAlertingCommentAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
@@ -106,16 +111,35 @@ class TransportSearchAlertingCommentAction @Inject constructor(
 
         val user = readUserFromThreadContext(client)
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        // Capture the caller's context before stashing. The resource-sharing client resolves the
+        // caller's accessible monitors from the authenticated-user header in ThreadContext; if we
+        // ran that under the stashed (empty) context it would see no user and return no resources,
+        // yielding zero comments. Restore this around the [getAccessibleResourceIds] call while
+        // keeping the actual comments-index search running under the stashed (plugin) context.
+        val storedContext = client.threadPool().threadContext.newStoredContext(false)
         client.threadPool().threadContext.stashContext().use {
             scope.launch(TenantContext(tenantId)) {
-                resolve(transformedRequest, actionListener, user)
+                resolve(transformedRequest, actionListener, user, storedContext)
             }
         }
     }
 
-    suspend fun resolve(searchCommentRequest: SearchCommentRequest, actionListener: ActionListener<SearchResponse>, user: User?) {
+    suspend fun resolve(
+        searchCommentRequest: SearchCommentRequest,
+        actionListener: ActionListener<SearchResponse>,
+        user: User?,
+        storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
+    ) {
         val tenantId = currentTenantId()
-        if (user == null) {
+        if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)) {
+            // resource sharing is enabled - filter comments by alerts on accessible monitors
+            val accessibleAlertIds = getAccessibleAlertIDs(storedThreadContext)
+            val queryBuilder = searchCommentRequest.searchRequest.source().query() as BoolQueryBuilder
+            searchCommentRequest.searchRequest.source().query(
+                queryBuilder.filter(QueryBuilders.termsQuery(Comment.ENTITY_ID_FIELD, accessibleAlertIds))
+            )
+            search(searchCommentRequest.searchRequest, actionListener, tenantId)
+        } else if (user == null) {
             // user is null when: 1/ security is disabled. 2/when user is super-admin.
             search(searchCommentRequest.searchRequest, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
@@ -199,5 +223,49 @@ class TransportSearchAlertingCommentAction @Inject constructor(
         }
 
         return alertIDs
+    }
+
+    // retrieve the IDs of Alerts belonging to monitors the current user has resource-sharing access to
+    private suspend fun getAccessibleAlertIDs(
+        storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
+    ): List<String> {
+        val rsc = ResourceSharingClientAccessor.getResourceSharingClient() ?: return emptyList()
+        // getAccessibleResourceIds resolves the caller from the authenticated-user header in
+        // ThreadContext, so it must run under the caller's context (restored here) rather than the
+        // stashed plugin context; otherwise it sees no user and returns no accessible monitors.
+        val accessibleMonitorIds: Set<String> = client.threadPool().threadContext.stashContext().use {
+            storedThreadContext?.restore()
+            suspendCoroutine { cont ->
+                (rsc as org.opensearch.security.spi.resources.client.ResourceSharingClient).getAccessibleResourceIds(
+                    ResourceSharingUtils.MONITOR_RESOURCE_TYPE,
+                    object : ActionListener<Set<String>> {
+                        override fun onResponse(ids: Set<String>) = cont.resume(ids)
+                        override fun onFailure(e: Exception) = cont.resumeWithException(e)
+                    }
+                )
+            }
+        }
+
+        val queryBuilder = QueryBuilders.boolQuery()
+            .filter(QueryBuilders.termsQuery("monitor_id", accessibleMonitorIds))
+        val searchSourceBuilder = SearchSourceBuilder()
+            .version(true)
+            .seqNoAndPrimaryTerm(true)
+            .query(queryBuilder)
+        val searchRequest = SearchRequest()
+            .source(searchSourceBuilder)
+            .indices(ALL_ALERT_INDEX_PATTERN)
+
+        val searchResponse: SearchResponse = client.suspendUntil { search(searchRequest, it) }
+        return searchResponse.hits.map { hit ->
+            val xcp = XContentHelper.createParser(
+                NamedXContentRegistry.EMPTY,
+                LoggingDeprecationHandler.INSTANCE,
+                hit.sourceRef,
+                XContentType.JSON
+            )
+            XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
+            Alert.parse(xcp, hit.id, hit.version).id
+        }
     }
 }

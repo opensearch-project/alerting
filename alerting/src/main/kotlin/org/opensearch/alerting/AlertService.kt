@@ -20,6 +20,7 @@ import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.MAX_SEARCH_SIZE
 import org.opensearch.alerting.util.await
 import org.opensearch.alerting.util.getBucketKeysHash
+import org.opensearch.alerting.util.putDataObjectStashed
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
@@ -557,7 +558,7 @@ class AlertService(
             .overwriteIfExists(true)
             .dataObject(ToXContentObject { builder, _ -> alert.toXContentWithUser(builder) })
             .build()
-        val putResponse = sdkClient.putDataObjectAsync(putRequest).await()
+        val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
         if (putResponse.isFailed) {
             throw ExceptionsHelper.convertToOpenSearchException(
                 putResponse.cause() ?: RuntimeException("Failed to upsert monitor error alert")
