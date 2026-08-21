@@ -126,7 +126,7 @@ class RemoteDocumentLevelMonitorRunner : MonitorRunner() {
                         indexLastRunContext.toMutableMap(),
                         concreteIndexName,
                         shardCount
-                    ) as MutableMap<String, Any>
+                    )
                     if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                         IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
                     ) {

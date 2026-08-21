@@ -206,9 +206,12 @@ object MonitorMetadataService :
             else if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
                 (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
             else null
-            val runContext = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
-                createFullRunContext(monitorIndex, metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
-            else null
+            val runContext = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)) {
+                @Suppress("UNCHECKED_CAST")
+                val lastRunCtx = if (metadata.lastRunContext.isEmpty()) null
+                else (metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
+                createFullRunContext(monitorIndex, lastRunCtx)
+            } else null
             return if (runContext != null) {
                 metadata.copy(
                     lastRunContext = runContext
