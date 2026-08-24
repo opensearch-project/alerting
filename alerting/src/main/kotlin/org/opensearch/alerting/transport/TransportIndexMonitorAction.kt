@@ -245,10 +245,11 @@ class TransportIndexMonitorAction @Inject constructor(
             return
         }
 
-        // Under resource-sharing authz the caller's backend roles no longer gate updates —
-        // the sharing entry does. Skip the legacy rbac_roles validation in that mode.
+        // Validate caller-supplied rbac_roles even under resource sharing: although the sharing entry
+        // (not backend roles) gates access while RSC is on, the roles are still persisted on the doc.
+        // Since the RSC feature flag is dynamic, validating here prevents a non-admin from planting
+        // roles they don't hold that would become the access gate if RSC is later turned off.
         if (
-            !useRsc &&
             user != null &&
             !isAdmin(user) &&
             transformedRequest.rbacRoles != null

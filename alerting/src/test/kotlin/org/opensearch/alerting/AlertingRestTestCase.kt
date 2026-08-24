@@ -168,6 +168,13 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         System.getProperty("resource_sharing.enabled", "false").toBoolean()
 
     /**
+     * The security plugin derives a resource's sharing index as `<resourceIndex>-sharing`
+     * (see ResourceSharingIndexHandler.getSharingIndex). Derive it here from the config-index
+     * constant rather than hardcoding, so it tracks the config index name.
+     */
+    protected val configSharingIndex = "${ScheduledJob.SCHEDULED_JOBS_INDEX}-sharing"
+
+    /**
      * Polls the alerting config sharing index until the resource-sharing entry for [resourceId] is
      * visible, so RSC-enabled tests don't race the security plugin's asynchronous postIndex write.
      * No-op behavior for non-RSC runs is the caller's responsibility (guard with
@@ -178,9 +185,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         var lastException: Exception? = null
         while (System.nanoTime() < deadline) {
             try {
-                adminClient().performRequest(Request("POST", "/.opendistro-alerting-config-sharing/_refresh"))
+                adminClient().performRequest(Request("POST", "/$configSharingIndex/_refresh"))
                 val resp = adminClient().performRequest(
-                    Request("GET", "/.opendistro-alerting-config-sharing/_doc/$resourceId")
+                    Request("GET", "/$configSharingIndex/_doc/$resourceId")
                 )
                 if (resp.statusLine.statusCode == 200) return
             } catch (e: Exception) {
@@ -224,9 +231,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val deadline = System.nanoTime() + 10_000L * 1_000_000
         while (System.nanoTime() < deadline) {
             try {
-                adminClient().performRequest(Request("POST", "/.opendistro-alerting-config-sharing/_refresh"))
+                adminClient().performRequest(Request("POST", "/$configSharingIndex/_refresh"))
                 val doc = adminClient().performRequest(
-                    Request("GET", "/.opendistro-alerting-config-sharing/_doc/$monitorId")
+                    Request("GET", "/$configSharingIndex/_doc/$monitorId")
                 )
                 val body = doc.entity.content.bufferedReader().use { it.readText() }
                 if (doc.statusLine.statusCode == 200 && body.contains("\"$user\"")) return

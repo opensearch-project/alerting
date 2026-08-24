@@ -165,7 +165,13 @@ constructor(
         private val user: User?,
     ) {
         suspend fun start() {
-            commentsIndices.createOrUpdateInitialCommentsHistoryIndex()
+            // Comments-history index management (exists/create/put-mapping) is a system-index
+            // operation and must run on the plugin subject, not the caller: under resource sharing a
+            // non-admin caller has no direct privileges on the comments-history index, so running the
+            // exists() check as the caller throws and the request never completes.
+            client.threadPool().threadContext.stashContext().use {
+                commentsIndices.createOrUpdateInitialCommentsHistoryIndex()
+            }
             if (request.method == RestRequest.Method.PUT) {
                 updateComment()
             } else {

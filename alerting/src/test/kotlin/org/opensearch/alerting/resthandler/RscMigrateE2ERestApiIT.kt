@@ -144,7 +144,7 @@ class RscMigrateE2ERestApiIT : AlertingRestTestCase() {
 
             // Wait for the sharing shard to acknowledge — mirrors the same race we work around
             // in [SecureResourceSharingMonitorRestApiIT.createMonitorAs].
-            adminClient().performRequest(Request("POST", "/.opendistro-alerting-config-sharing/_refresh"))
+            adminClient().performRequest(Request("POST", "/$configSharingIndex/_refresh"))
 
             // ─── Phase 5: alice reads her monitor again — RSC now lets her through ─
             val postMigrateGet = aliceClient.makeRequest("GET", "$ALERTING_BASE_URI/$monitorId")
@@ -185,7 +185,7 @@ class RscMigrateE2ERestApiIT : AlertingRestTestCase() {
             opts.setWarningsHandler(org.opensearch.client.WarningsHandler.PERMISSIVE)
             val delRequest = Request(
                 "DELETE",
-                "/.opendistro-alerting-config-sharing/_doc/$monitorId?refresh=true",
+                "/$configSharingIndex/_doc/$monitorId?refresh=true",
             )
             delRequest.setOptions(opts.build())
             adminClient().performRequest(delRequest)

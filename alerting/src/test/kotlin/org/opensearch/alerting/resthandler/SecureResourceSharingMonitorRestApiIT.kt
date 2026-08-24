@@ -300,11 +300,10 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    // FIXME: bob has read-only share on alice's monitor and `getAccessibleResourceIds` correctly
-    // reports the monitor as accessible, but the alerts search returns an empty result. Suspect
-    // the security plugin's DLS filter on the alerts index is filtering bob out even though the
-    // alerts index isn't itself a resource-sharing-protected type. Needs a separate investigation
-    // and possibly an alerts-index DLS exemption; not blocking the core RSC framework onboarding.
+    // Blocked on the subordinate-resource (child) sharing model in opensearch-project/security#6373:
+    // alerts are not a registered resource type, so the security plugin's DLS on the alerts index
+    // filters a read-only-shared, non-owner user out and the by-monitor alerts GET returns 403.
+    // Full inheritance requires registering alerts as a child of the monitor once #6373 lands.
     @Ignore
     fun `test alerts inherit access when monitor is shared read-only`() {
         val monitor = aliceCreatesMonitor()
@@ -335,11 +334,11 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
 
     // ─── Subordinate resource: comments ──────────────────────────────────────────
 
-    // FIXME: CommentsIndices.createOrUpdateInitialCommentsHistoryIndex fires an
-    // `indices().exists()` call as the caller — under RSC bob's role has no direct
-    // index privileges on the comments history index, so the coroutine throws an uncaught
-    // OpenSearchSecurityException and the HTTP response never returns (test hangs to suite
-    // timeout). Fix requires wrapping that path in a per-call stash the way monitor writes do.
+    // The comments-history index bootstrap now runs on the plugin subject (stashed in
+    // TransportIndexAlertingCommentAction.start()), so the request no longer hangs. But denying a
+    // comment when the caller lacks monitor access requires the subordinate-resource model in
+    // opensearch-project/security#6373 (the comment-create fetch is a search, not a monitor
+    // DocRequest, so the security plugin does not gate it). Blocked on #6373.
     @Ignore
     fun `test comment on alert denied without share`() {
         val monitor = aliceCreatesMonitor()
@@ -357,9 +356,9 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    // FIXME: same CommentsIndices.createIndex issue as the denied test above — bob's request
-    // dies in the initial `indices().exists()` call before RSC can gate it. Re-enable once the
-    // comments-flow stash pattern lands.
+    // Paired with the denied case above: kept ignored until subordinate-resource comment access is
+    // enforced via opensearch-project/security#6373 (today the create path isn't gated by monitor
+    // access, so this would pass for the wrong reason).
     @Ignore
     fun `test comment on alert allowed with read-write share`() {
         val monitor = aliceCreatesMonitor()
@@ -587,7 +586,7 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         // (for example `getAccessibleResourceIds`) may still miss until the shard's search view
         // catches up. Force a refresh so `getAccessibleResourceIds` picks up the new entry.
         try {
-            adminClient().performRequest(Request("POST", "/.opendistro-alerting-config-sharing/_refresh"))
+            adminClient().performRequest(Request("POST", "/$configSharingIndex/_refresh"))
         } catch (_: Exception) {
         }
     }

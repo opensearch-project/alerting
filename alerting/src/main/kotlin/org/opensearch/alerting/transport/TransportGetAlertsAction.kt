@@ -245,7 +245,11 @@ class TransportGetAlertsAction @Inject constructor(
         tenantId: String? = null,
         storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
     ) {
-        if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)) {
+        if (user == null) {
+            // user is null when: 1/ security is disabled. 2/ when the caller is super-admin.
+            // Both see everything, so no filtering is applied even under resource sharing.
+            search(alertIndex, searchSourceBuilder, actionListener, tenantId)
+        } else if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)) {
             // resource sharing is enabled - filter alerts by accessible monitor IDs
             val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
                 as org.opensearch.security.spi.resources.client.ResourceSharingClient
@@ -258,6 +262,8 @@ class TransportGetAlertsAction @Inject constructor(
                     ResourceSharingUtils.MONITOR_RESOURCE_TYPE,
                     object : ActionListener<Set<String>> {
                         override fun onResponse(accessibleMonitorIds: Set<String>) {
+                            // termsQuery is bounded by index.max_terms_count (default 65536); a caller
+                            // with more accessible monitors than that is not an expected scenario.
                             val query = searchSourceBuilder.query() as BoolQueryBuilder
                             query.filter(QueryBuilders.termsQuery("monitor_id", accessibleMonitorIds))
                             search(alertIndex, searchSourceBuilder, actionListener, tenantId)
@@ -269,9 +275,6 @@ class TransportGetAlertsAction @Inject constructor(
                     }
                 )
             }
-        } else if (user == null) {
-            // user is null when: 1/ security is disabled. 2/when user is super-admin.
-            search(alertIndex, searchSourceBuilder, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
             search(alertIndex, searchSourceBuilder, actionListener, tenantId)
         } else {

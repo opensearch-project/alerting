@@ -21,6 +21,7 @@ import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.util.MAX_SEARCH_SIZE
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -131,16 +132,17 @@ class TransportSearchAlertingCommentAction @Inject constructor(
         storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
     ) {
         val tenantId = currentTenantId()
-        if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)) {
+        if (user == null) {
+            // user is null when: 1/ security is disabled. 2/ when the caller is super-admin.
+            // Both see everything, so no filtering is applied even under resource sharing.
+            search(searchCommentRequest.searchRequest, actionListener, tenantId)
+        } else if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)) {
             // resource sharing is enabled - filter comments by alerts on accessible monitors
             val accessibleAlertIds = getAccessibleAlertIDs(storedThreadContext)
             val queryBuilder = searchCommentRequest.searchRequest.source().query() as BoolQueryBuilder
             searchCommentRequest.searchRequest.source().query(
                 queryBuilder.filter(QueryBuilders.termsQuery(Comment.ENTITY_ID_FIELD, accessibleAlertIds))
             )
-            search(searchCommentRequest.searchRequest, actionListener, tenantId)
-        } else if (user == null) {
-            // user is null when: 1/ security is disabled. 2/when user is super-admin.
             search(searchCommentRequest.searchRequest, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.
@@ -204,6 +206,8 @@ class TransportSearchAlertingCommentAction @Inject constructor(
                 .version(true)
                 .seqNoAndPrimaryTerm(true)
                 .query(queryBuilder)
+                // Explicit size so accessible-alert resolution isn't silently capped at the default 10.
+                .size(MAX_SEARCH_SIZE)
         val searchRequest = SearchRequest()
             .source(searchSourceBuilder)
             .indices(ALL_ALERT_INDEX_PATTERN)
@@ -246,12 +250,17 @@ class TransportSearchAlertingCommentAction @Inject constructor(
             }
         }
 
+        // termsQuery over accessible monitor ids is bounded by index.max_terms_count (default 65536);
+        // acceptable here since a caller with more accessible monitors than that is not expected.
         val queryBuilder = QueryBuilders.boolQuery()
             .filter(QueryBuilders.termsQuery("monitor_id", accessibleMonitorIds))
         val searchSourceBuilder = SearchSourceBuilder()
             .version(true)
             .seqNoAndPrimaryTerm(true)
             .query(queryBuilder)
+            // Without an explicit size the search defaults to 10 hits, silently dropping alerts (and
+            // therefore their comments) beyond the first 10 on accessible monitors.
+            .size(MAX_SEARCH_SIZE)
         val searchRequest = SearchRequest()
             .source(searchSourceBuilder)
             .indices(ALL_ALERT_INDEX_PATTERN)

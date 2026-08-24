@@ -211,7 +211,11 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
         user: User?,
         storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
     ) {
-        if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE)) {
+        if (user == null) {
+            // user is null when: 1/ security is disabled. 2/ when the caller is super-admin.
+            // Both see everything, so no filtering is applied even under resource sharing.
+            search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
+        } else if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE)) {
             // resource sharing is enabled - filter alerts by accessible workflow IDs
             val tenantId = currentTenantId()
             val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
@@ -225,6 +229,8 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
                     ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE,
                     object : ActionListener<Set<String>> {
                         override fun onResponse(accessibleWorkflowIds: Set<String>) {
+                            // termsQuery is bounded by index.max_terms_count (default 65536); a caller
+                            // with more accessible workflows than that is not an expected scenario.
                             val query = searchSourceBuilder.query() as BoolQueryBuilder
                             query.filter(QueryBuilders.termsQuery("workflow_id", accessibleWorkflowIds))
                             scope.launch(TenantContext(tenantId)) {
@@ -238,9 +244,6 @@ class TransportGetWorkflowAlertsAction @Inject constructor(
                     }
                 )
             }
-        } else if (user == null) {
-            // user is null when: 1/ security is disabled. 2/when user is super-admin.
-            search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
         } else if (!doFilterForUser(user)) {
             search(getWorkflowAlertsRequest, alertIndex, searchSourceBuilder, actionListener)
         } else {

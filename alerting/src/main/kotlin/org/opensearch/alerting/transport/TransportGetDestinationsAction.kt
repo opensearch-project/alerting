@@ -139,10 +139,12 @@ class TransportGetDestinationsAction @Inject constructor(
         tenantId: String? = null,
     ) {
         val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
-        if (useRsc) {
+        if (user == null) {
+            // user is null when: 1/ security is disabled. 2/ when the caller is super-admin.
+            // Both see everything, so run the search directly without resource-sharing/DLS routing.
+            searchDirect(searchSourceBuilder, actionListener, tenantId)
+        } else if (useRsc) {
             // resource sharing framework is enabled - access control handled by security plugin
-            search(searchSourceBuilder, actionListener, tenantId)
-        } else if (user == null) {
             search(searchSourceBuilder, actionListener, tenantId)
         } else if (!doFilterForUser(user)) {
             search(searchSourceBuilder, actionListener, tenantId)
@@ -185,6 +187,18 @@ class TransportGetDestinationsAction @Inject constructor(
             return
         }
 
+        searchDirect(searchSourceBuilder, actionListener, tenantId)
+    }
+
+    /**
+     * Direct search that does not route through the resource-sharing PluginClient/DLS path. Used for
+     * super-admin (who sees everything) and for the non-resource-sharing paths.
+     */
+    fun searchDirect(
+        searchSourceBuilder: SearchSourceBuilder,
+        actionListener: ActionListener<GetDestinationsResponse>,
+        tenantId: String? = null,
+    ) {
         val sdkSearchRequest = SearchDataObjectRequest.builder()
             .indices(ScheduledJob.SCHEDULED_JOBS_INDEX)
             .tenantId(tenantId)
