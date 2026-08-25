@@ -228,18 +228,18 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             // Compute full path relative to root
             val fullPath = if (currentPath.isEmpty()) it.key
             else "$currentPath.${it.key}"
-            val nodeProps = it.value as MutableMap<String, Any>
+            val nodeProps = (it.value as Map<String, Any>).toMutableMap()
             // If it has type property and type is not "nested" then this is a leaf
             if (nodeProps.containsKey(TYPE) && nodeProps[TYPE] != NESTED) {
                 // At this point we know full path of node, so we add it to output array
                 flattenPaths.put(fullPath, nodeProps)
                 // Calls processLeafFn and gets old node name, new node name and new properties of node.
                 // This is all information we need to update this node
-                val (oldName, newName, props) = processLeafFn(it.key, fullPath, it.value as MutableMap<String, Any>)
+                val (oldName, newName, props) = processLeafFn(it.key, fullPath, (it.value as Map<String, Any>).toMutableMap())
                 newNodes.add(Triple(oldName, newName, props))
             } else if (nodeProps.containsKey(PROPERTIES) && nodeProps[PROPERTIES] != null) {
                 // Internal(non-leaf) node - visit children
-                traverseMappingsAndUpdate(nodeProps[PROPERTIES] as MutableMap<String, Any>, fullPath, processLeafFn, flattenPaths)
+                traverseMappingsAndUpdate((nodeProps[PROPERTIES] as Map<String, Any>).toMutableMap(), fullPath, processLeafFn, flattenPaths)
             }
         }
         // Here we can update all processed leaves in tree
