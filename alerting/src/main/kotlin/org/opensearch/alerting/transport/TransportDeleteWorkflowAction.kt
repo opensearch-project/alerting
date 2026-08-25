@@ -24,6 +24,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.core.lock.LockModel
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.opensearchapi.addFilter
@@ -113,11 +114,18 @@ class TransportDeleteWorkflowAction @Inject constructor(
         val deleteRequest = DeleteRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, transformedRequest.workflowId)
             .setRefreshPolicy(RefreshPolicy.IMMEDIATE)
 
-        if (!validateUserBackendRoles(user, actionListener)) {
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE)
+        if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
 
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        // The handler's config (system/resource) index reads and deletes run on the plugin subject.
+        // We intentionally do NOT restore the caller's context here: the security plugin's
+        // ResourceIndexListener.postDelete cleans up the deleted resource's share entry by resource id
+        // only (it does not read the caller), and restoring the caller would instead make these
+        // internal-index operations run as the caller -- which the security plugin denies when
+        // resource-sharing is off, spuriously yielding 404/403.
         scope.launch(TenantContext(tenantId)) {
             DeleteWorkflowHandler(
                 client,
@@ -142,7 +150,10 @@ class TransportDeleteWorkflowAction @Inject constructor(
             try {
                 val workflow: Workflow = getWorkflow() ?: return
 
-                val canDelete = user == null ||
+                val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE)
+                // when resource sharing is enabled, security plugin gates access at the index layer
+                val canDelete = useRsc ||
+                    user == null ||
                     !doFilterForUser(user) ||
                     checkUserPermissionsWithResource(
                         user,

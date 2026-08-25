@@ -460,9 +460,22 @@ class JobSweeper(
 
     private fun isSweepableJobType(xcp: XContentParser): Boolean {
         XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
-        XContentParserUtils.ensureExpectedToken(XContentParser.Token.FIELD_NAME, xcp.nextToken(), xcp)
-        val jobType = xcp.currentName()
-        return sweepableJobTypes.contains(jobType)
+        // Scan top-level fields until we find one that names a sweepable job type. Docs stored on
+        // a resource-sharing-protected index may carry security-injected top-level fields (for
+        // example `all_shared_principals` for DLS) alongside the wrapper; skip past any such
+        // extras so callers using `typeIsParsed=true` see the wrapper at currentName.
+        var token = xcp.nextToken()
+        while (token != null && token != XContentParser.Token.END_OBJECT) {
+            if (token == XContentParser.Token.FIELD_NAME && sweepableJobTypes.contains(xcp.currentName())) {
+                return true
+            }
+            if (token == XContentParser.Token.FIELD_NAME) {
+                xcp.nextToken()
+                xcp.skipChildren()
+            }
+            token = xcp.nextToken()
+        }
+        return false
     }
 
     private fun isOwningNode(shardId: ShardId, jobId: JobId): Boolean {

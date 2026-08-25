@@ -21,7 +21,8 @@ import org.opensearch.action.admin.indices.stats.IndicesStatsResponse
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.IndexUtils
-import org.opensearch.alerting.util.await
+import org.opensearch.alerting.util.getDataObjectStashed
+import org.opensearch.alerting.util.putDataObjectStashed
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
@@ -98,7 +99,10 @@ object MonitorMetadataService :
                     putRequestBuilder.overwriteIfExists(false)
                 }
 
-                val putResponse = sdkClient.putDataObjectAsync(putRequestBuilder.build()).await()
+                val putResponse = sdkClient.putDataObjectStashed(
+                    putRequestBuilder.build(),
+                    client.threadPool().threadContext,
+                )
                 if (putResponse.isFailed) {
                     val failureReason = "The upsert metadata call failed: ${putResponse.cause()?.message}"
                     log.error(failureReason)
@@ -178,7 +182,7 @@ object MonitorMetadataService :
                 .tenantId(currentTenantId())
                 .build()
 
-            val response = sdkClient.getDataObjectAsync(getRequest).await()
+            val response = sdkClient.getDataObjectStashed(getRequest, client.threadPool().threadContext)
             val getResponse = response.getResponse()
             return if (getResponse != null && getResponse.isExists) {
                 val xcp = XContentHelper.createParser(

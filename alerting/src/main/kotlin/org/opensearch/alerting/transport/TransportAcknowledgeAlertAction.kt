@@ -15,6 +15,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.await
 import org.opensearch.alerting.util.use
@@ -94,7 +95,8 @@ class TransportAcknowledgeAlertAction @Inject constructor(
             ?: recreateObject(acknowledgeAlertRequest) { AcknowledgeAlertRequest(it) }
         val user = readUserFromThreadContext(client)
 
-        if (!validateUserBackendRoles(user, actionListener)) {
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
+        if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
 
@@ -118,7 +120,10 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                         return@launch
                     }
 
-                    val canAccess = user == null || !doFilterForUser(user) ||
+                    // when resource sharing is enabled, security plugin gates access at the index layer
+                    val canAccess = useRsc ||
+                        user == null ||
+                        !doFilterForUser(user) ||
                         checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", request.monitorId)
 
                     if (canAccess) {

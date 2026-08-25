@@ -26,6 +26,7 @@ import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_MONITOR_PATH
 import org.opensearch.alerting.util.await
+import org.opensearch.alerting.util.deleteDataObjectStashed
 import org.opensearch.alerting.util.use
 import org.opensearch.commons.alerting.action.DeleteMonitorResponse
 import org.opensearch.commons.alerting.model.Monitor
@@ -88,7 +89,7 @@ object DeleteMonitorService :
             .tenantId(tenantId)
             .refreshPolicy(refreshPolicy)
             .build()
-        val deleteResponse = sdkClient.deleteDataObjectAsync(deleteRequest).await()
+        val deleteResponse = sdkClient.deleteDataObjectStashed(deleteRequest, client.threadPool().threadContext)
         return DeleteMonitorResponse(deleteResponse.id(), deleteResponse.deleteResponse().version)
     }
 
@@ -101,7 +102,7 @@ object DeleteMonitorService :
             .refreshPolicy(RefreshPolicy.IMMEDIATE)
             .build()
         try {
-            val deleteResponse = sdkClient.deleteDataObjectAsync(deleteRequest).await()
+            val deleteResponse = sdkClient.deleteDataObjectStashed(deleteRequest, client.threadPool().threadContext)
             log.debug("Monitor metadata: ${deleteResponse.id()} deletion result: ${deleteResponse.status()}")
         } catch (e: Exception) {
             // we only log the error and don't fail the request because if monitor document has been deleted,

@@ -926,18 +926,8 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
         client().makeRequest("DELETE", getWorkflowResponse.relativeUrl())
 
-        // Verify that the workflow is deleted
-        try {
-            getWorkflow(workflowId)
-        } catch (e: ResponseException) {
-            assertEquals(RestStatus.NOT_FOUND, e.response.restStatus())
-            e.message?.let {
-                assertTrue(
-                    "Exception not returning GetWorkflow Action error ",
-                    it.contains("Workflow not found.")
-                )
-            }
-        }
+        // Verify that the workflow is deleted (accepts 403 under RSC; see assertDeletedNotAccessible).
+        assertDeletedNotAccessible("Workflow not found.") { getWorkflow(workflowId) }
     }
 
     fun `test delete workflow delete delegate monitors`() {
@@ -956,29 +946,35 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
         client().makeRequest("DELETE", getWorkflowResponse.relativeUrl().plus("?deleteDelegateMonitors=true"))
 
-        // Verify that the workflow is deleted
-        try {
-            getWorkflow(workflowId)
-        } catch (e: ResponseException) {
-            assertEquals(RestStatus.NOT_FOUND, e.response.restStatus())
-            e.message?.let {
-                assertTrue(
-                    "Exception not returning GetWorkflow Action error ",
-                    it.contains("Workflow not found.")
-                )
-            }
-        }
+        // Verify that the workflow is deleted. Under resource sharing the sharing entry is removed
+        // alongside the doc, so the RSC gate returns 403 before the transport action can return 404;
+        // accept either since both mean "no longer accessible".
+        assertDeletedNotAccessible("Workflow not found.") { getWorkflow(workflowId) }
 
-        // Verify that delegate monitor is deleted
+        // Verify that delegate monitor is deleted (same 403|404 reasoning under RSC).
+        assertDeletedNotAccessible("Monitor not found.") { getMonitor(monitor.id) }
+    }
+
+    /**
+     * Asserts that [block] fails because the resource is gone: 404 (non-RSC path) or 403 (under
+     * resource sharing, where the deleted resource's sharing entry is also removed so the RSC gate
+     * denies before the transport action can return 404). The "not found" message is only present
+     * on the 404 path.
+     */
+    private fun assertDeletedNotAccessible(notFoundMessage: String, block: () -> Unit) {
         try {
-            getMonitor(monitor.id)
+            block()
+            fail("Expected ResponseException for deleted resource but none was thrown")
         } catch (e: ResponseException) {
-            assertEquals(RestStatus.NOT_FOUND, e.response.restStatus())
-            e.message?.let {
-                assertTrue(
-                    "Exception not returning GetWorkflow Action error ",
-                    it.contains("Monitor not found.")
-                )
+            val status = e.response.restStatus()
+            assertTrue(
+                "Expected 403 or 404 for deleted resource, got $status",
+                status == RestStatus.NOT_FOUND || status == RestStatus.FORBIDDEN
+            )
+            if (status == RestStatus.NOT_FOUND) {
+                e.message?.let {
+                    assertTrue("Exception not returning expected error", it.contains(notFoundMessage))
+                }
             }
         }
     }
@@ -999,18 +995,8 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
 
         client().makeRequest("DELETE", getWorkflowResponse.relativeUrl().plus("?deleteDelegateMonitors=false"))
 
-        // Verify that the workflow is deleted
-        try {
-            getWorkflow(workflowId)
-        } catch (e: ResponseException) {
-            assertEquals(RestStatus.NOT_FOUND, e.response.restStatus())
-            e.message?.let {
-                assertTrue(
-                    "Exception not returning GetWorkflow Action error ",
-                    it.contains("Workflow not found.")
-                )
-            }
-        }
+        // Verify that the workflow is deleted (accepts 403 under RSC; see assertDeletedNotAccessible).
+        assertDeletedNotAccessible("Workflow not found.") { getWorkflow(workflowId) }
 
         // Verify that delegate monitor is not deleted
         val delegateMonitor = getMonitor(monitor.id)

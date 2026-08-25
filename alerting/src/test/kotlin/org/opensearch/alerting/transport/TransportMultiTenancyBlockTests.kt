@@ -404,7 +404,8 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
         val action = TransportGetDestinationsAction(
             transportService, client, clusterService, actionFilters,
             multiTenancySettings, xContentRegistry,
-            Mockito.mock(SdkClient::class.java)
+            Mockito.mock(SdkClient::class.java),
+            Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
         )
         val request = GetDestinationsRequest(
             null, 1L, null,
