@@ -84,24 +84,6 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         /**
          * Sanitizes a single field-mapping property map so it is safe to submit in a PutMappingRequest
          * against the doc-level query index.
-         *
-         * Two classes of attribute are removed:
-         *
-         * 1. Analysis resource references (analyzer, normalizer, similarity, search_analyzer,
-         *    search_quote_analyzer): these reference custom analysis objects defined in the source
-         *    index's settings.analysis block, which is never replicated to the query index.  Submitting
-         *    them causes an IllegalArgumentException from OpenSearch.
-         *
-         * 2. A "properties" sub-block on a scalar (non-object, non-nested) field type: this can appear
-         *    in cluster-state mappings when dynamic mapping collisions occur — a field is first mapped
-         *    as "text" from string-valued documents, then later documents send the same field as
-         *    structured objects causing OpenSearch to append "properties" to the existing scalar mapper.
-         *    OpenSearch accepts this at ingestion time (lenient) but rejects it via the explicit PUT
-         *    mapping API with MapperParsingException[unknown parameter [properties] on mapper of type
-         *    [text]].
-         *
-         * The sanitization is applied recursively to multi-fields (the "fields" sub-map).
-         *
          * @param fieldType the OpenSearch field type string (e.g. "text", "keyword"), or null when absent
          * @param mapping   the mutable property map for the field; modified in-place
          */

@@ -213,6 +213,110 @@ class AlertingUtilsTests : OpenSearchTestCase() {
         }
     }
 
+    // ----- sanitizeFieldMappingAttributes -----
+
+    fun `test sanitizeFieldMappingAttributes strips analyzer from text field`() {
+        val mapping = mutableMapOf<String, Any>(
+            "type" to "text",
+            "analyzer" to "my_custom_analyzer",
+            "search_analyzer" to "my_custom_analyzer"
+        )
+        DocLevelMonitorQueries.sanitizeFieldMappingAttributes("text", mapping)
+        assertFalse("analyzer must be removed", mapping.containsKey("analyzer"))
+        assertFalse("search_analyzer must be removed", mapping.containsKey("search_analyzer"))
+        assertEquals("type must be preserved", "text", mapping["type"])
+    }
+
+    fun `test sanitizeFieldMappingAttributes strips all analysis attributes`() {
+        val mapping = mutableMapOf<String, Any>(
+            "type" to "keyword",
+            "normalizer" to "my_normalizer",
+            "similarity" to "my_similarity",
+            "search_quote_analyzer" to "my_analyzer",
+            "doc_values" to true
+        )
+        DocLevelMonitorQueries.sanitizeFieldMappingAttributes("keyword", mapping)
+        assertFalse("normalizer must be removed", mapping.containsKey("normalizer"))
+        assertFalse("similarity must be removed", mapping.containsKey("similarity"))
+        assertFalse("search_quote_analyzer must be removed", mapping.containsKey("search_quote_analyzer"))
+        // Non-analysis attributes must not be affected
+        assertTrue("doc_values must be preserved", mapping.containsKey("doc_values"))
+        assertEquals("type must be preserved", "keyword", mapping["type"])
+    }
+
+    fun `test sanitizeFieldMappingAttributes strips properties from scalar field`() {
+        // Reproduces the MapperParsingException[unknown parameter [properties] on mapper of type [text]]
+        // failure caused by dynamic mapping collisions on the source index.
+        val mapping = mutableMapOf<String, Any>(
+            "type" to "text",
+            "properties" to mutableMapOf<String, Any>(
+                "subfield" to mutableMapOf<String, Any>("type" to "keyword")
+            )
+        )
+        DocLevelMonitorQueries.sanitizeFieldMappingAttributes("text", mapping)
+        assertFalse("properties must be removed from scalar-typed field", mapping.containsKey("properties"))
+        assertEquals("type must be preserved", "text", mapping["type"])
+    }
+
+    fun `test sanitizeFieldMappingAttributes preserves properties on object field`() {
+        val subProperties = mutableMapOf<String, Any>("sub" to mutableMapOf<String, Any>("type" to "keyword"))
+        val mapping = mutableMapOf<String, Any>(
+            "type" to "object",
+            "properties" to subProperties
+        )
+        DocLevelMonitorQueries.sanitizeFieldMappingAttributes("object", mapping)
+        assertTrue("properties must be kept on object field", mapping.containsKey("properties"))
+    }
+
+    fun `test sanitizeFieldMappingAttributes preserves properties on nested field`() {
+        val subProperties = mutableMapOf<String, Any>("sub" to mutableMapOf<String, Any>("type" to "keyword"))
+        val mapping = mutableMapOf<String, Any>(
+            "type" to "nested",
+            "properties" to subProperties
+        )
+        DocLevelMonitorQueries.sanitizeFieldMappingAttributes("nested", mapping)
+        assertTrue("properties must be kept on nested field", mapping.containsKey("properties"))
+    }
+
+    fun `test sanitizeFieldMappingAttributes preserves properties when type is absent`() {
+        // Absent type defaults to object in OpenSearch — must not strip properties
+        val subProperties = mutableMapOf<String, Any>("sub" to mutableMapOf<String, Any>("type" to "keyword"))
+        val mapping = mutableMapOf<String, Any>(
+            "properties" to subProperties
+        )
+        DocLevelMonitorQueries.sanitizeFieldMappingAttributes(null, mapping)
+        assertTrue("properties must be kept when type is absent", mapping.containsKey("properties"))
+    }
+
+    fun `test sanitizeFieldMappingAttributes recurses into multi-fields`() {
+        val subField = mutableMapOf<String, Any>(
+            "type" to "keyword",
+            "normalizer" to "my_normalizer"
+        )
+        val mapping = mutableMapOf<String, Any>(
+            "type" to "text",
+            "analyzer" to "my_analyzer",
+            "fields" to mutableMapOf<String, Any>("raw" to subField)
+        )
+        DocLevelMonitorQueries.sanitizeFieldMappingAttributes("text", mapping)
+        assertFalse("analyzer must be removed from top-level field", mapping.containsKey("analyzer"))
+        @Suppress("UNCHECKED_CAST")
+        val rawField = (mapping["fields"] as Map<*, *>)["raw"] as Map<*, *>
+        assertFalse("normalizer must be removed from multi-field", rawField.containsKey("normalizer"))
+        assertEquals("type must be preserved in multi-field", "keyword", rawField["type"])
+    }
+
+    fun `test sanitizeFieldMappingAttributes does not modify clean field`() {
+        val mapping = mutableMapOf<String, Any>(
+            "type" to "keyword",
+            "doc_values" to true,
+            "index" to false
+        )
+        val original = mapping.toMap()
+        DocLevelMonitorQueries.sanitizeFieldMappingAttributes("keyword", mapping)
+        assertEquals("clean mapping must be unchanged", original, mapping)
+    }
+
     fun `test traverseMappingsAndUpdate with nested field type without properties succeeds`() {
         // Verifies fix for https://github.com/opensearch-project/security-analytics/issues/1472
         val docLevelMonitorQueries = DocLevelMonitorQueries(mock(Client::class.java), mock(ClusterService::class.java))
