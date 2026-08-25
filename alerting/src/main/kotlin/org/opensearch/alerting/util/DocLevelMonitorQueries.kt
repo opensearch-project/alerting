@@ -64,6 +64,67 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         const val TYPE = "type"
         const val INDEX_PATTERN_SUFFIX = "-000001"
         const val QUERY_INDEX_BASE_FIELDS_COUNT = 8 // 3 fields we defined and 5 builtin additional metadata fields
+
+        /**
+         * Field attributes that reference custom analysis resources (analyzers, normalizers, similarity
+         * configurations) defined in a source index's settings.analysis block.  The doc-level query index
+         * is created from a fixed settings resource with no custom analysis block, so including these
+         * attributes in a PutMappingRequest against the query index causes OpenSearch to reject the
+         * request with "analyzer [x] has not been configured in mappings".  Strip them before copying
+         * field mappings from the source index to the query index.
+         */
+        val ANALYSIS_ATTRIBUTES = setOf(
+            "analyzer",
+            "search_analyzer",
+            "search_quote_analyzer",
+            "normalizer",
+            "similarity"
+        )
+
+        /**
+         * Sanitizes a single field-mapping property map so it is safe to submit in a PutMappingRequest
+         * against the doc-level query index.
+         *
+         * Two classes of attribute are removed:
+         *
+         * 1. Analysis resource references (analyzer, normalizer, similarity, search_analyzer,
+         *    search_quote_analyzer): these reference custom analysis objects defined in the source
+         *    index's settings.analysis block, which is never replicated to the query index.  Submitting
+         *    them causes an IllegalArgumentException from OpenSearch.
+         *
+         * 2. A "properties" sub-block on a scalar (non-object, non-nested) field type: this can appear
+         *    in cluster-state mappings when dynamic mapping collisions occur — a field is first mapped
+         *    as "text" from string-valued documents, then later documents send the same field as
+         *    structured objects causing OpenSearch to append "properties" to the existing scalar mapper.
+         *    OpenSearch accepts this at ingestion time (lenient) but rejects it via the explicit PUT
+         *    mapping API with MapperParsingException[unknown parameter [properties] on mapper of type
+         *    [text]].
+         *
+         * The sanitization is applied recursively to multi-fields (the "fields" sub-map).
+         *
+         * @param fieldType the OpenSearch field type string (e.g. "text", "keyword"), or null when absent
+         * @param mapping   the mutable property map for the field; modified in-place
+         */
+        fun sanitizeFieldMappingAttributes(fieldType: String?, mapping: MutableMap<String, Any>) {
+            // Category 1: remove analysis resource references
+            mapping.keys.removeAll(ANALYSIS_ATTRIBUTES)
+
+            // Category 2: remove "properties" from scalar (non-object, non-nested) fields.
+            // A null/absent type defaults to "object" in OpenSearch, so only strip when the type is
+            // explicitly set to something other than "object" or "nested".
+            if (fieldType != null && fieldType != "object" && fieldType != NESTED) {
+                mapping.remove(PROPERTIES)
+            }
+
+            // Recurse into multi-fields
+            @Suppress("UNCHECKED_CAST")
+            (mapping["fields"] as? Map<*, *>)?.forEach { (_, subMapping) ->
+                (subMapping as? MutableMap<String, Any>)?.let {
+                    sanitizeFieldMappingAttributes(it[TYPE] as? String, it)
+                }
+            }
+        }
+
         @JvmStatic
         fun docLevelQueriesMappings(): String {
             return DocLevelMonitorQueries::class.java.classLoader.getResource("mappings/doc-level-queries.json").readText()
@@ -306,7 +367,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         val leafNodeProcessor =
                             fun(fieldName: String, fullPath: String, props: MutableMap<String, Any>):
                                 Triple<String, String, MutableMap<String, Any>> {
-                                val newProps = props.toMutableMap()
+                                val newProps = props.toMutableMap().also {
+                                    sanitizeFieldMappingAttributes(it[TYPE] as? String, it)
+                                }
                                 if (monitor.dataSources.queryIndexMappingsByType.isNotEmpty()) {
                                     val mappingsByType = monitor.dataSources.queryIndexMappingsByType
                                     if (props.containsKey("type") && mappingsByType.containsKey(props["type"]!!)) {
