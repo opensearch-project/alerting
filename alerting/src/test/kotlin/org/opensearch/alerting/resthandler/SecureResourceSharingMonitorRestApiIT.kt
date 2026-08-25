@@ -11,7 +11,6 @@ import org.apache.hc.core5.http.io.entity.StringEntity
 import org.junit.After
 import org.junit.Before
 import org.junit.BeforeClass
-import org.junit.Ignore
 import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
 import org.opensearch.alerting.AlertingPlugin.Companion.COMMENTS_BASE_URI
@@ -300,11 +299,11 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    // Blocked on the subordinate-resource (child) sharing model in opensearch-project/security#6373:
-    // alerts are not a registered resource type, so the security plugin's DLS on the alerts index
-    // filters a read-only-shared, non-owner user out and the by-monitor alerts GET returns 403.
-    // Full inheritance requires registering alerts as a child of the monitor once #6373 lands.
-    @Ignore
+    // Alerts inherit monitor access via request typing: GetAlertsRequest reports type()="monitor"
+    // and id()=<monitorId>, so the security plugin's ResourceAccessEvaluator gates the by-monitor
+    // alerts GET as a monitor access check. A read-only share therefore grants the caller the
+    // alerts GET; TransportGetAlertsAction then runs the alert-index search on the plugin subject
+    // (bounded by the caller's accessible monitor_ids) so the caller needs no direct index perms.
     fun `test alerts inherit access when monitor is shared read-only`() {
         val monitor = aliceCreatesMonitor()
         putAlertMappings()
@@ -334,12 +333,11 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
 
     // ─── Subordinate resource: comments ──────────────────────────────────────────
 
-    // The comments-history index bootstrap now runs on the plugin subject (stashed in
-    // TransportIndexAlertingCommentAction.start()), so the request no longer hangs. But denying a
-    // comment when the caller lacks monitor access requires the subordinate-resource model in
-    // opensearch-project/security#6373 (the comment-create fetch is a search, not a monitor
-    // DocRequest, so the security plugin does not gate it). Blocked on #6373.
-    @Ignore
+    // A comment request targets the comments index (not the monitor), so the ResourceAccessEvaluator
+    // does not gate it. TransportIndexAlertingCommentAction instead gates the create explicitly on
+    // the caller's access to the parent monitor via ResourceSharingClient.verifyAccess with the
+    // comment write action, which is only granted at the read-write / full-access levels — so an
+    // unshared caller is denied.
     fun `test comment on alert denied without share`() {
         val monitor = aliceCreatesMonitor()
         putAlertMappings()
@@ -356,10 +354,8 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    // Paired with the denied case above: kept ignored until subordinate-resource comment access is
-    // enforced via opensearch-project/security#6373 (today the create path isn't gated by monitor
-    // access, so this would pass for the wrong reason).
-    @Ignore
+    // Paired with the denied case above: a read-write share grants the comment write action, so the
+    // monitor-access check in TransportIndexAlertingCommentAction lets bob's comment through.
     fun `test comment on alert allowed with read-write share`() {
         val monitor = aliceCreatesMonitor()
         putAlertMappings()

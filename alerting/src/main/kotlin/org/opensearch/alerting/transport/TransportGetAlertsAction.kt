@@ -266,7 +266,14 @@ class TransportGetAlertsAction @Inject constructor(
                             // with more accessible monitors than that is not an expected scenario.
                             val query = searchSourceBuilder.query() as BoolQueryBuilder
                             query.filter(QueryBuilders.termsQuery("monitor_id", accessibleMonitorIds))
-                            search(alertIndex, searchSourceBuilder, actionListener, tenantId)
+                            // The accessible-monitor lookup above needed the caller's restored context,
+                            // but the alert-index search itself must run on the plugin subject: a
+                            // non-admin caller shared a monitor (read-only) has no direct read permission
+                            // on the system alerts index. The monitor_id filter, bounded to the caller's
+                            // accessible monitors, is what enforces the resource-sharing boundary here.
+                            client.threadPool().threadContext.stashContext().use {
+                                search(alertIndex, searchSourceBuilder, actionListener, tenantId)
+                            }
                         }
 
                         override fun onFailure(e: Exception) {
