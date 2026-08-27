@@ -65,14 +65,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         const val INDEX_PATTERN_SUFFIX = "-000001"
         const val QUERY_INDEX_BASE_FIELDS_COUNT = 8 // 3 fields we defined and 5 builtin additional metadata fields
 
-        /**
-         * Field attributes that reference custom analysis resources (analyzers, normalizers, similarity
-         * configurations) defined in a source index's settings.analysis block.  The doc-level query index
-         * is created from a fixed settings resource with no custom analysis block, so including these
-         * attributes in a PutMappingRequest against the query index causes OpenSearch to reject the
-         * request with "analyzer [x] has not been configured in mappings".  Strip them before copying
-         * field mappings from the source index to the query index.
-         */
+        /** Analysis-resource attributes that must be stripped before copying mappings to the query index. */
         val ANALYSIS_ATTRIBUTES = setOf(
             "analyzer",
             "search_analyzer",
@@ -82,18 +75,15 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         )
 
         /**
-         * Sanitizes a single field-mapping property map so it is safe to submit in a PutMappingRequest
-         * against the doc-level query index.
-         * @param fieldType the OpenSearch field type string (e.g. "text", "keyword"), or null when absent
-         * @param mapping   the mutable property map for the field; modified in-place
+         * Strips analysis attributes and invalid structural attributes from a field-mapping map in-place.
+         * @param fieldType the OpenSearch field type (e.g. "text", "keyword"), or null when absent
+         * @param mapping   the mutable property map to sanitize
          */
         fun sanitizeFieldMappingAttributes(fieldType: String?, mapping: MutableMap<String, Any>) {
             // Category 1: remove analysis resource references
             mapping.keys.removeAll(ANALYSIS_ATTRIBUTES)
 
-            // Category 2: remove "properties" from scalar (non-object, non-nested) fields.
-            // A null/absent type defaults to "object" in OpenSearch, so only strip when the type is
-            // explicitly set to something other than "object" or "nested".
+            // Category 2: strip "properties" from scalar fields (null type defaults to object — only strip when explicit).
             if (fieldType != null && fieldType != "object" && fieldType != NESTED) {
                 mapping.remove(PROPERTIES)
             }
@@ -103,6 +93,16 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             (mapping["fields"] as? Map<*, *>)?.forEach { (_, subMapping) ->
                 (subMapping as? MutableMap<String, Any>)?.let {
                     sanitizeFieldMappingAttributes(it[TYPE] as? String, it)
+                }
+            }
+
+            // Recurse into sub-properties of object/implicit-object fields to strip analysis attributes.
+            if (fieldType == null || fieldType == "object" || fieldType == NESTED) {
+                @Suppress("UNCHECKED_CAST")
+                (mapping[PROPERTIES] as? Map<*, *>)?.forEach { (_, subMapping) ->
+                    (subMapping as? MutableMap<String, Any>)?.let {
+                        sanitizeFieldMappingAttributes(it[TYPE] as? String, it)
+                    }
                 }
             }
         }
