@@ -497,13 +497,14 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         var targetQueryIndex = monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id]
         if (
             targetQueryIndex == null || (
-                targetQueryIndex != monitor.dataSources.queryIndex &&
+                targetQueryIndex == monitor.dataSources.queryIndex &&
                     monitor.deleteQueryIndexInEveryRun == true
                 )
         ) {
-            // queryIndex is alias which will always have only 1 backing index which is writeIndex
-            // This is due to a fact that that _rollover API would maintain only single index under alias
-            // if you don't add is_write_index setting when creating index initially
+            // queryIndex is alias; its backing concrete index is the write index.
+            // The == guard handles the backwards-compat case where the alias name was mistakenly stored
+            // in metadata. Using != (the old code) caused this branch to fire on every run because
+            // the stored concrete index (e.g. "...-000001") always differs from the alias name.
             targetQueryIndex = getWriteIndexNameForAlias(monitor.dataSources.queryIndex)
             if (targetQueryIndex == null) {
                 val message = "Failed to get write index for queryIndex alias:${monitor.dataSources.queryIndex}"
