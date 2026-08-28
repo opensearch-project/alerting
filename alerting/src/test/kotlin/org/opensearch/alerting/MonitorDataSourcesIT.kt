@@ -414,8 +414,37 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
                 fields = listOf(),
                 queryFieldNames = listOf("alias.some.fff", "source.ip.v6.v1")
             )
+        val docQuery8 = DocLevelQuery(
+            query = "message:error",
+            name = "10",
+            fields = listOf()
+        )
+        val docQuery9 = DocLevelQuery(
+            query = "message:IAD",
+            name = "11",
+            fields = listOf()
+        )
+        val docQuery10 = DocLevelQuery(
+            query = "source.ip.v6.v1:[10000 TO 20000]",
+            name = "12",
+            fields = listOf()
+        )
+        val docQuery11 = DocLevelQuery(
+            query = "type.subtype:some",
+            name = "13",
+            fields = listOf()
+        )
+        val docQuery12 = DocLevelQuery(
+            query = "supertype.type:some",
+            name = "14",
+            fields = listOf()
+        )
         val docLevelInput = DocLevelMonitorInput(
-            "description", listOf(index), listOf(docQuery1, docQuery2, docQuery3, docQuery4, docQuery5, docQuery6, docQuery7)
+            "description", listOf(index),
+            listOf(
+                docQuery1, docQuery2, docQuery3, docQuery4, docQuery5, docQuery6, docQuery7,
+                docQuery8, docQuery9, docQuery10, docQuery11, docQuery12
+            )
         )
         val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
         val customFindingsIndex = "custom_findings_index"
@@ -464,7 +493,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val findings = searchFindings(id, customFindingsIndex)
         assertEquals("Findings saved for test monitor", 1, findings.size)
         assertTrue("Findings saved for test monitor", findings[0].relatedDocIds.contains("1"))
-        assertEquals("Didn't match all 7 queries", 7, findings[0].docLevelQueries.size)
+        assertEquals("Didn't match all 12 queries", 12, findings[0].docLevelQueries.size)
     }
 
     fun `test percolate query failure when queryFieldNames has alias`() {
