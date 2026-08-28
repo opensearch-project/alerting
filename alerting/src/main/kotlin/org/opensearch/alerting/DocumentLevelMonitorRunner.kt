@@ -33,7 +33,6 @@ import org.opensearch.core.common.breaker.CircuitBreakingException
 import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.IndexNotFoundException
-import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.node.NodeClosedException
 import org.opensearch.transport.ActionNotFoundTransportException
 import org.opensearch.transport.ConnectTransportException
@@ -188,12 +187,12 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         )
                         MonitorMetadataService.createRunContextForIndex(concreteIndexName, isIndexCreatedRecently)
                     }
-
+                    val shardCount: Int = getShardsCount(monitorCtx.clusterService!!, concreteIndexName)
                     // Prepare updatedLastRunContext for each index
                     val indexUpdatedRunContext = initializeNewLastRunContext(
                         indexLastRunContext.toMutableMap(),
-                        monitorCtx,
                         concreteIndexName,
+                        shardCount
                     ) as MutableMap<String, Any>
                     if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                         IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
@@ -217,8 +216,15 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         // update lastRunContext if its a temp monitor as we only want to view the last bit of data then
                         // TODO: If dryrun, we should make it so we limit the search as this could still potentially give us lots of data
                         if (isTempMonitor) {
-                            indexLastRunContext[shard] =
-                                max(-1, (indexUpdatedRunContext[shard] as String).toInt() - 10)
+                            indexLastRunContext[shard] = if (indexLastRunContext.containsKey(shard)) {
+                                if (indexLastRunContext[shard] is Long) {
+                                    max(-1L, indexUpdatedRunContext[shard] as Long - 10L)
+                                } else if (indexLastRunContext[shard] is Int) {
+                                    max(-1L, (indexUpdatedRunContext[shard] as Int).toLong() - 10L)
+                                } else -1L
+                            } else {
+                                -1L
+                            }
                         }
                     }
                     val indexExecutionContext = IndexExecutionContext(
@@ -421,7 +427,9 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             return monitorResult.copy(triggerResults = triggerResults, inputResults = inputRunResults)
         } catch (e: Exception) {
             val errorMessage = ExceptionsHelper.detailedMessage(e)
-            monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage, executionId, workflowRunContext)
+            if (false == dryrun) {
+                monitorCtx.alertService!!.upsertMonitorErrorAlert(monitor, errorMessage, executionId, workflowRunContext)
+            }
             logger.error("Failed running Document-level-monitor ${monitor.name}", e)
             val alertingException = AlertingException(
                 errorMessage,
@@ -455,7 +463,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     if (fanOutResponse.lastRunContexts.contains("index") && fanOutResponse.lastRunContexts["index"] == indexName) {
                         fanOutResponse.lastRunContexts.keys.forEach {
 
-                            val seq_no = fanOutResponse.lastRunContexts[it].toString().toIntOrNull()
+                            val seq_no = fanOutResponse.lastRunContexts[it].toString().toLongOrNull()
                             if (
                                 it != "shards_count" &&
                                 it != "index" &&
@@ -558,20 +566,6 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             }
         }
         return InputRunResults(listOf(inputRunResults), if (!errors.isEmpty()) AlertingException.merge(*errors.toTypedArray()) else null)
-    }
-
-    private fun initializeNewLastRunContext(
-        lastRunContext: Map<String, Any>,
-        monitorCtx: MonitorRunnerExecutionContext,
-        index: String,
-    ): Map<String, Any> {
-        val count: Int = getShardsCount(monitorCtx.clusterService!!, index)
-        val updatedLastRunContext = lastRunContext.toMutableMap()
-        for (i: Int in 0 until count) {
-            val shard = i.toString()
-            updatedLastRunContext[shard] = SequenceNumbers.UNASSIGNED_SEQ_NO.toString()
-        }
-        return updatedLastRunContext
     }
 
     private fun validate(monitor: Monitor) {

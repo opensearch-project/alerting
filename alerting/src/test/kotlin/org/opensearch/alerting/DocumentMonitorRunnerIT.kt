@@ -189,10 +189,15 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         val docLevelInput = DocLevelMonitorInput("description", listOf(index), listOf(docQuery))
 
         val action = randomAction(template = randomTemplateScript("Hello {{ctx.monitor.name}}"), destinationId = createDestination().id)
-        val monitor = randomDocumentLevelMonitor(
-            inputs = listOf(docLevelInput),
-            triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action)))
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(docLevelInput),
+                triggers = listOf(
+                    randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))
+                )
+            )
         )
+        assertNotNull(monitor.id)
 
         indexDoc(index, "1", testDoc)
         indexDoc(index, "2", testDoc)
@@ -206,7 +211,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         indexDoc(index, "51", testDoc)
 
         deleteDoc(index, "51")
-        val response = executeMonitor(monitor, params = mapOf("dryrun" to "false"))
+        val response = executeMonitor(monitor.id)
 
         val output = entityAsMap(response)
         assertEquals(monitor.name, output["monitor_name"])
