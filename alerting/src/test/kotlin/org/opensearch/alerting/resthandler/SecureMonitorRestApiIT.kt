@@ -1337,11 +1337,10 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf(user))
 
         try {
-            val response = executeMonitor(userClient as RestClient, modifiedMonitor, params = DRYRUN_MONITOR)
-            val output = entityAsMap(response)
-            val inputResults = output.stringMap("input_results")
-            assertTrue("Missing monitor error message", (inputResults?.get("error") as String).isNotEmpty())
-            assertTrue((inputResults.get("error") as String).contains("no permissions for [indices:data/read/search]"))
+            executeMonitor(userClient as RestClient, modifiedMonitor, params = DRYRUN_MONITOR)
+            fail("Expected FORBIDDEN response for inline monitor with restricted input indices")
+        } catch (e: ResponseException) {
+            assertEquals("Expected 403 status", RestStatus.FORBIDDEN.status, e.response.statusLine.statusCode)
         } finally {
             deleteRoleMapping(ALERTING_FULL_ACCESS_ROLE)
         }
