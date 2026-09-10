@@ -185,6 +185,14 @@ dependencies {
     // SQL/PPL plugin dependencies are included in alerting-core
     api project(":alerting-core")
     implementation 'org.json:json:20240303'
+    // jackson-core and jackson-annotations must be declared directly, not just forced.
+    // A force only overrides the version of a dependency already in the graph; it does
+    // not add one. When OpenSearch pulls Jackson 3 (tools.jackson), the com.fasterxml
+    // jackson-core/annotations can be evicted from the compile classpath, making the
+    // supertypes of jackson-databind types (TreeNode, ObjectCodec, Versioned) inaccessible
+    // and breaking compilation non-deterministically against the moving 3.x snapshot.
+    implementation "com.fasterxml.jackson.core:jackson-core:${versions.jackson}"
+    implementation "com.fasterxml.jackson.core:jackson-annotations:${versions.jackson_annotations}"
     implementation "com.fasterxml.jackson.core:jackson-databind:${versions.jackson_databind}"
 
     implementation "com.github.seancfoley:ipaddress:5.4.1"
