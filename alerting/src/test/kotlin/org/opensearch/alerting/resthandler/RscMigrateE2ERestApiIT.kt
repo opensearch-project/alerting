@@ -24,10 +24,10 @@ import org.opensearch.core.rest.RestStatus
  * Requires the test cluster to be started with security enabled AND
  * `-Dresource_sharing.enabled=true` (which sets the static seed but leaves the flag
  * runtime-toggleable via cluster settings). The test flips the dynamic
- * `plugins.security.experimental.resource_sharing.enabled` cluster setting on and off
+ * `plugins.security.resource_sharing.enabled` cluster setting on and off
  * to simulate an upgrade from a pre-RSC cluster.
  *
- * The test explicitly ignores `plugins.security.experimental.resource_sharing.protected_types`
+ * The test explicitly ignores `plugins.security.resource_sharing.protected_types`
  * because that setting is also dynamic and its default (empty) list would leave the framework
  * inert even with the feature enabled — we set it during the "enable" phase.
  */
@@ -61,8 +61,8 @@ class RscMigrateE2ERestApiIT : AlertingRestTestCase() {
 
         try {
             // ─── Phase 1: RSC disabled — legacy backend-roles path ───────────────
-            setClusterSetting("plugins.security.experimental.resource_sharing.enabled", false)
-            setClusterSetting("plugins.security.experimental.resource_sharing.protected_types", emptyList<String>())
+            setClusterSetting("plugins.security.resource_sharing.enabled", false)
+            setClusterSetting("plugins.security.resource_sharing.protected_types", emptyList<String>())
 
             val createResp = aliceClient.makeRequest(
                 "POST",
@@ -90,9 +90,9 @@ class RscMigrateE2ERestApiIT : AlertingRestTestCase() {
             deleteSharingEntry(monitorId)
 
             // ─── Phase 2: enable RSC — reads break because no sharing entry ──────
-            setClusterSetting("plugins.security.experimental.resource_sharing.enabled", true)
+            setClusterSetting("plugins.security.resource_sharing.enabled", true)
             setClusterSetting(
-                "plugins.security.experimental.resource_sharing.protected_types",
+                "plugins.security.resource_sharing.protected_types",
                 listOf("monitor", "alerting-workflow"),
             )
 
@@ -156,9 +156,9 @@ class RscMigrateE2ERestApiIT : AlertingRestTestCase() {
         } finally {
             aliceClient.close()
             // Reset the flags so subsequent tests don't inherit a modified cluster state.
-            setClusterSetting("plugins.security.experimental.resource_sharing.enabled", true)
+            setClusterSetting("plugins.security.resource_sharing.enabled", true)
             setClusterSetting(
-                "plugins.security.experimental.resource_sharing.protected_types",
+                "plugins.security.resource_sharing.protected_types",
                 listOf("monitor", "alerting-workflow"),
             )
         }
