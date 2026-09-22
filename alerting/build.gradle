@@ -113,6 +113,9 @@ configurations.all {
         // snapshot. Pin httpcore5 and its h2 variant to a single version to resolve it.
         force "org.apache.httpcomponents.core5:httpcore5:5.4.3"
         force "org.apache.httpcomponents.core5:httpcore5-h2:5.4.3"
+        force "org.apache.httpcomponents.client5:httpclient5:${versions.httpclient5}"
+        force "org.apache.logging.log4j:log4j-api:${versions.log4j}"
+        force "org.apache.logging.log4j:log4j-core:${versions.log4j}"
         eachDependency { details ->
             if (details.requested.group.startsWith('tools.jackson')) {
                 details.useVersion versions.jackson3
