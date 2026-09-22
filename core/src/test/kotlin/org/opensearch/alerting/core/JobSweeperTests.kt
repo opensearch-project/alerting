@@ -6,238 +6,270 @@
 package org.opensearch.alerting.core
 
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Test
-import org.mockito.Mockito
-import org.mockito.Mockito.never
-import org.mockito.Mockito.verify
-import org.opensearch.action.get.GetResponse
-import org.opensearch.action.support.PlainActionFuture
-import org.opensearch.alerting.core.model.MockScheduledJob
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
+import org.opensearch.Version
 import org.opensearch.alerting.core.schedule.JobScheduler
 import org.opensearch.alerting.core.schedule.MockJobRunner
-import org.opensearch.alerting.core.settings.LegacyOpenDistroScheduledJobSettings
-import org.opensearch.alerting.core.settings.ScheduledJobSettings
+import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.REQUEST_TIMEOUT
+import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEPER_ENABLED
+import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_BACKOFF_MILLIS
+import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_BACKOFF_RETRY_COUNT
+import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_PAGE_SIZE
+import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_PERIOD
+import org.opensearch.cluster.ClusterName
 import org.opensearch.cluster.ClusterState
-import org.opensearch.cluster.routing.OperationRouting
+import org.opensearch.cluster.node.DiscoveryNode
+import org.opensearch.cluster.routing.IndexShardRoutingTable
+import org.opensearch.cluster.routing.RoutingTable
+import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.commons.alerting.model.IntervalSchedule
+import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.core.common.bytes.BytesReference
+import org.opensearch.core.common.transport.TransportAddress
 import org.opensearch.core.index.Index
 import org.opensearch.core.index.shard.ShardId
 import org.opensearch.core.xcontent.NamedXContentRegistry
-import org.opensearch.index.IndexNotFoundException
+import org.opensearch.index.engine.Engine
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
+import java.net.InetAddress
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.concurrent.ConcurrentHashMap
-import org.mockito.Mockito.`when` as whenever
+import java.util.concurrent.TimeUnit
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
- * Coverage for the sweep's orphan reconciliation.
+ * Unit tests for the election that decides which node performs the cluster-wide cleanup after a scheduled job document
+ * is written or removed. That cleanup is `JobRunner.postIndex`/`postDelete`, which is what moves the ACTIVE alerts of a
+ * deleted monitor -- or of a trigger removed by an update -- into the alert history index.
  *
- * The situation it exists for cannot be produced by the indexing listener alone: on a remote-store enabled scheduled
- * jobs index the replica copy does not execute deletes, so a node that owns a job but holds the replica never observes
- * the delete and keeps running the job from memory. These tests drive [JobSweeper.reconcileOrphans] with the state that
- * leaves behind -- a job in the sweep's memory, still scheduled, that the shard search did not return.
+ * These are deliberately unit tests rather than integration tests. The defect they cover is that *every* shard copy can
+ * simultaneously compute "I do not own this job" from its own asynchronously-applied cluster state, and no integration
+ * test can force that interleaving. Here the divergent view is supplied directly: the mocked [ClusterService] returns a
+ * cluster state in which the local node holds no copy of the config shard, so the consistent hash elects some other
+ * node -- and, on that node, a state that has not converged yet elects a different one again, so nobody acts.
  *
- * The scheduler is real rather than a double, because what is being asserted is that the job actually leaves the
- * scheduler, not that a method was called on it.
+ * Before the fix, the whole of `postIndex`/`postDelete` was gated on that check, so the deleted monitor's alerts were
+ * never moved and nothing ever repaired them: the periodic sweep only discovers work by searching for job documents
+ * that still exist, and the delete request itself returns 200.
  */
 class JobSweeperTests {
 
-    private val testSettings: Settings = Settings.builder().put("node.name", "node-0").build()
-    private val shardId = ShardId(Index(ScheduledJob.SCHEDULED_JOBS_INDEX, "uuid"), 0)
+    private val settings: Settings = Settings.builder().put("node.name", LOCAL_NODE_ID).build()
 
-    private lateinit var client: Client
-    private lateinit var clusterService: ClusterService
     private lateinit var threadPool: ThreadPool
-    private lateinit var scheduler: JobScheduler
-    private lateinit var sweeper: JobSweeper
+    private lateinit var jobRunner: MockJobRunner
+    private lateinit var jobScheduler: JobScheduler
 
-    /** Served by the stubbed client for the next existence check, or an exception for it to fail with. */
-    private var documentExists: Boolean = false
-    private var getFailure: Exception? = null
+    private val shardId = ShardId(Index(ScheduledJob.SCHEDULED_JOBS_INDEX, "config-index-uuid"), 0)
 
     @Before
-    fun setup() {
-        client = Mockito.mock(Client::class.java)
-        clusterService = Mockito.mock(ClusterService::class.java)
-        threadPool = ThreadPool(testSettings)
-        scheduler = JobScheduler(threadPool, MockJobRunner())
-        documentExists = false
-        getFailure = null
-
-        val settingsSet = setOf(
-            ScheduledJobSettings.REQUEST_TIMEOUT,
-            ScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
-            ScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
-            ScheduledJobSettings.SWEEP_PERIOD,
-            ScheduledJobSettings.SWEEP_PAGE_SIZE,
-            ScheduledJobSettings.SWEEPER_ENABLED,
-            ScheduledJobSettings.SWEEP_ORPHAN_RECONCILIATION_ENABLED,
-            LegacyOpenDistroScheduledJobSettings.REQUEST_TIMEOUT,
-            LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
-            LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
-            LegacyOpenDistroScheduledJobSettings.SWEEP_PERIOD,
-            LegacyOpenDistroScheduledJobSettings.SWEEP_PAGE_SIZE,
-            LegacyOpenDistroScheduledJobSettings.SWEEPER_ENABLED
-        )
-        whenever(clusterService.clusterSettings).thenReturn(ClusterSettings(Settings.EMPTY, settingsSet))
-        whenever(clusterService.state()).thenReturn(Mockito.mock(ClusterState::class.java))
-        routeEverythingTo(shardId)
-
-        whenever(client.get(Mockito.any())).thenAnswer {
-            val future = PlainActionFuture<GetResponse>()
-            val failure = getFailure
-            if (failure != null) {
-                future.onFailure(failure)
-            } else {
-                val response = Mockito.mock(GetResponse::class.java)
-                whenever(response.isExists).thenReturn(documentExists)
-                future.onResponse(response)
-            }
-            future
-        }
-
-        sweeper = newSweeper(reconciliationEnabled = true)
+    fun setupSweeper() {
+        threadPool = ThreadPool(settings)
+        jobRunner = MockJobRunner()
+        jobScheduler = JobScheduler(threadPool, jobRunner)
     }
 
     @After
-    fun tearDown() {
-        threadPool.shutdownNow()
+    fun tearDownSweeper() {
+        ThreadPool.terminate(threadPool, 10, TimeUnit.SECONDS)
     }
 
-    private fun routeEverythingTo(target: ShardId) {
-        val routing = Mockito.mock(OperationRouting::class.java)
-        whenever(
-            routing.shardId(
-                Mockito.any(ClusterState::class.java), Mockito.anyString(), Mockito.anyString(), Mockito.isNull()
-            )
-        ).thenReturn(target)
-        whenever(clusterService.operationRouting()).thenReturn(routing)
-    }
+    @Test
+    fun `deleting a job runs cleanup on the primary when ownership resolved to another node`() {
+        val sweeper = newSweeper(stateWithConfigShardOn(OTHER_NODE_IDS))
 
-    private fun newSweeper(reconciliationEnabled: Boolean): JobSweeper {
-        val settings = Settings.builder()
-            .put(ScheduledJobSettings.SWEEP_ORPHAN_RECONCILIATION_ENABLED.key, reconciliationEnabled)
-            .build()
-        return JobSweeper(settings, client, clusterService, threadPool, NamedXContentRegistry.EMPTY, scheduler, listOf("monitor"))
-    }
+        sweeper.handleJobDeleted(shardId, JOB_ID, 2L, Engine.Operation.Origin.PRIMARY)
 
-    /** Puts [jobId] into the real scheduler, which is the state a node that never saw the delete is left in. */
-    private fun schedule(jobId: String) {
-        val job = MockScheduledJob(
-            jobId, 1L, "$jobId-name", "MockScheduledJob", true,
-            IntervalSchedule(1, ChronoUnit.MINUTES), Instant.now(), Instant.now()
+        assertEquals(
+            1,
+            jobRunner.numberOfDelete,
+            "Cleanup for the deleted job was skipped, so its ACTIVE alerts would stay orphaned forever"
         )
-        assertTrue("Precondition: the job must be scheduled", scheduler.schedule(job))
-    }
-
-    private fun inMemory(vararg jobIds: String): ConcurrentHashMap<JobId, JobVersion> {
-        val jobs = ConcurrentHashMap<JobId, JobVersion>()
-        jobIds.forEach { jobs[it] = 1L }
-        return jobs
     }
 
     @Test
-    fun `test an orphaned job whose document is gone is descheduled`() {
-        // The delete was never observed on this node, so the job is still scheduled and still in the sweep's memory,
-        // but the shard search no longer returns it.
-        schedule("orphan")
-        documentExists = false
-        val jobs = inMemory("orphan")
+    fun `deleting a job runs cleanup on the primary even when the routing table is missing`() {
+        // A node can see a cluster state that has no routing table for the config index at all, e.g. while the index is
+        // being created or right after it is deleted. Reading ownership out of that state used to throw
+        // IndexNotFoundException straight into the indexing path.
+        val sweeper = newSweeper(ClusterState.builder(ClusterName.DEFAULT).build())
 
-        sweeper.reconcileOrphans(shardId, jobs, emptySet())
+        sweeper.handleJobDeleted(shardId, JOB_ID, 2L, Engine.Operation.Origin.PRIMARY)
 
-        assertFalse("The orphan must leave the scheduler", scheduler.scheduledJobs().contains("orphan"))
-        assertTrue("The stale sweep entry must be dropped", jobs.isEmpty())
+        assertEquals(
+            1,
+            jobRunner.numberOfDelete,
+            "Cleanup must not depend on the local cluster state having a routing table for the config index"
+        )
     }
 
     @Test
-    fun `test a job the sweep returned is left alone`() {
-        schedule("live")
-        val jobs = inMemory("live")
+    fun `deleting a job runs cleanup exactly once across all operation origins`() {
+        val sweeper = newSweeper(stateWithConfigShardOn(OTHER_NODE_IDS))
 
-        sweeper.reconcileOrphans(shardId, jobs, setOf("live"))
+        for (origin in Engine.Operation.Origin.values()) {
+            sweeper.handleJobDeleted(shardId, JOB_ID, 2L, origin)
+        }
 
-        assertTrue(scheduler.scheduledJobs().contains("live"))
-        verify(client, never()).get(Mockito.any())
-        assertEquals(setOf<JobId>("live"), jobs.keys)
+        assertEquals(
+            1,
+            jobRunner.numberOfDelete,
+            "Cleanup must run exactly once per delete: on the PRIMARY origin and on no shard copy"
+        )
     }
 
     @Test
-    fun `test a stale entry for a job that is no longer scheduled here is dropped without a get`() {
-        // postDelete already descheduled it on this node; only the version entry is left behind, and confirming the
-        // document's absence would be a pointless round trip.
-        val jobs = inMemory("already-gone")
+    fun `non-primary origins never run cleanup`() {
+        val sweeper = newSweeper(stateWithConfigShardOn(OTHER_NODE_IDS))
 
-        sweeper.reconcileOrphans(shardId, jobs, emptySet())
+        for (origin in Engine.Operation.Origin.values().filter { it != Engine.Operation.Origin.PRIMARY }) {
+            sweeper.handleJobDeleted(shardId, JOB_ID, 2L, origin)
+        }
 
-        verify(client, never()).get(Mockito.any())
-        assertTrue(jobs.isEmpty())
+        assertEquals(0, jobRunner.numberOfDelete, "A shard copy must not duplicate the cluster-wide cleanup")
     }
 
     @Test
-    fun `test a job whose document still exists is not descheduled`() {
-        // The sweep search is refresh-bound, so a job re-indexed after the last refresh is absent from the results
-        // while its document is live. The realtime primary GET is what keeps it scheduled.
-        schedule("just-reindexed")
-        documentExists = true
-        val jobs = inMemory("just-reindexed")
+    fun `indexing a job runs the post index hook on the primary when ownership resolved to another node`() {
+        val sweeper = newSweeper(stateWithConfigShardOn(OTHER_NODE_IDS))
 
-        sweeper.reconcileOrphans(shardId, jobs, emptySet())
+        sweeper.handleJobIndexed(shardId, JOB_ID, 2L, monitorSource(), Engine.Operation.Origin.PRIMARY)
 
-        assertTrue("A live job must stay scheduled", scheduler.scheduledJobs().contains("just-reindexed"))
-        assertEquals(setOf<JobId>("just-reindexed"), jobs.keys)
+        assertEquals(
+            1,
+            jobRunner.numberOfIndex,
+            "postIndex was skipped, so the alerts of any trigger removed by this update would stay orphaned"
+        )
     }
 
     @Test
-    fun `test a failed existence check leaves the job scheduled`() {
-        // An unreadable index says nothing about whether the job is there, and descheduling a live monitor is worse
-        // than leaving an orphan for one more sweep.
-        schedule("unknown")
-        getFailure = IndexNotFoundException(ScheduledJob.SCHEDULED_JOBS_INDEX)
-        val jobs = inMemory("unknown")
+    fun `indexing a job does not run the post index hook on a shard copy`() {
+        val sweeper = newSweeper(stateWithConfigShardOn(OTHER_NODE_IDS))
 
-        sweeper.reconcileOrphans(shardId, jobs, emptySet())
+        for (origin in Engine.Operation.Origin.values().filter { it != Engine.Operation.Origin.PRIMARY }) {
+            sweeper.handleJobIndexed(shardId, JOB_ID, 2L, monitorSource(), origin)
+        }
 
-        assertTrue(scheduler.scheduledJobs().contains("unknown"))
-        assertEquals(setOf<JobId>("unknown"), jobs.keys)
+        assertEquals(0, jobRunner.numberOfIndex, "A shard copy must not duplicate the cluster-wide cleanup")
     }
 
     @Test
-    fun `test reconciliation does nothing when disabled`() {
-        val disabled = newSweeper(reconciliationEnabled = false)
-        schedule("orphan")
-        documentExists = false
-        val jobs = inMemory("orphan")
+    fun `indexing a job on the primary does not schedule it on a node that does not own it`() {
+        val sweeper = newSweeper(stateWithConfigShardOn(OTHER_NODE_IDS))
 
-        disabled.reconcileOrphans(shardId, jobs, emptySet())
+        sweeper.handleJobIndexed(shardId, JOB_ID, 2L, monitorSource(), Engine.Operation.Origin.PRIMARY)
 
-        assertTrue(scheduler.scheduledJobs().contains("orphan"))
-        verify(client, never()).get(Mockito.any())
-        assertEquals(setOf<JobId>("orphan"), jobs.keys)
+        assertEquals(
+            emptySet(),
+            jobScheduler.scheduledJobs(),
+            "Job scheduling must stay with the consistent-hash owner rather than follow the primary"
+        )
     }
 
     @Test
-    fun `test a job that does not route to the swept shard is skipped`() {
-        // A document indexed with custom routing cannot be verified by a GET on id, so it is left alone rather than
-        // descheduled on inconclusive evidence.
-        routeEverythingTo(ShardId(Index(ScheduledJob.SCHEDULED_JOBS_INDEX, "uuid"), 1))
-        schedule("custom-routed")
-        val jobs = inMemory("custom-routed")
+    fun `indexing a job schedules it locally when this node is the consistent hash owner`() {
+        val sweeper = newSweeper(stateWithConfigShardOn(listOf(LOCAL_NODE_ID)))
 
-        sweeper.reconcileOrphans(shardId, jobs, emptySet())
+        sweeper.handleJobIndexed(shardId, JOB_ID, 2L, monitorSource(), Engine.Operation.Origin.PRIMARY)
 
-        verify(client, never()).get(Mockito.any())
-        assertTrue(scheduler.scheduledJobs().contains("custom-routed"))
-        assertEquals(setOf<JobId>("custom-routed"), jobs.keys)
+        assertEquals(
+            setOf(JOB_ID),
+            jobScheduler.scheduledJobs(),
+            "Electing the cleanup on the primary must not stop the hash owner from scheduling the job"
+        )
+    }
+
+    private fun newSweeper(clusterState: ClusterState): JobSweeper {
+        val clusterSettings = ClusterSettings(
+            settings,
+            setOf(SWEEP_PERIOD, SWEEPER_ENABLED, SWEEP_BACKOFF_MILLIS, SWEEP_BACKOFF_RETRY_COUNT, SWEEP_PAGE_SIZE, REQUEST_TIMEOUT)
+        )
+        val localNode = DiscoveryNode(
+            LOCAL_NODE_ID,
+            TransportAddress(InetAddress.getLoopbackAddress(), 9300),
+            emptyMap(),
+            emptySet(),
+            Version.CURRENT
+        )
+        val clusterService = mock(ClusterService::class.java)
+        `when`(clusterService.clusterSettings).thenReturn(clusterSettings)
+        `when`(clusterService.localNode()).thenReturn(localNode)
+        `when`(clusterService.state()).thenReturn(clusterState)
+
+        return JobSweeper(
+            settings,
+            mock(Client::class.java),
+            clusterService,
+            threadPool,
+            NamedXContentRegistry(listOf(Monitor.XCONTENT_REGISTRY)),
+            jobScheduler,
+            listOf(MONITOR_TYPE)
+        )
+    }
+
+    /**
+     * A cluster state whose config-index shard has an active copy on exactly [nodeIds].
+     *
+     * The routing table is mocked rather than built with `IndexShardRoutingTable.Builder`, because that builder pulls a
+     * `Random` out of `RandomizedContext`, which only exists under the randomized test runner. `isOwningNode` reads
+     * nothing from a shard routing beyond [ShardRouting.active] and [ShardRouting.currentNodeId].
+     */
+    private fun stateWithConfigShardOn(nodeIds: List<String>): ClusterState {
+        val shardRoutings = nodeIds.map { nodeId ->
+            val shardRouting = mock(ShardRouting::class.java)
+            `when`(shardRouting.active()).thenReturn(true)
+            `when`(shardRouting.currentNodeId()).thenReturn(nodeId)
+            shardRouting
+        }
+        val shardRoutingTable = mock(IndexShardRoutingTable::class.java)
+        // A fresh iterator per call: isOwningNode iterates the table on every invocation.
+        `when`(shardRoutingTable.iterator()).thenAnswer { shardRoutings.iterator() }
+
+        val routingTable = mock(RoutingTable::class.java)
+        `when`(routingTable.shardRoutingTable(shardId)).thenReturn(shardRoutingTable)
+
+        val clusterState = mock(ClusterState::class.java)
+        `when`(clusterState.routingTable).thenReturn(routingTable)
+        return clusterState
+    }
+
+    /**
+     * A `monitor`-shaped source document, built from the real model so that it is guaranteed to round-trip through
+     * `ScheduledJob.parse`. [JobSweeper.handleJobIndexed] needs a sweepable job type; the monitor is never run.
+     */
+    private fun monitorSource(): BytesReference = BytesReference.bytes(
+        Monitor(
+            id = JOB_ID,
+            version = 2L,
+            name = JOB_ID,
+            enabled = true,
+            schedule = IntervalSchedule(1, ChronoUnit.MINUTES),
+            lastUpdateTime = Instant.ofEpochMilli(1700000000000L),
+            enabledTime = Instant.ofEpochMilli(1700000000000L),
+            monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR.value,
+            user = null,
+            schemaVersion = 0,
+            inputs = listOf(),
+            triggers = listOf(),
+            uiMetadata = mapOf()
+        ).toXContentWithType(XContentFactory.jsonBuilder())
+    )
+
+    companion object {
+        private const val JOB_ID = "monitor-1"
+        private const val MONITOR_TYPE = "monitor"
+        private const val LOCAL_NODE_ID = "node-0"
+
+        /** Shard copies on nodes other than the local one, so the consistent hash can never elect this node. */
+        private val OTHER_NODE_IDS = listOf("node-1", "node-2")
     }
 }
