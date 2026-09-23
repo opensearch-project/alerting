@@ -261,7 +261,7 @@ class AlertServiceTests : OpenSearchTestCase() {
 
     fun `test loadCurrentAlertsForQueryLevelMonitor excludes terminal-state alerts`() {
         val trigger = randomQueryLevelTrigger()
-        val monitor = randomQueryLevelMonitor(triggers = listOf(trigger))
+        val monitor = randomQueryLevelMonitor(triggers = listOf(trigger)).copy(id = "test-monitor-id")
 
         val active = randomAlert(monitor).copy(triggerId = trigger.id, triggerName = trigger.name, state = Alert.State.ACTIVE)
         val completed = randomAlert(monitor).copy(triggerId = trigger.id, triggerName = trigger.name, state = Alert.State.COMPLETED)
@@ -278,7 +278,7 @@ class AlertServiceTests : OpenSearchTestCase() {
 
     fun `test loadCurrentAlertsForQueryLevelMonitor returns null when only terminal alerts present`() {
         val trigger = randomQueryLevelTrigger()
-        val monitor = randomQueryLevelMonitor(triggers = listOf(trigger))
+        val monitor = randomQueryLevelMonitor(triggers = listOf(trigger)).copy(id = "test-monitor-id")
 
         val completed = randomAlert(monitor).copy(triggerId = trigger.id, triggerName = trigger.name, state = Alert.State.COMPLETED)
         val deleted = randomAlert(monitor).copy(triggerId = trigger.id, triggerName = trigger.name, state = Alert.State.DELETED)
@@ -293,7 +293,7 @@ class AlertServiceTests : OpenSearchTestCase() {
 
     fun `test searchAlerts emits server-side must_not excluding terminal states`() {
         val trigger = randomQueryLevelTrigger()
-        val monitor = randomQueryLevelMonitor(triggers = listOf(trigger))
+        val monitor = randomQueryLevelMonitor(triggers = listOf(trigger)).copy(id = "test-monitor-id")
         stubSearchAlerts(emptyList())
 
         runBlocking { alertService.loadCurrentAlertsForQueryLevelMonitor(monitor, null) }

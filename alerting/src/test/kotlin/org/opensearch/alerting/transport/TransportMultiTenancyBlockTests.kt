@@ -120,20 +120,28 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
         settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
+        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY)
         settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
         settingSet.add(AlertingSettings.ALERT_HISTORY_ENABLED)
         settingSet.add(AlertingSettings.ALERTING_MAX_MONITORS)
         settingSet.add(AlertingSettings.MAX_TRIGGERS_PER_MONITOR)
+        settingSet.add(AlertingSettings.MULTI_TENANT_TRIGGER_EVAL_ENABLED)
         settingSet.add(AlertingSettings.REQUEST_TIMEOUT)
         settingSet.add(AlertingSettings.INDEX_TIMEOUT)
         settingSet.add(AlertingSettings.MAX_ACTION_THROTTLE_VALUE)
         settingSet.add(DestinationSettings.ALLOW_LIST)
+        settingSet.add(AlertingSettings.PPL_MAX_QUERY_LENGTH)
+        settingSet.add(AlertingSettings.PPL_QUERY_RESULTS_MAX_DATAROWS)
+        settingSet.add(AlertingSettings.MAX_PPL_TRIGGERS_PER_MONITOR)
+        settingSet.add(AlertingSettings.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH)
+        settingSet.add(AlertingSettings.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH)
         settingSet.add(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
         settingSet.add(AlertingSettings.JOB_QUEUE_NAME)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ALLOWED_ACCOUNT_IDS)
         val clusterSettings = ClusterSettings(multiTenancySettings, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
 
@@ -598,14 +606,15 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
 
         val listener = queryLevelCreateRequest(action)
 
-        // The limit rejection is an IllegalArgumentException wrapped in AlertingException.
+        // The limit rejection is an IllegalArgumentException wrapped by AlertingException.wrap,
+        // which maps it to a BAD_REQUEST status and stringifies the original in the cause message.
         val captor = org.mockito.ArgumentCaptor.forClass(Exception::class.java)
         verify(listener, Mockito.timeout(2000)).onFailure(captor.capture())
         val exception = captor.value
         assertTrue(exception is org.opensearch.commons.alerting.util.AlertingException)
-        val cause = (exception as org.opensearch.commons.alerting.util.AlertingException).cause ?: exception
-        assertTrue(cause is IllegalArgumentException)
-        assertTrue(cause.message!!.contains("more than the allowed monitors [2]"))
+        val alertingEx = exception as org.opensearch.commons.alerting.util.AlertingException
+        assertEquals(RestStatus.BAD_REQUEST, alertingEx.status())
+        assertTrue(alertingEx.cause!!.message!!.contains("more than the allowed monitors [2]"))
 
         // A rejected create must never be written to the store.
         verify(sdkClient, Mockito.after(500).never()).putDataObjectAsync(org.mockito.ArgumentMatchers.any())
@@ -717,9 +726,9 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
 
         val captor = org.mockito.ArgumentCaptor.forClass(Exception::class.java)
         verify(listener, Mockito.timeout(2000)).onFailure(captor.capture())
-        val cause = (captor.value as? org.opensearch.commons.alerting.util.AlertingException)?.cause ?: captor.value
-        assertTrue(cause is OpenSearchStatusException)
-        assertEquals(RestStatus.INTERNAL_SERVER_ERROR, (cause as OpenSearchStatusException).status())
+        assertTrue(captor.value is org.opensearch.commons.alerting.util.AlertingException)
+        val alertingEx = captor.value as org.opensearch.commons.alerting.util.AlertingException
+        assertEquals(RestStatus.INTERNAL_SERVER_ERROR, alertingEx.status())
 
         // The monitor must not be written when the count could not be determined.
         verify(sdkClient, Mockito.after(500).never()).putDataObjectAsync(org.mockito.ArgumentMatchers.any())
@@ -731,20 +740,28 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
         settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
+        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY)
         settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
         settingSet.add(AlertingSettings.ALERT_HISTORY_ENABLED)
         settingSet.add(AlertingSettings.ALERTING_MAX_MONITORS)
         settingSet.add(AlertingSettings.MAX_TRIGGERS_PER_MONITOR)
+        settingSet.add(AlertingSettings.MULTI_TENANT_TRIGGER_EVAL_ENABLED)
         settingSet.add(AlertingSettings.REQUEST_TIMEOUT)
         settingSet.add(AlertingSettings.INDEX_TIMEOUT)
         settingSet.add(AlertingSettings.MAX_ACTION_THROTTLE_VALUE)
         settingSet.add(DestinationSettings.ALLOW_LIST)
+        settingSet.add(AlertingSettings.PPL_MAX_QUERY_LENGTH)
+        settingSet.add(AlertingSettings.PPL_QUERY_RESULTS_MAX_DATAROWS)
+        settingSet.add(AlertingSettings.MAX_PPL_TRIGGERS_PER_MONITOR)
+        settingSet.add(AlertingSettings.NOTIFICATION_SUBJECT_SOURCE_MAX_LENGTH)
+        settingSet.add(AlertingSettings.NOTIFICATION_MESSAGE_SOURCE_MAX_LENGTH)
         settingSet.add(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
         settingSet.add(AlertingSettings.JOB_QUEUE_NAME)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
         settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME)
+        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ALLOWED_ACCOUNT_IDS)
         whenever(clusterService.clusterSettings).thenReturn(ClusterSettings(settings, settingSet))
 
         return TransportIndexMonitorAction(

@@ -102,8 +102,8 @@ class AlertingMetricsServiceTests {
             it.metricName() == AlertingMetricsService.METRIC_EXECUTION_FAILURES &&
                 dim(it, AlertingMetricsService.DIMENSION_APPLICATION_ID) == "app-X"
         }
-        assertEquals(1.0, executions.value())
-        assertEquals(1.0, failures.value())
+        assertEquals(1.0, executions.value(), 0.0)
+        assertEquals(1.0, failures.value(), 0.0)
     }
 
     @Test
