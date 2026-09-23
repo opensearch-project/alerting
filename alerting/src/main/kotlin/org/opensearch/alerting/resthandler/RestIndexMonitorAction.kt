@@ -158,7 +158,7 @@ class RestIndexMonitorAction : BaseRestHandler() {
         }
         val indexMonitorRequest = IndexMonitorRequest(id, seqNo, primaryTerm, refreshPolicy, request.method(), monitor, rbacRoles)
 
-        log.info("Dispatching IndexMonitorRequest with monitor: {}", monitor)
+        log.debug("Dispatching IndexMonitorRequest for monitor id [{}]", id)
         return RestChannelConsumer { channel ->
             client.execute(AlertingActions.INDEX_MONITOR_ACTION_TYPE, indexMonitorRequest, indexMonitorResponse(channel, request.method()))
         }

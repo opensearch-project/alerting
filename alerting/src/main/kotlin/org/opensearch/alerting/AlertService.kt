@@ -79,6 +79,9 @@ class AlertService(
 ) {
 
     companion object {
+        // Per-cycle fetch cap for current bucket-level alerts. Terminal-state alerts (COMPLETED/DELETED)
+        // are excluded server-side by the mustNot filter in searchAlerts, so this budget is spent only on
+        // ACTIVE/ACKNOWLEDGED alerts that still need categorization — 100 covers expected in-progress cardinality.
         const val MAX_BUCKET_LEVEL_MONITOR_ALERT_SEARCH_COUNT = 100
         const val ERROR_ALERT_ID_PREFIX = "error-alert"
 
@@ -727,7 +730,7 @@ class AlertService(
         allowUpdatingAcknowledgedAlert: Boolean = false,
         routingId: String // routing is mandatory and set as monitor id. for workflow chained alerts we pass workflow id as routing
     ) {
-        logger.info("Save alerts: alertCount=${alerts.size}, alerts=$alerts")
+        logger.debug("Save alerts: alertCount=${alerts.size}, alertIds=${alerts.map { it.id }}")
         val alertsIndex = dataSources.alertsIndex
         val alertsHistoryIndex = dataSources.alertsHistoryIndex
 
@@ -817,9 +820,9 @@ class AlertService(
             val bulkRequest = BulkDataObjectRequest(null)
             putRequests.forEach { bulkRequest.add(it) }
             deleteRequests.forEach { bulkRequest.add(it) }
-            logger.info("AlertService.saveAlerts: tenantId=${currentTenantId()}, putRequests=${putRequests.size}, deleteRequests=${deleteRequests.size}, bulkRequest=$bulkRequest")
+            logger.debug("AlertService.saveAlerts: putRequests=${putRequests.size}, deleteRequests=${deleteRequests.size}")
             val bulkResponse = sdkClient.bulkDataObjectAsync(bulkRequest).await()
-            logger.info("AlertService.saveAlerts: bulkResponse=$bulkResponse")
+            logger.debug("AlertService.saveAlerts: bulkResponse failures=${bulkResponse.responses.count { it.isFailed }}")
             val failedResponses = bulkResponse.responses.filter { it.isFailed }
             val retryableFailures = failedResponses.filter { it.status() == RestStatus.TOO_MANY_REQUESTS }
 

@@ -960,7 +960,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .build()
 
             try {
-                log.info("Calling putDataObjectStashed with putRequest: $putRequest")
+                log.debug("Calling putDataObjectStashed for index [${putRequest.index()}] id [${putRequest.id()}]")
                 val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
                 if (putResponse.isFailed) {
                     actionListener.onFailure(
@@ -1185,7 +1185,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .build()
 
             try {
-                log.info("Calling putDataObjectStashed with putRequest: $putRequest")
+                log.debug("Calling putDataObjectStashed for index [${putRequest.index()}] id [${putRequest.id()}]")
                 val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
                 if (putResponse.isFailed) {
                     actionListener.onFailure(
@@ -1327,7 +1327,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .overwriteIfExists(true)
                 .dataObject(monitorObj)
                 .build()
-            log.info("Calling putDataObjectStashed with putRequest: $putRequest")
+            log.debug("Calling putDataObjectStashed for index [${putRequest.index()}] id [${putRequest.id()}]")
             sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
         }
 
