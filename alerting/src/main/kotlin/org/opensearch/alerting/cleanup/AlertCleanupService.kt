@@ -54,9 +54,12 @@ import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.engine.VersionConflictEngineException
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.search.sort.SortOrder
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
+import java.time.Duration
+import java.time.Instant
 import kotlin.coroutines.CoroutineContext
 
 private val log = LogManager.getLogger(AlertCleanupService::class.java)
@@ -133,7 +136,10 @@ object AlertCleanupService : CoroutineScope {
     }
 
     fun cleanupTaskMapping(): String =
-        AlertCleanupService::class.java.getResource("alert_cleanup_task_mapping.json").readText()
+        (
+            AlertCleanupService::class.java.getResource("alert_cleanup_task_mapping.json")
+                ?: error("alert_cleanup_task_mapping.json is missing from the plugin jar")
+            ).readText()
 
     // ---------------------------------------------------------------------------------------------------------------
     // Record
@@ -224,6 +230,7 @@ object AlertCleanupService : CoroutineScope {
             // behind it, free of documents that would be created only to be drained empty and removed again.
             val outstanding = countOutstanding(task)
             if (outstanding == 0L) return null
+            // UNKNOWN_OUTSTANDING_COUNT falls through here deliberately: an uncounted task is recorded, not skipped.
             log.info("$outstanding alert(s) to move for [${task.taskId}]; recording a cleanup task.")
             createTaskIndexIfAbsent()
             val request = IndexRequest(CLEANUP_TASK_INDEX)
@@ -257,7 +264,7 @@ object AlertCleanupService : CoroutineScope {
             if (e is IndexNotFoundException || e.cause is IndexNotFoundException) return 0L
             // Unknown rather than zero. Recording the task is the safe error: a drain that finds nothing removes it.
             log.warn("Failed to count alerts outstanding for [${task.taskId}]; recording the task anyway.", e)
-            -1L
+            UNKNOWN_OUTSTANDING_COUNT
         }
     }
 
@@ -421,9 +428,14 @@ object AlertCleanupService : CoroutineScope {
      */
     private suspend fun runWorkUnit(taskId: String): Boolean {
         val task = findTask(taskId) ?: return false
-        if (!isTaskStillApplicable(task)) {
-            deleteTask(taskId)
-            return false
+        when (applicabilityOf(task)) {
+            TaskApplicability.DISCARD -> {
+                deleteTask(taskId)
+                return false
+            }
+            // Left in place for a later pass; the lock is released by the caller either way.
+            TaskApplicability.DEFER -> return false
+            TaskApplicability.DRAIN -> {}
         }
 
         val result = retryPolicy.retry(log, RETRY_ON) {
@@ -453,35 +465,60 @@ object AlertCleanupService : CoroutineScope {
         return result.failure == null || result.movedCount > 0
     }
 
+    /** What a drain should do with a task, having checked it against the job it names. */
+    private enum class TaskApplicability {
+        /** The job is gone (or was never expected to go). Drain it. */
+        DRAIN,
+
+        /** The job is still there well after the task was written, so the task is stale. Remove it. */
+        DISCARD,
+
+        /** Cannot be told apart from DISCARD yet. Leave the task alone and let a later pass decide. */
+        DEFER,
+    }
+
     /**
      * Guards against the task having been recorded for a delete that never committed.
      *
      * The task is written before the job document is removed, so a failure in between leaves a task naming a job that
      * is still live. Draining it would move a live monitor's alerts into history, which is worse than the leak this
      * service exists to close. The check is on the recorded job's identity, not on the alerts.
+     *
+     * "Still live" on its own is not enough to condemn a task, because the same write-first ordering means every task
+     * names a live job for the short window before the delete commits. A task seen inside that window is deferred, not
+     * discarded: discarding it would leave the committed delete with no cleanup record, which is the one failure the
+     * ordering exists to prevent and the one nothing else can discover.
      */
-    private suspend fun isTaskStillApplicable(task: AlertCleanupTask): Boolean {
+    private suspend fun applicabilityOf(task: AlertCleanupTask): TaskApplicability {
         // A task recorded for a trigger removal belongs to a job that is expected to still exist.
-        if (!task.jobDeleted) return true
+        if (!task.jobDeleted) return TaskApplicability.DRAIN
         return try {
             val response: GetResponse = client.suspendUntil {
                 get(GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, task.jobId), it)
             }
-            if (response.isExists) {
+            if (!response.isExists) return TaskApplicability.DRAIN
+            val age = Duration.between(task.createdAt, Instant.now())
+            if (age < RECORD_COMMIT_GRACE) {
+                log.info(
+                    "Alert cleanup task [${task.taskId}] names a job that still exists, but was written ${age.toMillis()}ms " +
+                        "ago; deferring in case the delete has not committed yet."
+                )
+                TaskApplicability.DEFER
+            } else {
                 log.warn(
                     "Alert cleanup task [${task.taskId}] names a job that still exists; discarding the task. " +
                         "Either the delete did not commit or the id was reused."
                 )
-                false
-            } else {
-                true
+                TaskApplicability.DISCARD
             }
         } catch (e: IndexNotFoundException) {
             // No config index at all, so no job can exist.
-            true
+            TaskApplicability.DRAIN
         } catch (e: Exception) {
-            log.error("Failed to confirm job ${task.jobId} is deleted; leaving cleanup task in place.", e)
-            false
+            // Deliberately not DISCARD: a 503 from a recovering config index says nothing about whether the job is
+            // there, and removing the task on that evidence would drop the cleanup for good.
+            log.error("Failed to confirm job ${task.jobId} is deleted; leaving the cleanup task in place.", e)
+            TaskApplicability.DEFER
         }
     }
 
@@ -555,7 +592,11 @@ object AlertCleanupService : CoroutineScope {
         if (!clusterService.state().routingTable().hasIndex(CLEANUP_TASK_INDEX)) return
         val taskIds = try {
             val request = SearchRequest(CLEANUP_TASK_INDEX).source(
-                SearchSourceBuilder.searchSource().query(QueryBuilders.matchAllQuery()).size(MAX_TASKS_PER_RESUME)
+                SearchSourceBuilder.searchSource().query(QueryBuilders.matchAllQuery())
+                    // Oldest first, so that a backlog larger than one pass drains in the order it accumulated. Without
+                    // an explicit sort the same arbitrary subset can come back every pass while the rest never runs.
+                    .sort(AlertCleanupTask.CREATED_AT_FIELD, SortOrder.ASC)
+                    .size(MAX_TASKS_PER_RESUME)
                     .fetchSource(false)
             )
             val response: SearchResponse = client.suspendUntil { search(request, it) }
@@ -571,6 +612,23 @@ object AlertCleanupService : CoroutineScope {
 
     /** Bound on one resume pass, so a large backlog is worked through over several passes instead of in one burst. */
     const val MAX_TASKS_PER_RESUME = 100
+
+    /**
+     * Returned by `countOutstanding` when the count could not be taken, as distinct from a count of zero.
+     *
+     * Callers must treat it as "there may be work", because skipping on an unknown count would drop a cleanup on a
+     * transient search failure, whereas recording a task that turns out to be empty costs one drain that removes it.
+     */
+    const val UNKNOWN_OUTSTANDING_COUNT = -1L
+
+    /**
+     * How long after a task was written its job is still allowed to exist without the task being considered stale.
+     *
+     * Covers the window between recording the task and the job delete committing -- see `applicabilityOf`. Generous
+     * relative to that window, because the cost of waiting one resume interval is a delay, while the cost of
+     * discarding a live task is a permanent leak.
+     */
+    val RECORD_COMMIT_GRACE: Duration = Duration.ofMinutes(1)
 
     // ---------------------------------------------------------------------------------------------------------------
     // Storage
