@@ -139,6 +139,15 @@ class AlertMover {
 
                 // Advance the cursor before doing any work so that a page whose documents all fail to copy cannot
                 // cause an infinite loop. `_seq_no` is strictly increasing, so a non-advancing cursor ends the drain.
+                //
+                // Known limitation. An alert that fails to copy is excluded from the delete below and stays in the live
+                // index, but the cursor has already moved past its `_seq_no`, so neither a later work unit nor a resume
+                // pass revisits it -- and once a subsequent unit reaches the end of the range cleanly, the task is
+                // removed and that alert is leaked. This applies to any per-item copy failure, not only a permanent one
+                // such as a document that `Alert.parse` cannot read. Trading it for loop-freedom is deliberate: the
+                // alternative is tracking the lowest failed `_seq_no` and rewinding to it, which reintroduces exactly
+                // the unbounded retry this line prevents unless the number of rewinds is also bounded and persisted.
+                // Failures are logged per page, so a leak of this kind is visible in the log rather than silent.
                 val nextSearchAfter = hits.last().seqNo
                 searchAfter = if (nextSearchAfter > searchAfter!!) nextSearchAfter else null
 
