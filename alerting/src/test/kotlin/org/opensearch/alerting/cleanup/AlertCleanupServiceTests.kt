@@ -55,6 +55,8 @@ import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.index.engine.VersionConflictEngineException
 import org.opensearch.search.SearchHit
 import org.opensearch.search.SearchHits
+import org.opensearch.search.sort.FieldSortBuilder
+import org.opensearch.search.sort.SortOrder
 import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.transport.client.Client
 import java.time.Instant
@@ -97,6 +99,9 @@ class AlertCleanupServiceTests : OpenSearchTestCase() {
 
     /** Served in place of the next reads of the lock index, one per entry, for a lock index that cannot yet be read. */
     private val lockReadFailures = ArrayDeque<Exception>()
+
+    /** Served in place of the next reads of the config index, one per entry, so a job's existence cannot be confirmed. */
+    private val jobReadFailures = ArrayDeque<Exception>()
 
     /** Cursor writes only; the lock's own documents go through the same client. */
     private val cursorWrites get() = indexRequests.filter { it.index() == AlertCleanupService.CLEANUP_TASK_INDEX }
@@ -157,6 +162,8 @@ class AlertCleanupServiceTests : OpenSearchTestCase() {
             val listener = invocation.arguments[1] as ActionListener<GetResponse>
             if (index == LockService.LOCK_INDEX_NAME && lockReadFailures.isNotEmpty()) {
                 listener.onFailure(lockReadFailures.removeFirst())
+            } else if (index == ScheduledJob.SCHEDULED_JOBS_INDEX && jobReadFailures.isNotEmpty()) {
+                listener.onFailure(jobReadFailures.removeFirst())
             } else {
                 listener.onResponse(getResponse(documents[index]))
             }
@@ -295,6 +302,31 @@ class AlertCleanupServiceTests : OpenSearchTestCase() {
         verify(client, never()).bulk(Mockito.any(BulkRequest::class.java), Mockito.any())
     }
 
+    fun `test a task recorded moments ago is kept even though its job is still there`() {
+        // The task is written before the job document is removed, so for a short window every task names a live job.
+        // Discarding on that evidence would leave the committed delete with no cleanup record at all -- the one failure
+        // the write-first ordering exists to prevent, and the one nothing else can discover.
+        documents[AlertCleanupService.CLEANUP_TASK_INDEX] = taskJson(jobDeleted = true, createdAt = Instant.now())
+        documents[ScheduledJob.SCHEDULED_JOBS_INDEX] = """{"monitor":{}}"""
+
+        runBlocking { AlertCleanupService.runTask(TASK_ID) }
+
+        assertTrue("A task inside the grace period must survive", deleteRequests.none { it.id() == TASK_ID })
+        verify(client, never()).bulk(Mockito.any(BulkRequest::class.java), Mockito.any())
+    }
+
+    fun `test a task is kept when the config index cannot say whether the job is gone`() {
+        // A 503 from a recovering config index says nothing about whether the job is there, so the task must not be
+        // removed on the strength of it.
+        documents[AlertCleanupService.CLEANUP_TASK_INDEX] = taskJson(jobDeleted = true)
+        jobReadFailures.add(OpenSearchStatusException("shard is recovering", RestStatus.SERVICE_UNAVAILABLE))
+
+        runBlocking { AlertCleanupService.runTask(TASK_ID) }
+
+        assertTrue("An unreadable job must not cost the cleanup task", deleteRequests.none { it.id() == TASK_ID })
+        verify(client, never()).bulk(Mockito.any(BulkRequest::class.java), Mockito.any())
+    }
+
     fun `test a completed task is removed`() {
         documents[AlertCleanupService.CLEANUP_TASK_INDEX] = taskJson(jobDeleted = true)
         searchResponses.add(emptyPage())
@@ -418,7 +450,24 @@ class AlertCleanupServiceTests : OpenSearchTestCase() {
         )
     }
 
-    private fun taskJson(jobDeleted: Boolean): String {
+    fun `test the resume pass takes the oldest tasks first`() {
+        // One pass is bounded, so a backlog larger than the bound is worked through over several passes. Without an
+        // explicit order the same arbitrary subset can come back every time while the rest of the backlog never runs.
+        searchResponses.add(taskListResponse(listOf(TASK_ID)))
+        documents[LockService.LOCK_INDEX_NAME] = heldLockJson()
+        documents[AlertCleanupService.CLEANUP_TASK_INDEX] = taskJson(jobDeleted = true)
+
+        runBlocking { AlertCleanupService.resumeAbandonedTasks() }
+
+        val sorts = searchRequests.single().source().sorts()
+        assertEquals("The pass must impose an order on the backlog", 1, sorts?.size)
+        val sort = sorts!!.single() as FieldSortBuilder
+        assertEquals(AlertCleanupTask.CREATED_AT_FIELD, sort.fieldName)
+        assertEquals(SortOrder.ASC, sort.order())
+        assertEquals(AlertCleanupService.MAX_TASKS_PER_RESUME, searchRequests.single().source().size())
+    }
+
+    private fun taskJson(jobDeleted: Boolean, createdAt: Instant = Instant.ofEpochMilli(1_700_000_000_000L)): String {
         val task = AlertCleanupTask(
             jobId = JOB_ID,
             scope = CleanupScope.MONITOR,
@@ -426,7 +475,7 @@ class AlertCleanupServiceTests : OpenSearchTestCase() {
             alertHistoryIndex = "history-write",
             survivingTriggerIds = emptyList(),
             jobDeleted = jobDeleted,
-            createdAt = Instant.ofEpochMilli(1_700_000_000_000L)
+            createdAt = createdAt
         )
         return BytesReference.bytes(task.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS)).utf8ToString()
     }
