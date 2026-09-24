@@ -157,7 +157,6 @@ class TransportDocLevelMonitorFanOutAction
     var docTransformTimeTakenStat = 0L
     var totalDocsSizeInBytesStat = 0L
     var docsSizeOfBatchInBytes = 0L
-    var findingsToTriggeredQueries: Map<String, List<DocLevelQuery>> = mutableMapOf()
 
     @Volatile var percQueryMaxNumDocsInMemory: Int = PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY.get(settings)
     @Volatile var docLevelMonitorFanoutMaxDuration = DOC_LEVEL_MONITOR_FANOUT_MAX_DURATION.get(settings)
@@ -237,6 +236,7 @@ class TransportDocLevelMonitorFanOutAction
             val docsToQueries = mutableMapOf<String, MutableList<String>>()
             val transformedDocs = mutableListOf<Pair<String, TransformedDocDto>>()
             val findingIdToDocSource = mutableMapOf<String, MultiGetItemResponse>()
+            val findingsToTriggeredQueries = mutableMapOf<String, List<DocLevelQuery>>()
             val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
 
             val docLevelMonitorInput = request.monitor.inputs[0] as DocLevelMonitorInput
@@ -309,7 +309,7 @@ class TransportDocLevelMonitorFanOutAction
             // If there are no triggers defined, we still want to generate findings
             if (monitor.triggers.isEmpty()) {
                 if (dryrun == false && monitor.id != Monitor.NO_ID) {
-                    createFindings(monitor, docsToQueries, idQueryMap, true)
+                    createFindings(monitor, docsToQueries, idQueryMap, true, findingsToTriggeredQueries = findingsToTriggeredQueries)
                 }
             } else {
                 /**
@@ -328,6 +328,7 @@ class TransportDocLevelMonitorFanOutAction
                             dryrun,
                             executionId = executionId,
                             findingIdToDocSource,
+                            findingsToTriggeredQueries = findingsToTriggeredQueries,
                             workflowRunContext = workflowRunContext
                         )
                     }
@@ -449,6 +450,7 @@ class TransportDocLevelMonitorFanOutAction
         dryrun: Boolean,
         executionId: String,
         findingIdToDocSource: MutableMap<String, MultiGetItemResponse>,
+        findingsToTriggeredQueries: MutableMap<String, List<DocLevelQuery>>,
         workflowRunContext: WorkflowRunContext?
     ): DocumentLevelTriggerRunResult {
         val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger, clusterSettings = clusterService.clusterSettings)
@@ -462,7 +464,8 @@ class TransportDocLevelMonitorFanOutAction
             docsToQueries,
             idQueryMap,
             !dryrun && monitor.id != Monitor.NO_ID,
-            executionId
+            executionId,
+            findingsToTriggeredQueries
         )
 
         findingToDocPairs.forEach {
@@ -569,12 +572,12 @@ class TransportDocLevelMonitorFanOutAction
         idQueryMap: Map<String, DocLevelQuery>,
         shouldCreateFinding: Boolean,
         workflowExecutionId: String? = null,
+        findingsToTriggeredQueries: MutableMap<String, List<DocLevelQuery>> = mutableMapOf(),
     ): List<Pair<String, String>> {
 
         val findingDocPairs = mutableListOf<Pair<String, String>>()
         val findings = mutableListOf<Finding>()
         val indexRequests = mutableListOf<IndexRequest>()
-        val findingsToTriggeredQueries = mutableMapOf<String, List<DocLevelQuery>>()
 
         docsToQueries.forEach {
             val triggeredQueries = it.value.map { queryId -> idQueryMap[queryId]!! }
@@ -628,7 +631,6 @@ class TransportDocLevelMonitorFanOutAction
                 log.error("Optional finding callback failed", e)
             }
         }
-        this.findingsToTriggeredQueries += findingsToTriggeredQueries
 
         return findingDocPairs
     }
