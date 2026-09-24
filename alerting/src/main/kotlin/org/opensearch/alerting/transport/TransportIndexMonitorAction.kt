@@ -107,6 +107,8 @@ import org.opensearch.index.reindex.DeleteByQueryRequestBuilder
 import org.opensearch.remote.metadata.client.GetDataObjectRequest
 import org.opensearch.remote.metadata.client.PutDataObjectRequest
 import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
+import org.opensearch.remote.metadata.common.SdkClientUtils
 import org.opensearch.rest.RestRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse
@@ -159,6 +161,7 @@ class TransportIndexMonitorAction @Inject constructor(
     @Volatile private var externalSchedulerRoleName = AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME.get(settings)
     @Volatile private var externalSchedulerExecutionRoleName = AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME.get(settings)
     @Volatile override var filterByAccessStrategy = AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.get(settings)
+    @Volatile private var allowedSchedulerAccountIds = AlertingSettings.EXTERNAL_SCHEDULER_ALLOWED_ACCOUNT_IDS.get(settings)
 
     private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
 
@@ -197,6 +200,9 @@ class TransportIndexMonitorAction @Inject constructor(
         }
         clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME) {
             externalSchedulerExecutionRoleName = it
+        }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.EXTERNAL_SCHEDULER_ALLOWED_ACCOUNT_IDS) {
+            allowedSchedulerAccountIds = it
         }
 
         listenFilterBySettingChange(clusterService)
@@ -758,10 +764,8 @@ class TransportIndexMonitorAction @Inject constructor(
                     updateMonitor()
                 }
             } else if (multiTenancyEnabled) {
-                // Skip local scheduled-job index search for monitor count when multi-tenancy is enabled.
-                scope.launch(TenantContext(tenantId)) {
-                    indexMonitor()
-                }
+                // Limit the number of monitors a single tenant can create
+                countTenantMonitorsAndExecute()
             } else {
                 val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
                 val searchSource = SearchSourceBuilder().query(query).timeout(requestTimeout)
@@ -779,6 +783,47 @@ class TransportIndexMonitorAction @Inject constructor(
                         }
                     }
                 )
+            }
+        }
+
+        /**
+         * Counts the monitors belonging to the current tenant and enforces the per-tenant [maxMonitors] limit
+         * before creating a new monitor. Used when multi-tenancy is enabled, where monitors are stored in
+         * remote metadata and the count must be tenant-scoped through the SDK client.
+         */
+        private fun countTenantMonitorsAndExecute() {
+            val query = QueryBuilders.boolQuery().filter(QueryBuilders.termQuery("${Monitor.MONITOR_TYPE}.type", Monitor.MONITOR_TYPE))
+            val searchSource = SearchSourceBuilder().query(query).size(0).timeout(requestTimeout)
+            val sdkSearchRequest = SearchDataObjectRequest.builder()
+                .indices(SCHEDULED_JOBS_INDEX)
+                .tenantId(tenantId)
+                .searchSourceBuilder(searchSource)
+                .build()
+
+            sdkClient.searchDataObjectAsync(sdkSearchRequest).whenComplete { response, throwable ->
+                if (throwable != null) {
+                    // A tenant with no monitors returns a normal response with totalHits=0, not an error,
+                    // since Neo Data Service stores all tenants' monitors in one shared index scoped by a
+                    // tenant filter. Any throwable here is a genuine failure and must be surfaced.
+                    val cause = SdkClientUtils.unwrapAndConvertToException(throwable)
+                    actionListener.onFailure(AlertingException.wrap(cause))
+                    return@whenComplete
+                }
+                val searchResponse = response.searchResponse()
+                if (searchResponse == null) {
+                    // Fail closed: a null response is not expected from the monitor search path, and
+                    // proceeding would let the tenant bypass the per-tenant monitor limit entirely.
+                    actionListener.onFailure(
+                        AlertingException.wrap(
+                            OpenSearchStatusException(
+                                "Unexpected null response when counting tenant monitors",
+                                RestStatus.INTERNAL_SERVER_ERROR
+                            )
+                        )
+                    )
+                } else {
+                    onSearchResponse(searchResponse)
+                }
             }
         }
 
@@ -915,6 +960,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .build()
 
             try {
+                log.debug("Calling putDataObjectStashed for index [${putRequest.index()}] id [${putRequest.id()}]")
                 val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
                 if (putResponse.isFailed) {
                     actionListener.onFailure(
@@ -1106,6 +1152,13 @@ class TransportIndexMonitorAction @Inject constructor(
 
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
 
+            // Preserve metadata from the existing monitor during monitor update.
+            // The update API request doesn't include internal metadata fields
+            if (!currentMonitor.metadata.isNullOrEmpty()) {
+                val updatedMetadata = currentMonitor.metadata.orEmpty() + request.monitor.metadata.orEmpty()
+                request.monitor = request.monitor.copy(metadata = updatedMetadata)
+            }
+
             log.info("Updating monitor, ${currentMonitor.id}")
 
             // Restore the caller's context so the security plugin's persistent auth header is present
@@ -1132,6 +1185,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .build()
 
             try {
+                log.debug("Calling putDataObjectStashed for index [${putRequest.index()}] id [${putRequest.id()}]")
                 val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
                 if (putResponse.isFailed) {
                     actionListener.onFailure(
@@ -1273,6 +1327,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .overwriteIfExists(true)
                 .dataObject(monitorObj)
                 .build()
+            log.debug("Calling putDataObjectStashed for index [${putRequest.index()}] id [${putRequest.id()}]")
             sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
         }
 
@@ -1281,7 +1336,8 @@ class TransportIndexMonitorAction @Inject constructor(
             settingsQueueName = jobQueueName,
             settingsRoleName = externalSchedulerRoleName,
             settingsExecutionRoleName = externalSchedulerExecutionRoleName,
-            threadContextAccountIdOverride = accountIdOverride
+            threadContextAccountIdOverride = accountIdOverride,
+            allowedAccountIds = allowedSchedulerAccountIds
         )
     }
 }

@@ -32,7 +32,6 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
-import org.opensearch.commons.alerting.util.optionalTimeField
 import org.opensearch.commons.utils.TenantContext
 import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.commons.utils.recreateObject
@@ -50,7 +49,6 @@ import org.opensearch.remote.metadata.client.GetDataObjectRequest
 import org.opensearch.remote.metadata.client.PutDataObjectRequest
 import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.remote.metadata.client.SearchDataObjectRequest
-import org.opensearch.remote.metadata.client.UpdateDataObjectRequest
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
@@ -102,6 +100,9 @@ class TransportAcknowledgeAlertAction @Inject constructor(
 
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         client.threadPool().threadContext.stashContext().use {
+            if (!tenantId.isNullOrEmpty()) {
+                client.threadPool().threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, tenantId)
+            }
             scope.launch(TenantContext(tenantId)) {
                 try {
                     val monitor = getMonitor(request.monitorId)
@@ -127,7 +128,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                         checkUserPermissionsWithResource(user, monitor.user, actionListener, "monitor", request.monitorId)
 
                     if (canAccess) {
-                        AcknowledgeHandler(client, actionListener, request).start(monitor)
+                        AcknowledgeHandler(client, actionListener, request, tenantId).start(monitor)
                     } else {
                         actionListener.onFailure(
                             AlertingException(
@@ -167,7 +168,8 @@ class TransportAcknowledgeAlertAction @Inject constructor(
     inner class AcknowledgeHandler(
         private val client: Client,
         private val actionListener: ActionListener<AcknowledgeAlertResponse>,
-        private val request: AcknowledgeAlertRequest
+        private val request: AcknowledgeAlertRequest,
+        private val tenantId: String?
     ) {
         val alerts = mutableMapOf<String, Alert>()
 
@@ -185,20 +187,26 @@ class TransportAcknowledgeAlertAction @Inject constructor(
             val sdkSearchRequest = SearchDataObjectRequest.builder()
                 .indices(monitor.dataSources.alertsIndex)
                 .routing(request.monitorId)
+                .tenantId(tenantId)
                 .searchSourceBuilder(searchSourceBuilder)
                 .build()
             try {
                 val searchResponse = sdkClient.searchDataObjectAsync(sdkSearchRequest).await()
                     .searchResponse() ?: throw RuntimeException("Unknown error loading alerts")
+                log.debug(
+                    "Acknowledge alerts search returned response={} for request={}",
+                    searchResponse, request
+                )
                 onSearchResponse(searchResponse, monitor)
             } catch (t: Exception) {
+                log.error("Failed to search alerts for acknowledge, request: {}", request, t)
                 actionListener.onFailure(AlertingException.wrap(t))
             }
         }
 
         private suspend fun onSearchResponse(response: SearchResponse, monitor: Monitor) {
             val alertsHistoryIndex = monitor.dataSources.alertsHistoryIndex
-            val updateRequests = mutableListOf<UpdateDataObjectRequest>()
+            val updateRequests = mutableListOf<PutDataObjectRequest>()
             val copyRequests = mutableListOf<PutDataObjectRequest>()
             response.hits.forEach { hit ->
                 val xcp = XContentHelper.createParser(
@@ -208,27 +216,25 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                 XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                 val alert = Alert.parse(xcp, hit.id, hit.version)
                 alerts[alert.id] = alert
+                log.debug(
+                    "Acknowledge alert found alert={} seqNo={} primaryTerm={}",
+                    alert, hit.seqNo, hit.primaryTerm
+                )
 
                 if (alert.state == Alert.State.ACTIVE) {
                     if (
                         alert.findingIds.isEmpty() ||
                         !isAlertHistoryEnabled
                     ) {
+                        val ackedAlert = alert.copy(state = Alert.State.ACKNOWLEDGED, acknowledgedTime = Instant.now())
                         updateRequests.add(
-                            UpdateDataObjectRequest.builder()
+                            PutDataObjectRequest.builder()
                                 .index(monitor.dataSources.alertsIndex)
                                 .id(alert.id)
                                 .routing(request.monitorId)
-                                .ifSeqNo(hit.seqNo)
-                                .ifPrimaryTerm(hit.primaryTerm)
-                                .dataObject(
-                                    ToXContentObject { builder, _ ->
-                                        builder.startObject()
-                                            .field(Alert.STATE_FIELD, Alert.State.ACKNOWLEDGED.toString())
-                                            .optionalTimeField(Alert.ACKNOWLEDGED_TIME_FIELD, Instant.now())
-                                            .endObject()
-                                    }
-                                )
+                                .tenantId(tenantId)
+                                .overwriteIfExists(true)
+                                .dataObject(ToXContentObject { builder, _ -> ackedAlert.toXContentWithUser(builder) })
                                 .build()
                         )
                     } else {
@@ -238,6 +244,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                                 .index(alertsHistoryIndex)
                                 .id(alert.id)
                                 .routing(request.monitorId)
+                                .tenantId(tenantId)
                                 .overwriteIfExists(true)
                                 .dataObject(ToXContentObject { builder, _ -> ackedAlert.toXContentWithUser(builder) })
                                 .build()
@@ -248,18 +255,20 @@ class TransportAcknowledgeAlertAction @Inject constructor(
 
             try {
                 val updateResponse = if (updateRequests.isNotEmpty()) {
+                    log.info("Sending bulk update request for {}", updateRequests)
                     val bulkRequest = BulkDataObjectRequest(null)
                     updateRequests.forEach { bulkRequest.add(it) }
                     sdkClient.bulkDataObjectAsync(bulkRequest).await()
                 } else null
                 val copyResponse = if (copyRequests.isNotEmpty()) {
+                    log.info("Sending bulk copy request for {}", copyRequests)
                     val bulkRequest = BulkDataObjectRequest(null)
                     copyRequests.forEach { bulkRequest.add(it) }
                     sdkClient.bulkDataObjectAsync(bulkRequest).await()
                 } else null
                 onBulkResponse(updateResponse, copyResponse, monitor)
             } catch (t: Exception) {
-                log.error("ack error: ${t.message}")
+                log.error("ack error during bulk operation: ${t.message}", t)
                 actionListener.onFailure(AlertingException.wrap(t))
             }
         }
@@ -284,6 +293,10 @@ class TransportAcknowledgeAlertAction @Inject constructor(
             updateResponse?.responses?.forEach { item ->
                 missing.remove(item.id())
                 if (item.isFailed) {
+                    log.error(
+                        "Bulk update failed for alert={} state={} cause={}",
+                        item, alerts[item.id()]?.state, item.cause()?.message
+                    )
                     failed.add(alerts[item.id()]!!)
                 } else {
                     acknowledged.add(alerts[item.id()]!!)
@@ -302,6 +315,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                             .index(monitor.dataSources.alertsIndex)
                             .id(item.id())
                             .routing(request.monitorId)
+                            .tenantId(tenantId)
                             .build()
                     )
                 }
@@ -315,16 +329,25 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                     deleteResponse.responses.forEach { item ->
                         missing.remove(item.id())
                         if (item.isFailed) {
+                            log.error(
+                                "Bulk delete failed for alert={} cause={}",
+                                item, item.cause()?.message
+                            )
                             failed.add(alerts[item.id()]!!)
                         } else {
                             acknowledged.add(alerts[item.id()]!!)
                         }
                     }
                 } catch (t: Exception) {
+                    log.error("Exception during bulk delete of acknowledged alerts", t)
                     actionListener.onFailure(AlertingException.wrap(t))
                     return
                 }
             }
+            log.info(
+                "Acknowledge alerts result: acknowledged={} failed={} missing={} monitorId={}",
+                acknowledged.map { it.id }, failed.map { "${it.id}(${it.state})" }, missing, request.monitorId
+            )
             actionListener.onResponse(AcknowledgeAlertResponse(acknowledged.toList(), failed.toList(), missing.toList()))
         }
     }

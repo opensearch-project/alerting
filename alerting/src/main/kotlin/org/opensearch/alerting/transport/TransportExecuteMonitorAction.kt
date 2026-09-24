@@ -23,6 +23,7 @@ import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
+import org.opensearch.alerting.service.AlertingMetricsService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
@@ -368,11 +369,21 @@ class TransportExecuteMonitorAction @Inject constructor(
                     execMonitorRequest.dryrun,
                     transportService
                 )
+                if (!execMonitorRequest.dryrun) {
+                    try {
+                        AlertingMetricsService.recordRun(tenantId, monitorRunResult)
+                    } catch (me: Exception) {
+                        log.warn("Failed to record alerting metrics", me)
+                    }
+                }
                 withContext(Dispatchers.IO) {
                     actionListener.onResponse(ExecuteMonitorResponse(monitorRunResult))
                 }
             } catch (e: Exception) {
                 log.error("Unexpected error running monitor", e)
+                if (!execMonitorRequest.dryrun) {
+                    AlertingMetricsService.recordExecutionFailure(tenantId)
+                }
                 withContext(Dispatchers.IO) {
                     actionListener.onFailure(AlertingException.wrap(e))
                 }

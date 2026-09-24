@@ -20,8 +20,13 @@ import java.util.concurrent.ConcurrentHashMap
 class AssumeRoleCredentialsCache(
     private val region: String,
     private val roleArnFormat: String,
+    private val externalId: String,
     private val sessionPrefix: String = "alerting"
 ) {
+    init {
+        require(externalId.isNotBlank()) { "externalId must not be blank for cross-account AssumeRole" }
+    }
+
     private val cache = ConcurrentHashMap<String, AwsCredentialsProvider>()
     private val stsClient: StsClient by lazy {
         StsClient.builder()
@@ -37,6 +42,7 @@ class AssumeRoleCredentialsCache(
                     AssumeRoleRequest.builder()
                         .roleArn(String.format(roleArnFormat, accountId))
                         .roleSessionName("$sessionPrefix-$accountId")
+                        .externalId(externalId)
                         .build()
                 )
                 .build()

@@ -79,13 +79,27 @@ class AlertService(
 ) {
 
     companion object {
-        const val MAX_BUCKET_LEVEL_MONITOR_ALERT_SEARCH_COUNT = 500
+        // Per-cycle fetch cap for current bucket-level alerts. Terminal-state alerts (COMPLETED/DELETED)
+        // are excluded server-side by the mustNot filter in searchAlerts, so this budget is spent only on
+        // ACTIVE/ACKNOWLEDGED alerts that still need categorization — 100 covers expected in-progress cardinality.
+        const val MAX_BUCKET_LEVEL_MONITOR_ALERT_SEARCH_COUNT = 100
         const val ERROR_ALERT_ID_PREFIX = "error-alert"
 
         val ALERTS_SEARCH_TIMEOUT = TimeValue(5, TimeUnit.MINUTES)
     }
 
     private val logger = LogManager.getLogger(AlertService::class.java)
+
+    /**
+     * Whether an alert is in a terminal (resolved) state. In OSS, COMPLETED/DELETED alerts are moved
+     * out of the active alert index (to the history index) on completion, so a monitor's "current
+     * alerts" search never returns them. The Neo Data Service backed store keeps them in the same
+     * partition as active alerts, so the runner must exclude terminal alerts when loading current
+     * alerts; otherwise it re-loads already-resolved alerts every cycle and re-writes them as
+     * COMPLETED, producing redundant BulkUpdateAlerts writes against the shared metadata domain.
+     */
+    private fun Alert.isTerminalState(): Boolean =
+        state == Alert.State.COMPLETED || state == Alert.State.DELETED
 
     suspend fun loadCurrentAlertsForWorkflow(workflow: Workflow, dataSources: DataSources): Map<Trigger, Alert?> {
         val searchAlertsResponse: SearchResponse = searchAlerts(
@@ -95,6 +109,7 @@ class AlertService(
         )
 
         val foundAlerts = searchAlertsResponse.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
+            .filterNot { it.isTerminalState() }
             .groupBy { it.triggerId }
         foundAlerts.values.forEach { alerts ->
             if (alerts.size > 1) {
@@ -120,6 +135,7 @@ class AlertService(
         )
 
         val foundAlerts = searchAlertsResponse.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
+            .filterNot { it.isTerminalState() }
             .groupBy { it.triggerId }
         foundAlerts.values.forEach { alerts ->
             if (alerts.size > 1) {
@@ -149,6 +165,7 @@ class AlertService(
         )
 
         val foundAlerts = searchAlertsResponse.hits.map { Alert.parse(contentParser(it.sourceRef), it.id, it.version) }
+            .filterNot { it.isTerminalState() }
             .groupBy { it.triggerId }
 
         return monitor.triggers.associateWith { trigger ->
@@ -713,6 +730,7 @@ class AlertService(
         allowUpdatingAcknowledgedAlert: Boolean = false,
         routingId: String // routing is mandatory and set as monitor id. for workflow chained alerts we pass workflow id as routing
     ) {
+        logger.debug("Save alerts: alertCount=${alerts.size}, alertIds=${alerts.map { it.id }}")
         val alertsIndex = dataSources.alertsIndex
         val alertsHistoryIndex = dataSources.alertsHistoryIndex
 
@@ -802,7 +820,9 @@ class AlertService(
             val bulkRequest = BulkDataObjectRequest(null)
             putRequests.forEach { bulkRequest.add(it) }
             deleteRequests.forEach { bulkRequest.add(it) }
+            logger.debug("AlertService.saveAlerts: putRequests=${putRequests.size}, deleteRequests=${deleteRequests.size}")
             val bulkResponse = sdkClient.bulkDataObjectAsync(bulkRequest).await()
+            logger.debug("AlertService.saveAlerts: bulkResponse failures=${bulkResponse.responses.count { it.isFailed }}")
             val failedResponses = bulkResponse.responses.filter { it.isFailed }
             val retryableFailures = failedResponses.filter { it.status() == RestStatus.TOO_MANY_REQUESTS }
 
@@ -909,6 +929,9 @@ class AlertService(
 
         val queryBuilder = QueryBuilders.boolQuery()
             .must(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, monitorId))
+            // Exclude terminal alerts server-side so the size-limited fetch is spent only on
+            // in-progress states and active alerts are never crowded out of the results.
+            .mustNot(QueryBuilders.termsQuery(Alert.STATE_FIELD, Alert.State.COMPLETED.name, Alert.State.DELETED.name))
         if (workflowRunContext != null) {
             queryBuilder.must(QueryBuilders.termQuery(Alert.WORKFLOW_ID_FIELD, workflowRunContext.workflowId))
         }
@@ -948,6 +971,8 @@ class AlertService(
         val queryBuilder = QueryBuilders.boolQuery()
             .must(QueryBuilders.termQuery(Alert.WORKFLOW_ID_FIELD, workflowId))
             .must(QueryBuilders.termQuery(Alert.MONITOR_ID_FIELD, ""))
+            // Exclude terminal chained alerts server-side (see searchAlerts(monitor)).
+            .mustNot(QueryBuilders.termsQuery(Alert.STATE_FIELD, Alert.State.COMPLETED.name, Alert.State.DELETED.name))
         val searchSourceBuilder = SearchSourceBuilder()
             .size(size)
             .query(queryBuilder)

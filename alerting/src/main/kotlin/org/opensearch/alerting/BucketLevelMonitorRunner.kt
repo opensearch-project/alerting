@@ -27,6 +27,7 @@ import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.alerting.util.getCancelAfterTimeInterval
 import org.opensearch.alerting.util.getCombinedTriggerRunResult
 import org.opensearch.alerting.util.printsSampleDocData
+import org.opensearch.alerting.util.use
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
@@ -45,6 +46,7 @@ import org.opensearch.commons.alerting.model.action.AlertCategory
 import org.opensearch.commons.alerting.model.action.PerAlertActionScope
 import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.commons.alerting.util.string
+import org.opensearch.commons.utils.currentTenantId
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.core.xcontent.XContentBuilder
@@ -128,37 +130,51 @@ object BucketLevelMonitorRunner : MonitorRunner() {
             //  If a setting is imposed that limits buckets that can be processed for Bucket-Level Monitors, we'd need to iterate over
             //  the buckets until we hit that threshold. In that case, we'd want to exit the execution without creating any alerts since the
             //  buckets we iterate over before hitting the limit is not deterministic. Is there a better way to fail faster in this case?
-            withClosableContext(
-                InjectorContextElement(
-                    monitor.id,
-                    monitorCtx.settings!!,
-                    monitorCtx.threadPool!!.threadContext,
-                    roles,
-                    monitor.user
-                )
-            ) {
-                reinjectHeaders(monitor, monitorCtx)
-                // Storing the first page of results in the case of pagination input results to prevent empty results
-                // in the final output of monitorResult which occurs when all pages have been exhausted.
-                // If it's favorable to return the last page, will need to check how to accomplish that with multiple aggregation paths
-                // with different page counts.
-                //
-                // When the flag is on, bucket-level monitors are limited to 1 trigger. The standard
-                // bucket_selector is injected directly into the query so a single search call performs
-                // both data collection and trigger evaluation — no separate per-trigger queries needed.
-                val inputResults = monitorCtx.inputService!!.collectInputResults(
-                    monitor,
-                    periodStart,
-                    periodEnd,
-                    monitorResult.inputResults,
-                    workflowRunContext,
-                    useStandardBucketSelector = monitorCtx.multiTenantTriggerEvalEnabled
-                )
-                if (firstIteration) {
-                    firstPageOfInputResults = inputResults
-                    firstIteration = false
+            // Stash a fresh ThreadContext before reinjecting the routing headers so the write-once
+            // remote-search headers set by reinjectHeaders (notably the AOSS collection endpoint) are
+            // always written for THIS monitor. Monitor runs share a pool of coroutine worker threads,
+            // and a stale endpoint left on the thread by a previous run would otherwise cause
+            // reinjectHeaders to skip its `putHeader` (write-once + its `== null` guard) and route this
+            // monitor's search to the wrong collection. Mirrors the stash pattern in MonitorRunner.runAction.
+            val tenantId = currentTenantId()
+            monitorCtx.client!!.threadPool().threadContext.stashContext().use {
+                // Stashing clears the tenant_id header too, and reinjectHeaders does not restore it, so
+                // re-set it here (as MonitorRunner.runAction does) to preserve tenant routing for the search.
+                tenantId?.let {
+                    monitorCtx.client!!.threadPool().threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, it)
                 }
-                monitorResult = monitorResult.copy(inputResults = inputResults)
+                withClosableContext(
+                    InjectorContextElement(
+                        monitor.id,
+                        monitorCtx.settings!!,
+                        monitorCtx.threadPool!!.threadContext,
+                        roles,
+                        monitor.user
+                    )
+                ) {
+                    reinjectHeaders(monitor, monitorCtx)
+                    // Storing the first page of results in the case of pagination input results to prevent empty results
+                    // in the final output of monitorResult which occurs when all pages have been exhausted.
+                    // If it's favorable to return the last page, will need to check how to accomplish that with multiple aggregation paths
+                    // with different page counts.
+                    //
+                    // When the flag is on, bucket-level monitors are limited to 1 trigger. The standard
+                    // bucket_selector is injected directly into the query so a single search call performs
+                    // both data collection and trigger evaluation — no separate per-trigger queries needed.
+                    val inputResults = monitorCtx.inputService!!.collectInputResults(
+                        monitor,
+                        periodStart,
+                        periodEnd,
+                        monitorResult.inputResults,
+                        workflowRunContext,
+                        useStandardBucketSelector = monitorCtx.multiTenantTriggerEvalEnabled
+                    )
+                    if (firstIteration) {
+                        firstPageOfInputResults = inputResults
+                        firstIteration = false
+                    }
+                    monitorResult = monitorResult.copy(inputResults = inputResults)
+                }
             }
 
             for (trigger in monitor.triggers) {
@@ -283,12 +299,34 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                         matchingDocIdsPerIndex = null,
                         returnSampleDocs = true
                     )
-                    val sampleDocumentsByBucket = getSampleDocs(
-                        client = monitorCtx.client!!,
-                        monitorId = monitor.id,
-                        triggerId = trigger.id,
-                        searchRequest = searchRequest
-                    )
+                    // getSampleDocs searches the user's monitored collection, so it needs the same routing
+                    // headers as input collection. Stash a fresh context first so the write-once endpoint
+                    // header is set for THIS monitor rather than skipped because a stale value lingers on this
+                    // pooled worker thread.
+                    val tenantId = currentTenantId()
+                    val sampleDocumentsByBucket =
+                        monitorCtx.client!!.threadPool().threadContext.stashContext().use {
+                            tenantId?.let {
+                                monitorCtx.client!!.threadPool().threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, it)
+                            }
+                            withClosableContext(
+                                InjectorContextElement(
+                                    monitor.id,
+                                    monitorCtx.settings!!,
+                                    monitorCtx.threadPool!!.threadContext,
+                                    monitor.user?.roles,
+                                    monitor.user
+                                )
+                            ) {
+                                reinjectHeaders(monitor, monitorCtx)
+                                getSampleDocs(
+                                    client = monitorCtx.client!!,
+                                    monitorId = monitor.id,
+                                    triggerId = trigger.id,
+                                    searchRequest = searchRequest
+                                )
+                            }
+                        }
                     alertSampleDocs[trigger.id] = sampleDocumentsByBucket
                 } catch (e: Exception) {
                     logger.error("Error retrieving sample documents for trigger {} of monitor {}.", trigger.id, monitor.id, e)
@@ -504,7 +542,31 @@ object BucketLevelMonitorRunner : MonitorRunner() {
                     sr.cancelAfterTimeInterval = TimeValue.timeValueMinutes(
                         getCancelAfterTimeInterval()
                     )
-                    val searchResponse: SearchResponse = monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
+                    // This search runs against the user's monitored collection (input.indices), so it needs
+                    // the same routing headers as input collection. Stash a fresh context first so the
+                    // write-once endpoint header is set for THIS monitor rather than skipped because a stale
+                    // value lingers on this pooled worker thread. The findings bulk write in
+                    // createFindingPerIndex targets the local alerting findings index, so it is intentionally
+                    // left outside this stash.
+                    val tenantId = currentTenantId()
+                    val searchResponse: SearchResponse =
+                        monitorCtx.client!!.threadPool().threadContext.stashContext().use {
+                            tenantId?.let {
+                                monitorCtx.client!!.threadPool().threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, it)
+                            }
+                            withClosableContext(
+                                InjectorContextElement(
+                                    monitor.id,
+                                    monitorCtx.settings!!,
+                                    monitorCtx.threadPool!!.threadContext,
+                                    monitor.user?.roles,
+                                    monitor.user
+                                )
+                            ) {
+                                reinjectHeaders(monitor, monitorCtx)
+                                monitorCtx.client!!.suspendUntil { monitorCtx.client!!.search(sr, it) }
+                            }
+                        }
                     return createFindingPerIndex(searchResponse, monitor, monitorCtx, shouldCreateFinding, executionId)
                 } else {
                     logger.error("Couldn't resolve groupBy field. Not generating bucket level monitor findings for monitor %${monitor.id}")

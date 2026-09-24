@@ -417,6 +417,43 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        val CLOUDWATCH_METRICS_ENABLED = Setting.boolSetting(
+            "plugins.alerting.cloudwatch_metrics.enabled",
+            false,
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
+        val CLOUDWATCH_METRICS_NAMESPACE = Setting.simpleString(
+            "plugins.alerting.cloudwatch_metrics.namespace",
+            "ObservabilityOasis/Alerting",
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
+        val CLOUDWATCH_METRICS_FLUSH_INTERVAL_SECONDS = Setting.intSetting(
+            "plugins.alerting.cloudwatch_metrics.flush_interval_seconds",
+            60,
+            10,
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
+        val CLOUDWATCH_METRICS_STAGE = Setting.simpleString(
+            "plugins.alerting.cloudwatch_metrics.stage",
+            "",
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
+        val CLOUDWATCH_METRICS_CELL_ID = Setting.simpleString(
+            "plugins.alerting.cloudwatch_metrics.cell_id",
+            "",
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
+        val CLOUDWATCH_METRICS_LOG_ONLY = Setting.boolSetting(
+            "plugins.alerting.cloudwatch_metrics.log_only",
+            false,
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
         /**
          * Default AWS account that owns the EventBridge schedules. May be overridden per-request
          * by a transient ThreadContext value under [ExternalSchedulerService.SCHEDULER_ACCOUNT_ID_KEY].
@@ -435,6 +472,20 @@ class AlertingSettings {
         /** IAM role name that EventBridge Scheduler assumes at fire time (Target.roleArn). The full ARN is constructed from the account ID. */
         val EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME = Setting.simpleString(
             "plugins.alerting.external_scheduler.execution_role_name",
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /** External ID passed in the cross-account AssumeRole call to prevent confused-deputy attacks. Must match the condition in the target role's trust policy. */
+        val EXTERNAL_SCHEDULER_EXTERNAL_ID = Setting.simpleString(
+            "plugins.alerting.external_scheduler.external_id",
+            Setting.Property.NodeScope, Setting.Property.Final
+        )
+
+        /** Comma-separated allow-list of AWS account IDs that the external scheduler may route to. ThreadContext overrides are validated against this list. */
+        val EXTERNAL_SCHEDULER_ALLOWED_ACCOUNT_IDS: Setting<List<String>> = Setting.listSetting(
+            "plugins.alerting.external_scheduler.allowed_account_ids",
+            listOf(),
+            Function.identity(),
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 

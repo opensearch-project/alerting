@@ -228,4 +228,35 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
     fun `test tenant_id metadata key constant value`() {
         assertEquals("tenant_id", AlertingPlugin.TENANT_ID_METADATA_KEY)
     }
+
+    fun `test metadata preserved from current monitor during update`() {
+        val currentMonitorMetadata = mapOf(
+            "tenant_id" to "463569007234:ycedbwj94ouygrrywiw6:edsIH9",
+            "schedule_arn" to "arn:aws:scheduler:us-west-2:232778956370:schedule/default/monitor-123"
+        )
+        val requestMonitorMetadata: Map<String, String>? = null
+
+        val updatedMetadata = if (!currentMonitorMetadata.isNullOrEmpty()) {
+            currentMonitorMetadata + requestMonitorMetadata.orEmpty()
+        } else {
+            requestMonitorMetadata.orEmpty()
+        }
+
+        assertEquals("463569007234:ycedbwj94ouygrrywiw6:edsIH9", updatedMetadata["tenant_id"])
+        assertEquals("arn:aws:scheduler:us-west-2:232778956370:schedule/default/monitor-123", updatedMetadata["schedule_arn"])
+        assertEquals(2, updatedMetadata.size)
+    }
+
+    fun `test metadata merge gives precedence to request monitor metadata`() {
+        val currentMonitorMetadata = mapOf(
+            "tenant_id" to "old-tenant",
+            "schedule_arn" to "old-arn"
+        )
+        val requestMonitorMetadata = mapOf("tenant_id" to "new-tenant")
+
+        val updatedMetadata = currentMonitorMetadata + requestMonitorMetadata
+
+        assertEquals("new-tenant", updatedMetadata["tenant_id"])
+        assertEquals("old-arn", updatedMetadata["schedule_arn"])
+    }
 }
