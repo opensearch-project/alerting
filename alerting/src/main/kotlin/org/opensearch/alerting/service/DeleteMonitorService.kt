@@ -20,6 +20,7 @@ import org.opensearch.action.support.IndicesOptions
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
 import org.opensearch.alerting.MonitorMetadataService
+import org.opensearch.alerting.cleanup.AlertCleanupService
 import org.opensearch.alerting.core.lock.LockModel
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -74,6 +75,11 @@ object DeleteMonitorService :
      * @param refreshPolicy
      */
     suspend fun deleteMonitor(monitor: Monitor, refreshPolicy: RefreshPolicy): DeleteMonitorResponse {
+        // Recorded before the monitor document goes, because this is the last point at which the monitor's configured
+        // alert indices are readable -- the post-delete hook receives an id and nothing else. Recording early also
+        // means a crash here leaves a task for a monitor that still exists, which the drain detects and discards; the
+        // reverse order would leave a deleted monitor with no task, which nothing could ever discover.
+        AlertCleanupService.recordMonitorCleanupTask(monitor, survivingTriggerIds = emptyList(), jobDeleted = true)
         val deleteResponse = deleteMonitorDoc(monitor.id, refreshPolicy)
         deleteDocLevelMonitorQueriesAndIndices(monitor)
         deleteMetadata(monitor)
