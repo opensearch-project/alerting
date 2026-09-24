@@ -2596,6 +2596,94 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test document-level monitor notification message includes queries across repeated executions`() {
+        // Regression test for the per-execution scoping of findingsToTriggeredQueries in
+        // TransportDocLevelMonitorFanOutAction: every execution must resolve the queries
+        // associated with its own findings, with no dependence on state left behind by
+        // earlier executions on the same node.
+        val testIndex = createTestIndex()
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "test-query", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val actionExecutionPolicy = ActionExecutionPolicy(PerAlertActionScope(setOf(AlertCategory.NEW)))
+        val action = randomActionWithPolicy(
+            template = randomTemplateScript(
+                "{{#ctx.alerts}}\n{{#associated_queries}}\n(name={{name}})\n{{/associated_queries}}\n{{/ctx.alerts}}"
+            ),
+            destinationId = createDestination().id,
+            actionExecutionPolicy = actionExecutionPolicy
+        )
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN, actions = listOf(action))
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        // Execute the same monitor several times, indexing fresh matching docs before each run,
+        // and assert every run's notifications carry the triggered query name.
+        for (execution in 1..3) {
+            val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+            val testDoc = """{
+                "message" : "This is an error from IAD region",
+                "test_strict_date_time" : "$testTime",
+                "test_field" : "us-west-2"
+            }"""
+            indexDoc(testIndex, "$execution", testDoc)
+
+            val response = executeMonitor(monitor.id)
+            val output = entityAsMap(response)
+            assertEquals(monitor.name, output["monitor_name"])
+
+            for (triggerResult in output.objectMap("trigger_results").values) {
+                val actionResults = triggerResult.objectMap("action_results").values
+                assertTrue("Execution $execution produced no action results", actionResults.isNotEmpty())
+                for (alertActionResult in actionResults) {
+                    for (actionResult in alertActionResult.values) {
+                        @Suppress("UNCHECKED_CAST")
+                        val actionOutput = (actionResult as Map<String, Map<String, String>>)["output"] as Map<String, String>
+                        assertTrue(
+                            "Execution $execution notification message is missing the query name.",
+                            actionOutput["message"]!!.contains("(name=${docQuery.name})")
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun `test document-level monitor without triggers creates findings across repeated executions`() {
+        // Exercises the no-trigger createFindings path, which also participates in the
+        // per-execution findingsToTriggeredQueries scoping.
+        val testIndex = createTestIndex()
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf()))
+        assertNotNull(monitor.id)
+
+        for (execution in 1..2) {
+            val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+            val testDoc = """{
+                "message" : "This is an error from IAD region",
+                "test_strict_date_time" : "$testTime",
+                "test_field" : "us-west-2"
+            }"""
+            indexDoc(testIndex, "$execution", testDoc)
+
+            val response = executeMonitor(monitor.id)
+            val output = entityAsMap(response)
+            assertEquals(monitor.name, output["monitor_name"])
+
+            val findings = searchFindings(monitor)
+            assertEquals("Execution $execution did not create the expected findings", execution, findings.size)
+            assertTrue(
+                "Execution $execution findings do not reference the matching doc",
+                findings.any { it.relatedDocIds.contains("$execution") }
+            )
+        }
+    }
+
     fun `test expected document and rules print in notification message`() {
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
         val testDoc = """{
