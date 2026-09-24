@@ -17,6 +17,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
@@ -72,6 +73,7 @@ class TransportGetMonitorAction @Inject constructor(
 
     @Volatile
     override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile override var filterByAccessStrategy = AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.get(settings)
 
     private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
 
@@ -87,7 +89,8 @@ class TransportGetMonitorAction @Inject constructor(
 
         val user = readUserFromThreadContext(client)
 
-        if (!validateUserBackendRoles(user, actionListener)) {
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
+        if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
 
@@ -131,7 +134,10 @@ class TransportGetMonitorAction @Inject constructor(
                             monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
                         }
                     }
-                    if (!checkUserPermissionsWithResource(user, monitor?.user, actionListener, "monitor", transformedRequest.monitorId)) {
+                    // when resource sharing is enabled, security plugin gates access at the index layer
+                    if (!useRsc &&
+                        !checkUserPermissionsWithResource(user, monitor?.user, actionListener, "monitor", transformedRequest.monitorId)
+                    ) {
                         return@whenComplete
                     }
                     scope.launch(TenantContext(tenantId)) {

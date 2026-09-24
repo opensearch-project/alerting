@@ -11,6 +11,7 @@ import org.opensearch.action.get.GetRequest
 import org.opensearch.action.get.GetResponse
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
@@ -48,6 +49,7 @@ class TransportGetWorkflowAction @Inject constructor(
     private val log = LogManager.getLogger(javaClass)
 
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile override var filterByAccessStrategy = AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.get(settings)
 
     private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
 
@@ -72,7 +74,8 @@ class TransportGetWorkflowAction @Inject constructor(
 
         val getRequest = GetRequest(ScheduledJob.SCHEDULED_JOBS_INDEX, getWorkflowRequest.workflowId)
 
-        if (!validateUserBackendRoles(user, actionListener)) {
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE)
+        if (!useRsc && !validateUserBackendRoles(user, actionListener)) {
             return
         }
 
@@ -116,14 +119,15 @@ class TransportGetWorkflowAction @Inject constructor(
                                     return
                                 }
 
-                                // security is enabled and filterby is enabled
-                                if (!checkUserPermissionsWithResource(
-                                        user,
-                                        workflow?.user,
-                                        actionListener,
-                                        "workflow",
-                                        getWorkflowRequest.workflowId
-                                    )
+                                // when resource sharing is enabled, security plugin gates access at the index layer
+                                if (!useRsc &&
+                                    !checkUserPermissionsWithResource(
+                                            user,
+                                            workflow?.user,
+                                            actionListener,
+                                            "workflow",
+                                            getWorkflowRequest.workflowId
+                                        )
                                 ) {
                                     return
                                 }

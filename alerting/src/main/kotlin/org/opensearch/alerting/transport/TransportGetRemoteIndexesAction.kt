@@ -21,6 +21,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.IndicesOptions
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.action.GetRemoteIndexesAction
 import org.opensearch.alerting.action.GetRemoteIndexesRequest
 import org.opensearch.alerting.action.GetRemoteIndexesResponse
@@ -63,6 +64,7 @@ class TransportGetRemoteIndexesAction @Inject constructor(
     SecureTransportAction {
 
     @Volatile override var filterByEnabled = AlertingSettings.FILTER_BY_BACKEND_ROLES.get(settings)
+    @Volatile override var filterByAccessStrategy = AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.get(settings)
 
     @Volatile private var remoteMonitoringEnabled = CROSS_CLUSTER_MONITORING_ENABLED.get(settings)
 
@@ -101,7 +103,8 @@ class TransportGetRemoteIndexesAction @Inject constructor(
         }
 
         val user = readUserFromThreadContext(client)
-        if (!validateUserBackendRoles(user, actionListener)) return
+        val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
+        if (!useRsc && !validateUserBackendRoles(user, actionListener)) return
 
         if (!request.isValid()) {
             actionListener.onFailure(

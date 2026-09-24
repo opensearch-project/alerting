@@ -153,7 +153,94 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         ).map()
         assertUserNull(monitorJson as HashMap<String, Any>)
 
-        return getMonitor(monitorId = monitorJson["_id"] as String)
+        val monitorId = monitorJson["_id"] as String
+        // Under the resource-sharing framework the security plugin writes the sharing entry to
+        // `.opendistro-alerting-config-sharing` asynchronously via its shard-level postIndex hook,
+        // after the monitor POST already acked the caller. The follow-up getMonitor below races that
+        // write and can get a spurious 403 ("No sharing info found"). Wait for the entry first.
+        if (isResourceSharingEnabled()) {
+            waitForResourceSharingEntry(monitorId)
+        }
+        return getMonitor(monitorId = monitorId)
+    }
+
+    protected fun isResourceSharingEnabled(): Boolean =
+        System.getProperty("resource_sharing.enabled", "false").toBoolean()
+
+    /**
+     * The security plugin derives a resource's sharing index as `<resourceIndex>-sharing`
+     * (see ResourceSharingIndexHandler.getSharingIndex). Derive it here from the config-index
+     * constant rather than hardcoding, so it tracks the config index name.
+     */
+    protected val configSharingIndex = "${ScheduledJob.SCHEDULED_JOBS_INDEX}-sharing"
+
+    /**
+     * Polls the alerting config sharing index until the resource-sharing entry for [resourceId] is
+     * visible, so RSC-enabled tests don't race the security plugin's asynchronous postIndex write.
+     * No-op behavior for non-RSC runs is the caller's responsibility (guard with
+     * [isResourceSharingEnabled]).
+     */
+    protected fun waitForResourceSharingEntry(resourceId: String, timeoutMs: Long = 10_000) {
+        val deadline = System.nanoTime() + timeoutMs * 1_000_000
+        var lastException: Exception? = null
+        while (System.nanoTime() < deadline) {
+            try {
+                adminClient().performRequest(Request("POST", "/$configSharingIndex/_refresh"))
+                val resp = adminClient().performRequest(
+                    Request("GET", "/$configSharingIndex/_doc/$resourceId")
+                )
+                if (resp.statusLine.statusCode == 200) return
+            } catch (e: Exception) {
+                lastException = e
+            }
+            Thread.sleep(100)
+        }
+        throw IllegalStateException("Sharing entry for $resourceId never appeared within ${timeoutMs}ms", lastException)
+    }
+
+    /**
+     * Shares monitor [monitorId] with [user] at the given resource-sharing [accessLevel]
+     * (e.g. "alerting_read_only", "alerting_full_access") via the security plugin's share API,
+     * using the caller's [client]. Under the resource-sharing framework, actions that read a
+     * monitor's related resources (e.g. searching comments on its alerts) require the caller to
+     * have resource access to the monitor, so tests must share admin-created monitors with the
+     * acting user. Forces a sharing-index refresh so a follow-up getAccessibleResourceIds sees it.
+     */
+    protected fun shareMonitorWithUser(
+        client: RestClient,
+        monitorId: String,
+        user: String,
+        accessLevel: String = "alerting_read_only",
+    ) {
+        val request = Request("PUT", "/_plugins/_security/api/resource/share")
+        request.setJsonEntity(
+            """
+            {
+              "resource_id": "$monitorId",
+              "resource_type": "monitor",
+              "share_with": { "$accessLevel": { "users": ["$user"] } }
+            }
+            """.trimIndent()
+        )
+        val response = client.performRequest(request)
+        assertEquals(200, response.statusLine.statusCode)
+        // The share write is IMMEDIATE-refreshed, but a follow-up search-based read of the sharing
+        // index (getAccessibleResourceIds) can still miss until the shard's search view catches up.
+        // Poll the sharing doc until it reflects the grant for [user] so the acting client reliably
+        // sees the resource.
+        val deadline = System.nanoTime() + 10_000L * 1_000_000
+        while (System.nanoTime() < deadline) {
+            try {
+                adminClient().performRequest(Request("POST", "/$configSharingIndex/_refresh"))
+                val doc = adminClient().performRequest(
+                    Request("GET", "/$configSharingIndex/_doc/$monitorId")
+                )
+                val body = doc.entity.content.bufferedReader().use { it.readText() }
+                if (doc.statusLine.statusCode == 200 && body.contains("\"$user\"")) return
+            } catch (_: Exception) {
+            }
+            Thread.sleep(100)
+        }
     }
 
     protected fun createMonitor(monitor: Monitor, refresh: Boolean = true): Monitor {
@@ -162,6 +249,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     protected fun deleteMonitor(monitor: Monitor, refresh: Boolean = true): Response {
         val response = client().makeRequest(
+            "DELETE", "$ALERTING_BASE_URI/${monitor.id}?refresh=$refresh", emptyMap(),
+            monitor.toHttpEntity()
+        )
+        assertEquals("Unable to delete a monitor", RestStatus.OK, response.restStatus())
+
+        return response
+    }
+
+    protected fun deleteMonitorWithClient(client: RestClient, monitor: Monitor, refresh: Boolean = true): Response {
+        val response = client.makeRequest(
             "DELETE", "$ALERTING_BASE_URI/${monitor.id}?refresh=$refresh", emptyMap(),
             monitor.toHttpEntity()
         )
@@ -757,6 +854,21 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             .let { StringEntity(it, APPLICATION_JSON) }
 
         val response = client().makeRequest(
+            "POST", "${monitor.relativeUrl()}/_acknowledge/alerts?refresh=true",
+            emptyMap(), request
+        )
+        assertEquals("Acknowledge call failed.", RestStatus.OK, response.restStatus())
+        return response
+    }
+
+    protected fun acknowledgeAlertsWithClient(client: RestClient, monitor: Monitor, vararg alerts: Alert): Response {
+        val request = XContentFactory.jsonBuilder().startObject()
+            .array("alerts", *alerts.map { it.id }.toTypedArray())
+            .endObject()
+            .string()
+            .let { StringEntity(it, APPLICATION_JSON) }
+
+        val response = client.makeRequest(
             "POST", "${monitor.relativeUrl()}/_acknowledge/alerts?refresh=true",
             emptyMap(), request
         )
@@ -1493,6 +1605,20 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             StringEntity(
                 XContentFactory.jsonBuilder().startObject().field("persistent")
                     .startObject().field(AlertingSettings.FILTER_BY_BACKEND_ROLES.key, true).endObject()
+                    .endObject().string(),
+                ContentType.APPLICATION_JSON
+            )
+        )
+        assertEquals(updateResponse.statusLine.toString(), 200, updateResponse.statusLine.statusCode)
+    }
+
+    fun setFilterByBackendRolesStrategy(strategy: String) {
+        val updateResponse = client().makeRequest(
+            "PUT", "_cluster/settings",
+            emptyMap(),
+            StringEntity(
+                XContentFactory.jsonBuilder().startObject().field("persistent")
+                    .startObject().field(AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY.key, strategy).endObject()
                     .endObject().string(),
                 ContentType.APPLICATION_JSON
             )

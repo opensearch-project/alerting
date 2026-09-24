@@ -7,7 +7,7 @@ buildscript {
     apply from: 'build-tools/repositories.gradle'
 
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "3.7.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.9.0-SNAPSHOT")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         // 3.0.0-SNAPSHOT -> 3.0.0.0-SNAPSHOT
@@ -22,21 +22,21 @@ buildscript {
             opensearch_build += "-SNAPSHOT"
         }
         opensearch_no_snapshot = opensearch_version.replace("-SNAPSHOT","")
-        // TODO: revert to opensearch_build after alerting version bump to 3.7.0
-        common_utils_version = System.getProperty("common_utils.version", "3.7.0.0-SNAPSHOT")
+        common_utils_version = System.getProperty("common_utils.version", opensearch_build)
         kotlin_version = '2.2.0'
     }
 
     repositories {
         mavenLocal()
+        maven { url "https://ci.opensearch.org/maven2/" }
+        maven { url "https://ci.opensearch.org/m2/" }
+        mavenCentral()
         maven {
             url "https://ci.opensearch.org/ci/dbc/snapshots/maven/"
             mavenContent {
                 snapshotsOnly()
             }
         }
-        maven { url "https://ci.opensearch.org/maven2/" }
-        mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
     }
 
@@ -60,6 +60,7 @@ apply from: 'build-tools/merged-coverage.gradle'
 // Add explicit repository configuration for ktlint
 repositories {
     maven { url "https://ci.opensearch.org/maven2/" }
+    maven { url "https://ci.opensearch.org/m2/" }
     mavenCentral()
 }
 
@@ -78,6 +79,7 @@ configurations.ktlint.incoming.beforeResolve {
     repositories.clear()
     repositories {
         maven { url "https://ci.opensearch.org/maven2/" }
+        maven { url "https://ci.opensearch.org/m2/" }
         mavenCentral()
     }
 }
@@ -95,6 +97,7 @@ task ktlint(type: JavaExec, group: "verification") {
     mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
     args "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+    jvmArgs "--add-opens=java.base/java.lang=ALL-UNNAMED"
     
     // Skip on JDK 25
     onlyIf {
@@ -107,6 +110,7 @@ task ktlintFormat(type: JavaExec, group: "formatting") {
     mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
     args "-F", "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+    jvmArgs "--add-opens=java.base/java.lang=ALL-UNNAMED"
     
     // Skip on JDK 25 until ktlint fully supports it
     onlyIf {
@@ -129,9 +133,6 @@ allprojects {
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${kotlin_version}"
             force "org.jetbrains.kotlin:kotlin-reflect:${kotlin_version}"
-            force "org.apache.logging.log4j:log4j-api:2.25.4"
-            force "org.apache.logging.log4j:log4j-core:2.25.4"
-            force "org.apache.httpcomponents.client5:httpclient5:5.6.1"
         }
     }
 
