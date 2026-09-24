@@ -16,6 +16,7 @@ import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.lifecycle.LifecycleListener
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
@@ -45,6 +46,8 @@ class DestinationMigrationCoordinator(
     }
 
     override fun clusterChanged(event: ClusterChangedEvent) {
+        if (!event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)) return
+
         if (DestinationMigrationUtilService.finishFlag) {
             logger.info("Reset destination migration process.")
             scheduledMigration?.cancel()
