@@ -9,6 +9,7 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.util.context
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetMonitorRequest
+import org.opensearch.commons.alerting.util.IndexUtils.Companion.INCLUDE_BACKEND_ROLES_PARAM
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.BaseRestHandler.RestChannelConsumer
 import org.opensearch.rest.RestHandler.ReplacedRoute
@@ -34,6 +35,14 @@ class RestGetMonitorAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf()
+    }
+
+    /**
+     * Declared so the caller can ask for the backend roles it is entitled to see without the request being
+     * rejected for carrying an unrecognized parameter. The response serialization consumes it.
+     */
+    override fun responseParams(): Set<String> {
+        return setOf(INCLUDE_BACKEND_ROLES_PARAM)
     }
 
     override fun replacedRoutes(): MutableList<ReplacedRoute> {

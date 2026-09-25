@@ -10,6 +10,7 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.GetAlertsRequest
 import org.opensearch.commons.alerting.model.Table
+import org.opensearch.commons.alerting.util.IndexUtils.Companion.INCLUDE_BACKEND_ROLES_PARAM
 import org.opensearch.rest.BaseRestHandler
 import org.opensearch.rest.RestHandler.ReplacedRoute
 import org.opensearch.rest.RestHandler.Route
@@ -31,6 +32,14 @@ class RestGetAlertsAction : BaseRestHandler() {
 
     override fun routes(): List<Route> {
         return listOf()
+    }
+
+    /**
+     * Declared so the caller can ask for the backend roles it is entitled to see without the request being
+     * rejected for carrying an unrecognized parameter. The response serialization consumes it.
+     */
+    override fun responseParams(): Set<String> {
+        return setOf(INCLUDE_BACKEND_ROLES_PARAM)
     }
 
     override fun replacedRoutes(): MutableList<ReplacedRoute> {
