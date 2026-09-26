@@ -64,6 +64,49 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         const val TYPE = "type"
         const val INDEX_PATTERN_SUFFIX = "-000001"
         const val QUERY_INDEX_BASE_FIELDS_COUNT = 8 // 3 fields we defined and 5 builtin additional metadata fields
+
+        /** Analysis-resource attributes that must be stripped before copying mappings to the query index. */
+        val ANALYSIS_ATTRIBUTES = setOf(
+            "analyzer",
+            "search_analyzer",
+            "search_quote_analyzer",
+            "normalizer",
+            "similarity"
+        )
+
+        /**
+         * Strips analysis attributes and invalid structural attributes from a field-mapping map in-place.
+         * @param fieldType the OpenSearch field type (e.g. "text", "keyword"), or null when absent
+         * @param mapping   the mutable property map to sanitize
+         */
+        fun sanitizeFieldMappingAttributes(fieldType: String?, mapping: MutableMap<String, Any>) {
+            // Category 1: remove analysis resource references
+            mapping.keys.removeAll(ANALYSIS_ATTRIBUTES)
+
+            // Category 2: strip "properties" from scalar fields (null type defaults to object — only strip when explicit).
+            if (fieldType != null && fieldType != "object" && fieldType != NESTED) {
+                mapping.remove(PROPERTIES)
+            }
+
+            // Recurse into multi-fields
+            @Suppress("UNCHECKED_CAST")
+            (mapping["fields"] as? Map<*, *>)?.forEach { (_, subMapping) ->
+                (subMapping as? MutableMap<String, Any>)?.let {
+                    sanitizeFieldMappingAttributes(it[TYPE] as? String, it)
+                }
+            }
+
+            // Recurse into sub-properties of object/implicit-object fields to strip analysis attributes.
+            if (fieldType == null || fieldType == "object" || fieldType == NESTED) {
+                @Suppress("UNCHECKED_CAST")
+                (mapping[PROPERTIES] as? Map<*, *>)?.forEach { (_, subMapping) ->
+                    (subMapping as? MutableMap<String, Any>)?.let {
+                        sanitizeFieldMappingAttributes(it[TYPE] as? String, it)
+                    }
+                }
+            }
+        }
+
         @JvmStatic
         fun docLevelQueriesMappings(): String {
             return DocLevelMonitorQueries::class.java.classLoader.getResource("mappings/doc-level-queries.json").readText()
@@ -306,7 +349,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         val leafNodeProcessor =
                             fun(fieldName: String, fullPath: String, props: MutableMap<String, Any>):
                                 Triple<String, String, MutableMap<String, Any>> {
-                                val newProps = props.toMutableMap()
+                                val newProps = props.toMutableMap().also {
+                                    sanitizeFieldMappingAttributes(it[TYPE] as? String, it)
+                                }
                                 if (monitor.dataSources.queryIndexMappingsByType.isNotEmpty()) {
                                     val mappingsByType = monitor.dataSources.queryIndexMappingsByType
                                     if (props.containsKey("type") && mappingsByType.containsKey(props["type"]!!)) {
