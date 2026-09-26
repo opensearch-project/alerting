@@ -59,7 +59,7 @@ fun initializeNewLastRunContext(
     lastRunContext: Map<String, Any>,
     index: String,
     shardCount: Int,
-): Map<String, Any> {
+): MutableMap<String, Any> {
     val updatedLastRunContext = lastRunContext.toMutableMap()
 
     // Only initialize shards that don't already have a sequence number
