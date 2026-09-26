@@ -1,0 +1,40 @@
+{
+  "**/*.*": [
+    " Copyright OpenSearch Contributors",
+    " SPDX-License-Identifier: Apache-2.0"
+  ],
+  "ignore": [
+    ".md",
+    ".json",
+    ".yml",
+    ".yaml",
+    ".txt",
+    ".xml",
+    ".config",
+    ".png",
+    ".jar",
+    ".jks",
+    ".pem",
+    ".gz",
+    ".lock",
+    ".toml",
+    ".ini",
+    ".bat",
+    ".git",
+    ".gitignore",
+    ".whitesource",
+    ".editorConfig",
+    ".properties",
+    ".http",
+    ".gradle",
+    "gradle/wrapper",
+    "settings.gradle",
+    "**/build/",
+    "licenses/",
+    "src/test/resources/",
+    "THIRD-PARTY",
+    "gradlew",
+    ".policy",
+    ".idea"
+  ]
+}
