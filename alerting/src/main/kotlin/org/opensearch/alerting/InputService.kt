@@ -58,8 +58,8 @@ import org.opensearch.index.query.RangeQueryBuilder
 import org.opensearch.index.query.TermsQueryBuilder
 import org.opensearch.script.ScriptService
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
-import org.opensearch.transport.client.node.NodeClient
 import java.time.Duration
 import java.time.Instant
 import kotlin.time.measureTimedValue
@@ -223,7 +223,8 @@ class InputService(
 
     suspend fun collectInputResultsForPPLMonitor(
         monitor: Monitor,
-        monitorCtx: MonitorRunnerExecutionContext
+        monitorCtx: MonitorRunnerExecutionContext,
+        transportService: TransportService
     ): InputRunResults {
         return try {
             if (onlyHasCustomTriggers(monitor)) {
@@ -243,7 +244,8 @@ class InputService(
             val basePplQueryResults = runPPLBaseQuery(
                 monitor,
                 (monitor.inputs[0] as PPLInput).query,
-                monitorCtx
+                monitorCtx,
+                transportService
             )
             val numPplResults = basePplQueryResults.get("total").asLong()
 
@@ -294,6 +296,7 @@ class InputService(
         pplMonitor: Monitor,
         baseQuery: String,
         monitorCtx: MonitorRunnerExecutionContext,
+        transportService: TransportService,
     ): JsonNode {
 
         val queryExecutionDuration = monitorCtx
@@ -313,7 +316,9 @@ class InputService(
                 executePplQuery(
                     limitedQueryToExecute,
                     false,
-                    monitorCtx.client!! as NodeClient
+                    transportService,
+                    monitorCtx.clusterService!!.localNode(),
+                    queryExecutionDuration
                 )
             }
             logger.debug("base query results: $queryResponseJsonReceived")

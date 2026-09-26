@@ -78,7 +78,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
             ) {
                 reinjectHeaders(monitor, monitorCtx)
                 monitorResult = monitorResult.copy(
-                    inputResults = monitorCtx.inputService!!.collectInputResultsForPPLMonitor(monitor, monitorCtx)
+                    inputResults = monitorCtx.inputService!!.collectInputResultsForPPLMonitor(monitor, monitorCtx, transportService)
                 )
             }
         } else {
@@ -188,7 +188,8 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                                 monitor,
                                 pplTrigger,
                                 (monitor.inputs[0] as PPLInput).query,
-                                monitorCtx
+                                monitorCtx,
+                                transportService
                             )
                         }
                     }
