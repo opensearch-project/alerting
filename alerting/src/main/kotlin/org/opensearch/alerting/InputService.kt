@@ -15,6 +15,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.PPLUtils.appendDataRowsLimit
 import org.opensearch.alerting.PPLUtils.capAndReformatPPLQueryResults
 import org.opensearch.alerting.PPLUtils.executePplQuery
+import org.opensearch.alerting.PPLUtils.getPPLResultCount
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
@@ -245,7 +246,7 @@ class InputService(
                 (monitor.inputs[0] as PPLInput).query,
                 monitorCtx
             )
-            val numPplResults = basePplQueryResults.get("total").asLong()
+            val numPplResults = getPPLResultCount(basePplQueryResults)
 
             // PPL Alerting:
             // PPL Trigger evaluations won't read this input result in.

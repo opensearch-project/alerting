@@ -179,6 +179,27 @@ object PPLUtils {
     }
 
     /**
+     * Returns the number of result rows in a PPL query response.
+     *
+     * A PPL response normally carries a numeric `total` field. It is not present on every
+     * response shape the SQL/PPL plugin can return, and calling `asLong()` on the `null`
+     * that `JsonNode.get("total")` yields in that case throws a NullPointerException, which
+     * turns every execution of the monitor into an input failure. Fall back to the length of
+     * `datarows` when `total` is absent or null, and to 0 when neither field is present.
+     */
+    fun getPPLResultCount(pplQueryResults: JsonNode): Long {
+        val total = pplQueryResults.get("total")
+        if (total != null && !total.isNull) {
+            return total.asLong()
+        }
+        val dataRows = pplQueryResults.get("datarows")
+        if (dataRows != null && dataRows.isArray) {
+            return dataRows.size().toLong()
+        }
+        return 0L
+    }
+
+    /**
      * Caps the size of PPL query results to prevent memory issues and oversized alert payloads.
      *
      * Checks if the serialized query results exceed a specified size limit. If the results
