@@ -11,6 +11,7 @@ import org.opensearch.alerting.PPLUtils.appendCustomCondition
 import org.opensearch.alerting.PPLUtils.appendDataRowsLimit
 import org.opensearch.alerting.PPLUtils.capAndReformatPPLQueryResults
 import org.opensearch.alerting.PPLUtils.executePplQuery
+import org.opensearch.alerting.PPLUtils.getPPLResultCount
 import org.opensearch.alerting.chainedAlertCondition.parsers.ChainedAlertExpressionParser
 import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.withClosableContext
@@ -407,7 +408,7 @@ class TriggerService(val scriptService: ScriptService) {
                 // the custom condition query returns all buckets that met the custom condition,
                 // so if there are any results at all, the custom condition was met for at least one bukcet,
                 // this trigger has triggered.
-                triggered = queryResponseJson.get("total").asLong() > 0
+                triggered = getPPLResultCount(queryResponseJson) > 0
 
                 // cap and reformat the results to be included in trigger run result
                 customConditionQueryResults = capAndReformatPPLQueryResults(queryResponseJson, queryResultsSizeLimit)
