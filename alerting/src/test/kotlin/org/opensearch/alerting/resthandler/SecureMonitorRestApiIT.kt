@@ -330,6 +330,216 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test get monitor returns every backend role on the monitor for an admin`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE, "role2"),
+            false
+        )
+        val createdMonitor = createMonitorWithClient(
+            userClient!!,
+            monitor = randomQueryLevelMonitor(enabled = true),
+            listOf(TEST_HR_BACKEND_ROLE, "role2")
+        )
+
+        try {
+            // client() is the admin client, which holds all_access, so it sees the monitor's full access scope.
+            val userMap = getMonitorUser(client(), createdMonitor.id)
+            assertNotNull("Backend roles were not returned", userMap)
+            assertEquals(
+                setOf(TEST_HR_BACKEND_ROLE, "role2"),
+                (userMap!!["backend_roles"] as List<String>).toSet()
+            )
+            // Only the backend roles are exposed: the owner's identity stays hidden.
+            assertNull("Monitor owner name was exposed", userMap["name"])
+            assertNull("Monitor owner security roles were exposed", userMap["roles"])
+            assertNull("Monitor owner custom attributes were exposed", userMap["custom_attribute_names"])
+        } finally {
+            deleteMonitor(createdMonitor)
+        }
+    }
+
+    fun `test get monitor returns only the backend roles the requester belongs to`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("intersect")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE, "role2"),
+            false
+        )
+        val createdMonitor = createMonitorWithClient(
+            userClient!!,
+            monitor = randomQueryLevelMonitor(enabled = true),
+            listOf(TEST_HR_BACKEND_ROLE, "role2")
+        )
+
+        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+        createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+
+        // getUser shares only one of the monitor's two backend roles, so intersect lets it read the monitor.
+        val getUser = "getUser"
+        createUserWithTestDataAndCustomRole(
+            getUser,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            listOf("role2"),
+            getClusterPermissionsFromCustomRole(ALERTING_GET_MONITOR_ACCESS)
+        )
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            val userMap = getMonitorUser(getUserClient, createdMonitor.id)
+            assertNotNull("Backend roles were not returned", userMap)
+            assertEquals(listOf("role2"), userMap!!["backend_roles"])
+            assertNull("Monitor owner name was exposed", userMap["name"])
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
+            deleteUser(getUser)
+            getUserClient.close()
+        }
+    }
+
+    fun `test get alerts returns only the backend roles the requester belongs to`() {
+        enableFilterBy()
+        putAlertMappings()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("intersect")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE, "role2"),
+            false
+        )
+        val createdMonitor = createMonitorWithClient(
+            userClient!!,
+            monitor = randomQueryLevelMonitor(enabled = true),
+            listOf(TEST_HR_BACKEND_ROLE, "role2")
+        )
+        // The create response strips the user, so put it back on the copy the alert is generated from: the
+        // alert stores its monitor's user, which is what Get Alerts filters and reports on.
+        val monitorOwner = User(user, listOf(TEST_HR_BACKEND_ROLE, "role2"), listOf(), listOf())
+        createAlert(randomAlert(createdMonitor.copy(user = monitorOwner)).copy(state = Alert.State.ACTIVE))
+
+        val getUser = "getAlertsUser"
+        createUserWithTestDataAndCustomRole(
+            getUser,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            listOf("role2"),
+            getClusterPermissionsFromCustomRole(ALERTING_GET_ALERTS_ACCESS)
+        )
+        val getUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), getUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            val alerts = getAlerts(getUserClient).asMap()["alerts"] as List<Map<String, Any>>
+            assertEquals("Expected one alert", 1, alerts.size)
+            val monitorUser = alerts[0]["monitor_user"] as Map<String, Any>?
+            assertNotNull("Backend roles were not returned", monitorUser)
+            assertEquals(listOf("role2"), monitorUser!!["backend_roles"])
+            assertNull("Monitor owner name was exposed", monitorUser["name"])
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
+            deleteUser(getUser)
+            getUserClient.close()
+        }
+    }
+
+    fun `test search monitor returns only the backend roles the requester belongs to`() {
+        enableFilterBy()
+        if (!isHttps()) {
+            // if security is disabled and filter by is enabled, we can't create monitor
+            // refer: `test create monitor with enable filter by`
+            return
+        }
+        setFilterByBackendRolesStrategy("intersect")
+
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE, "role2"),
+            false
+        )
+        val createdMonitor = createMonitorWithClient(
+            userClient!!,
+            monitor = randomQueryLevelMonitor(enabled = true),
+            listOf(TEST_HR_BACKEND_ROLE, "role2")
+        )
+
+        createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+        createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+
+        val searchUser = "searchUser"
+        createUserWithTestDataAndCustomRole(
+            searchUser,
+            TEST_HR_INDEX,
+            TEST_HR_ROLE,
+            listOf("role2"),
+            getClusterPermissionsFromCustomRole(ALERTING_SEARCH_MONITOR_ONLY_ACCESS)
+        )
+        val searchUserClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), searchUser, password)
+            .setSocketTimeout(60000)
+            .setConnectionRequestTimeout(180000)
+            .build()
+
+        try {
+            val search = SearchSourceBuilder().query(QueryBuilders.matchQuery("_id", createdMonitor.id)).toString()
+            val searchResponse = searchUserClient.makeRequest(
+                "GET",
+                "$ALERTING_BASE_URI/_search",
+                emptyMap(),
+                StringEntity(search, ContentType.APPLICATION_JSON)
+            )
+            assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
+
+            val hits = (searchResponse.asMap()["hits"] as Map<String, Any>)["hits"] as List<Map<String, Any>>
+            assertEquals("Expected one monitor", 1, hits.size)
+            val source = hits.first()["_source"] as Map<String, Any>
+            val userMap = source["user"] as Map<String, Any>?
+            assertNotNull("Backend roles were not returned", userMap)
+            assertEquals(listOf("role2"), userMap!!["backend_roles"])
+            assertNull("Monitor owner name was exposed", userMap["name"])
+            assertNull("Monitor owner security roles were exposed", userMap["roles"])
+        } finally {
+            deleteRoleAndRoleMapping(TEST_HR_ROLE)
+            deleteUser(searchUser)
+            searchUserClient.close()
+        }
+    }
+
+    private fun getMonitorUser(client: RestClient, monitorId: String): Map<String, Any>? {
+        val uri = "$ALERTING_BASE_URI/$monitorId"
+        val response = client.makeRequest("GET", uri, null, BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json"))
+        assertEquals("Get monitor failed", RestStatus.OK, response.restStatus())
+        val monitorMap = response.asMap()["monitor"] as Map<String, Any>
+        return monitorMap["user"] as Map<String, Any>?
+    }
+
     fun `test get monitor succeeds for same backend roles in same order when filterByAccessStrategy is exact`() {
         enableFilterBy()
         if (!isHttps()) {

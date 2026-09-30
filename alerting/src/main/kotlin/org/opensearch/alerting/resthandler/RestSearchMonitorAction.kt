@@ -19,6 +19,7 @@ import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.SearchMonitorRequest
+import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
 import org.opensearch.core.common.bytes.BytesReference
@@ -120,8 +121,15 @@ class RestSearchMonitorAction(
                             channel.request().xContentRegistry,
                             LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
                         ).use { hitsParser ->
-                            val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version)
-                            val xcb = monitor.toXContent(jsonBuilder(), EMPTY_PARAMS)
+                            val job = ScheduledJob.parse(hitsParser, hit.id, hit.version)
+                            // The transport action has already narrowed the roles to those the requester may
+                            // see; write those out and leave the rest of the user behind.
+                            val visibleBackendRoles = (job as? Monitor)?.user?.backendRoles?.takeIf { it.isNotEmpty() }
+                            val xcb = if (job is Monitor && visibleBackendRoles != null) {
+                                job.toXContentWithBackendRoles(jsonBuilder(), EMPTY_PARAMS, visibleBackendRoles)
+                            } else {
+                                job.toXContent(jsonBuilder(), EMPTY_PARAMS)
+                            }
                             hit.sourceRef(BytesReference.bytes(xcb))
                         }
                     }

@@ -80,6 +80,24 @@ interface SecureTransportAction {
         }
     }
 
+    /**
+     * Resolves which of a resource's backend roles the requester is allowed to see. Admins, and callers that have
+     * no user at all (security disabled or the super-admin), see every role on the resource. Everyone else sees
+     * only the roles they themselves belong to, so no caller learns of a role they are not a member of. Returns
+     * null when the resource carries no user, in which case there is nothing to show.
+     *
+     * This is independent of the filter_by_backend_roles setting: it narrows what is shown, it does not grant
+     * access, which [checkUserPermissionsWithResource] has already decided by this point.
+     */
+    fun getVisibleBackendRoles(requesterUser: User?, resourceUser: User?): List<String>? {
+        val resourceBackendRoles = resourceUser?.backendRoles ?: return null
+        if (requesterUser == null || isAdmin(requesterUser)) {
+            return resourceBackendRoles
+        }
+        val requesterBackendRoles = requesterUser.backendRoles ?: return emptyList()
+        return resourceBackendRoles.filter { it in requesterBackendRoles }
+    }
+
     fun <T : Any> validateUserBackendRoles(user: User?, actionListener: ActionListener<T>): Boolean {
         if (filterByEnabled) {
             if (user == null) {
