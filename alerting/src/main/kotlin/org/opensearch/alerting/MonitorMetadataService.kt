@@ -211,7 +211,7 @@ object MonitorMetadataService :
                 (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
             else null
             val runContext = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value))
-                createFullRunContext(monitorIndex, metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
+                createFullRunContext(monitorIndex, metadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>)
             else null
             return if (runContext != null) {
                 metadata.copy(
