@@ -6,6 +6,7 @@
 package org.opensearch.alerting
 
 import junit.framework.TestCase.assertNull
+import junit.framework.TestCase.assertTrue
 import org.apache.hc.core5.http.Header
 import org.apache.hc.core5.http.HttpEntity
 import org.opensearch.alerting.model.AlertContext
@@ -834,6 +835,18 @@ fun assertUserNull(map: Map<String, Any?>) {
 
 fun assertUserNull(monitor: Monitor) {
     assertNull("User is not null", monitor.user)
+}
+
+/**
+ * Read APIs return the backend roles the requester may see, and nothing else from the user. A monitor with no
+ * roles to report carries no user at all.
+ */
+fun assertOnlyBackendRolesExposed(monitor: Monitor) {
+    val user = monitor.user ?: return
+    assertTrue("Backend roles were not returned", user.backendRoles.isNotEmpty())
+    assertEquals("Monitor owner name was exposed", "", user.name)
+    assertTrue("Monitor owner security roles were exposed", user.roles.isEmpty())
+    assertTrue("Monitor owner custom attributes were exposed", user.customAttNames.isEmpty())
 }
 
 fun assertUserNull(workflow: Workflow) {
