@@ -1635,6 +1635,24 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test update document-level monitor when alias has no write index`() {
+        // With no write index on the alias, the monitor metadata is persisted with an empty last run context.
+        // Updating the monitor must not fail casting that context to a mutable map.
+        val alias = createTestAlias(numOfAliasIndices = 2, includeWriteIndex = false)
+        val aliasName = alias.keys.first()
+        val query = randomDocLevelQuery(tags = listOf())
+        val input = randomDocLevelMonitorInput(indices = listOf(aliasName), queries = listOf(query))
+        val trigger = randomDocumentLevelTrigger(condition = Script("query[id=\"${query.id}\"]"))
+        val monitor = createMonitor(randomDocumentLevelMonitor(enabled = true, inputs = listOf(input), triggers = listOf(trigger)))
+
+        val updatedMonitor = updateMonitor(monitor.copy(name = "${monitor.name}-updated"))
+        assertEquals("${monitor.name}-updated", updatedMonitor.name)
+
+        // A second update reads the metadata persisted by the first one.
+        val updatedAgain = updateMonitor(updatedMonitor.copy(name = "${monitor.name}-updated-again"))
+        assertEquals("${monitor.name}-updated-again", updatedAgain.name)
+    }
+
     fun `test document-level monitor when docs exist prior to monitor creation`() {
         // FIXME: Consider renaming this test case
         // Only new docs should create findings.
