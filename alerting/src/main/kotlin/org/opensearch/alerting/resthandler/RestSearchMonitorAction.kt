@@ -19,8 +19,10 @@ import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.SearchMonitorRequest
+import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.ScheduledJob.Companion.SCHEDULED_JOBS_INDEX
+import org.opensearch.commons.alerting.util.IndexUtils.Companion.INCLUDE_BACKEND_ROLES_PARAM
 import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.ToXContent.EMPTY_PARAMS
@@ -64,6 +66,14 @@ class RestSearchMonitorAction(
         return listOf()
     }
 
+    /**
+     * Declared so the caller can ask for the backend roles it is entitled to see without the request being
+     * rejected for carrying an unrecognized parameter.
+     */
+    override fun responseParams(): Set<String> {
+        return setOf(INCLUDE_BACKEND_ROLES_PARAM)
+    }
+
     override fun replacedRoutes(): MutableList<ReplacedRoute> {
         return mutableListOf(
             // Search for monitors
@@ -99,13 +109,18 @@ class RestSearchMonitorAction(
             .source(searchSourceBuilder)
             .indices(index)
 
-        val searchMonitorRequest = SearchMonitorRequest(searchRequest)
+        val includeBackendRoles = request.paramAsBoolean(INCLUDE_BACKEND_ROLES_PARAM, false)
+        val searchMonitorRequest = SearchMonitorRequest(searchRequest, includeBackendRoles)
         return RestChannelConsumer { channel ->
-            client.execute(AlertingActions.SEARCH_MONITORS_ACTION_TYPE, searchMonitorRequest, searchMonitorResponse(channel))
+            client.execute(
+                AlertingActions.SEARCH_MONITORS_ACTION_TYPE,
+                searchMonitorRequest,
+                searchMonitorResponse(channel, includeBackendRoles)
+            )
         }
     }
 
-    private fun searchMonitorResponse(channel: RestChannel): RestResponseListener<SearchResponse> {
+    private fun searchMonitorResponse(channel: RestChannel, includeBackendRoles: Boolean): RestResponseListener<SearchResponse> {
         return object : RestResponseListener<SearchResponse>(channel) {
             @Throws(Exception::class)
             override fun buildResponse(response: SearchResponse): RestResponse {
@@ -120,8 +135,20 @@ class RestSearchMonitorAction(
                             channel.request().xContentRegistry,
                             LoggingDeprecationHandler.INSTANCE, hit.sourceAsString
                         ).use { hitsParser ->
-                            val monitor = ScheduledJob.parse(hitsParser, hit.id, hit.version)
-                            val xcb = monitor.toXContent(jsonBuilder(), EMPTY_PARAMS)
+                            val job = ScheduledJob.parse(hitsParser, hit.id, hit.version)
+                            // Only when the caller opted in: the transport action has already narrowed the roles to
+                            // those the requester may see; write those out and leave the rest of the user behind.
+                            // Otherwise fall back to the secure serialization, which drops the user block entirely.
+                            val visibleBackendRoles = if (includeBackendRoles) {
+                                (job as? Monitor)?.user?.backendRoles?.takeIf { it.isNotEmpty() }
+                            } else {
+                                null
+                            }
+                            val xcb = if (job is Monitor && visibleBackendRoles != null) {
+                                job.toXContentWithBackendRoles(jsonBuilder(), EMPTY_PARAMS, visibleBackendRoles)
+                            } else {
+                                job.toXContent(jsonBuilder(), EMPTY_PARAMS)
+                            }
                             hit.sourceRef(BytesReference.bytes(xcb))
                         }
                     }

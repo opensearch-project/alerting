@@ -747,6 +747,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             }
         }
 
+        // Default read path does not pass include_backend_roles, so no user block is returned.
         assertUserNull(monitor)
         return monitor.copy(id = id, version = version)
     }

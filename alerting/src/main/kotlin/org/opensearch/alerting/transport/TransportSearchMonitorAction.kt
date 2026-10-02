@@ -23,6 +23,9 @@ import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.XContentFactory.jsonBuilder
+import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AlertingActions
 import org.opensearch.commons.alerting.action.SearchMonitorRequest
 import org.opensearch.commons.alerting.model.Monitor
@@ -32,7 +35,10 @@ import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
+import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
+import org.opensearch.core.xcontent.NamedXContentRegistry
+import org.opensearch.core.xcontent.ToXContent
 import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.ExistsQueryBuilder
@@ -59,6 +65,7 @@ class TransportSearchMonitorAction @Inject constructor(
     clusterService: ClusterService,
     actionFilters: ActionFilters,
     val namedWriteableRegistry: NamedWriteableRegistry,
+    val xContentRegistry: NamedXContentRegistry,
     val sdkClient: SdkClient,
     private val pluginClient: PluginClient
 ) : HandledTransportAction<ActionRequest, SearchResponse>(
@@ -112,21 +119,69 @@ class TransportSearchMonitorAction @Inject constructor(
         user: User?,
         tenantId: String? = null,
     ) {
+        // Only narrow (and thereby expose) backend roles when the caller opted in; otherwise the search response
+        // is returned exactly as it is today, with the stored user dropped by the REST layer's secure serialization.
+        val narrowingListener = if (searchMonitorRequest.includeBackendRoles) {
+            narrowBackendRoles(user, actionListener)
+        } else {
+            actionListener
+        }
         val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
         if (useRsc) {
             // resource sharing is enabled - security plugin filters results at index layer
-            search(searchMonitorRequest.searchRequest, actionListener, tenantId)
+            search(searchMonitorRequest.searchRequest, narrowingListener, tenantId)
         } else if (user == null) {
             // user header is null when: 1/ security is disabled. 2/when user is super-admin.
-            search(searchMonitorRequest.searchRequest, actionListener, tenantId)
+            search(searchMonitorRequest.searchRequest, narrowingListener, tenantId)
         } else if (!doFilterForUser(user)) {
             // security is enabled and filterby is disabled.
-            search(searchMonitorRequest.searchRequest, actionListener, tenantId)
+            search(searchMonitorRequest.searchRequest, narrowingListener, tenantId)
         } else {
             // security is enabled and filterby is enabled.
             log.info("Filtering result by: ${user.backendRoles}")
             addFilter(user, searchMonitorRequest.searchRequest.source(), "monitor.user.backend_roles.keyword")
-            search(searchMonitorRequest.searchRequest, actionListener, tenantId)
+            search(searchMonitorRequest.searchRequest, narrowingListener, tenantId)
+        }
+    }
+
+    /**
+     * Rewrites each monitor hit so the user it carries holds only the backend roles the requester is entitled to
+     * see. The rest of the user is left alone, so a caller reading a hit still sees the same fields it does today;
+     * the REST layer writes out the backend roles and drops the rest.
+     */
+    private fun narrowBackendRoles(
+        requester: User?,
+        actionListener: ActionListener<SearchResponse>,
+    ): ActionListener<SearchResponse> {
+        return object : ActionListener<SearchResponse> {
+            override fun onResponse(response: SearchResponse) {
+                try {
+                    for (hit in response.hits) {
+                        val job = XContentType.JSON.xContent().createParser(
+                            xContentRegistry,
+                            LoggingDeprecationHandler.INSTANCE,
+                            hit.sourceAsString
+                        ).use { parser -> ScheduledJob.parse(parser, hit.id, hit.version) }
+                        if (job !is Monitor) continue
+                        val owner = job.user ?: continue
+                        val visible = getVisibleBackendRoles(requester, owner) ?: continue
+                        if (visible == owner.backendRoles) continue
+                        val narrowed = job.copy(
+                            user = User(owner.name, visible, owner.roles, owner.customAttNames)
+                        )
+                        val builder = jsonBuilder()
+                        narrowed.toXContentWithUser(builder, ToXContent.MapParams(mapOf("with_type" to "true")))
+                        hit.sourceRef(BytesReference.bytes(builder))
+                    }
+                } catch (e: Exception) {
+                    // A hit that cannot be parsed cannot be narrowed either. Failing the whole search over one
+                    // malformed document would be worse than returning it as the index holds it.
+                    log.error("Failed to narrow backend roles on search monitor results", e)
+                }
+                actionListener.onResponse(response)
+            }
+
+            override fun onFailure(e: Exception) = actionListener.onFailure(e)
         }
     }
 
