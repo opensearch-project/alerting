@@ -17,18 +17,24 @@ import java.io.IOException
 class ScheduledJobsStatsRequest : BaseNodesRequest<ScheduledJobsStatsRequest> {
     var jobSchedulingMetrics: Boolean = true
     var jobsInfo: Boolean = true
+    var showAlertingV2ScheduledJobs: Boolean = false // show Alerting V2 scheduled jobs if true, Alerting V1 scheduled jobs if false
 
     constructor(si: StreamInput) : super(si) {
         jobSchedulingMetrics = si.readBoolean()
         jobsInfo = si.readBoolean()
+        showAlertingV2ScheduledJobs = si.readBoolean()
     }
-    constructor(nodeIds: Array<String>) : super(*nodeIds)
+
+    constructor(nodeIds: Array<String>, showAlertingV2ScheduledJobs: Boolean) : super(*nodeIds) {
+        this.showAlertingV2ScheduledJobs = showAlertingV2ScheduledJobs
+    }
 
     @Throws(IOException::class)
     override fun writeTo(out: StreamOutput) {
         super.writeTo(out)
         out.writeBoolean(jobSchedulingMetrics)
         out.writeBoolean(jobsInfo)
+        out.writeBoolean(showAlertingV2ScheduledJobs)
     }
 
     fun all(): ScheduledJobsStatsRequest {

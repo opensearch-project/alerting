@@ -3,10 +3,44 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+buildscript {
+    ext {
+        opensearch_group = "org.opensearch"
+        opensearch_version = System.getProperty("opensearch.version", "3.1.0-SNAPSHOT")
+        isSnapshot = "true" == System.getProperty("build.snapshot", "true")
+        buildVersionQualifier = System.getProperty("build.version_qualifier", "")
+        kotlin_version = System.getProperty("kotlin.version", "1.9.25")
+        version_tokens = opensearch_version.tokenize('-')
+        opensearch_build = version_tokens[0] + '.0'
+        if (buildVersionQualifier) {
+            opensearch_build += "-${buildVersionQualifier}"
+        }
+        if (isSnapshot) {
+            opensearch_build += "-SNAPSHOT"
+        }
+    }
+}
+
 apply plugin: 'java'
 apply plugin: 'opensearch.java-rest-test'
 apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'jacoco'
+
+configurations {
+    zipArchive
+}
+
+def sqlJarDirectory = "$buildDir/dependencies/opensearch-sql-plugin"
+
+task addJarsToClasspath(type: Copy) {
+    from(fileTree(dir: sqlJarDirectory)) {
+        include "opensearch-sql-${opensearch_build}.jar"
+        include "ppl-${opensearch_build}.jar"
+        include "protocol-${opensearch_build}.jar"
+        include "core-${opensearch_build}.jar"
+    }
+    into("$buildDir/classes")
+}
 
 dependencies {
     compileOnly "org.opensearch:opensearch:${opensearch_version}"
@@ -17,8 +51,44 @@ dependencies {
     api "org.opensearch.client:opensearch-rest-client:${opensearch_version}"
     api "org.opensearch:common-utils:${common_utils_version}@jar"
     implementation 'commons-validator:commons-validator:1.7'
+    implementation 'org.json:json:20240303'
+
+    api fileTree(dir: sqlJarDirectory, include: ["opensearch-sql-thin-${opensearch_build}.jar", "ppl-${opensearch_build}.jar", "protocol-${opensearch_build}.jar", "core-${opensearch_build}.jar"])
+
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-sql-plugin', version: "${opensearch_build}"
 
     testImplementation "org.opensearch.test:framework:${opensearch_version}"
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
     testImplementation "org.jetbrains.kotlin:kotlin-test-junit:${kotlin_version}"
+}
+
+task extractSqlJar(type: Copy) {
+    mustRunAfter()
+    from(zipTree(configurations.zipArchive.find { it.name.startsWith("opensearch-sql-plugin") }))
+    into sqlJarDirectory
+}
+
+task extractSqlClass(type: Copy, dependsOn: [extractSqlJar]) {
+    from zipTree("${sqlJarDirectory}/opensearch-sql-${opensearch_build}.jar")
+    into("$buildDir/opensearch-sql")
+    include 'org/opensearch/sql/**'
+}
+
+task replaceSqlJar(type: Jar, dependsOn: [extractSqlClass]) {
+    from("$buildDir/opensearch-sql")
+    archiveFileName = "opensearch-sql-thin-${opensearch_build}.jar"
+    destinationDirectory = file(sqlJarDirectory)
+    doLast {
+        file("${sqlJarDirectory}/opensearch-sql-${opensearch_build}.jar").delete()
+    }
+}
+
+tasks.addJarsToClasspath.dependsOn(replaceSqlJar)
+
+compileJava {
+    dependsOn addJarsToClasspath
+}
+
+compileKotlin {
+    dependsOn addJarsToClasspath
 }

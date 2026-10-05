@@ -29,6 +29,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse
+import org.opensearch.alerting.AlertingV2Utils.validateMonitorV1
 import org.opensearch.alerting.MonitorMetadataService
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
@@ -614,7 +615,15 @@ class TransportIndexMonitorAction @Inject constructor(
                     xContentRegistry, LoggingDeprecationHandler.INSTANCE,
                     getResponse.sourceAsBytesRef, XContentType.JSON
                 )
-                val monitor = ScheduledJob.parse(xcp, getResponse.id, getResponse.version) as Monitor
+                val scheduledJob = ScheduledJob.parse(xcp, getResponse.id, getResponse.version)
+
+                validateMonitorV1(scheduledJob)?.let {
+                    actionListener.onFailure(AlertingException.wrap(it))
+                    return
+                }
+
+                val monitor = scheduledJob as Monitor
+
                 onGetResponse(monitor)
             } catch (t: Exception) {
                 actionListener.onFailure(AlertingException.wrap(t))
