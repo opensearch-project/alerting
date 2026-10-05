@@ -17,7 +17,17 @@ jobs:
   build-linux:
     strategy:
       matrix:
-        java: [ 21 ]
+        # Resource-sharing disabled: run the full security IT suite (backend-role / filterBy model).
+        # Resource-sharing enabled: run ONLY the resource-sharing-specific suites; the backend-role
+        # secure suites and general functional ITs assume the pre-RSC access model and are covered by
+        # the disabled variant, so they are not re-run under RSC.
+        include:
+          - java: 21
+            resource_sharing_flag: ""
+            test_filter: "--tests '*IT'"
+          - java: 21
+            resource_sharing_flag: "-Dresource_sharing.enabled=true"
+            test_filter: "--tests '*SecureResourceSharingMonitorRestApiIT' --tests '*RscMigrateE2ERestApiIT'"
     needs: Get-CI-Image-Tag
     # This job runs on Linux
     runs-on: ubuntu-latest
@@ -46,12 +56,12 @@ jobs:
       - name: Run integration tests
         run: |
           chown -R 1000:1000 `pwd`
-          su `id -un 1000` -c "./gradlew integTest -Dsecurity=true -Dhttps=true --tests '*IT'"
+          su `id -un 1000` -c "./gradlew integTest -Dsecurity=true -Dhttps=true ${{ matrix.resource_sharing_flag }} ${{ matrix.test_filter }}"
 
       - name: Upload failed logs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()
         with:
-          name: logs
+          name: logs-${{ matrix.resource_sharing_flag != '' && 'resource-sharing' || 'no-resource-sharing' }}
           overwrite: 'true'
           path: build/testclusters/integTest-*/logs/*

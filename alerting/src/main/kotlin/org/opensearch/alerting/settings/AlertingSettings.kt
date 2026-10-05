@@ -222,10 +222,14 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        /**
+         * Superseded by the security plugin's resource sharing and access control, which authorizes each resource by
+         * the access level it is shared at rather than by backend-role overlap. Slated for removal in 4.0.
+         */
         val FILTER_BY_BACKEND_ROLES = Setting.boolSetting(
             "plugins.alerting.filter_by_backend_roles",
             LegacyOpenDistroAlertingSettings.FILTER_BY_BACKEND_ROLES,
-            Setting.Property.NodeScope, Setting.Property.Dynamic
+            Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
         )
 
         val MAX_ACTIONABLE_ALERT_COUNT = Setting.longSetting(
@@ -484,13 +488,15 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        /** Only meaningful while [FILTER_BY_BACKEND_ROLES] is in use, so it retires with it in 4.0. */
         val FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY = Setting.simpleString(
             "plugins.alerting.filter_by_backend_roles_access_strategy",
             FilterByBackendRolesAccessStrategy.INTERSECT.strategy,
             FilterByBackendRolesAccessStrategyValidator(),
             Setting.Property.NodeScope,
             Setting.Property.Dynamic,
-            Setting.Property.Sensitive
+            Setting.Property.Sensitive,
+            Setting.Property.Deprecated
         )
     }
 }

@@ -14,6 +14,8 @@ import org.opensearch.action.ActionRequest
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.alerting.AlertingPlugin
+import org.opensearch.alerting.ResourceSharingClientAccessor
+import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.comments.CommentsIndices.Companion.COMMENTS_HISTORY_WRITE_INDEX
@@ -24,9 +26,11 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.INDEX_TIMEOUT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_COMMENTS_PER_ALERT
 import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.await
+import org.opensearch.alerting.util.putDataObjectStashed
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
 import org.opensearch.common.settings.Settings
+import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
@@ -58,6 +62,8 @@ import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.lang.IllegalArgumentException
 import java.time.Instant
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 private val log = LogManager.getLogger(TransportIndexMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -144,9 +150,19 @@ constructor(
         val user = readUserFromThreadContext(client)
 
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        // Capture the caller's context before stashing. Under resource sharing the subordinate-
+        // resource access check ([ResourceSharingClient.verifyAccess]) resolves the caller from the
+        // authenticated-user header in ThreadContext; run under the stashed (empty) context it would
+        // see no user and deny every comment.
+        val storedContext = client.threadPool().threadContext.newStoredContext(false)
+        // Stash the caller's transient auth so the alert-fetch and comment-write flow runs under
+        // the plugin subject — comments target system indices where callers rarely have direct
+        // permissions. When resource-sharing is enabled the shard-level ResourceIndexListener
+        // still sees the caller via the persistent auth header (persistents survive stashContext),
+        // so it can record the comment share entry with createdBy=<caller>.
         client.threadPool().threadContext.stashContext().use {
             scope.launch(TenantContext(tenantId)) {
-                IndexCommentHandler(client, actionListener, transformedRequest, user).start()
+                IndexCommentHandler(client, actionListener, transformedRequest, user, storedContext).start()
             }
         }
     }
@@ -156,9 +172,16 @@ constructor(
         private val actionListener: ActionListener<IndexCommentResponse>,
         private val request: IndexCommentRequest,
         private val user: User?,
+        private val storedContext: ThreadContext.StoredContext? = null,
     ) {
         suspend fun start() {
-            commentsIndices.createOrUpdateInitialCommentsHistoryIndex()
+            // Comments-history index management (exists/create/put-mapping) is a system-index
+            // operation and must run on the plugin subject, not the caller: under resource sharing a
+            // non-admin caller has no direct privileges on the comments-history index, so running the
+            // exists() check as the caller throws and the request never completes.
+            client.threadPool().threadContext.stashContext().use {
+                commentsIndices.createOrUpdateInitialCommentsHistoryIndex()
+            }
             if (request.method == RestRequest.Method.PUT) {
                 updateComment()
             } else {
@@ -182,8 +205,30 @@ constructor(
                 return
             }
 
-            log.debug("checking user permissions in index comment")
-            checkUserPermissionsWithResource(user, alert.monitorUser, actionListener, "monitor", alert.monitorId)
+            val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
+            if (useRsc) {
+                // Comments are a subordinate resource: the comment request targets the comments index
+                // (not the monitor), so the security plugin's ResourceAccessEvaluator does not gate it.
+                // Gate the create explicitly on the caller's access to the parent monitor. The comment
+                // write action is only in the read-write / full-access level groups, so a read-only
+                // share (or no share) is denied.
+                if (!callerCanAccessMonitor(alert.monitorId, AlertingActions.INDEX_COMMENT_ACTION_NAME)) {
+                    actionListener.onFailure(
+                        AlertingException.wrap(
+                            OpenSearchStatusException(
+                                "User does not have permission to add a comment to this alert",
+                                RestStatus.FORBIDDEN,
+                            )
+                        )
+                    )
+                    return
+                }
+            } else {
+                log.debug("checking user permissions in index comment")
+                if (!checkUserPermissionsWithResource(user, alert.monitorUser, actionListener, "monitor", alert.monitorId)) {
+                    return
+                }
+            }
 
             val comment = Comment(
                 entityId = request.entityId,
@@ -206,7 +251,7 @@ constructor(
             log.debug("Creating new comment")
 
             try {
-                val putResponse = sdkClient.putDataObjectAsync(putRequest).await()
+                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
                 val seqNo = putResponse.indexResponse()?.seqNo ?: 0L
                 val primaryTerm = putResponse.indexResponse()?.primaryTerm ?: 0L
                 actionListener.onResponse(
@@ -256,7 +301,7 @@ constructor(
             log.debug("Updating comment, ${currentComment.id}")
 
             try {
-                val putResponse = sdkClient.putDataObjectAsync(putRequest).await()
+                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
                 actionListener.onResponse(
                     IndexCommentResponse(
                         putResponse.id(),
@@ -268,6 +313,32 @@ constructor(
             } catch (t: Exception) {
                 log.error("Failed to update comment ${currentComment.id}", t)
                 actionListener.onFailure(AlertingException.wrap(t))
+            }
+        }
+
+        /**
+         * Under resource sharing, verify the caller has [action] on the parent [monitorId] via the
+         * [ResourceSharingClient]. The comment flow runs on the stashed plugin subject, so restore
+         * the caller's context around the call — verifyAccess resolves the user from the
+         * authenticated-user header in ThreadContext. Returns false (deny) if the client is
+         * unavailable or the lookup fails.
+         */
+        private suspend fun callerCanAccessMonitor(monitorId: String, action: String): Boolean {
+            val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
+                as? org.opensearch.security.spi.resources.client.ResourceSharingClient ?: return false
+            return suspendCoroutine { cont ->
+                client.threadPool().threadContext.stashContext().use {
+                    storedContext?.restore()
+                    rsc.verifyAccess(
+                        monitorId,
+                        ResourceSharingUtils.MONITOR_RESOURCE_TYPE,
+                        action,
+                        object : ActionListener<Boolean> {
+                            override fun onResponse(hasAccess: Boolean) = cont.resume(hasAccess)
+                            override fun onFailure(e: Exception) = cont.resume(false)
+                        }
+                    )
+                }
             }
         }
 

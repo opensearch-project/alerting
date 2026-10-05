@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.opensearch.alerting.PPLUtils.PPL_RESULTS_SIZE_EXCEEDED_MESSAGE
 import org.opensearch.test.OpenSearchTestCase
 
@@ -323,5 +324,50 @@ class PPLUtilsTests : OpenSearchTestCase() {
         val firstObject = arrayOfObjects?.get(0) as? Map<*, *>
         assertEquals(1, firstObject?.get("id"))
         assertEquals("item1", firstObject?.get("name"))
+    }
+
+    private val mapper = ObjectMapper()
+
+    fun `test getPPLResultCount reads total when present`() {
+        val response = mapper.readTree(
+            """{"schema":[{"name":"user","type":"string"}],"datarows":[["VK"],["VK"]],"total":2,"size":2}"""
+        )
+        assertEquals(2L, PPLUtils.getPPLResultCount(response))
+    }
+
+    fun `test getPPLResultCount falls back to datarows when total is missing`() {
+        // Some PPL response shapes omit "total". Reading it as a JsonNode and calling asLong()
+        // on the null returned by get("total") threw a NullPointerException and failed the
+        // monitor execution ("Failed fetching inputs: Cannot invoke JsonNode.asLong() because
+        // the return value of JsonNode.get(String) is null").
+        val response = mapper.readTree(
+            """{"schema":[{"name":"user","type":"string"}],"datarows":[["VK"],["VK"],["VK"]]}"""
+        )
+        assertEquals(3L, PPLUtils.getPPLResultCount(response))
+    }
+
+    fun `test getPPLResultCount falls back to datarows when total is null`() {
+        val response = mapper.readTree(
+            """{"schema":[{"name":"user","type":"string"}],"datarows":[["VK"]],"total":null}"""
+        )
+        assertEquals(1L, PPLUtils.getPPLResultCount(response))
+    }
+
+    fun `test getPPLResultCount returns zero when total and datarows are both missing`() {
+        val response = mapper.readTree("""{"schema":[{"name":"user","type":"string"}]}""")
+        assertEquals(0L, PPLUtils.getPPLResultCount(response))
+    }
+
+    fun `test getPPLResultCount returns zero for empty datarows without total`() {
+        val response = mapper.readTree("""{"schema":[],"datarows":[]}""")
+        assertEquals(0L, PPLUtils.getPPLResultCount(response))
+    }
+
+    fun `test getPPLResultCount prefers total over datarows length`() {
+        // datarows may be capped by the query limit while total reports the real count
+        val response = mapper.readTree(
+            """{"schema":[{"name":"user","type":"string"}],"datarows":[["VK"]],"total":250,"size":1}"""
+        )
+        assertEquals(250L, PPLUtils.getPPLResultCount(response))
     }
 }

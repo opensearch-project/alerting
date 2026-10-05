@@ -7,7 +7,7 @@ buildscript {
     apply from: 'build-tools/repositories.gradle'
 
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "3.8.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.9.0-SNAPSHOT")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         // 3.0.0-SNAPSHOT -> 3.0.0.0-SNAPSHOT
@@ -68,8 +68,8 @@ repositories {
 configurations {
     ktlint {
         resolutionStrategy {
-            force "ch.qos.logback:logback-classic:1.5.19"
-            force "ch.qos.logback:logback-core:1.5.19"
+            force "ch.qos.logback:logback-classic:1.5.34"
+            force "ch.qos.logback:logback-core:1.5.34"
         }
     }
 }
@@ -97,6 +97,7 @@ task ktlint(type: JavaExec, group: "verification") {
     mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
     args "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+    jvmArgs "--add-opens=java.base/java.lang=ALL-UNNAMED"
     
     // Skip on JDK 25
     onlyIf {
@@ -109,6 +110,7 @@ task ktlintFormat(type: JavaExec, group: "formatting") {
     mainClass = "com.pinterest.ktlint.Main"
     classpath = configurations.ktlint
     args "-F", "alerting/**/*.kt", "elastic-api/**/*.kt", "core/**/*.kt"
+    jvmArgs "--add-opens=java.base/java.lang=ALL-UNNAMED"
     
     // Skip on JDK 25 until ktlint fully supports it
     onlyIf {
@@ -131,9 +133,6 @@ allprojects {
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${kotlin_version}"
             force "org.jetbrains.kotlin:kotlin-reflect:${kotlin_version}"
-            force "org.apache.logging.log4j:log4j-api:2.25.4"
-            force "org.apache.logging.log4j:log4j-core:2.25.4"
-            force "org.apache.httpcomponents.client5:httpclient5:5.6.1"
         }
     }
 

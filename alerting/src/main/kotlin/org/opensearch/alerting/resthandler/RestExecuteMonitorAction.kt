@@ -9,8 +9,10 @@ import org.apache.logging.log4j.LogManager
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
+import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.xcontent.XContentParser.Token.START_OBJECT
 import org.opensearch.core.xcontent.XContentParserUtils.ensureExpectedToken
@@ -73,6 +75,8 @@ class RestExecuteMonitorAction : BaseRestHandler() {
                     throw AlertingException.wrap(e)
                 }
 
+                validateDataSources(monitor)
+
                 val execMonitorRequest = ExecuteMonitorRequest(dryrun, requestEnd, null, monitor)
                 client.execute(ExecuteMonitorAction.INSTANCE, execMonitorRequest, RestToXContentListener(channel))
             }
@@ -81,5 +85,17 @@ class RestExecuteMonitorAction : BaseRestHandler() {
 
     override fun responseParams(): Set<String> {
         return setOf("dryrun", "period_end", "monitorID")
+    }
+
+    private fun validateDataSources(monitor: Monitor) { // Data Sources are only supported at the transport layer for stored monitors.
+        if (monitor.dataSources != null) {
+            if (
+                monitor.dataSources.queryIndex != ScheduledJob.DOC_LEVEL_QUERIES_INDEX ||
+                monitor.dataSources.findingsIndex != AlertIndices.FINDING_HISTORY_WRITE_INDEX ||
+                monitor.dataSources.alertsIndex != AlertIndices.ALERT_INDEX
+            ) {
+                throw IllegalArgumentException("Custom Data Sources are not allowed.")
+            }
+        }
     }
 }
