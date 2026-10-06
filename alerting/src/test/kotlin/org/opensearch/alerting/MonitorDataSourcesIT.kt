@@ -34,6 +34,7 @@ import org.opensearch.alerting.workflow.CompositeWorkflowRunner
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
+import org.opensearch.common.xcontent.XContentFactory
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.action.AcknowledgeAlertRequest
@@ -68,6 +69,7 @@ import org.opensearch.commons.alerting.util.AlertingException
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
+import org.opensearch.env.Environment
 import org.opensearch.index.mapper.MapperService
 import org.opensearch.index.query.MatchQueryBuilder
 import org.opensearch.index.query.QueryBuilders
@@ -77,6 +79,7 @@ import org.opensearch.script.Script
 import org.opensearch.search.aggregations.bucket.composite.CompositeAggregationBuilder
 import org.opensearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.snapshots.SnapshotState
 import org.opensearch.test.OpenSearchTestCase
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -84,6 +87,7 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.time.temporal.ChronoUnit.MILLIS
 import java.util.Collections
+import java.util.Locale
 import java.util.Map
 import java.util.UUID
 import java.util.concurrent.ExecutionException
@@ -6590,5 +6594,229 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         monitorMetadata = searchMonitorMetadata("${monitorResponse.id}-metadata")
         val lastRunContextAfterEnable = (monitorMetadata?.lastRunContext?.get(index) as? Map<String, Any>)
         assertEquals(3, lastRunContextAfterEnable?.get("0"))
+    }
+
+    fun `test doc level monitor resumes when its index is recreated with fewer documents than its last run context`() {
+        val monitor = createLoginMonitor(index)
+        val testDoc = """{ "test_field_1" : "login" }"""
+        (1..6).forEach { indexDoc(index, "a$it", testDoc) }
+        executeMonitor(monitor, monitor.id, false)
+        assertEquals(6, searchFindings(monitor.id).size)
+        assertEquals(5L, lastRunContextSeqNo("${monitor.id}-metadata", index, "0"))
+
+        // The index now has fewer documents than the saved seq_no, as after a restore from an older snapshot
+        deleteIndex(index)
+        createTestIndex(index)
+        indexDoc(index, "b1", testDoc)
+        indexDoc(index, "b2", testDoc)
+
+        // The first run resumes from the newest document, like a monitor that starts watching an index
+        executeMonitor(monitor, monitor.id, false)
+        assertEquals(6, searchFindings(monitor.id).size)
+        assertEquals(1L, lastRunContextSeqNo("${monitor.id}-metadata", index, "0"))
+
+        // seq_nos 2 to 4, all below the old saved seq_no 5
+        (3..5).forEach { indexDoc(index, "b$it", testDoc) }
+        executeMonitor(monitor, monitor.id, false)
+        val findings = searchFindings(monitor.id)
+        assertEquals(9, findings.size)
+        assertEquals(listOf("b3", "b4", "b5"), findings.flatMap { it.relatedDocIds }.filter { it.startsWith("b") }.sorted())
+    }
+
+    fun `test doc level monitor resets after its index is restored from an older snapshot`() {
+        val monitor = createLoginMonitor(index)
+        val testDoc = """{ "test_field_1" : "login" }"""
+        (1..3).forEach { indexDoc(index, "a$it", testDoc) }
+        val snapshot = snapshotIndex(index)
+        (4..6).forEach { indexDoc(index, "a$it", testDoc) }
+        executeMonitor(monitor, monitor.id, false)
+        assertEquals(6, searchFindings(monitor.id).size)
+        assertEquals(5L, lastRunContextSeqNo("${monitor.id}-metadata", index, "0"))
+
+        // The restored shard ends at seq_no 2, below the saved 5, so the first run resets to 2 without reading anything again
+        deleteIndex(index)
+        restoreIndex(snapshot, index)
+        executeMonitor(monitor, monitor.id, false)
+        assertEquals(6, searchFindings(monitor.id).size)
+        assertEquals(2L, lastRunContextSeqNo("${monitor.id}-metadata", index, "0"))
+
+        // seq_no 3 is below the old saved 5 and is found on the next run
+        indexDoc(index, "b1", testDoc)
+        executeMonitor(monitor, monitor.id, false)
+        assertEquals(7, searchFindings(monitor.id).size)
+        assertEquals(3L, lastRunContextSeqNo("${monitor.id}-metadata", index, "0"))
+    }
+
+    fun `test doc level monitor continues from its last run context after its index is restored from a newer snapshot`() {
+        val monitor = createLoginMonitor(index)
+        val testDoc = """{ "test_field_1" : "login" }"""
+        (1..3).forEach { indexDoc(index, "a$it", testDoc) }
+        executeMonitor(monitor, monitor.id, false)
+        assertEquals(2L, lastRunContextSeqNo("${monitor.id}-metadata", index, "0"))
+        (4..6).forEach { indexDoc(index, "a$it", testDoc) }
+        val snapshot = snapshotIndex(index)
+
+        // The restored shard ends at seq_no 5, above the saved 2, so nothing resets and the run reads seq_nos 3 to 5
+        deleteIndex(index)
+        restoreIndex(snapshot, index)
+        executeMonitor(monitor, monitor.id, false)
+        assertEquals(6, searchFindings(monitor.id).size)
+        assertEquals(5L, lastRunContextSeqNo("${monitor.id}-metadata", index, "0"))
+    }
+
+    fun `test doc level monitor keeps its last run context when the newest documents are deleted`() {
+        val monitor = createLoginMonitor(index)
+        val testDoc = """{ "test_field_1" : "login" }"""
+        (1..5).forEach { indexDoc(index, "a$it", testDoc) }
+        executeMonitor(monitor, monitor.id, false)
+        assertEquals(4L, lastRunContextSeqNo("${monitor.id}-metadata", index, "0"))
+
+        // The newest live document is now below the saved seq_no, but the primary's max_seq_no is not
+        client().prepareDelete(index, "a5").setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).get()
+        client().prepareDelete(index, "a4").setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE).get()
+        executeMonitor(monitor, monitor.id, false)
+        assertEquals(4L, lastRunContextSeqNo("${monitor.id}-metadata", index, "0"))
+
+        indexDoc(index, "a6", testDoc)
+        executeMonitor(monitor, monitor.id, false)
+        val findings = searchFindings(monitor.id)
+        assertEquals(6, findings.size)
+        assertEquals(1, findings.count { it.relatedDocIds.contains("a6") })
+    }
+
+    fun `test doc level monitor drops shards its index no longer has after it is recreated with fewer shards`() {
+        val shardedIndex = "sharded-${randomAlphaOfLength(6).lowercase(Locale.ROOT)}"
+        createLoginIndex(shardedIndex, 3)
+        val monitor = createLoginMonitor(shardedIndex)
+        val testDoc = """{ "test_field_1" : "login" }"""
+        (1..6).forEach { indexDoc(shardedIndex, "a$it", testDoc) }
+        executeMonitor(monitor, monitor.id, false)
+        assertEquals(6, searchFindings(monitor.id).size)
+
+        deleteIndex(shardedIndex)
+        createLoginIndex(shardedIndex, 1)
+        indexDoc(shardedIndex, "b1", testDoc)
+        executeMonitor(monitor, monitor.id, false)
+        @Suppress("UNCHECKED_CAST")
+        val context = searchMonitorMetadata("${monitor.id}-metadata")!!.lastRunContext[shardedIndex] as kotlin.collections.Map<String, Any>
+        assertEquals(setOf("index", "shards_count", "0"), context.keys)
+        assertEquals(1, context["shards_count"])
+
+        indexDoc(shardedIndex, "b2", testDoc)
+        executeMonitor(monitor, monitor.id, false)
+        assertEquals(1, searchFindings(monitor.id).count { it.relatedDocIds.contains("b2") })
+    }
+
+    fun `test chained doc level delegate resets on the first run after its index is recreated`() {
+        // A bucket-level monitor has no last run context, so it keeps passing doc ids to the delegate after the index
+        // is recreated, while the delegate's saved seq_no still belongs to the old index. The first run resets the
+        // delegate to the shard's max_seq_no, skipping what is already there; later runs read new documents.
+        val query = QueryBuilders.rangeQuery("test_strict_date_time")
+            .gt("{{period_end}}||-10d")
+            .lte("{{period_end}}")
+            .format("epoch_millis")
+        val compositeAgg = CompositeAggregationBuilder(
+            "composite_agg", listOf(TermsValuesSourceBuilder("test_field_1").field("test_field_1"))
+        )
+        val input = SearchInput(indices = listOf(index), query = SearchSourceBuilder().size(0).query(query).aggregation(compositeAgg))
+        var trigger = randomBucketLevelTrigger()
+        trigger = trigger.copy(
+            bucketSelector = BucketSelectorExtAggregationBuilder(
+                name = trigger.id,
+                bucketsPathsMap = mapOf("docCount" to "_count"),
+                script = Script("params.docCount > 1"),
+                parentBucketPath = "composite_agg",
+                filter = null,
+            )
+        )
+        val findingsIndex = "custom_findings_index"
+        val dataSources = DataSources(
+            findingsEnabled = true,
+            alertsIndex = "custom_alerts_index",
+            findingsIndex = findingsIndex,
+            findingsIndexPattern = "custom_findings_index-1"
+        )
+        val bucketMonitor = createMonitor(
+            randomBucketLevelMonitor(inputs = listOf(input), enabled = false, triggers = listOf(trigger), dataSources = dataSources)
+        )!!
+        val docQuery = DocLevelQuery(query = "test_field_1:\"test_value_1\"", name = "1", fields = listOf())
+        val docMonitor = createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery))),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN)),
+                dataSources = dataSources
+            )
+        )!!
+        val workflow = upsertWorkflow(
+            randomWorkflow(monitorIds = listOf(bucketMonitor.id, docMonitor.id), enabled = false, auditDelegateMonitorAlerts = false)
+        )!!
+        val delegateMetadataId = "${workflow.id}-metadata-${docMonitor.id}-metadata"
+
+        insertSampleTimeSerializedData(index, listOf("test_value_1", "test_value_1", "test_value_1", "test_value_1"))
+        executeWorkflow(searchWorkflow(workflow.id), workflow.id, false)
+        assertEquals(4, searchFindings(docMonitor.id, findingsIndex).size)
+        assertEquals(3L, lastRunContextSeqNo(delegateMetadataId, index, "0"))
+
+        deleteIndex(index)
+        createTestIndex(index)
+        insertSampleTimeSerializedData(index, listOf("test_value_1", "test_value_1"))
+        executeWorkflow(searchWorkflow(workflow.id), workflow.id, false)
+        assertEquals(4, searchFindings(docMonitor.id, findingsIndex).size)
+        assertEquals(1L, lastRunContextSeqNo(delegateMetadataId, index, "0"))
+
+        insertSampleTimeSerializedData(index, listOf("test_value_1", "test_value_1"))
+        executeWorkflow(searchWorkflow(workflow.id), workflow.id, false)
+        assertEquals(6, searchFindings(docMonitor.id, findingsIndex).size)
+        assertEquals(3L, lastRunContextSeqNo(delegateMetadataId, index, "0"))
+    }
+
+    override fun nodeSettings(): Settings {
+        return Settings.builder()
+            .put(super.nodeSettings())
+            .put(Environment.PATH_REPO_SETTING.key, createTempDir().toString())
+            .build()
+    }
+
+    /** Snapshots [monitoredIndex] into a filesystem repository and returns the snapshot name. */
+    private fun snapshotIndex(monitoredIndex: String): String {
+        val repoPath = getInstanceFromNode(Environment::class.java).repoFiles().first()
+        client().admin().cluster().preparePutRepository(snapshotRepo).setType("fs")
+            .setSettings(Settings.builder().put("location", repoPath.toString())).get()
+        val snapshot = "snapshot-${randomAlphaOfLength(8).lowercase(Locale.ROOT)}"
+        val response = client().admin().cluster().prepareCreateSnapshot(snapshotRepo, snapshot)
+            .setIndices(monitoredIndex).setIncludeGlobalState(false).setWaitForCompletion(true).get()
+        assertEquals(SnapshotState.SUCCESS, response.snapshotInfo.state())
+        return snapshot
+    }
+
+    private fun restoreIndex(snapshot: String, monitoredIndex: String) {
+        val response = client().admin().cluster().prepareRestoreSnapshot(snapshotRepo, snapshot)
+            .setIndices(monitoredIndex).setWaitForCompletion(true).get()
+        assertEquals(0, response.restoreInfo.failedShards())
+    }
+
+    private val snapshotRepo = "monitor-test-repo"
+
+    private fun createLoginMonitor(monitoredIndex: String): Monitor {
+        val docQuery = DocLevelQuery(query = "test_field_1:\"login\"", name = "1", fields = listOf())
+        return createMonitor(
+            randomDocumentLevelMonitor(
+                inputs = listOf(DocLevelMonitorInput("description", listOf(monitoredIndex), listOf(docQuery))),
+                triggers = listOf()
+            )
+        )!!.let { it.monitor.copy(id = it.id) }
+    }
+
+    private fun createLoginIndex(name: String, shards: Int) {
+        val mapping = XContentFactory.jsonBuilder().startObject()
+            .startObject("properties").startObject("test_field_1").field("type", "keyword").endObject().endObject()
+            .endObject()
+        createIndex(name, Settings.builder().put("index.number_of_shards", shards).build(), mapping)
+    }
+
+    private fun lastRunContextSeqNo(metadataId: String, monitoredIndex: String, shard: String): Long? {
+        @Suppress("UNCHECKED_CAST")
+        val context = searchMonitorMetadata(metadataId)?.lastRunContext?.get(monitoredIndex) as? kotlin.collections.Map<String, Any>
+        return context?.get(shard)?.toString()?.toLong()
     }
 }

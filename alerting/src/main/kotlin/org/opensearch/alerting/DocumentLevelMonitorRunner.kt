@@ -194,6 +194,9 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         concreteIndexName,
                         shardCount
                     ) as MutableMap<String, Any>
+                    // Drop shards the index no longer has (it was recreated or restored with fewer shards). Keeping them
+                    // would send searches to shard ids that do not exist on every run.
+                    indexUpdatedRunContext.keys.removeIf { key -> key.toIntOrNull()?.let { it >= shardCount } ?: false }
                     if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                         IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
                     ) {
