@@ -276,14 +276,15 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                 IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
             ) {
-                val lastWriteIndex = concreteIndices.find { monitorMetadata.lastRunContext.containsKey(it) }
-                if (lastWriteIndex != null) {
-                    val lastWriteIndexCreationDate =
-                        IndexUtils.getCreationDateForIndex(lastWriteIndex, monitorCtx.clusterService!!.state())
+                val oldestTrackedIndexCreationDate = IndexUtils.getOldestCreationDate(
+                    concreteIndices.filter { monitorMetadata.lastRunContext.containsKey(it) },
+                    monitorCtx.clusterService!!.state()
+                )
+                if (oldestTrackedIndexCreationDate != null) {
                     concreteIndices = IndexUtils.getNewestIndicesByCreationDate(
                         concreteIndices,
                         monitorCtx.clusterService!!.state(),
-                        lastWriteIndexCreationDate
+                        oldestTrackedIndexCreationDate
                     )
                 }
             }

@@ -154,18 +154,25 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                     monitorCtx.indexNameExpressionResolver!!
                 )
                 var lastWriteIndex: String? = null
-                if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
+                val isAliasOrDataStream = IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                     IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
-                ) {
-                    lastWriteIndex = concreteIndices.find { lastRunContext.containsKey(it) }
-                    if (lastWriteIndex != null) {
-                        val lastWriteIndexCreationDate =
-                            IndexUtils.getCreationDateForIndex(lastWriteIndex, monitorCtx.clusterService!!.state())
+                val writeIndex = if (isAliasOrDataStream) {
+                    IndexUtils.getWriteIndex(indexName, monitorCtx.clusterService!!.state())
+                } else null
+                // Without a write index any backing index can receive documents: all are tracked, and newly tracked ones start at -1.
+                var scanNewBackingIndicesFromStart = false
+                if (isAliasOrDataStream) {
+                    val trackedIndices = concreteIndices.filter { lastRunContext.containsKey(it) }
+                    lastWriteIndex = trackedIndices.firstOrNull()
+                    val oldestTrackedIndexCreationDate =
+                        IndexUtils.getOldestCreationDate(trackedIndices, monitorCtx.clusterService!!.state())
+                    if (oldestTrackedIndexCreationDate != null) {
                         concreteIndices = IndexUtils.getNewestIndicesByCreationDate(
                             concreteIndices,
                             monitorCtx.clusterService!!.state(),
-                            lastWriteIndexCreationDate
+                            oldestTrackedIndexCreationDate
                         )
+                        scanNewBackingIndicesFromStart = writeIndex == null
                     }
                 }
                 concreteIndicesSeenSoFar.addAll(concreteIndices)
@@ -185,7 +192,10 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                             periodEnd,
                             monitorCtx.clusterService!!.state().metadata.index(concreteIndexName)
                         )
-                        MonitorMetadataService.createRunContextForIndex(concreteIndexName, isIndexCreatedRecently)
+                        MonitorMetadataService.createRunContextForIndex(
+                            concreteIndexName,
+                            isIndexCreatedRecently || scanNewBackingIndicesFromStart
+                        )
                     }
                     val shardCount: Int = getShardsCount(monitorCtx.clusterService!!, concreteIndexName)
                     // Prepare updatedLastRunContext for each index
@@ -194,14 +204,10 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         concreteIndexName,
                         shardCount
                     ) as MutableMap<String, Any>
-                    if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
-                        IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
-                    ) {
-                        if (concreteIndexName == IndexUtils.getWriteIndex(
-                                indexName,
-                                monitorCtx.clusterService!!.state()
-                            )
-                        ) {
+                    if (isAliasOrDataStream) {
+                        if (writeIndex == null) {
+                            updatedLastRunContext[concreteIndexName] = indexUpdatedRunContext
+                        } else if (concreteIndexName == writeIndex) {
                             updatedLastRunContext.remove(lastWriteIndex)
                             updatedLastRunContext[concreteIndexName] = indexUpdatedRunContext
                         }
