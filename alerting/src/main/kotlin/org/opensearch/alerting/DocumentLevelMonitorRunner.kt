@@ -10,6 +10,7 @@ import org.opensearch.ExceptionsHelper
 import org.opensearch.Version
 import org.opensearch.action.ActionListenerResponseHandler
 import org.opensearch.action.support.GroupedActionListener
+import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.cluster.node.DiscoveryNode
@@ -121,7 +122,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             }
 
             monitorCtx.docLevelMonitorQueries!!.initDocLevelQueryIndex(monitor.dataSources)
-            monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
+            val queryIndexingFailures = monitorCtx.docLevelMonitorQueries!!.indexDocLevelQueries(
                 monitor = monitor,
                 monitorId = monitor.id,
                 monitorMetadata,
@@ -412,7 +413,11 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             }
             updateLastRunContextFromFanOutResponses(docLevelMonitorFanOutResponses, updatedLastRunContext)
             val triggerResults = buildTriggerResults(docLevelMonitorFanOutResponses)
-            val inputRunResults = buildInputRunResults(docLevelMonitorFanOutResponses)
+            val queryIndexingError = if (queryIndexingFailures.isNotEmpty()) {
+                val message = DocLevelMonitorQueries.queryIndexingFailuresMessage(monitor.id, queryIndexingFailures)
+                AlertingException(message, RestStatus.BAD_REQUEST, IllegalArgumentException(message))
+            } else null
+            val inputRunResults = buildInputRunResults(docLevelMonitorFanOutResponses, queryIndexingError)
             if (!isTempMonitor) {
                 MonitorMetadataService.upsertMetadata(
                     monitorMetadata.copy(lastRunContext = updatedLastRunContext),
@@ -545,9 +550,12 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
         return triggerResults
     }
 
-    private fun buildInputRunResults(docLevelMonitorFanOutResponses: MutableList<DocLevelMonitorFanOutResponse>): InputRunResults {
+    private fun buildInputRunResults(
+        docLevelMonitorFanOutResponses: MutableList<DocLevelMonitorFanOutResponse>,
+        queryIndexingError: AlertingException?
+    ): InputRunResults {
         val inputRunResults = mutableMapOf<String, MutableSet<String>>()
-        val errors: MutableList<AlertingException> = mutableListOf()
+        val errors: MutableList<AlertingException> = listOfNotNull(queryIndexingError).toMutableList()
         for (response in docLevelMonitorFanOutResponses) {
             if (response.exception == null) {
                 if (response.inputResults.error != null) {

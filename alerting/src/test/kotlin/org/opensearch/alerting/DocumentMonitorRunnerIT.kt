@@ -574,6 +574,49 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertTrue("Findings saved for test monitor", findings1)
     }
 
+    fun `test execute monitor reports doc level queries that fail to install`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val mappedFieldQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val unmappedFieldQuery = DocLevelQuery(query = "unmapped_field:\"us-west-2\"", name = "4", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(mappedFieldQuery, unmappedFieldQuery))
+
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+        indexDoc(testIndex, "5", testDoc)
+
+        val output = entityAsMap(executeMonitor(monitor.id))
+
+        assertEquals(monitor.name, output["monitor_name"])
+        assertNull(output["error"])
+        val inputResults = output.stringMap("input_results")!!
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (inputResults["results"] as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[mappedFieldQuery.id] as List<String>
+        assertEquals("Incorrect search result", 2, matchingDocsToQuery.size)
+        assertTrue("Incorrect search result", matchingDocsToQuery.containsAll(listOf("1|$testIndex", "5|$testIndex")))
+        assertFalse(searchResult.containsKey(unmappedFieldQuery.id))
+
+        val error = inputResults["error"] as String
+        assertTrue(error, error.contains("Monitor [${monitor.id}] failed to install [1] doc level queries"))
+        assertTrue(error, error.contains("[query: ${unmappedFieldQuery.id}, index: $testIndex, reason: "))
+        assertTrue(error, error.contains("[unmapped_field]"))
+        assertFalse(error, error.contains(mappedFieldQuery.id))
+
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 2, findings.size)
+    }
+
     fun `test monitor run generates no error alerts with versionconflictengineexception with locks`() {
         val testIndex = createTestIndex()
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
