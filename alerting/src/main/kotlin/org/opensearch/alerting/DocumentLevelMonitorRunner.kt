@@ -212,8 +212,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         updatedLastRunContext[concreteIndexName] = indexUpdatedRunContext
                     }
 
-                    val count: Int = indexLastRunContext["shards_count"] as Int
-                    for (i: Int in 0 until count) {
+                    for (i: Int in 0 until shardCount) {
                         val shard = i.toString()
 
                         // update lastRunContext if its a temp monitor as we only want to view the last bit of data then

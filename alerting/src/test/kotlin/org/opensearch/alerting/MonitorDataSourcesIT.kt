@@ -6647,7 +6647,7 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         assertEquals(3L, lastRunContextSeqNo("${monitor.id}-metadata", index, "0"))
     }
 
-    fun `test doc level monitor continues from its last run context after its index is restored from a newer snapshot`() {
+    fun `test doc level monitor reads documents it has not seen after its index is restored from a newer snapshot`() {
         val monitor = createLoginMonitor(index)
         val testDoc = """{ "test_field_1" : "login" }"""
         (1..3).forEach { indexDoc(index, "a$it", testDoc) }
@@ -6705,6 +6705,24 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         indexDoc(shardedIndex, "b2", testDoc)
         executeMonitor(monitor, monitor.id, false)
         assertEquals(1, searchFindings(monitor.id).count { it.relatedDocIds.contains("b2") })
+    }
+
+    fun `test dryrun of a doc level monitor succeeds after its index is recreated with fewer shards`() {
+        // The saved context still says 3 shards while the index now has 1, so the dryrun must not read the shards
+        // that were dropped from the updated context.
+        val shardedIndex = "sharded-${randomAlphaOfLength(6).lowercase(Locale.ROOT)}"
+        createLoginIndex(shardedIndex, 3)
+        val monitor = createLoginMonitor(shardedIndex)
+        val testDoc = """{ "test_field_1" : "login" }"""
+        (1..6).forEach { indexDoc(shardedIndex, "a$it", testDoc) }
+        executeMonitor(monitor, monitor.id, false)
+        assertEquals(6, searchFindings(monitor.id).size)
+
+        deleteIndex(shardedIndex)
+        createLoginIndex(shardedIndex, 1)
+        indexDoc(shardedIndex, "b1", testDoc)
+        val response = executeMonitor(monitor, monitor.id, true)
+        assertNull(response!!.monitorRunResult.error)
     }
 
     fun `test chained doc level delegate resets on the first run after its index is recreated`() {
