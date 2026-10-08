@@ -53,6 +53,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_ACTIONABL
 import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_DOCS_SIZE_MEMORY_PERCENTAGE_LIMIT
 import org.opensearch.alerting.settings.AlertingSettings.Companion.PERCOLATE_QUERY_MAX_NUM_DOCS_IN_MEMORY
 import org.opensearch.alerting.settings.DestinationSettings
+import org.opensearch.alerting.util.IndexUtils
 import org.opensearch.alerting.util.MAX_SEARCH_SIZE
 import org.opensearch.alerting.util.MustacheTemplateService
 import org.opensearch.alerting.util.defaultToPerExecutionAction
@@ -258,6 +259,14 @@ class TransportDocLevelMonitorFanOutAction
                     fieldsToBeQueried.addAll(it.queryFieldNames)
                 }
                 if (fieldsToBeQueried.isNotEmpty()) {
+                    // The fields API returns field-alias values under the field-alias name;
+                    // percolate documents cannot contain field-alias keys.
+                    val resolvedFields = IndexUtils.resolveFieldAliases(
+                        fieldsToBeQueried,
+                        clusterService.state().metadata().index(indexExecutionContext!!.concreteIndexName)?.mapping()?.sourceAsMap
+                    )
+                    fieldsToBeQueried.clear()
+                    fieldsToBeQueried.addAll(resolvedFields)
                     log.debug(
                         "Monitor ${monitor.id} Querying only fields " +
                             "${fieldsToBeQueried.joinToString()} instead of entire _source of documents"

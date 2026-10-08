@@ -384,6 +384,47 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertEquals("Alert saved for test monitor", 0, alerts.size)
     }
 
+    fun `test execute monitor with queryFieldNames containing a field-alias generates findings`() {
+        adminClient().updateSettings(AlertingSettings.DOC_LEVEL_MONITOR_FETCH_ONLY_QUERY_FIELDS_ENABLED.key, "true")
+        val testIndex = createTestIndex(
+            randomAlphaOfLength(10).lowercase(Locale.ROOT),
+            """
+                "properties" : {
+                  "fw" : { "properties" : { "dst" : { "type" : "keyword" } } },
+                  "dst-ip" : { "type" : "alias", "path" : "fw.dst" }
+                }
+            """
+        )
+        val docQuery = DocLevelQuery(
+            query = "dst-ip:\"10.0.0.1\"",
+            name = "3",
+            fields = listOf(),
+            queryFieldNames = listOf("dst-ip")
+        )
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger)))
+
+        indexDoc(testIndex, "1", """{ "fw" : { "dst" : "10.0.0.1" } }""")
+        indexDoc(testIndex, "2", """{ "fw" : { "dst" : "10.0.0.2" } }""")
+
+        val response = executeMonitor(monitor.id)
+
+        val output = entityAsMap(response)
+        val inputResults = output.stringMap("input_results")
+        val errorMessage = inputResults?.get("error")
+        assertNull("Unexpected monitor execution failure: $errorMessage", errorMessage)
+        @Suppress("UNCHECKED_CAST")
+        val searchResult = (inputResults?.get("results") as List<Map<String, Any>>).first()
+        @Suppress("UNCHECKED_CAST")
+        val matchingDocsToQuery = searchResult[docQuery.id] as List<String>
+        assertEquals("Incorrect search result", listOf("1|$testIndex"), matchingDocsToQuery)
+
+        val findings = searchFindings(monitor)
+        assertEquals("Findings saved for test monitor", 1, findings.size)
+        assertEquals(listOf("1"), findings[0].relatedDocIds)
+    }
+
     fun `test execute monitor returns search result with dryrun`() {
         val testIndex = createTestIndex()
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
