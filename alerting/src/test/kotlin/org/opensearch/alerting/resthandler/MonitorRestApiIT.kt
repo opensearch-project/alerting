@@ -134,6 +134,24 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         assertEquals("Incorrect Location header", "$ALERTING_BASE_URI/$createdId", createResponse.getHeader("Location"))
     }
 
+    fun `test create monitor ignores client supplied created_by`() {
+        val createdMonitor = createMonitor(randomQueryLevelMonitor().copy(createdBy = "spoofed-user"))
+
+        assertNotEquals("Client-supplied created_by must be ignored", "spoofed-user", createdMonitor.createdBy)
+        if (!isHttps()) {
+            assertNull("created_by must be null when security is disabled", createdMonitor.createdBy)
+        }
+    }
+
+    fun `test update monitor does not change created_by`() {
+        val createdMonitor = createMonitor(randomQueryLevelMonitor())
+
+        val updatedMonitor = updateMonitor(createdMonitor.copy(name = "renamed-monitor", createdBy = "spoofed-user"))
+
+        assertEquals("Monitor was not updated", "renamed-monitor", updatedMonitor.name)
+        assertEquals("Update must not change created_by", createdMonitor.createdBy, updatedMonitor.createdBy)
+    }
+
     @Throws(Exception::class)
     fun `test creating a bucket monitor`() {
         val monitor = randomBucketLevelMonitor()

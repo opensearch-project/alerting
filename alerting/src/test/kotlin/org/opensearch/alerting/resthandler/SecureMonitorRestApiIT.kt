@@ -56,6 +56,7 @@ import org.opensearch.commons.alerting.aggregation.bucketselectorext.BucketSelec
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.IntervalSchedule
+import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.PPLTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
@@ -680,7 +681,112 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    fun `test user cannot overwrite ui_metadata created_by by writing to the config index directly`() {
+    fun `test created_by is set to the creator and preserved on update by another user`() {
+        if (!isHttps()) {
+            return
+        }
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE),
+            false
+        )
+        try {
+            val createdMonitor = createMonitorWithClient(
+                userClient!!,
+                monitor = randomQueryLevelMonitor().copy(createdBy = "spoofed-user"),
+                rbacRoles = listOf(TEST_HR_BACKEND_ROLE)
+            )
+            assertEquals("created_by must be the authenticated creator", user, createdMonitor.createdBy)
+
+            // The admin client is a different user; its update must not change created_by.
+            val updatedMonitor = updateMonitor(createdMonitor.copy(name = "renamed-by-admin", createdBy = "spoofed-user"))
+            assertEquals("Monitor was not updated", "renamed-by-admin", updatedMonitor.name)
+            assertEquals("Update by another user must not change created_by", user, updatedMonitor.createdBy)
+        } finally {
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
+    }
+
+    fun `test created_by is returned by get and search monitor APIs`() {
+        if (!isHttps()) {
+            return
+        }
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE),
+            false
+        )
+        try {
+            val createdMonitor = createMonitorWithClient(userClient!!, randomQueryLevelMonitor(), listOf(TEST_HR_BACKEND_ROLE))
+
+            val getResponse = client().makeRequest(
+                "GET", "$ALERTING_BASE_URI/${createdMonitor.id}", null,
+                BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+            )
+            assertEquals("Get monitor failed", RestStatus.OK, getResponse.restStatus())
+            val getMonitorJson = getResponse.asMap()["monitor"] as Map<String, Any>
+            assertEquals("GET must return created_by", user, getMonitorJson[Monitor.CREATED_BY_FIELD])
+            assertUserNull(getMonitorJson)
+
+            val search = SearchSourceBuilder().query(
+                QueryBuilders.boolQuery()
+                    .filter(QueryBuilders.termQuery("_id", createdMonitor.id))
+                    .filter(QueryBuilders.termQuery("monitor.${Monitor.CREATED_BY_FIELD}", user))
+            ).toString()
+            val searchResponse = client().makeRequest(
+                "POST", "$ALERTING_BASE_URI/_search", emptyMap(),
+                StringEntity(search, ContentType.APPLICATION_JSON)
+            )
+            assertEquals("Search monitor failed", RestStatus.OK, searchResponse.restStatus())
+            val hits = (searchResponse.asMap()["hits"] as Map<String, Any>)["hits"] as List<Map<String, Any>>
+            assertEquals("Search on created_by must find the monitor", 1, hits.size)
+            // The search API re-serializes each hit as the bare monitor (no "monitor" wrapper).
+            val searchMonitorJson = hits[0]["_source"] as Map<String, Any>
+            assertEquals("SEARCH must return created_by", user, searchMonitorJson[Monitor.CREATED_BY_FIELD])
+            assertUserNull(searchMonitorJson)
+        } finally {
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
+    }
+
+    fun `test user cannot spoof another user in created_by on create or update`() {
+        if (!isHttps()) {
+            return
+        }
+        createUserWithRoles(
+            user,
+            listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE),
+            listOf(TEST_HR_BACKEND_ROLE),
+            false
+        )
+        try {
+            // Impersonate a real, more privileged user on create.
+            val createdMonitor = createMonitorWithClient(
+                userClient!!,
+                randomQueryLevelMonitor().copy(createdBy = "admin"),
+                listOf(TEST_HR_BACKEND_ROLE)
+            )
+            assertEquals("Create must record the authenticated user, not the requested one", user, createdMonitor.createdBy)
+
+            // The creator updating their own monitor cannot rewrite created_by either.
+            val updatedMonitor = updateMonitorWithClient(
+                userClient!!,
+                createdMonitor.copy(name = "renamed-by-owner", createdBy = "admin"),
+                listOf(TEST_HR_BACKEND_ROLE)
+            )
+            assertEquals("Monitor was not updated", "renamed-by-owner", updatedMonitor.name)
+            assertEquals("Update must not change created_by", user, updatedMonitor.createdBy)
+        } finally {
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
+    }
+
+    fun `test user cannot overwrite created_by or ui_metadata created_by by writing to the config index directly`() {
         if (!isHttps()) {
             return
         }
@@ -720,13 +826,15 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             )
 
             val configIndex = ScheduledJob.SCHEDULED_JOBS_INDEX
-            val attempts = listOf(
-                "/$configIndex/_update/${monitor.id}" to
-                    "{\"doc\":{\"monitor\":{\"ui_metadata\":{\"created_by\":\"admin\"}}}}",
-                "/$configIndex/_update_by_query" to
-                    "{\"query\":{\"term\":{\"_id\":\"${monitor.id}\"}}," +
-                    "\"script\":{\"source\":\"ctx._source.monitor.ui_metadata.created_by = 'admin'\"}}"
-            )
+            val attempts = listOf("created_by", "ui_metadata.created_by").flatMap { field ->
+                val doc = if (field == "created_by") "{\"created_by\":\"admin\"}" else "{\"ui_metadata\":{\"created_by\":\"admin\"}}"
+                listOf(
+                    "/$configIndex/_update/${monitor.id}" to "{\"doc\":{\"monitor\":$doc}}",
+                    "/$configIndex/_update_by_query" to
+                        "{\"query\":{\"term\":{\"_id\":\"${monitor.id}\"}}," +
+                        "\"script\":{\"source\":\"ctx._source.monitor.$field = 'admin'\"}}"
+                )
+            }
             attempts.forEach { (endpoint, body) ->
                 try {
                     userClient!!.makeRequest("POST", endpoint, emptyMap(), StringEntity(body, ContentType.APPLICATION_JSON))
@@ -735,7 +843,9 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                     assertEquals("Direct write to $endpoint must be forbidden", RestStatus.FORBIDDEN, e.response.restStatus())
                 }
             }
-            assertEquals("created_by must be unchanged", user, getMonitorAsDashboards(monitor.id).uiMetadata["created_by"])
+            val storedMonitor = getMonitorAsDashboards(monitor.id)
+            assertEquals("created_by must be unchanged", user, storedMonitor.createdBy)
+            assertEquals("ui_metadata created_by must be unchanged", user, storedMonitor.uiMetadata["created_by"])
         } finally {
             deleteRoleAndRoleMapping(WRITE_ANY_INDEX_ROLE)
             createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
