@@ -205,5 +205,10 @@ class IndexUtils {
         fun getCreationDateForIndex(index: String, clusterState: ClusterState): Long {
             return clusterState.metadata.index(index).creationDate
         }
+
+        @JvmStatic
+        fun getOldestCreationDate(indices: Collection<String>, clusterState: ClusterState): Long? {
+            return indices.minOfOrNull { getCreationDateForIndex(it, clusterState) }
+        }
     }
 }

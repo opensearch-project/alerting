@@ -13,6 +13,7 @@ import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.client.Response
 import org.opensearch.client.ResponseException
+import org.opensearch.cluster.metadata.IndexMetadata
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.json.JsonXContent
@@ -1651,6 +1652,74 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         // A second update reads the metadata persisted by the first one.
         val updatedAgain = updateMonitor(updatedMonitor.copy(name = "${monitor.name}-updated-again"))
         assertEquals("${monitor.name}-updated-again", updatedAgain.name)
+    }
+
+    fun `test document-level monitor scans every backing index when index-alias has no write index`() {
+        val aliasName = "test-alias-no-write-index"
+        val firstIndex = "test-alias-no-write-index-000001"
+        val secondIndex = "test-alias-no-write-index-000002"
+        val mapping = """"properties": { "test_field": { "type": "keyword" } }"""
+        val now = System.currentTimeMillis()
+        // Creation dates precede the monitor period: neither index counts as created recently.
+        createIndex(
+            firstIndex,
+            Settings.builder().put(IndexMetadata.SETTING_CREATION_DATE, now - TimeUnit.HOURS.toMillis(2)).build(),
+            mapping
+        )
+        updateIndexAliases("""{ "add": { "index": "$firstIndex", "alias": "$aliasName" } }""")
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(aliasName), listOf(docQuery))
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(
+                enabled = false,
+                inputs = listOf(docLevelInput),
+                triggers = listOf(randomDocumentLevelTrigger(condition = ALWAYS_RUN))
+            )
+        )
+        executeMonitor(monitor.id)
+
+        val testDoc = """{ "test_field": "us-west-2" }"""
+        val expectedDocIds = mutableListOf<String>()
+        fun indexDocs(index: String, prefix: String) {
+            (1..3).forEach {
+                indexDoc(index, "$prefix-$it", testDoc)
+                expectedDocIds.add("$prefix-$it|$index")
+            }
+        }
+
+        indexDocs(firstIndex, "first-index")
+        executeMonitor(monitor.id)
+
+        createIndex(
+            secondIndex,
+            Settings.builder().put(IndexMetadata.SETTING_CREATION_DATE, now - TimeUnit.HOURS.toMillis(1)).build(),
+            mapping
+        )
+        indexDocs(secondIndex, "before-join")
+        updateIndexAliases("""{ "add": { "index": "$secondIndex", "alias": "$aliasName" } }""")
+        executeMonitor(monitor.id)
+
+        indexDocs(secondIndex, "after-join")
+        executeMonitor(monitor.id)
+
+        updateIndexAliases("""{ "remove": { "index": "$firstIndex", "alias": "$aliasName" } }""")
+        indexDocs(secondIndex, "sole-index")
+        executeMonitor(monitor.id)
+
+        val foundDocIds = searchFindings(mapOf("size" to "100")).findings
+            .filter { it.finding.monitorId == monitor.id }
+            .flatMap { it.finding.relatedDocIds.map { docId -> "$docId|${it.finding.index}" } }
+        assertEquals(
+            "Every matching document must produce exactly one finding",
+            expectedDocIds.sorted(),
+            foundDocIds.sorted()
+        )
+    }
+
+    private fun updateIndexAliases(vararg actions: String) {
+        val requestBody = """{ "actions": [ ${actions.joinToString(",")} ] }"""
+        client().makeRequest("POST", "/_aliases", emptyMap(), StringEntity(requestBody, ContentType.APPLICATION_JSON))
     }
 
     fun `test document-level monitor when docs exist prior to monitor creation`() {

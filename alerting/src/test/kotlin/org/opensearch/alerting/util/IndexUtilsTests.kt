@@ -5,8 +5,12 @@
 
 package org.opensearch.alerting.util
 
+import org.opensearch.Version
 import org.opensearch.alerting.parser
+import org.opensearch.cluster.ClusterName
+import org.opensearch.cluster.ClusterState
 import org.opensearch.cluster.metadata.IndexMetadata
+import org.opensearch.cluster.metadata.Metadata
 import org.opensearch.test.OpenSearchTestCase
 import java.lang.NumberFormatException
 import kotlin.test.assertFailsWith
@@ -87,5 +91,25 @@ class IndexUtilsTests : OpenSearchTestCase() {
 
         val shouldUpdateIndex = IndexUtils.shouldUpdateIndex(index, newMapping)
         assertFalse(shouldUpdateIndex)
+    }
+
+    fun `test get oldest creation date`() {
+        val metadata = Metadata.builder()
+        mapOf("index-1" to 300L, "index-2" to 100L, "index-3" to 200L).forEach { (name, creationDate) ->
+            metadata.put(
+                IndexMetadata.builder(name)
+                    .settings(settings(Version.CURRENT))
+                    .numberOfShards(1)
+                    .numberOfReplicas(0)
+                    .creationDate(creationDate)
+                    .build(),
+                false
+            )
+        }
+        val clusterState = ClusterState.builder(ClusterName.DEFAULT).metadata(metadata).build()
+
+        assertEquals(100L, IndexUtils.getOldestCreationDate(listOf("index-1", "index-2", "index-3"), clusterState))
+        assertEquals(200L, IndexUtils.getOldestCreationDate(listOf("index-1", "index-3"), clusterState))
+        assertNull(IndexUtils.getOldestCreationDate(listOf(), clusterState))
     }
 }
