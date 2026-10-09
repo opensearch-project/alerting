@@ -15,6 +15,7 @@ import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.Monitor
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.action.ActionExecutionPolicy
 import org.opensearch.commons.alerting.model.action.PerExecutionActionScope
 import org.opensearch.test.OpenSearchTestCase
@@ -122,6 +123,26 @@ class DocLeveFanOutIT : AlertingRestTestCase() {
         assertEquals((0 until 12).map { "c$it" }.sorted(), newFindings.sorted())
     }
 
+    fun `test doc level monitor reads every document indexed after its index is recreated empty`() {
+        val testIndex = createTestIndex(settings = shardedIndexSettings())
+        val monitor = createUsWest2Monitor(testIndex)
+        bulkIndexUsWest2Docs(testIndex, "a", 600)
+        executeMonitor(monitor.id)
+        assertEquals(600, findingDocIds(monitor).size)
+
+        // Every shard of the recreated index is empty, so each node resets its shards to -1 and the run must save -1.
+        deleteIndex(testIndex)
+        createTestIndex(testIndex, shardedIndexSettings())
+        executeMonitor(monitor.id)
+        assertEquals((0 until 6).associate { "$it" to -1L }, lastRunContextSeqNos(monitor, testIndex))
+
+        // The next run reads every shard from the start, so no document indexed after the recreate is skipped.
+        bulkIndexUsWest2Docs(testIndex, "b", 12)
+        executeMonitor(monitor.id)
+        val newFindings = findingDocIds(monitor).filter { it.startsWith("b") }
+        assertEquals((0 until 12).map { "b$it" }.sorted(), newFindings.sorted())
+    }
+
     private fun shardedIndexSettings(): Settings =
         Settings.builder().put("index.number_of_shards", 6).put("index.number_of_replicas", 0).build()
 
@@ -146,6 +167,16 @@ class DocLeveFanOutIT : AlertingRestTestCase() {
         val hits = (entityAsMap(response)["hits"] as Map<String, Any>)["hits"] as List<Map<String, Any>>
         @Suppress("UNCHECKED_CAST")
         return hits.flatMap { (it["_source"] as Map<String, Any>)["related_doc_ids"] as List<String> }
+    }
+
+    /** Saved seq_no per shard of [testIndex] in the monitor's last run context. */
+    private fun lastRunContextSeqNos(monitor: Monitor, testIndex: String): Map<String, Long> {
+        val response = adminClient().makeRequest("GET", "${ScheduledJob.SCHEDULED_JOBS_INDEX}/_doc/${monitor.id}-metadata")
+        @Suppress("UNCHECKED_CAST")
+        val metadata = (entityAsMap(response)["_source"] as Map<String, Any>)["metadata"] as Map<String, Any>
+        @Suppress("UNCHECKED_CAST")
+        val context = (metadata["last_run_context"] as Map<String, Any>)[testIndex] as Map<String, Any>
+        return context.filterKeys { it != "index" && it != "shards_count" }.mapValues { it.value.toString().toLong() }
     }
 
     private fun bulkIndexUsWest2Docs(testIndex: String, idPrefix: String, count: Int) {

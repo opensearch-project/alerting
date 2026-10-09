@@ -33,6 +33,7 @@ import org.opensearch.core.common.breaker.CircuitBreakingException
 import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.IndexNotFoundException
+import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.node.NodeClosedException
 import org.opensearch.transport.ActionNotFoundTransportException
 import org.opensearch.transport.ConnectTransportException
@@ -470,7 +471,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                 it != "shards_count" &&
                                 it != "index" &&
                                 seq_no != null &&
-                                seq_no >= 0
+                                seq_no >= SequenceNumbers.NO_OPS_PERFORMED
                             ) {
                                 indexLastRunContext[it] = seq_no
                             }
