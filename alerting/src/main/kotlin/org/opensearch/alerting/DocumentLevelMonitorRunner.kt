@@ -33,6 +33,7 @@ import org.opensearch.core.common.breaker.CircuitBreakingException
 import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.index.IndexNotFoundException
+import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.node.NodeClosedException
 import org.opensearch.transport.ActionNotFoundTransportException
 import org.opensearch.transport.ConnectTransportException
@@ -194,6 +195,9 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         concreteIndexName,
                         shardCount
                     ) as MutableMap<String, Any>
+                    // Drop shards the index no longer has (it was recreated or restored with fewer shards). Keeping them
+                    // would send searches to shard ids that do not exist on every run.
+                    indexUpdatedRunContext.keys.removeIf { key -> key.toIntOrNull()?.let { it >= shardCount } ?: false }
                     if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                         IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
                     ) {
@@ -209,8 +213,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         updatedLastRunContext[concreteIndexName] = indexUpdatedRunContext
                     }
 
-                    val count: Int = indexLastRunContext["shards_count"] as Int
-                    for (i: Int in 0 until count) {
+                    for (i: Int in 0 until shardCount) {
                         val shard = i.toString()
 
                         // update lastRunContext if its a temp monitor as we only want to view the last bit of data then
@@ -468,7 +471,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                                 it != "shards_count" &&
                                 it != "index" &&
                                 seq_no != null &&
-                                seq_no >= 0
+                                seq_no >= SequenceNumbers.NO_OPS_PERFORMED
                             ) {
                                 indexLastRunContext[it] = seq_no
                             }
