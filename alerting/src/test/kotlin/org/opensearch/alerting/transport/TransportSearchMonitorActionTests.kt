@@ -192,6 +192,7 @@ class TransportSearchMonitorActionTests : OpenSearchTestCase() {
             clusterService,
             Mockito.mock(ActionFilters::class.java),
             Mockito.mock(NamedWriteableRegistry::class.java),
+            org.opensearch.core.xcontent.NamedXContentRegistry.EMPTY,
             sdkClient,
             Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
         )
