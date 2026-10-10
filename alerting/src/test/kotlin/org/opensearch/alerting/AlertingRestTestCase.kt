@@ -821,7 +821,17 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         }.filter { finding -> finding.monitorId == monitor.id }
     }
 
-    protected fun searchAlerts(monitor: Monitor, indices: String = AlertIndices.ALERT_INDEX, refresh: Boolean = true): List<Alert> {
+    /**
+     * @param size the number of alerts to return. Defaults to OpenSearch's own default of 10, so callers that may see
+     * more than 10 alerts *must* pass an explicit size -- otherwise the result is silently truncated and an assertion
+     * on `.size` cannot distinguish "10 alerts" from "any number greater than 10".
+     */
+    protected fun searchAlerts(
+        monitor: Monitor,
+        indices: String = AlertIndices.ALERT_INDEX,
+        refresh: Boolean = true,
+        size: Int = 10,
+    ): List<Alert> {
         try {
             if (refresh) refreshIndex(indices)
         } catch (e: Exception) {
@@ -833,6 +843,8 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         val searchParams = if (monitor.id != Monitor.NO_ID) mapOf("routing" to monitor.id) else mapOf()
         val request = """
             { "version" : true,
+              "size" : $size,
+              "track_total_hits" : true,
               "query" : { "term" : { "${Alert.MONITOR_ID_FIELD}" : "${monitor.id}" } }
             }
         """.trimIndent()
@@ -844,6 +856,61 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             val xcp = createParser(jsonXContent, it.sourceRef).also { it.nextToken() }
             Alert.parse(xcp, it.id, it.version)
         }
+    }
+
+    /**
+     * Counts the alerts belonging to [monitorId] in [indices] using `_count`, which is subject to neither the default
+     * search size of 10 nor `index.max_result_window`. Prefer this over `searchAlerts(...).size` whenever the expected
+     * number of alerts is (or could be) greater than 10.
+     */
+    protected fun countAlerts(monitorId: String, indices: String = AlertIndices.ALERT_INDEX): Int {
+        try {
+            refreshIndex(indices)
+        } catch (e: Exception) {
+            logger.warn("Could not refresh index $indices because: ${e.message}")
+            return 0
+        }
+
+        val request = """
+            { "query" : { "term" : { "${Alert.MONITOR_ID_FIELD}" : "$monitorId" } } }
+        """.trimIndent()
+        val httpResponse = adminClient().makeRequest(
+            "GET", "/$indices/_count", mapOf("ignore_unavailable" to "true"),
+            StringEntity(request, APPLICATION_JSON)
+        )
+        assertEquals("Count failed", RestStatus.OK, httpResponse.restStatus())
+        return (httpResponse.asMap()["count"] as Number).toInt()
+    }
+
+    /**
+     * Bulk-indexes [alerts] into [indices] in a single request, routed by monitor id exactly as
+     * [createAlert] does. Tests that need more than a handful of alerts should use this instead of
+     * looping over [createAlert], which refreshes the index once per alert.
+     *
+     * @param routing overrides the routing value for every alert. Chained alerts carry an empty `monitor_id`, which is
+     * not a legal routing value, so those must be routed by workflow id instead.
+     */
+    protected fun createAlerts(
+        alerts: List<Alert>,
+        indices: String = AlertIndices.ALERT_INDEX,
+        routing: String? = null,
+    ): List<Alert> {
+        if (alerts.isEmpty()) return alerts
+
+        val body = StringBuilder()
+        alerts.forEach { alert ->
+            assertNotEquals("Bulk-created alerts must carry an explicit id", Alert.NO_ID, alert.id)
+            body.append("""{"index":{"_id":"${alert.id}","routing":"${routing ?: alert.monitorId}"}}""").append('\n')
+            body.append(alert.toJsonStringWithUser()).append('\n')
+        }
+
+        val httpResponse = adminClient().makeRequest(
+            "POST", "/$indices/_bulk", mapOf("refresh" to "true"),
+            StringEntity(body.toString(), APPLICATION_JSON)
+        )
+        assertEquals("Unable to bulk create alerts", RestStatus.OK, httpResponse.restStatus())
+        assertFalse("Bulk alert creation reported failures", httpResponse.asMap()["errors"] as Boolean)
+        return alerts
     }
 
     protected fun acknowledgeAlerts(monitor: Monitor, vararg alerts: Alert): Response {

@@ -16,6 +16,9 @@ import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PATTERN
+import org.opensearch.alerting.cleanup.AlertCleanupService
+import org.opensearch.alerting.cleanup.action.AlertCleanupAction
+import org.opensearch.alerting.cleanup.action.TransportAlertCleanupAction
 import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.comments.CommentsIndices.Companion.ALL_COMMENTS_INDEX_PATTERN
 import org.opensearch.alerting.core.JobSweeper
@@ -250,6 +253,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     override fun getActions(): List<ActionPlugin.ActionHandler<out ActionRequest, out ActionResponse>> {
         return listOf(
             ActionPlugin.ActionHandler(ScheduledJobsStatsAction.INSTANCE, ScheduledJobsStatsTransportAction::class.java),
+            ActionPlugin.ActionHandler(AlertCleanupAction.INSTANCE, TransportAlertCleanupAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.INDEX_MONITOR_ACTION_TYPE, TransportIndexMonitorAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_MONITOR_ACTION_TYPE, TransportGetMonitorAction::class.java),
             ActionPlugin.ActionHandler(ExecuteMonitorAction.INSTANCE, TransportExecuteMonitorAction::class.java),
@@ -327,6 +331,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             client.threadPool().executor(ThreadPool.Names.GENERIC)
         )
 
+        // Initialized before the runner, whose registerConsumers() supplies its settings-driven fields.
+        AlertCleanupService.initialize(client, clusterService, lockService, xContentRegistry)
+
         val alertService = AlertService(client, xContentRegistry, alertIndices, sdkClient)
         val triggerService = TriggerService(scriptService)
         runner = MonitorRunnerService
@@ -384,6 +391,10 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         )
 
         DeleteMonitorService.initialize(client, lockService, sdkClient)
+
+        // Backstop for a cleanup whose announcement was lost, or whose executor left the cluster mid-drain. Every data
+        // node runs it; the per-task lock decides which one actually resumes each task.
+        AlertCleanupService.scheduleResume(threadPool, AlertingSettings.ALERT_CLEANUP_RESUME_INTERVAL.get(settings))
 
         val providerType = AlertingSettings.JOB_QUEUE_ACCOUNT_PROVIDER_TYPE.get(settings)
         val monitorJobPoller = MonitorJobPoller(
@@ -459,6 +470,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.ALERT_BACKOFF_COUNT,
             AlertingSettings.MOVE_ALERTS_BACKOFF_MILLIS,
             AlertingSettings.MOVE_ALERTS_BACKOFF_COUNT,
+            AlertingSettings.ALERT_CLEANUP_RESUME_INTERVAL,
             AlertingSettings.ALERT_HISTORY_ENABLED,
             AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD,
             AlertingSettings.ALERT_HISTORY_INDEX_MAX_AGE,
