@@ -499,9 +499,15 @@ String baseName = "alertingBwcCluster"
                     return new RegularFile() {
                         @Override
                         File getAsFile() {
-                            return configurations.zipArchive.asFileTree.matching {
-                                include '**/alerting*'
-                            }.singleFile
+                            // The BWC alerting zip is declared under the `opensearchPlugin`
+                            // configuration (see `opensearchPlugin "org.opensearch.plugin:alerting:${bwcPluginVersion}@zip"`),
+                            // not `zipArchive`, so resolve it from there. Mirrors the
+                            // opensearch-security resolution used for integTest above.
+                            return configurations.opensearchPlugin.resolvedConfiguration.resolvedArtifacts
+                                    .find { ResolvedArtifact f ->
+                                        f.name.startsWith("alerting")
+                                    }
+                                    .file
                         }
                     }
                 }
