@@ -15,14 +15,19 @@ import org.opensearch.alerting.ALERTING_BASE_URI
 import org.opensearch.alerting.ALERTING_FULL_ACCESS_ROLE
 import org.opensearch.alerting.AlertingPlugin.Companion.COMMENTS_BASE_URI
 import org.opensearch.alerting.AlertingRestTestCase
+import org.opensearch.alerting.ResourceSharingUtils.MONITOR_RESOURCE_TYPE
+import org.opensearch.alerting.ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.randomAlert
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelTrigger
+import org.opensearch.alerting.randomWorkflow
 import org.opensearch.client.Request
 import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
 import org.opensearch.commons.alerting.model.Alert
+import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.rest.SecureRestClientBuilder
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.test.junit.annotations.TestLogging
@@ -38,6 +43,8 @@ import org.opensearch.test.junit.annotations.TestLogging
  *  - revoke removes access
  *  - cross-resource isolation: a share on monitor A does not grant access to monitor B
  *  - third-party isolation: a share to bob does not grant access to carol
+ *  - search returns a monitor only while it is owned or shared
+ *  - monitor and workflow docs keep `all_shared_principals` in step with share, update and revoke
  *
  * Runs only when both `security` and `resource_sharing.enabled` system properties are true.
  */
@@ -257,21 +264,90 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
 
     // ─── Search DLS ──────────────────────────────────────────────────────────────
 
-    fun `test search excludes monitors not owned or shared`() {
-        val aliceMonitorId = aliceCreatesMonitor().id
+    fun `test search returns monitors owned or currently shared`() {
+        val sharedMonitor = aliceCreatesMonitor()
+        val unsharedMonitorId = aliceCreatesMonitor().id
         val bobMonitorId = bobCreatesMonitor().id
 
-        val body = searchMonitors(bobClient!!)
+        var body = searchMonitors(bobClient!!)
         assertTrue("Bob's own monitor missing: $body", body.contains(bobMonitorId))
-        assertFalse("Alice's monitor leaked: $body", body.contains(aliceMonitorId))
+        assertFalse("Monitor visible to Bob before share: $body", body.contains(sharedMonitor.id))
+
+        shareResource(aliceClient!!, sharedMonitor.id, READ_ONLY, RS_BOB)
+        body = searchMonitors(bobClient!!)
+        assertTrue("Bob's own monitor missing after share: $body", body.contains(bobMonitorId))
+        assertTrue("Shared monitor missing: $body", body.contains(sharedMonitor.id))
+        assertFalse("Unshared monitor visible to Bob: $body", body.contains(unsharedMonitorId))
+
+        updateMonitorAs(aliceClient!!, sharedMonitor.copy(name = "renamed"))
+        awaitStoredPrincipals(sharedMonitor.id, setOf("user:$RS_ALICE", "user:$RS_BOB"))
+        body = searchMonitors(bobClient!!)
+        assertTrue("Shared monitor missing after update: $body", body.contains(sharedMonitor.id))
+
+        revokeResource(aliceClient!!, sharedMonitor.id, RS_BOB)
+        body = searchMonitors(bobClient!!)
+        assertTrue("Bob's own monitor missing after revoke: $body", body.contains(bobMonitorId))
+        assertFalse("Monitor visible to Bob after revoke: $body", body.contains(sharedMonitor.id))
     }
 
-    fun `test search includes shared monitor`() {
+    fun `test search returns workflows owned or currently shared`() {
         val aliceMonitorId = aliceCreatesMonitor().id
-        shareResource(aliceClient!!, aliceMonitorId, READ_ONLY, RS_BOB)
+        val workflowId = createWorkflowWithClient(aliceClient!!, randomWorkflow(monitorIds = listOf(aliceMonitorId))).id
+        val bobMonitorId = bobCreatesMonitor().id
 
-        val body = searchMonitors(bobClient!!)
-        assertTrue("Shared monitor missing from search: $body", body.contains(aliceMonitorId))
+        // The security plugin writes the workflow's sharing entry and all_shared_principals after create returns.
+        assertBusy {
+            val body = searchMonitors(aliceClient!!)
+            assertTrue("Alice's own monitor missing: $body", body.contains(aliceMonitorId))
+            assertTrue("Alice's own workflow missing: $body", body.contains(workflowId))
+        }
+        var body = searchMonitors(bobClient!!)
+        assertTrue("Bob's own monitor missing: $body", body.contains(bobMonitorId))
+        assertFalse("Workflow visible to Bob before share: $body", body.contains(workflowId))
+
+        shareResource(aliceClient!!, workflowId, READ_ONLY, RS_BOB, WORKFLOW_RESOURCE_TYPE)
+        body = searchMonitors(bobClient!!)
+        assertTrue("Shared workflow missing: $body", body.contains(workflowId))
+
+        revokeResource(aliceClient!!, workflowId, RS_BOB, WORKFLOW_RESOURCE_TYPE)
+        body = searchMonitors(bobClient!!)
+        assertTrue("Bob's own monitor missing after revoke: $body", body.contains(bobMonitorId))
+        assertFalse("Workflow visible to Bob after revoke: $body", body.contains(workflowId))
+    }
+
+    // ─── all_shared_principals on the resource document ─────────────────────────
+    // DLS and accessible-id listing match the doc's own all_shared_principals, so it must be stored and keyword-indexed.
+
+    fun `test all_shared_principals follows share, update and revoke on monitor`() {
+        val monitor = aliceCreatesMonitor()
+        assertPrincipals(monitor.id, setOf("user:$RS_ALICE"))
+
+        shareResource(aliceClient!!, monitor.id, READ_WRITE, RS_BOB)
+        assertPrincipals(monitor.id, setOf("user:$RS_ALICE", "user:$RS_BOB"))
+
+        // A monitor update replaces the whole document, so the field must be restored after it.
+        updateMonitorAs(bobClient!!, monitor.copy(name = "renamed-by-bob"))
+        assertEquals("renamed-by-bob", storedSource(monitor.id).stringMap("monitor")?.get("name"))
+        assertPrincipals(monitor.id, setOf("user:$RS_ALICE", "user:$RS_BOB"))
+
+        revokeResource(aliceClient!!, monitor.id, RS_BOB)
+        assertPrincipals(monitor.id, setOf("user:$RS_ALICE"), absent = setOf("user:$RS_BOB"))
+    }
+
+    fun `test all_shared_principals follows share, update and revoke on workflow`() {
+        val workflow = aliceCreatesWorkflow()
+        assertPrincipals(workflow.id, setOf("user:$RS_ALICE"))
+
+        shareResource(aliceClient!!, workflow.id, READ_WRITE, RS_BOB, WORKFLOW_RESOURCE_TYPE)
+        assertPrincipals(workflow.id, setOf("user:$RS_ALICE", "user:$RS_BOB"))
+
+        // Updated as the owner: a workflow update by bob would also need access to its delegate monitor.
+        updateWorkflowAs(aliceClient!!, workflow.copy(name = "renamed"))
+        assertEquals("renamed", storedSource(workflow.id).stringMap("workflow")?.get("name"))
+        assertPrincipals(workflow.id, setOf("user:$RS_ALICE", "user:$RS_BOB"))
+
+        revokeResource(aliceClient!!, workflow.id, RS_BOB, WORKFLOW_RESOURCE_TYPE)
+        assertPrincipals(workflow.id, setOf("user:$RS_ALICE"), absent = setOf("user:$RS_BOB"))
     }
 
     // ─── Subordinate resource: alerts ────────────────────────────────────────────
@@ -417,6 +493,75 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
     private fun aliceCreatesMonitor() = createMonitorAs(aliceClient!!, sampleMonitor())
 
     private fun bobCreatesMonitor() = createMonitorAs(bobClient!!, sampleMonitor())
+
+    /** Creates a workflow as alice over one of her monitors and waits for its sharing entry. */
+    private fun aliceCreatesWorkflow(): Workflow {
+        val monitorId = aliceCreatesMonitor().id
+        val workflow = createWorkflowWithClient(aliceClient!!, randomWorkflow(monitorIds = listOf(monitorId)))
+        waitForResourceSharingEntry(workflow.id)
+        return workflow
+    }
+
+    /** PUTs a workflow as [client] without the base helper's follow-up GET, which runs as admin. */
+    private fun updateWorkflowAs(client: RestClient, workflow: Workflow) {
+        val response = client.makeRequest("PUT", "${workflow.relativeUrl()}?refresh=true", emptyMap(), workflow.toHttpEntity())
+        assertEquals("Unable to update a workflow", RestStatus.OK.status, response.statusLine.statusCode)
+    }
+
+    /** Asserts [docId] stores exactly [expected] in `all_shared_principals`, and term queries match each and none of [absent]. */
+    private fun assertPrincipals(docId: String, expected: Set<String>, absent: Set<String> = emptySet()) {
+        awaitStoredPrincipals(docId, expected)
+        expected.forEach { principal ->
+            assertEquals("Term query on all_shared_principals=$principal for $docId", 1, countMatching(docId, principal))
+        }
+        // user:nobody proves the term query can miss, so the matches above come from the indexed field.
+        (absent + "user:nobody").forEach { principal ->
+            assertEquals("Term query on absent principal $principal for $docId", 0, countMatching(docId, principal))
+        }
+    }
+
+    /** Waits until [docId] stores exactly [expected] in `all_shared_principals`, then refreshes the index for search. */
+    private fun awaitStoredPrincipals(docId: String, expected: Set<String>) {
+        // Create and update write the field asynchronously, from the security plugin's index listener.
+        assertBusy {
+            assertEquals("all_shared_principals in _source of $docId", expected.sorted(), storedPrincipals(docId).sorted())
+        }
+        adminClient().makeRequest("POST", "/${ScheduledJob.SCHEDULED_JOBS_INDEX}/_refresh")
+    }
+
+    private fun storedSource(docId: String): Map<String, Any> {
+        val response = adminClient().makeRequest("GET", "/${ScheduledJob.SCHEDULED_JOBS_INDEX}/_doc/$docId")
+        return response.asMap()["_source"] as Map<String, Any>
+    }
+
+    /** Returns the stored values as a list, so a duplicate value fails the comparison. */
+    private fun storedPrincipals(docId: String): List<String> {
+        val raw = storedSource(docId)["all_shared_principals"] ?: return emptyList()
+        val values = raw as? List<*> ?: throw AssertionError("all_shared_principals is not a list on $docId: $raw")
+        return values.map { it as String }
+    }
+
+    private fun countMatching(docId: String, principal: String): Int {
+        val query = """
+            {
+              "query": {
+                "bool": {
+                  "filter": [
+                    { "ids": { "values": ["$docId"] } },
+                    { "term": { "all_shared_principals": "$principal" } }
+                  ]
+                }
+              }
+            }
+        """.trimIndent()
+        val response = adminClient().makeRequest(
+            "POST",
+            "/${ScheduledJob.SCHEDULED_JOBS_INDEX}/_count",
+            emptyMap(),
+            StringEntity(query, ContentType.APPLICATION_JSON)
+        )
+        return (response.asMap()["count"] as Number).toInt()
+    }
 
     /**
      * POSTs a monitor as [client] and parses the id out of the response directly.
@@ -564,13 +709,19 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
-    private fun shareResource(client: RestClient, resourceId: String, accessLevel: String, user: String) {
+    private fun shareResource(
+        client: RestClient,
+        resourceId: String,
+        accessLevel: String,
+        user: String,
+        resourceType: String = MONITOR_RESOURCE_TYPE
+    ) {
         val request = Request("PUT", "/_plugins/_security/api/resource/share")
         request.setJsonEntity(
             """
             {
               "resource_id": "$resourceId",
-              "resource_type": "monitor",
+              "resource_type": "$resourceType",
               "share_with": { "$accessLevel": { "users": ["$user"] } }
             }
             """.trimIndent()
@@ -581,10 +732,7 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         // security plugin, but any secondary queries that hit the sharing index via a search
         // (for example `getAccessibleResourceIds`) may still miss until the shard's search view
         // catches up. Force a refresh so `getAccessibleResourceIds` picks up the new entry.
-        try {
-            adminClient().performRequest(Request("POST", "/$configSharingIndex/_refresh"))
-        } catch (_: Exception) {
-        }
+        adminClient().performRequest(Request("POST", "/$configSharingIndex/_refresh"))
     }
 
     /**
@@ -593,13 +741,18 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
      * enumerate all access levels the user might be shared at — we pass all three since tests
      * don't always know which level was granted.
      */
-    private fun revokeResource(client: RestClient, resourceId: String, user: String) {
+    private fun revokeResource(
+        client: RestClient,
+        resourceId: String,
+        user: String,
+        resourceType: String = MONITOR_RESOURCE_TYPE
+    ) {
         val request = Request("PATCH", "/_plugins/_security/api/resource/share")
         request.setJsonEntity(
             """
             {
               "resource_id": "$resourceId",
-              "resource_type": "monitor",
+              "resource_type": "$resourceType",
               "revoke": {
                 "$READ_ONLY":   { "users": ["$user"] },
                 "$READ_WRITE":  { "users": ["$user"] },
