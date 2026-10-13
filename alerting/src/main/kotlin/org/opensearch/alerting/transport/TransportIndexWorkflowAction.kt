@@ -227,6 +227,8 @@ class TransportIndexWorkflowAction @Inject constructor(
         }
 
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        // Capture ownership before dispatching onto a coroutine thread.
+        val storedContext = client.threadPool().threadContext.newStoredContext(false)
         scope.launch(TenantContext(tenantId)) {
             try {
                 val triggerCount = transformedRequest.workflow.triggers.size
@@ -246,10 +248,6 @@ class TransportIndexWorkflowAction @Inject constructor(
                     client,
                     object : ActionListener<AcknowledgedResponse> {
                         override fun onResponse(response: AcknowledgedResponse) {
-                            // Capture pre-stash context so the write path can restore the auth-user
-                            // transient — the security plugin's ResourceIndexListener needs it to
-                            // record the workflow's resource-share entry with createdBy=<caller>.
-                            val storedContext = client.threadPool().threadContext.newStoredContext(false)
                             client.threadPool().threadContext.stashContext().use {
                                 IndexWorkflowHandler(
                                     client, actionListener, transformedRequest, user, tenantId, storedContext
@@ -444,12 +442,8 @@ class TransportIndexWorkflowAction @Inject constructor(
                 .setIfPrimaryTerm(request.primaryTerm)
                 .timeout(indexTimeout)
 
-            // Restore the caller's persistent auth header so the shard-level ResourceIndexListener sees
-            // the caller when recording the workflow's share entry. [Client.indexStashed] stashes
-            // per-call so the internal-index write isn't gated by the caller's privileges.
-            storedThreadContext?.restore()
             try {
-                val indexResponse: IndexResponse = client.indexStashed(indexRequest)
+                val indexResponse: IndexResponse = client.indexStashed(indexRequest, storedThreadContext)
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
                     log.error("Failed to create workflow: $failureReasons")
@@ -624,11 +618,8 @@ class TransportIndexWorkflowAction @Inject constructor(
                 .setIfPrimaryTerm(request.primaryTerm)
                 .timeout(indexTimeout)
 
-            // Restore the caller's persistent auth header for the shard-level ResourceIndexListener;
-            // [Client.indexStashed] stashes per-call so the internal-index write isn't gated by the caller.
-            storedThreadContext?.restore()
             try {
-                val indexResponse: IndexResponse = client.indexStashed(indexRequest)
+                val indexResponse: IndexResponse = client.indexStashed(indexRequest, storedThreadContext)
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
                     actionListener.onFailure(
