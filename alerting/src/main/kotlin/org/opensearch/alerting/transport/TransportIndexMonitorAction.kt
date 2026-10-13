@@ -885,6 +885,18 @@ class TransportIndexMonitorAction @Inject constructor(
                 log.debug("Created monitor's backend roles: $rbacRoles")
             }
 
+            try {
+                request.monitor = request.monitor.copy(
+                    user = excludeBackendRoles(
+                        request.monitor.user,
+                        clusterService.clusterSettings.get(AlertingSettings.EXCLUDED_BACKEND_ROLES)
+                    )
+                )
+            } catch (e: IllegalArgumentException) {
+                actionListener.onFailure(AlertingException.wrap(e))
+                return
+            }
+
             log.info("Creating new monitor: ${request.monitor.name}, type: ${request.monitor.monitorType}")
 
             if (!tenantId.isNullOrEmpty()) {
@@ -1102,6 +1114,18 @@ class TransportIndexMonitorAction @Inject constructor(
                         .copy(user = User(user.name, currentMonitor.user!!.backendRoles, user.roles, user.customAttributes))
                 }
                 log.debug("Update monitor backend roles to: ${request.monitor.user?.backendRoles}")
+            }
+
+            try {
+                request.monitor = request.monitor.copy(
+                    user = excludeBackendRoles(
+                        request.monitor.user,
+                        clusterService.clusterSettings.get(AlertingSettings.EXCLUDED_BACKEND_ROLES)
+                    )
+                )
+            } catch (e: IllegalArgumentException) {
+                actionListener.onFailure(AlertingException.wrap(e))
+                return
             }
 
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)

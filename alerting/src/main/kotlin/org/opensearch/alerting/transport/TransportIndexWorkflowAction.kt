@@ -420,6 +420,18 @@ class TransportIndexWorkflowAction @Inject constructor(
                 log.debug("Created workflow's backend roles: $rbacRoles")
             }
 
+            try {
+                request.workflow = request.workflow.copy(
+                    user = excludeBackendRoles(
+                        request.workflow.user,
+                        clusterService.clusterSettings.get(AlertingSettings.EXCLUDED_BACKEND_ROLES)
+                    )
+                )
+            } catch (e: IllegalArgumentException) {
+                actionListener.onFailure(AlertingException.wrap(e))
+                return
+            }
+
             val indexRequest = IndexRequest(SCHEDULED_JOBS_INDEX)
                 .setRefreshPolicy(request.refreshPolicy)
                 .source(
@@ -584,6 +596,18 @@ class TransportIndexWorkflowAction @Inject constructor(
                         )
                 }
                 log.debug("Update workflow backend roles to: ${request.workflow.user?.backendRoles}")
+            }
+
+            try {
+                request.workflow = request.workflow.copy(
+                    user = excludeBackendRoles(
+                        request.workflow.user,
+                        clusterService.clusterSettings.get(AlertingSettings.EXCLUDED_BACKEND_ROLES)
+                    )
+                )
+            } catch (e: IllegalArgumentException) {
+                actionListener.onFailure(AlertingException.wrap(e))
+                return
             }
 
             request.workflow = request.workflow.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
