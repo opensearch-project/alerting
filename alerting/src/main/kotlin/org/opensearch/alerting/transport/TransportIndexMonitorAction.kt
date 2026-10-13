@@ -905,14 +905,6 @@ class TransportIndexMonitorAction @Inject constructor(
                 request.monitor = request.monitor.copy(metadata = updatedMetadata)
             }
 
-            // Coroutine dispatchers hop the work onto a fresh pool thread, which does not inherit the
-            // ThreadContext stashed at the transport entry point. Restore the caller's context here so the
-            // security plugin's persistent auth header is present for the shard-level
-            // ResourceIndexListener. Every subsequent sdkClient write below runs through
-            // [putDataObjectStashed] / [deleteDataObjectStashed], which stash transients per-call to keep
-            // internal-index operations off the caller's privileges (mirrors flow-framework / ml-commons).
-            storedThreadContext?.restore()
-
             val putRequest = PutDataObjectRequest.builder()
                 .index(SCHEDULED_JOBS_INDEX)
                 .tenantId(tenantId)
@@ -927,7 +919,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .build()
 
             try {
-                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
+                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext, storedThreadContext)
                 if (putResponse.isFailed) {
                     actionListener.onFailure(
                         AlertingException.wrap(
@@ -1132,12 +1124,6 @@ class TransportIndexMonitorAction @Inject constructor(
 
             log.info("Updating monitor, ${currentMonitor.id}")
 
-            // Restore the caller's context so the security plugin's persistent auth header is present
-            // for the shard-level ResourceIndexListener. Every sdkClient call below uses
-            // [putDataObjectStashed] which stashes transients per-call, keeping internal-index writes
-            // off the caller's privileges.
-            storedThreadContext?.restore()
-
             val putRequest = PutDataObjectRequest.builder()
                 .index(SCHEDULED_JOBS_INDEX)
                 .id(request.monitorId)
@@ -1156,7 +1142,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .build()
 
             try {
-                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext)
+                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext, storedThreadContext)
                 if (putResponse.isFailed) {
                     actionListener.onFailure(
                         AlertingException.wrap(
