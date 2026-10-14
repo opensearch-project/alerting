@@ -157,7 +157,7 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                         "Monitor ${monitor.id} trigger ${trigger.id}: search input failed, " +
                             "skipping trigger evaluation. Error: ${monitorResult.error?.message}"
                     )
-                    QueryLevelTriggerRunResult(trigger.name, !dryrun, monitorResult.error)
+                    QueryLevelTriggerRunResult(trigger.name, !dryrun, monitorResult.error ?: monitorResult.inputResults.error)
                 }
             } else {
                 when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {
