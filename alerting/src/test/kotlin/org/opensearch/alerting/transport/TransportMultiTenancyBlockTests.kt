@@ -14,6 +14,7 @@ import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.search.SearchResponse
 import org.opensearch.action.support.ActionFilters
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
@@ -29,12 +30,9 @@ import org.opensearch.alerting.action.GetRemoteIndexesRequest
 import org.opensearch.alerting.action.GetRemoteIndexesResponse
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.lock.LockService
-import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
-import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.util.concurrent.ThreadContext
@@ -110,23 +108,7 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
         whenever(client.threadPool()).thenReturn(threadPool)
         whenever(threadPool.threadContext).thenReturn(threadContext)
 
-        val settingSet = hashSetOf<Setting<*>>()
-        settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
-        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
-        settingSet.add(AlertingSettings.ALERT_HISTORY_ENABLED)
-        settingSet.add(AlertingSettings.ALERTING_MAX_MONITORS)
-        settingSet.add(AlertingSettings.MAX_TRIGGERS_PER_MONITOR)
-        settingSet.add(AlertingSettings.REQUEST_TIMEOUT)
-        settingSet.add(AlertingSettings.INDEX_TIMEOUT)
-        settingSet.add(AlertingSettings.MAX_ACTION_THROTTLE_VALUE)
-        settingSet.add(DestinationSettings.ALLOW_LIST)
-        settingSet.add(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
-        settingSet.add(AlertingSettings.JOB_QUEUE_NAME)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME)
+        val settingSet = ClusterSettings.BUILT_IN_CLUSTER_SETTINGS + AlertingPlugin().settings
         val clusterSettings = ClusterSettings(multiTenancySettings, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
 
@@ -405,7 +387,7 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
             transportService, client, clusterService, actionFilters,
             multiTenancySettings, xContentRegistry,
             Mockito.mock(SdkClient::class.java),
-            Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
+            org.opensearch.alerting.util.PluginClient(client)
         )
         val request = GetDestinationsRequest(
             null, 1L, null,
