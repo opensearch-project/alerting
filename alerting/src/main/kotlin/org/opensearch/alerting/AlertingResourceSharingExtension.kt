@@ -16,10 +16,10 @@ class AlertingResourceSharingExtension : ResourceSharingExtension {
      * type-specific field paths so the security plugin can distinguish them without a
      * top-level discriminator on the stored doc:
      *
-     *  - [ResourceProvider.typeField] — used by the postIndex hook to classify new writes.
-     *    `monitor.type` is present on monitor docs and absent on workflow docs (and vice versa),
-     *    so the framework iterates matching providers and picks the one whose typeField
-     *    resolves non-null.
+     *  - [ResourceProvider.typeField] and [ResourceProvider.typeFieldValue]: used by the postIndex
+     *    hook to classify new writes. A document is of a type when its typeField holds that
+     *    provider's typeFieldValue. Workflow documents hold `workflow` in `workflow.type`, while
+     *    the type is registered as `alerting-workflow`, so the workflow provider declares the value.
      *  - [ResourceProvider.ownerNamePath] / [ResourceProvider.ownerBackendRolesPath] — used by
      *    the security plugin's `POST /_plugins/_security/api/resources/migrate` endpoint when
      *    seeding sharing entries for legacy docs, so a single admin call can attribute owners
@@ -38,6 +38,7 @@ class AlertingResourceSharingExtension : ResourceSharingExtension {
                 override fun resourceType(): String = ResourceSharingUtils.WORKFLOW_RESOURCE_TYPE
                 override fun resourceIndexName(): String = SCHEDULED_JOBS_INDEX
                 override fun typeField(): String = "workflow.type"
+                override fun typeFieldValue(): String = "workflow"
                 override fun ownerNamePath(): String = "/workflow/user/name"
                 override fun ownerBackendRolesPath(): String = "/workflow/user/backend_roles"
             }
