@@ -19,6 +19,7 @@ import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
+import org.opensearch.commons.alerting.action.DeleteMonitorResponse
 import org.opensearch.remote.metadata.client.DeleteDataObjectRequest
 import org.opensearch.remote.metadata.client.DeleteDataObjectResponse
 import org.opensearch.remote.metadata.client.SdkClient
@@ -160,27 +161,21 @@ class DeleteMonitorServiceTests : OpenSearchTestCase() {
         whenever(sdkClient.deleteDataObjectAsync(any(DeleteDataObjectRequest::class.java)))
             .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(sdkDeleteResponse))
 
-        // Mock lock service for deleteLock
-        whenever(lockService.deleteLock(any(), any())).thenAnswer { invocation ->
-            @Suppress("UNCHECKED_CAST")
-            val listener = invocation.arguments[1] as org.opensearch.core.action.ActionListener<Boolean>
-            listener.onResponse(true)
-        }
-
         // We need to call the public deleteMonitor method which calls deleteMonitorDoc internally
         // But deleteMonitor also calls deleteDocLevelMonitorQueriesAndIndices and deleteMetadata
         // For this test, we'll use reflection to call deleteMonitorDoc directly
         val method = DeleteMonitorService.javaClass.getDeclaredMethod(
             "deleteMonitorDoc",
             String::class.java,
-            RefreshPolicy::class.java
+            RefreshPolicy::class.java,
+            kotlin.coroutines.Continuation::class.java
         )
         method.isAccessible = true
 
         val result = kotlinx.coroutines.runBlocking {
-            @Suppress("UNCHECKED_CAST")
-            method.invoke(DeleteMonitorService, "test-monitor-id", RefreshPolicy.IMMEDIATE)
-                as org.opensearch.commons.alerting.action.DeleteMonitorResponse
+            kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn<DeleteMonitorResponse> { cont ->
+                method.invoke(DeleteMonitorService, "test-monitor-id", RefreshPolicy.IMMEDIATE, cont)
+            }
         }
 
         assertEquals("test-monitor-id", result.id)
@@ -207,12 +202,15 @@ class DeleteMonitorServiceTests : OpenSearchTestCase() {
 
         val method = DeleteMonitorService.javaClass.getDeclaredMethod(
             "deleteMetadata",
-            org.opensearch.commons.alerting.model.Monitor::class.java
+            org.opensearch.commons.alerting.model.Monitor::class.java,
+            kotlin.coroutines.Continuation::class.java
         )
         method.isAccessible = true
 
         kotlinx.coroutines.runBlocking {
-            method.invoke(DeleteMonitorService, monitor)
+            kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn<Unit> { cont ->
+                method.invoke(DeleteMonitorService, monitor, cont)
+            }
         }
 
         val captor = ArgumentCaptor.forClass(DeleteDataObjectRequest::class.java)
@@ -230,19 +228,22 @@ class DeleteMonitorServiceTests : OpenSearchTestCase() {
 
         val method = DeleteMonitorService.javaClass.getDeclaredMethod(
             "deleteMetadata",
-            org.opensearch.commons.alerting.model.Monitor::class.java
+            org.opensearch.commons.alerting.model.Monitor::class.java,
+            kotlin.coroutines.Continuation::class.java
         )
         method.isAccessible = true
 
         // Should not throw - errors are logged but swallowed
         kotlinx.coroutines.runBlocking {
-            method.invoke(DeleteMonitorService, monitor)
+            kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn<Unit> { cont ->
+                method.invoke(DeleteMonitorService, monitor, cont)
+            }
         }
     }
 
     fun `test initialize sets sdkClient`() {
         val newSdkClient = Mockito.mock(SdkClient::class.java)
-        val newClient = Mockito.mock(Client::class.java)
+        val newClient = client
         val newLockService = Mockito.mock(LockService::class.java)
 
         DeleteMonitorService.initialize(newClient, newLockService, newSdkClient)

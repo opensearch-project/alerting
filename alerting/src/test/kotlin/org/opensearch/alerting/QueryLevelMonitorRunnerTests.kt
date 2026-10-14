@@ -8,7 +8,7 @@ package org.opensearch.alerting
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.mockito.Mockito
-import org.mockito.Mockito.doNothing
+import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.doReturn
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -40,6 +40,8 @@ class QueryLevelMonitorRunnerTests : OpenSearchTestCase() {
     private lateinit var clusterService: ClusterService
     private lateinit var threadPool: ThreadPool
     private lateinit var transportService: TransportService
+    private fun <T> any(): T = Mockito.any<T>()
+
     private lateinit var inputService: InputService
 
     @Before
@@ -62,7 +64,18 @@ class QueryLevelMonitorRunnerTests : OpenSearchTestCase() {
         val threadContext = org.opensearch.common.util.concurrent.ThreadContext(Settings.EMPTY)
         `when`(threadPool.threadContext).thenReturn(threadContext)
 
+        val client = mock(org.opensearch.transport.client.Client::class.java)
+        `when`(client.threadPool()).thenReturn(threadPool)
+        val searchResponse = mock(org.opensearch.action.search.SearchResponse::class.java)
+        `when`(searchResponse.hits).thenReturn(org.opensearch.search.SearchHits.empty())
+        doAnswer { invocation ->
+            invocation.getArgument<org.opensearch.core.action.ActionListener<org.opensearch.action.search.SearchResponse>>(1)
+                .onResponse(searchResponse)
+            null
+        }.`when`(client).search(Mockito.any(org.opensearch.action.search.SearchRequest::class.java), Mockito.any())
+
         monitorCtx = MonitorRunnerExecutionContext(
+            client = client,
             scriptService = scriptService,
             triggerService = triggerService,
             alertService = alertService,
@@ -80,13 +93,11 @@ class QueryLevelMonitorRunnerTests : OpenSearchTestCase() {
         val trigger = randomQueryLevelTrigger()
         val monitor = randomQueryLevelMonitor(triggers = listOf(trigger))
 
-        doNothing().`when`(alertIndices).createOrUpdateAlertIndex(Mockito.any())
-        doNothing().`when`(alertIndices).createOrUpdateInitialAlertHistoryIndex(Mockito.any())
         doReturn(mapOf(trigger to null))
-            .`when`(alertService).loadCurrentAlertsForQueryLevelMonitor(Mockito.any(), Mockito.any())
+            .`when`(alertService).loadCurrentAlertsForQueryLevelMonitor(any(), any())
         doReturn(InputRunResults(emptyList(), RuntimeException("403 Forbidden")))
             .`when`(inputService).collectInputResults(
-                Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyBoolean()
+                any(), any(), any(), any(), any(), Mockito.anyBoolean()
             )
 
         val result = QueryLevelMonitorRunner.runMonitor(
@@ -102,7 +113,7 @@ class QueryLevelMonitorRunnerTests : OpenSearchTestCase() {
 
         verify(scriptService, never())
             .compile(Mockito.any(Script::class.java), Mockito.any(ScriptContext::class.java))
-        verify(triggerService, never()).runQueryLevelTrigger(Mockito.any(), Mockito.any(), Mockito.any())
+        verify(triggerService, never()).runQueryLevelTrigger(any(), any(), any())
 
         val triggerResult = result.triggerResults[trigger.id]
         assertNotNull(triggerResult)
@@ -116,13 +127,11 @@ class QueryLevelMonitorRunnerTests : OpenSearchTestCase() {
         val trigger = randomQueryLevelTrigger()
         val monitor = randomQueryLevelMonitor(triggers = listOf(trigger))
 
-        doNothing().`when`(alertIndices).createOrUpdateAlertIndex(Mockito.any())
-        doNothing().`when`(alertIndices).createOrUpdateInitialAlertHistoryIndex(Mockito.any())
         doReturn(mapOf(trigger to null))
-            .`when`(alertService).loadCurrentAlertsForQueryLevelMonitor(Mockito.any(), Mockito.any())
+            .`when`(alertService).loadCurrentAlertsForQueryLevelMonitor(any(), any())
         doReturn(InputRunResults(emptyList(), RuntimeException("403 Forbidden")))
             .`when`(inputService).collectInputResults(
-                Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyBoolean()
+                any(), any(), any(), any(), any(), Mockito.anyBoolean()
             )
 
         val result = QueryLevelMonitorRunner.runMonitor(
@@ -138,7 +147,7 @@ class QueryLevelMonitorRunnerTests : OpenSearchTestCase() {
 
         verify(scriptService, never())
             .compile(Mockito.any(Script::class.java), Mockito.any(ScriptContext::class.java))
-        verify(triggerService, never()).runQueryLevelTrigger(Mockito.any(), Mockito.any(), Mockito.any())
+        verify(triggerService, never()).runQueryLevelTrigger(any(), any(), any())
 
         val triggerResult = result.triggerResults[trigger.id]
         assertNotNull(triggerResult)

@@ -138,6 +138,8 @@ configurations.testImplementation {
 }
 
 configurations {
+    mockitoAgent
+    testRuntimeOnly.extendsFrom(mockitoAgent)
     opensearchPlugin
     zipArchive
 }
@@ -242,6 +244,7 @@ dependencies {
     testImplementation "org.antlr:antlr4-runtime:${versions.antlr4}"
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
     testImplementation "org.mockito:mockito-core:${versions.mockito}"
+    mockitoAgent "net.bytebuddy:byte-buddy-agent:${versions.bytebuddy}"
     testImplementation "org.opensearch.plugin:reindex-client:${opensearch_version}"
     testImplementation "org.opensearch.plugin:parent-join-client:${opensearch_version}"
     testImplementation "org.opensearch.plugin:lang-painless:${opensearch_version}"
@@ -262,6 +265,7 @@ opensearch_tmp_dir.mkdirs()
 
 test {
     systemProperty 'tests.security.manager', 'false'
+    jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
 }
 
 task integTest(type: RestIntegTestTask) {
