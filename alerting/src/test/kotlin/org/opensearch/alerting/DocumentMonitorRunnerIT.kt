@@ -574,6 +574,37 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         assertTrue("Findings saved for test monitor", findings1)
     }
 
+    fun `test execute monitor with multiple triggers generates single finding per document`() {
+        val testIndex = createTestIndex()
+        val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
+        val testDoc = """{
+            "message" : "This is an error from IAD region",
+            "test_strict_date_time" : "$testTime",
+            "test_field" : "us-west-2"
+        }"""
+
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+
+        val trigger1 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val trigger2 = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+        val monitor = createMonitor(
+            randomDocumentLevelMonitor(inputs = listOf(docLevelInput), triggers = listOf(trigger1, trigger2))
+        )
+        assertNotNull(monitor.id)
+
+        indexDoc(testIndex, "1", testDoc)
+
+        executeMonitor(monitor.id)
+
+        val alerts = searchAlertsWithFilter(monitor)
+        assertEquals("One alert per trigger", 2, alerts.size)
+
+        val findings = searchFindings(monitor)
+        assertEquals("Exactly one finding per matched document regardless of trigger count", 1, findings.size)
+        assertTrue("Finding references the indexed document", findings[0].relatedDocIds.contains("1"))
+    }
+
     fun `test monitor run generates no error alerts with versionconflictengineexception with locks`() {
         val testIndex = createTestIndex()
         val testTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ZonedDateTime.now().truncatedTo(MILLIS))
