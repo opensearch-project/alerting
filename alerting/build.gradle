@@ -633,6 +633,23 @@ task bwcTestSuite {
     dependsOn tasks.named("${baseName}#mixedClusterTask")
     dependsOn tasks.named("${baseName}#rollingUpgradeClusterTask")
     dependsOn tasks.named("${baseName}#fullRestartClusterTask")
+    doLast {
+        // Gradle can report success for NO-SOURCE tasks; require results from every upgrade phase.
+        tasks.withType(StandaloneRestIntegTestTask).matching { it.name.startsWith("${baseName}#") }.each { phase ->
+            def reports = fileTree(phase.reports.junitXml.outputLocation.get().asFile).matching { include 'TEST-*.xml' }
+            int executed = 0
+            int failures = 0
+            reports.each { report ->
+                def suite = new groovy.xml.XmlSlurper().parse(report)
+                executed += suite.@tests.toInteger() - suite.@skipped.toInteger()
+                failures += suite.@failures.toInteger() + suite.@errors.toInteger()
+            }
+            if (phase.state.noSource || !phase.state.executed || executed < 2 || failures > 0) {
+                throw new GradleException("${phase.name}: expected both BWC tests to pass; executed=${executed}, failures=${failures}")
+            }
+            logger.lifecycle("${phase.name}: ${executed} tests passed")
+        }
+    }
 }
 
 run {
