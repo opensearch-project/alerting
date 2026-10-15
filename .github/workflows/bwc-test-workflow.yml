@@ -17,12 +17,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  Get-CI-Image-Tag:
+    uses: opensearch-project/opensearch-build/.github/workflows/get-ci-image-tag.yml@main
+    with:
+      product: opensearch
+
   build-linux:
+    needs: Get-CI-Image-Tag
     name: Alerting BWC (rolling and full restart)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    container:
+      image: ${{ needs.Get-CI-Image-Tag.outputs.ci-image-version-linux }}
+      options: ${{ needs.Get-CI-Image-Tag.outputs.ci-image-start-options }}
 
     steps:
+      - name: Run start commands
+        run: ${{ needs.Get-CI-Image-Tag.outputs.ci-image-start-command }}
       - name: Checkout Branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Set Up JDK
@@ -31,7 +42,9 @@ jobs:
           distribution: temurin
           java-version: 21
       - name: Run Alerting Backwards Compatibility Tests
-        run: ./gradlew :alerting:bwcTestSuite --no-daemon --max-workers=2
+        run: |
+          chown -R 1000:1000 "$PWD"
+          su "$(id -un 1000)" -c './gradlew :alerting:bwcTestSuite --no-daemon --max-workers=2'
       - name: Verify every upgrade phase ran tests
         run: |
           python3 - <<'PY'
