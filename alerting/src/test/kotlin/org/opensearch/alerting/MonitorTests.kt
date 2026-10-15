@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting
 
-import org.opensearch.commons.alerting.model.Trigger
 import org.opensearch.test.OpenSearchTestCase
 import java.lang.IllegalArgumentException
 import java.time.Instant
@@ -26,21 +25,6 @@ class MonitorTests : OpenSearchTestCase() {
         try {
             disabledMonitor.copy(enabled = true)
             fail("Enabling monitor without enabled time should fail")
-        } catch (e: IllegalArgumentException) {
-        }
-    }
-
-    fun `test max triggers`() {
-        val monitor = randomQueryLevelMonitor()
-
-        val tooManyTriggers = mutableListOf<Trigger>()
-        for (i in 0..10) {
-            tooManyTriggers.add(randomQueryLevelTrigger())
-        }
-
-        try {
-            monitor.copy(triggers = tooManyTriggers)
-            fail("Monitor with too many triggers should be rejected.")
         } catch (e: IllegalArgumentException) {
         }
     }

@@ -6,6 +6,7 @@
 package org.opensearch.alerting.transport
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope
+import org.mockito.Mockito.mockConstruction
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.WriteRequest
 import org.opensearch.alerting.action.ExecuteMonitorAction
@@ -24,6 +25,7 @@ import org.opensearch.alerting.action.SearchEmailAccountAction
 import org.opensearch.alerting.action.SearchEmailGroupAction
 import org.opensearch.alerting.randomClusterMetricsMonitor
 import org.opensearch.alerting.randomDocumentLevelMonitor
+import org.opensearch.alerting.service.MonitorJobPoller
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.alerting.action.AlertingActions
@@ -40,6 +42,13 @@ import java.time.Instant
 
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 class MultiTenancyBlockSingleNodeTests : AlertingSingleNodeTestCase() {
+
+    override fun setUp() {
+        // These tests exercise API restrictions, not the external SQS job poller.
+        mockConstruction(MonitorJobPoller::class.java).use {
+            super.setUp()
+        }
+    }
 
     override fun nodeSettings(): Settings {
         return Settings.builder()
