@@ -446,6 +446,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ScheduledJobSettings.SWEEP_PERIOD,
             ScheduledJobSettings.SWEEP_PAGE_SIZE,
             ScheduledJobSettings.SWEEPER_ENABLED,
+            ScheduledJobSettings.SWEEP_ORPHAN_RECONCILIATION_ENABLED,
             LegacyOpenDistroScheduledJobSettings.REQUEST_TIMEOUT,
             LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_MILLIS,
             LegacyOpenDistroScheduledJobSettings.SWEEP_BACKOFF_RETRY_COUNT,
