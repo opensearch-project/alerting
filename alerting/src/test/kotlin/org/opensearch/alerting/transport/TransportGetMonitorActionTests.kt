@@ -15,11 +15,11 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.ActionFilters
+import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.AlertingPlugin.Companion.TENANT_ID_HEADER
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
-import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.commons.alerting.action.GetMonitorRequest
@@ -68,10 +68,7 @@ class TransportGetMonitorActionTests : OpenSearchTestCase() {
         whenever(client.threadPool()).thenReturn(threadPool)
         whenever(threadPool.threadContext).thenReturn(threadContext)
 
-        val settingSet = hashSetOf<Setting<*>>()
-        settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
-        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
+        val settingSet = ClusterSettings.BUILT_IN_CLUSTER_SETTINGS + AlertingPlugin().settings
         val clusterSettings = ClusterSettings(Settings.EMPTY, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
     }
@@ -170,6 +167,7 @@ class TransportGetMonitorActionTests : OpenSearchTestCase() {
     fun `test resource sharing client set skips backend role validation`() {
         // Set up resource sharing client
         val mockRsc = Mockito.mock(org.opensearch.security.spi.resources.client.ResourceSharingClient::class.java)
+        whenever(mockRsc.isFeatureEnabledForType(org.opensearch.alerting.ResourceSharingUtils.MONITOR_RESOURCE_TYPE)).thenReturn(true)
         org.opensearch.alerting.ResourceSharingClientAccessor.setResourceSharingClient(mockRsc)
 
         try {
@@ -197,6 +195,7 @@ class TransportGetMonitorActionTests : OpenSearchTestCase() {
 
             // Should NOT fail with forbidden - it should proceed to SDK call
             verify(sdkClient).getDataObjectAsync(any(GetDataObjectRequest::class.java))
+            assertSettingDeprecationsAndWarnings(arrayOf(AlertingSettings.FILTER_BY_BACKEND_ROLES))
         } finally {
             org.opensearch.alerting.ResourceSharingClientAccessor.clear()
         }
@@ -218,10 +217,7 @@ class TransportGetMonitorActionTests : OpenSearchTestCase() {
     }
 
     private fun createAction(settings: Settings): TransportGetMonitorAction {
-        val settingSet = hashSetOf<Setting<*>>()
-        settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
-        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
+        val settingSet = ClusterSettings.BUILT_IN_CLUSTER_SETTINGS + AlertingPlugin().settings
         val clusterSettings = ClusterSettings(settings, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
 

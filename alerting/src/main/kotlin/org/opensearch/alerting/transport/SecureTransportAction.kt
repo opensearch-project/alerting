@@ -63,6 +63,17 @@ interface SecureTransportAction {
         }
     }
 
+    /** Filters only the persisted user copy, after request-specific backend roles have been resolved. */
+    fun excludeBackendRoles(user: User?, excludedRoles: List<String>): User? {
+        if (user == null || excludedRoles.isEmpty() || user.backendRoles.isNullOrEmpty()) return user
+        val retainedRoles = user.backendRoles.filterNot { it in excludedRoles }
+        // ALL matching accepts an empty list, so removing the last role could broaden access.
+        require(retainedRoles.isNotEmpty()) {
+            "plugins.alerting.excluded_backend_roles would remove all backend roles from the stored user"
+        }
+        return User(user.name, retainedRoles, user.roles, user.customAttributes)
+    }
+
     /**
      *  'all_access' role users are treated as admins.
      */

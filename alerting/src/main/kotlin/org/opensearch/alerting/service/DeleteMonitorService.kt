@@ -185,7 +185,11 @@ object DeleteMonitorService :
     }
 
     private suspend fun deleteLock(monitor: Monitor) {
-        client.suspendUntil<Client, Boolean> { lockService.deleteLock(LockModel.generateLockId(monitor.id), it) }
+        client.suspendUntil<Client, Boolean> { listener ->
+            client.threadPool().threadContext.stashContext().use {
+                lockService.deleteLock(LockModel.generateLockId(monitor.id), listener)
+            }
+        }
     }
 
     /**
@@ -212,19 +216,19 @@ object DeleteMonitorService :
                 .searchSourceBuilder(SearchSourceBuilder().query(queryBuilder))
                 .build()
 
-            client.threadPool().threadContext.stashContext().use {
-                val sdkResponse = sdkClient.searchDataObjectAsync(searchRequest).await()
-                val searchResponse = sdkResponse.searchResponse()
-                    ?: throw RuntimeException("Unknown error searching for workflow delegates")
-
-                if (searchResponse.hits.totalHits?.value == 0L) {
-                    return false
-                }
-
-                val workflowIds = searchResponse.hits.hits.map { it.id }.joinToString()
-                log.info("Monitor $monitorId can't be deleted since it belongs to $workflowIds")
-                return true
+            val future = client.threadPool().threadContext.stashContext().use {
+                sdkClient.searchDataObjectAsync(searchRequest)
             }
+            val searchResponse = future.await().searchResponse()
+                ?: throw RuntimeException("Unknown error searching for workflow delegates")
+
+            if (searchResponse.hits.totalHits?.value == 0L) {
+                return false
+            }
+
+            val workflowIds = searchResponse.hits.hits.map { it.id }.joinToString()
+            log.info("Monitor $monitorId can't be deleted since it belongs to $workflowIds")
+            return true
         } catch (ex: Exception) {
             log.error("Error getting the monitor workflows", ex)
             throw AlertingException.wrap(ex)

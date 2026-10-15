@@ -475,6 +475,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.REQUEST_TIMEOUT,
             AlertingSettings.MAX_ACTION_THROTTLE_VALUE,
             AlertingSettings.FILTER_BY_BACKEND_ROLES,
+            AlertingSettings.EXCLUDED_BACKEND_ROLES,
             AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY,
             AlertingSettings.MAX_ACTIONABLE_ALERT_COUNT,
             LegacyOpenDistroAlertingSettings.INPUT_TIMEOUT,
