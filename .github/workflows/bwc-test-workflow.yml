@@ -1,49 +1,62 @@
 name: BWC Test Workflow
-# This workflow is triggered on pull requests and pushes to main or an OpenSearch release branch
 on:
   pull_request:
-    branches:
-      - "*"
   push:
     branches:
-      - "*"
+      - main
+      - '*.x'
+      - '2.*'
+      - '3.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bwc-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  Get-CI-Image-Tag:
-    uses: ./.github/workflows/get-ci-image-tag.yml
-    with:
-      platform: centos7
-      usage: opensearch
-
   build-linux:
-    needs: Get-CI-Image-Tag
-    strategy:
-      matrix:
-        java: [ 21 ]
-    # Job name
-    name: Build and test Alerting
-    # This job runs on Linux
-    runs-on: ubuntu-latest
-    container:
-      # using the same image which is used by opensearch-build team to build the OpenSearch Distribution
-      # this image tag is subject to change as more dependencies and updates will arrive over time
-      image: ${{ needs.Get-CI-Image-Tag.outputs.ci-image-version-linux }}
-      # need to switch to root so that github actions can install runner binary on container without permission issues.
-      options: ${{ needs.Get-CI-Image-Tag.outputs.ci-image-start-options }}
+    name: Alerting BWC (rolling and full restart)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
 
     steps:
-      - name: Run start commands
-        run: ${{ needs.Get-CI-Image-Tag.outputs.ci-image-start-command }}
-      # This step uses the checkout Github action: https://github.com/actions/checkout
       - name: Checkout Branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      # This step uses the setup-java Github action: https://github.com/actions/setup-java
-      - name: Set Up JDK ${{ matrix.java }}
-        uses: actions/setup-java@b6e674f4b717d7b0ae3baee0fbe79f498905dfde # v1
+      - name: Set Up JDK
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
         with:
-          java-version: ${{ matrix.java }}
+          distribution: temurin
+          java-version: 21
       - name: Run Alerting Backwards Compatibility Tests
+        run: ./gradlew :alerting:bwcTestSuite --no-daemon --max-workers=2
+      - name: Verify every upgrade phase ran tests
         run: |
-          echo "Running backwards compatibility tests..."
-          chown -R opensearch.opensearch `pwd`
-          su opensearch -c "whoami && java -version && ./gradlew bwcTestSuite"
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          phases = [
+              "oldVersionClusterTask0", "oldVersionClusterTask1", "mixedClusterTask",
+              "twoThirdsUpgradedClusterTask", "rollingUpgradeClusterTask", "fullRestartClusterTask",
+          ]
+          for phase in phases:
+              reports = list(Path(f"alerting/build/test-results/alertingBwcCluster#{phase}").glob("TEST-*.xml"))
+              suites = [ET.parse(report).getroot() for report in reports]
+              executed = sum(int(s.get("tests", 0)) - int(s.get("skipped", 0)) for s in suites)
+              failures = sum(int(s.get("failures", 0)) + int(s.get("errors", 0)) for s in suites)
+              if executed < 2 or failures:
+                  raise SystemExit(f"{phase}: expected both BWC tests to pass; executed={executed}, failures={failures}")
+              print(f"{phase}: {executed} tests passed")
+          PY
+      - name: Upload BWC reports and cluster logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: alerting-bwc-reports
+          path: |
+            alerting/build/reports/tests/
+            alerting/build/test-results/
+            alerting/build/testclusters/**/logs/

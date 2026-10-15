@@ -61,6 +61,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
     fun `test backwards compatibility`() {
         val uri = getPluginUri()
         val responseMap = getAsMap(uri)["nodes"] as Map<String, Map<String, Any>>
+        assertFalse("Expected a node to verify during the upgrade", responseMap.isEmpty())
         for (response in responseMap.values) {
             val plugins = response["plugins"] as List<Map<String, Any>>
             val pluginNames = plugins.map { plugin -> plugin["name"] }.toSet()
@@ -109,6 +110,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
     fun `test backwards compatibility for doc-level monitors`() {
         val uri = getPluginUri()
         val responseMap = getAsMap(uri)["nodes"] as Map<String, Map<String, Any>>
+        assertFalse("Expected a node to verify during the upgrade", responseMap.isEmpty())
         for (response in responseMap.values) {
             val plugins = response["plugins"] as List<Map<String, Any>>
             val pluginNames = plugins.map { plugin -> plugin["name"] }.toSet()
@@ -320,7 +322,7 @@ class AlertingBackwardsCompatibilityIT : AlertingRestTestCase() {
                 @Suppress("UNCHECKED_CAST")
                 val matchingDocsToQuery = searchResult["4"] as List<String>
                 passed = matchingDocsToQuery.isNotEmpty()
-                return@waitUntil true
+                return@waitUntil passed
             } catch (e: AssertionError) {
                 return@waitUntil false
             }

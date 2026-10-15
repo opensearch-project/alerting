@@ -145,25 +145,11 @@ configurations {
 // This flag indicates the existence of security plugin
 def securityEnabled = System.getProperty("security", "false") == "true" || System.getProperty("https", "false") == "true"
 
-// Always be minimumCompatibilityVersion of current opensearch version(3.6.0)
-// get latest 3.x version from OpenSearch
-static def fetchVersionProperties() {
-    def url = 'https://raw.githubusercontent.com/opensearch-project/OpenSearch/refs/heads/3.2/buildSrc/version.properties'
-    def content = new URL(url).text
-    // Use regex to extract the version number
-    def matcher = content =~ /opensearch\s*=\s*(\d+\.\d+\.\d+)/
-    if (matcher.find()) {
-        def version = matcher.group(1)
-        println("Extracted latest 3.x version: $version")
-        return version
-    } else {
-        return "3.2.0"
-    }
-}
-String bwcVersionShort = fetchVersionProperties()
+// Test upgrades from a released baseline; override to exercise another supported release.
+String bwcVersionShort = System.getProperty("bwc.version", "3.2.0")
 def bwcVersion = bwcVersionShort + ".0"
-def bwcOpenSearchVersion = bwcVersionShort + (isSnapshot ? "-SNAPSHOT" : "")
-def bwcPluginVersion = bwcVersion + (isSnapshot ? "-SNAPSHOT" : "")
+def bwcOpenSearchVersion = bwcVersionShort
+def bwcPluginVersion = bwcVersion
 
 dependencies {
     // Needed for integ tests
@@ -487,6 +473,11 @@ task integTestRemote(type: RestIntegTestTask) {
 integTestRemote.enabled = System.getProperty("tests.rest.cluster") != null
 
 String baseName = "alertingBwcCluster"
+tasks.withType(StandaloneRestIntegTestTask).configureEach {
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+}
+
 2.times {i ->
     testClusters {
         "${baseName}$i" {
@@ -636,9 +627,7 @@ task "${baseName}#fullRestartClusterTask"(type: StandaloneRestIntegTestTask) {
 }
 
 // A bwc test suite which runs all the bwc tasks combined
-task bwcTestSuite(type: StandaloneRestIntegTestTask) {
-    exclude '**/*Test*'
-    exclude '**/*IT*'
+task bwcTestSuite {
     dependsOn tasks.named("${baseName}#mixedClusterTask")
     dependsOn tasks.named("${baseName}#rollingUpgradeClusterTask")
     dependsOn tasks.named("${baseName}#fullRestartClusterTask")
