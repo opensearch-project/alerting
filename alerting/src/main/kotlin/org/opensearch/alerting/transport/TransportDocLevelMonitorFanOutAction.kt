@@ -14,6 +14,8 @@ import org.opensearch.OpenSearchStatusException
 import org.opensearch.action.DocWriteRequest
 import org.opensearch.action.admin.indices.refresh.RefreshAction
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
+import org.opensearch.action.admin.indices.stats.IndicesStatsRequest
+import org.opensearch.action.admin.indices.stats.IndicesStatsResponse
 import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
@@ -369,7 +371,13 @@ class TransportDocLevelMonitorFanOutAction
                     nodeId = clusterService.localNode().id,
                     executionId = request.executionId,
                     monitorId = monitor.id,
-                    indexExecutionContext.updatedLastRunContext,
+                    // Only the shards this node read: the others still hold the values the runner sent, and returning
+                    // them would let this response overwrite another node's progress when the runner merges.
+                    shardIds.map { it.id.toString() }.toSet().let { ownShards ->
+                        indexExecutionContext.updatedLastRunContext
+                            .filterKeys { it in ownShards || it == "index" || it == "shards_count" }
+                            .toMutableMap()
+                    },
                     InputRunResults(listOf(inputRunResults)),
                     triggerResults
                 )
@@ -784,11 +792,12 @@ class TransportDocLevelMonitorFanOutAction
         transformedDocs: MutableList<Pair<String, TransformedDocDto>>,
         updateLastRunContext: (String, Long) -> Unit
     ) {
+        var maxSeqNosFromStats: Map<Int, Long>? = null // fetched once per index, only if a shard needs it
         for (shardId in shardList) {
             val shard = shardId.toString()
             try {
                 val prevSeqNo = indexExecutionCtx.lastRunContext[shard].toString().toLongOrNull()
-                val from = prevSeqNo ?: SequenceNumbers.NO_OPS_PERFORMED
+                var from = prevSeqNo ?: SequenceNumbers.NO_OPS_PERFORMED
                 if (isFanOutTimeEnded(endTime)) {
                     log.info(
                         "Doc level monitor ${monitor.id}: " +
@@ -806,9 +815,31 @@ class TransportDocLevelMonitorFanOutAction
                     indexExecutionCtx.docIds
                 )
 
+                // maxSeqNo is the newest document this search can see, so it can be below the saved seq_no on a healthy
+                // shard (newest documents deleted, or the chained-workflow doc id filter). maxSeqNoFromStats is the
+                // highest seq_no ever written to the shard and never goes down, so a saved seq_no above it was saved
+                // against another copy of the index (deleted and recreated, or restored from an older snapshot).
+                // The stats call is made only when no document was found above the saved seq_no.
+                if (prevSeqNo != null && prevSeqNo >= 0 && (maxSeqNo == null || maxSeqNo < prevSeqNo)) {
+                    if (maxSeqNosFromStats == null) {
+                        maxSeqNosFromStats = getMaxSeqNosFromShardStats(monitor, indexExecutionCtx.concreteIndexName)
+                    }
+                    val maxSeqNoFromStats = maxSeqNosFromStats!![shardId]
+                    if (maxSeqNoFromStats != null && prevSeqNo > maxSeqNoFromStats) {
+                        // Skip the documents already in the shard, as a new monitor does, and read from here on.
+                        from = maxSeqNoFromStats
+                        log.warn(
+                            "Doc level monitor ${monitor.id}: last run context seq_no $prevSeqNo for shard " +
+                                "[${indexExecutionCtx.concreteIndexName}][$shardId] is above the shard's max_seq_no " +
+                                "$maxSeqNoFromStats (index deleted and recreated, or restored from an older snapshot). " +
+                                "Resuming from $from."
+                        )
+                    }
+                }
+
                 if (maxSeqNo == null || maxSeqNo <= from) {
                     // No new documents to process
-                    updateLastRunContext(shard, (prevSeqNo ?: SequenceNumbers.NO_OPS_PERFORMED))
+                    updateLastRunContext(shard, from)
                     continue
                 }
                 // Process documents in chunks between prevSeqNo and maxSeqNo
@@ -993,6 +1024,23 @@ class TransportDocLevelMonitorFanOutAction
 
         nonPercolateSearchesTimeTakenStat += response.took.millis
         return if (response.hits.hits.isNotEmpty()) response.hits.hits[0].seqNo else null
+    }
+
+    /**
+     * max_seq_no of each shard of the index, by shard id, read from its started primary. A shard whose primary is not
+     * started is left out, and a failed call returns an empty map, so the caller keeps the saved seq_no.
+     */
+    private suspend fun getMaxSeqNosFromShardStats(monitor: Monitor, index: String): Map<Int, Long> {
+        return try {
+            val request = IndicesStatsRequest().indices(index).clear()
+            val response: IndicesStatsResponse = client.suspendUntil { client.admin().indices().stats(request, it) }
+            response.shards
+                .filter { it.shardRouting.primary() && it.shardRouting.active() && it.seqNoStats != null }
+                .associate { it.shardRouting.id to it.seqNoStats!!.maxSeqNo }
+        } catch (e: Exception) {
+            log.warn("Doc level monitor ${monitor.id}: could not read primary seq_no stats for [$index], keeping saved positions", e)
+            emptyMap()
+        }
     }
 
     /** Executes percolate query on the docs against the monitor's query index and return the hits from the search response*/
