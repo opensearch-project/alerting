@@ -476,6 +476,8 @@ String baseName = "alertingBwcCluster"
 tasks.withType(StandaloneRestIntegTestTask).configureEach {
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
+    // Match the other REST test clients; this does not change the cluster JVMs.
+    systemProperty 'tests.security.manager', 'false'
 }
 
 2.times {i ->
