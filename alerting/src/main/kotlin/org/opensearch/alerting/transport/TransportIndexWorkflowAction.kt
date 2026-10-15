@@ -49,6 +49,7 @@ import org.opensearch.alerting.util.indexStashed
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isQueryLevelMonitor
 import org.opensearch.alerting.util.use
+import org.opensearch.alerting.util.withStoredContext
 import org.opensearch.alerting.workflow.CompositeWorkflowRunner
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -227,6 +228,8 @@ class TransportIndexWorkflowAction @Inject constructor(
         }
 
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
+        // Capture before launch: Dispatchers.IO drops the thread context, and the workflow write needs the caller's auth
+        val storedContext = client.threadPool().threadContext.newStoredContext(false)
         scope.launch(TenantContext(tenantId)) {
             try {
                 val triggerCount = transformedRequest.workflow.triggers.size
@@ -246,10 +249,6 @@ class TransportIndexWorkflowAction @Inject constructor(
                     client,
                     object : ActionListener<AcknowledgedResponse> {
                         override fun onResponse(response: AcknowledgedResponse) {
-                            // Capture pre-stash context so the write path can restore the auth-user
-                            // transient — the security plugin's ResourceIndexListener needs it to
-                            // record the workflow's resource-share entry with createdBy=<caller>.
-                            val storedContext = client.threadPool().threadContext.newStoredContext(false)
                             client.threadPool().threadContext.stashContext().use {
                                 IndexWorkflowHandler(
                                     client, actionListener, transformedRequest, user, tenantId, storedContext
@@ -285,7 +284,7 @@ class TransportIndexWorkflowAction @Inject constructor(
         private val request: IndexWorkflowRequest,
         private val user: User?,
         private val tenantId: String?,
-        private val storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
+        private val storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext,
     ) {
         fun resolveUserAndStart() {
             scope.launch(TenantContext(tenantId)) {
@@ -432,12 +431,11 @@ class TransportIndexWorkflowAction @Inject constructor(
                 .setIfPrimaryTerm(request.primaryTerm)
                 .timeout(indexTimeout)
 
-            // Restore the caller's persistent auth header so the shard-level ResourceIndexListener sees
-            // the caller when recording the workflow's share entry. [Client.indexStashed] stashes
-            // per-call so the internal-index write isn't gated by the caller's privileges.
-            storedThreadContext?.restore()
             try {
-                val indexResponse: IndexResponse = client.indexStashed(indexRequest)
+                // The caller's context reaches only this write, where the security plugin records the creator
+                val indexResponse: IndexResponse = client.threadPool().threadContext.withStoredContext(storedThreadContext) {
+                    client.indexStashed(indexRequest)
+                }
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
                     log.error("Failed to create workflow: $failureReasons")
@@ -600,11 +598,10 @@ class TransportIndexWorkflowAction @Inject constructor(
                 .setIfPrimaryTerm(request.primaryTerm)
                 .timeout(indexTimeout)
 
-            // Restore the caller's persistent auth header for the shard-level ResourceIndexListener;
-            // [Client.indexStashed] stashes per-call so the internal-index write isn't gated by the caller.
-            storedThreadContext?.restore()
             try {
-                val indexResponse: IndexResponse = client.indexStashed(indexRequest)
+                val indexResponse: IndexResponse = client.threadPool().threadContext.withStoredContext(storedThreadContext) {
+                    client.indexStashed(indexRequest)
+                }
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
                     actionListener.onFailure(
