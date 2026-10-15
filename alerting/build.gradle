@@ -165,7 +165,7 @@ dependencies {
     opensearchPlugin "org.opensearch.plugin:opensearch-security:${opensearch_build}@zip"
 
     // Needed for BWC tests
-    opensearchPlugin "org.opensearch.plugin:alerting:${bwcPluginVersion}@zip"
+    zipArchive "org.opensearch.plugin:alerting:${bwcPluginVersion}@zip"
 
     compileOnly "org.opensearch.plugin:opensearch-scripting-painless-spi:${versions.opensearch}"
     api "org.opensearch.plugin:percolator-client:${opensearch_version}"
