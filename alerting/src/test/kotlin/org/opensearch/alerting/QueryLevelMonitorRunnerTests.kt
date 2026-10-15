@@ -107,7 +107,7 @@ class QueryLevelMonitorRunnerTests : OpenSearchTestCase() {
         val triggerResult = result.triggerResults[trigger.id]
         assertNotNull(triggerResult)
         assertTrue("Trigger should fire for error alert", triggerResult!!.triggered)
-        assertNotNull("Error should be propagated", triggerResult.error)
+        assertEquals("403 Forbidden", triggerResult.error?.message)
     }
 
     fun `test multiTenantTriggerEvalEnabled with search failure sets triggered false on dryrun`() = runBlocking {
@@ -143,6 +143,6 @@ class QueryLevelMonitorRunnerTests : OpenSearchTestCase() {
         val triggerResult = result.triggerResults[trigger.id]
         assertNotNull(triggerResult)
         assertFalse("Trigger should NOT fire on dryrun", triggerResult!!.triggered)
-        assertNotNull("Error should be propagated", triggerResult.error)
+        assertEquals("403 Forbidden", triggerResult.error?.message)
     }
 }
