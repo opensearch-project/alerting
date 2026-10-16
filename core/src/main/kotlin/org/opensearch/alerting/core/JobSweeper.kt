@@ -39,10 +39,12 @@ import org.opensearch.core.rest.RestStatus
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
+import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.engine.Engine
 import org.opensearch.index.query.BoolQueryBuilder
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.index.shard.IndexingOperationListener
+import org.opensearch.index.shard.ShardNotFoundException
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.search.sort.FieldSortBuilder
 import org.opensearch.threadpool.Scheduler
@@ -168,15 +170,47 @@ class JobSweeper(
             return
         }
 
-        if (isOwningNode(shardId, index.id())) {
-            val xcp = XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, index.source(), XContentType.JSON)
-            if (isSweepableJobType(xcp)) {
-                val job = parseAndSweepJob(xcp, shardId, index.id(), result.version, index.source(), true)
-                if (job != null) scheduler.postIndex(job)
-            } else {
-                logger.debug("Not a valid job type in document ${index.id()} to sweep.")
+        handleJobIndexed(shardId, index.id(), result.version, index.source(), index.origin())
+    }
+
+    /**
+     * Handles a successfully indexed job document, split into the two independent responsibilities that used to be
+     * conflated behind a single [isOwningNode] check. See [handleJobDeleted] for why the consistent hash cannot be
+     * used to elect the node that performs the cluster-wide work.
+     */
+    internal fun handleJobIndexed(
+        shardId: ShardId,
+        jobId: JobId,
+        jobVersion: JobVersion,
+        jobSource: BytesReference,
+        origin: Engine.Operation.Origin
+    ) {
+        // Scheduling is load-balanced across the shard's nodes by the consistent hash, so only the elected owner may
+        // schedule the job locally.
+        val isSchedulingOwner = isOwningNode(shardId, jobId)
+        // The cluster-wide work (JobRunner.postIndex, which moves the alerts of any removed trigger to the history
+        // index) must run exactly once, on the divergence-free primary election.
+        val isPrimary = origin == Engine.Operation.Origin.PRIMARY
+        if (!isSchedulingOwner && !isPrimary) return
+
+        val xcp = XContentHelper.createParser(xContentRegistry, LoggingDeprecationHandler.INSTANCE, jobSource, XContentType.JSON)
+        if (!isSweepableJobType(xcp)) {
+            logger.debug("Not a valid job type in document $jobId to sweep.")
+            return
+        }
+
+        val job = if (isSchedulingOwner) {
+            parseAndSweepJob(xcp, shardId, jobId, jobVersion, jobSource, true)
+        } else {
+            // Primary but not the scheduling owner: parse only, so that the job is not scheduled on this node.
+            try {
+                parseScheduledJob(xcp, jobId, jobVersion, true)
+            } catch (e: Exception) {
+                logger.warn("Unable to parse ScheduledJob source: {}", Strings.cleanTruncate(jobSource.utf8ToString(), 1000))
+                null
             }
         }
+        if (isPrimary && job != null) scheduler.postIndex(job)
     }
 
     /**
@@ -193,11 +227,33 @@ class JobSweeper(
             return
         }
 
-        if (isOwningNode(shardId, delete.id())) {
-            if (scheduler.scheduledJobs().contains(delete.id())) {
-                sweep(shardId, delete.id(), result.version, null)
-            }
-            scheduler.postDelete(delete.id())
+        handleJobDeleted(shardId, delete.id(), result.version, delete.origin())
+    }
+
+    /**
+     * Handles a successfully deleted job document.
+     *
+     * Local bookkeeping (descheduling the job, forgetting its swept version) is deliberately *not* gated on
+     * [isOwningNode]: a node that currently has the job scheduled must stop running it regardless of what its own,
+     * possibly stale, view of the routing table now says about ownership.
+     *
+     * The cluster-wide cleanup -- [JobScheduler.postDelete], which is what moves a deleted monitor's ACTIVE alerts to
+     * the alert history index -- is elected on the write path instead. The consistent hash cannot be used for it:
+     * every shard copy applies cluster state independently, so while the routing table is changing each copy can
+     * compute "not me" from its own view and the cleanup is then skipped on *every* node. Nothing ever repairs that,
+     * because the periodic full sweep discovers work by searching the config index and the job document is gone, so
+     * the monitor's alerts stay ACTIVE forever while the delete request itself returns 200. Exactly one copy of a
+     * shard is the primary and it always processes the delete, so `origin == PRIMARY` is a divergence-free
+     * exactly-once election. It is also the only correct choice under segment replication, where replicas do not
+     * invoke indexing operation listeners at all.
+     */
+    internal fun handleJobDeleted(shardId: ShardId, jobId: JobId, jobVersion: JobVersion, origin: Engine.Operation.Origin) {
+        if (scheduler.scheduledJobs().contains(jobId)) {
+            sweep(shardId, jobId, jobVersion, null)
+        }
+
+        if (origin == Engine.Operation.Origin.PRIMARY) {
+            scheduler.postDelete(jobId)
         }
     }
 
@@ -480,9 +536,20 @@ class JobSweeper(
 
     private fun isOwningNode(shardId: ShardId, jobId: JobId): Boolean {
         val localNodeId = clusterService.localNode().id
-        val shardNodeIds = clusterService.state().routingTable.shardRoutingTable(shardId)
-            .filter { it.active() }
-            .map { it.currentNodeId() }
+        val shardNodeIds = try {
+            clusterService.state().routingTable.shardRoutingTable(shardId)
+                .filter { it.active() }
+                .map { it.currentNodeId() }
+        } catch (e: IndexNotFoundException) {
+            // The local cluster state has not caught up with (or has already moved past) this shard. Ownership is
+            // only used for local scheduling decisions, so treat it as "not mine" rather than propagating an
+            // exception into the indexing path.
+            logger.debug("No routing table for shard $shardId in the local cluster state; skipping $jobId.", e)
+            return false
+        } catch (e: ShardNotFoundException) {
+            logger.debug("No routing table for shard $shardId in the local cluster state; skipping $jobId.", e)
+            return false
+        }
         val shardNodes = ShardNodes(localNodeId, shardNodeIds)
         return shardNodes.isOwningNode(jobId)
     }
@@ -496,7 +563,7 @@ class JobSweeper(
  * Implementation notes: This class is not thread safe. It uses the same [hash function][Murmur3HashFunction] that OpenSearch uses
  * for routing. For each real node `100` virtual nodes are added to provide a good distribution.
  */
-private class ShardNodes(val localNodeId: String, activeShardNodeIds: Collection<String>) {
+internal class ShardNodes(val localNodeId: String, activeShardNodeIds: Collection<String>) {
 
     private val circle = TreeMap<Int, String>()
 
