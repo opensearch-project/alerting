@@ -14,11 +14,9 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.service.ExternalSchedulerService
 import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
-import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
@@ -54,22 +52,7 @@ class TransportIndexMonitorActionTests : OpenSearchTestCase() {
     }
 
     private fun clusterSettingsFor(settings: Settings): ClusterSettings {
-        val settingSet = hashSetOf<Setting<*>>()
-        settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
-        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
-        settingSet.add(AlertingSettings.ALERTING_MAX_MONITORS)
-        settingSet.add(AlertingSettings.MAX_TRIGGERS_PER_MONITOR)
-        settingSet.add(AlertingSettings.REQUEST_TIMEOUT)
-        settingSet.add(AlertingSettings.INDEX_TIMEOUT)
-        settingSet.add(AlertingSettings.MAX_ACTION_THROTTLE_VALUE)
-        settingSet.add(DestinationSettings.ALLOW_LIST)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
-        settingSet.add(AlertingSettings.JOB_QUEUE_NAME)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME)
-        return ClusterSettings(settings, settingSet)
+        return ClusterSettings(settings, ClusterSettings.BUILT_IN_CLUSTER_SETTINGS + AlertingPlugin().settings)
     }
 
     private fun createAction(settings: Settings = Settings.EMPTY): TransportIndexMonitorAction {

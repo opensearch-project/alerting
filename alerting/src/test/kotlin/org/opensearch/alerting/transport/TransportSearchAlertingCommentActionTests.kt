@@ -17,7 +17,6 @@ import org.opensearch.alerting.AlertingPlugin.Companion.TENANT_ID_HEADER
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
-import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.core.action.ActionListener
@@ -52,10 +51,7 @@ class TransportSearchAlertingCommentActionTests : OpenSearchTestCase() {
         whenever(client.threadPool()).thenReturn(threadPool)
         whenever(threadPool.threadContext).thenReturn(threadContext)
 
-        val settingSet = hashSetOf<Setting<*>>()
-        settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
-        settingSet.add(AlertingSettings.ALERTING_COMMENTS_ENABLED)
+        val settingSet = ClusterSettings.BUILT_IN_CLUSTER_SETTINGS + org.opensearch.alerting.AlertingPlugin().settings
         val clusterSettings = ClusterSettings(Settings.EMPTY, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
     }
@@ -72,7 +68,7 @@ class TransportSearchAlertingCommentActionTests : OpenSearchTestCase() {
 
         @Suppress("UNCHECKED_CAST")
         val listener = Mockito.mock(ActionListener::class.java) as ActionListener<SearchResponse>
-        action.search(SearchRequest(".opensearch-alerting-comments-history-*"), listener)
+        action.search(SearchRequest(".opensearch-alerting-comments-history-*"), listener, expectedTenantId)
 
         val captor = ArgumentCaptor.forClass(SearchDataObjectRequest::class.java)
         verify(sdkClient).searchDataObjectAsync(captor.capture())

@@ -29,55 +29,51 @@ import org.opensearch.transport.client.Client
  * `OPENDISTRO_SECURITY_AUTHENTICATED_USER` header must still be readable by
  * [org.opensearch.security.resources.ResourceIndexListener] to record `createdBy`.
  *
- * Each helper here stashes right before the sdk call and restores on the completion callback via
- * `whenComplete`, mirroring flow-framework / ml-commons. Callers should invoke these instead of
- * `sdkClient.xxxAsync(...).await()` directly.
+ * Stash only while dispatching the async call, then restore on that same thread before awaiting.
+ * Restoring on a completion or coroutine-resume thread would leak context between requests.
  */
 
 suspend fun SdkClient.putDataObjectStashed(
     request: PutDataObjectRequest,
     threadContext: ThreadContext,
+    callerContext: ThreadContext.StoredContext? = null,
 ): PutDataObjectResponse {
-    val stored = threadContext.stashContext()
-    return this.putDataObjectAsync(request)
-        .whenComplete { _, _ -> stored.close() }
-        .await()
+    val future = threadContext.newStoredContext(false).use {
+        callerContext?.restore()
+        threadContext.stashContext().use { this.putDataObjectAsync(request) }
+    }
+    return future.await()
 }
 
 suspend fun SdkClient.getDataObjectStashed(
     request: GetDataObjectRequest,
     threadContext: ThreadContext,
 ): GetDataObjectResponse {
-    val stored = threadContext.stashContext()
-    return this.getDataObjectAsync(request)
-        .whenComplete { _, _ -> stored.close() }
-        .await()
+    val future = threadContext.stashContext().use { this.getDataObjectAsync(request) }
+    return future.await()
 }
 
 suspend fun SdkClient.deleteDataObjectStashed(
     request: DeleteDataObjectRequest,
     threadContext: ThreadContext,
 ): DeleteDataObjectResponse {
-    val stored = threadContext.stashContext()
-    return this.deleteDataObjectAsync(request)
-        .whenComplete { _, _ -> stored.close() }
-        .await()
+    val future = threadContext.stashContext().use { this.deleteDataObjectAsync(request) }
+    return future.await()
 }
 
 /**
- * Executes [Client.index] with the caller's [ThreadContext] stashed just before dispatch; the stash
- * is closed via the completion callback so it works across the async / coroutine-resume boundary.
- * Prefer this over `client.suspendUntil { client.index(req, it) }` when the write must run under
- * the plugin (not the caller) but the surrounding coroutine flow must retain the caller's
- * persistent auth for the security plugin's [ResourceIndexListener].
+ * Dispatches an internal write with the caller's persistent headers but without their transients.
+ * Both context scopes close on the dispatching thread, before suspension.
  */
 suspend fun Client.indexStashed(
     request: IndexRequest,
+    callerContext: ThreadContext.StoredContext? = null,
 ): IndexResponse {
-    val stored = this.threadPool().threadContext.stashContext()
-    return try {
-        this.suspendUntil { this.index(request, it) }
-    } finally {
-        stored.close()
+    val threadContext = this.threadPool().threadContext
+    return this.suspendUntil { listener ->
+        threadContext.newStoredContext(false).use {
+            callerContext?.restore()
+            threadContext.stashContext().use { this.index(request, listener) }
+        }
     }
 }
