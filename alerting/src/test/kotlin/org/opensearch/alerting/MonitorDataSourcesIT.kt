@@ -18,6 +18,7 @@ import org.opensearch.action.admin.indices.mapping.get.GetMappingsRequest
 import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest
 import org.opensearch.action.admin.indices.open.OpenIndexRequest
 import org.opensearch.action.admin.indices.refresh.RefreshRequest
+import org.opensearch.action.admin.indices.rollover.RolloverRequest
 import org.opensearch.action.admin.indices.settings.get.GetSettingsResponse
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
@@ -2531,6 +2532,53 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         } catch (e: Exception) {
             fail("Exception happend but it shouldn't!")
         }
+    }
+
+    fun `test doc level monitor runs when its saved query index no longer exists`() {
+        val monitors = createMonitorsWithDeletedQueryIndices()
+
+        indexDoc(index, "1", """{ "test_field_1" : "login" }""")
+        monitors.toList().forEach { monitor ->
+            assertNull(executeMonitor(monitor, monitor.id, false)!!.monitorRunResult.error)
+            assertEquals(1, searchFindings(monitor.id).size)
+            assertEquals("$DOC_LEVEL_QUERIES_INDEX-000001", savedQueryIndex(monitor))
+        }
+    }
+
+    fun `test doc level monitor can be updated when its saved query index no longer exists`() {
+        val monitor = createMonitorsWithDeletedQueryIndices().second
+
+        updateMonitor(monitor.copy(name = "updated"), monitor.id)
+        assertEquals("$DOC_LEVEL_QUERIES_INDEX-000001", savedQueryIndex(monitor))
+        indexDoc(index, "1", """{ "test_field_1" : "login" }""")
+        assertNull(executeMonitor(monitor, monitor.id, false)!!.monitorRunResult.error)
+        assertEquals(1, searchFindings(monitor.id).size)
+    }
+
+    /**
+     * Creates a monitor before and one after a query index rollover, so they save different query indices, then deletes
+     * the query indices. This is the state after restoring the alerting config without the query indices.
+     */
+    private fun createMonitorsWithDeletedQueryIndices(): Pair<Monitor, Monitor> {
+        val docQuery = DocLevelQuery(query = "test_field_1:\"login\"", name = "1", fields = listOf())
+        val monitor = randomDocumentLevelMonitor(
+            inputs = listOf(DocLevelMonitorInput("description", listOf(index), listOf(docQuery))),
+            triggers = listOf()
+        )
+        val before = createMonitor(monitor)!!.let { it.monitor.copy(id = it.id) }
+        // The plugin rolls the query index over when it reaches its field limit
+        assertTrue(client().admin().indices().rolloverIndex(RolloverRequest(DOC_LEVEL_QUERIES_INDEX, null)).get().isRolledOver)
+        val after = createMonitor(monitor)!!.let { it.monitor.copy(id = it.id) }
+        assertEquals("$DOC_LEVEL_QUERIES_INDEX-000001", savedQueryIndex(before))
+        assertEquals("$DOC_LEVEL_QUERIES_INDEX-000002", savedQueryIndex(after))
+
+        deleteIndex("$DOC_LEVEL_QUERIES_INDEX-000001")
+        deleteIndex("$DOC_LEVEL_QUERIES_INDEX-000002")
+        return before to after
+    }
+
+    private fun savedQueryIndex(monitor: Monitor): String? {
+        return searchMonitorMetadata("${monitor.id}-metadata")?.sourceToQueryIndexMapping?.get(index + monitor.id)
     }
 
     // TODO - revisit single node integ tests setup to figure out why we cannot have multiple test classes implementing it
