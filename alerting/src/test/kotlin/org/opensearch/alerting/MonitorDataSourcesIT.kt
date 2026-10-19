@@ -2538,6 +2538,8 @@ class MonitorDataSourcesIT : AlertingSingleNodeTestCase() {
         val monitors = createMonitorsWithDeletedQueryIndices()
 
         indexDoc(index, "1", """{ "test_field_1" : "login" }""")
+        // Only `after` goes through the fix. The first run recreates the deleted -000001 index, so when `before` checks its
+        // saved -000001 it exists again. `after`'s saved -000002 is still missing, so its run switches to -000001.
         monitors.toList().forEach { monitor ->
             assertNull(executeMonitor(monitor, monitor.id, false)!!.monitorRunResult.error)
             assertEquals(1, searchFindings(monitor.id).size)
