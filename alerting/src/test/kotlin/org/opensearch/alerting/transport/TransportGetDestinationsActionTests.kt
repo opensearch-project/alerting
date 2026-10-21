@@ -13,10 +13,8 @@ import org.mockito.Mockito.verify
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.alerting.AlertingPlugin.Companion.TENANT_ID_HEADER
 import org.opensearch.alerting.action.GetDestinationsResponse
-import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
-import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.core.action.ActionListener
@@ -51,9 +49,7 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
         whenever(client.threadPool()).thenReturn(threadPool)
         whenever(threadPool.threadContext).thenReturn(threadContext)
 
-        val settingSet = hashSetOf<Setting<*>>()
-        settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
+        val settingSet = ClusterSettings.BUILT_IN_CLUSTER_SETTINGS + org.opensearch.alerting.AlertingPlugin().settings
         val clusterSettings = ClusterSettings(Settings.EMPTY, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
     }
@@ -74,12 +70,12 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
             Settings.EMPTY,
             Mockito.mock(NamedXContentRegistry::class.java),
             sdkClient,
-            Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
+            org.opensearch.alerting.util.PluginClient(client)
         )
 
         @Suppress("UNCHECKED_CAST")
         val listener = Mockito.mock(ActionListener::class.java) as ActionListener<GetDestinationsResponse>
-        action.search(SearchSourceBuilder(), listener)
+        action.search(SearchSourceBuilder(), listener, expectedTenantId)
 
         val captor = ArgumentCaptor.forClass(SearchDataObjectRequest::class.java)
         verify(sdkClient).searchDataObjectAsync(captor.capture())
@@ -102,7 +98,7 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
             Settings.EMPTY,
             Mockito.mock(NamedXContentRegistry::class.java),
             sdkClient,
-            Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
+            org.opensearch.alerting.util.PluginClient(client)
         )
 
         @Suppress("UNCHECKED_CAST")
@@ -127,7 +123,7 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
             Settings.EMPTY,
             Mockito.mock(NamedXContentRegistry::class.java),
             sdkClient,
-            Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
+            org.opensearch.alerting.util.PluginClient(client)
         )
 
         @Suppress("UNCHECKED_CAST")
@@ -154,7 +150,7 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
             Settings.EMPTY,
             Mockito.mock(NamedXContentRegistry::class.java),
             sdkClient,
-            Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
+            org.opensearch.alerting.util.PluginClient(client)
         )
 
         @Suppress("UNCHECKED_CAST")
@@ -179,7 +175,7 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
             Settings.EMPTY,
             Mockito.mock(NamedXContentRegistry::class.java),
             sdkClient,
-            Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
+            org.opensearch.alerting.util.PluginClient(client)
         )
 
         @Suppress("UNCHECKED_CAST")
@@ -208,7 +204,7 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
                 Settings.EMPTY,
                 Mockito.mock(NamedXContentRegistry::class.java),
                 sdkClient,
-                Mockito.mock(org.opensearch.alerting.util.PluginClient::class.java)
+                org.opensearch.alerting.util.PluginClient(client)
             )
 
             // User with backend roles that would normally trigger filterBy
