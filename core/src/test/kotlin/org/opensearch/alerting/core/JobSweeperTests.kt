@@ -16,6 +16,7 @@ import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.REQU
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEPER_ENABLED
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_BACKOFF_MILLIS
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_BACKOFF_RETRY_COUNT
+import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_ORPHAN_RECONCILIATION_ENABLED
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_PAGE_SIZE
 import org.opensearch.alerting.core.settings.ScheduledJobSettings.Companion.SWEEP_PERIOD
 import org.opensearch.cluster.ClusterName
@@ -191,7 +192,10 @@ class JobSweeperTests {
     private fun newSweeper(clusterState: ClusterState): JobSweeper {
         val clusterSettings = ClusterSettings(
             settings,
-            setOf(SWEEP_PERIOD, SWEEPER_ENABLED, SWEEP_BACKOFF_MILLIS, SWEEP_BACKOFF_RETRY_COUNT, SWEEP_PAGE_SIZE, REQUEST_TIMEOUT)
+            setOf(
+                SWEEP_PERIOD, SWEEPER_ENABLED, SWEEP_BACKOFF_MILLIS, SWEEP_BACKOFF_RETRY_COUNT, SWEEP_PAGE_SIZE,
+                REQUEST_TIMEOUT, SWEEP_ORPHAN_RECONCILIATION_ENABLED
+            )
         )
         val localNode = DiscoveryNode(
             LOCAL_NODE_ID,
