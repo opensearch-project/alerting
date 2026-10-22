@@ -65,6 +65,20 @@ suspend fun SdkClient.deleteDataObjectStashed(
 }
 
 /**
+ * Runs [block] under [stored], then restores the context the coroutine had, on whichever thread it resumes. This keeps
+ * the caller's context from reaching the calls that follow [block].
+ */
+suspend fun <T> ThreadContext.withStoredContext(stored: ThreadContext.StoredContext, block: suspend () -> T): T {
+    val own = newStoredContext(false)
+    stored.restore()
+    try {
+        return block()
+    } finally {
+        own.restore()
+    }
+}
+
+/**
  * Executes [Client.index] with the caller's [ThreadContext] stashed just before dispatch; the stash
  * is closed via the completion callback so it works across the async / coroutine-resume boundary.
  * Prefer this over `client.suspendUntil { client.index(req, it) }` when the write must run under
