@@ -52,6 +52,7 @@ import org.opensearch.alerting.resthandler.RestSearchAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
+import org.opensearch.alerting.restore.AlertingRestoreReconciler
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.service.AssumeRoleCredentialsCache
 import org.opensearch.alerting.service.DeleteMonitorService
@@ -142,6 +143,7 @@ import org.opensearch.plugins.ActionPlugin
 import org.opensearch.plugins.ExtensiblePlugin
 import org.opensearch.plugins.IdentityAwarePlugin
 import org.opensearch.plugins.ReloadablePlugin
+import org.opensearch.plugins.RestoreListenerPlugin
 import org.opensearch.plugins.ScriptPlugin
 import org.opensearch.plugins.SearchPlugin
 import org.opensearch.plugins.SystemIndexPlugin
@@ -157,6 +159,7 @@ import org.opensearch.rest.RestController
 import org.opensearch.rest.RestHandler
 import org.opensearch.script.ScriptContext
 import org.opensearch.script.ScriptService
+import org.opensearch.snapshots.RestoreContext
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
 import org.opensearch.watcher.ResourceWatcherService
@@ -169,9 +172,10 @@ import java.util.function.Supplier
  * [BucketLevelTrigger.XCONTENT_REGISTRY], [ClusterMetricsInput.XCONTENT_REGISTRY] to the [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
  */
 internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin,
-    SearchPlugin, SystemIndexPlugin, IdentityAwarePlugin, PercolatorPluginExt() {
+    SearchPlugin, SystemIndexPlugin, IdentityAwarePlugin, RestoreListenerPlugin, PercolatorPluginExt() {
 
     private var pluginClient: PluginClient? = null
+    private lateinit var restoreReconciler: AlertingRestoreReconciler
 
     override fun getContextAllowlists(): Map<ScriptContext<*>, List<Allowlist>> {
         val whitelist = AllowlistLoader.loadFromResourceFiles(javaClass, "org.opensearch.alerting.txt")
@@ -417,6 +421,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
         val pluginClientInstance = PluginClient(client)
         this.pluginClient = pluginClientInstance
+        this.restoreReconciler = AlertingRestoreReconciler(pluginClientInstance, clusterService)
 
         return listOf(
             sweeper,
@@ -437,6 +442,10 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
 
     override fun assignSubject(pluginSubject: PluginSubject) {
         pluginClient?.setSubject(pluginSubject)
+    }
+
+    override fun onRestore(context: RestoreContext) {
+        restoreReconciler.onRestore(context)
     }
 
     override fun getSettings(): List<Setting<*>> {
