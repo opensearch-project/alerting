@@ -15,9 +15,9 @@ import org.opensearch.snapshots.RestoreContext
 import org.opensearch.transport.client.Client
 
 /**
- * Repairs alerting state as soon as a snapshot restore finishes, before any monitor runs. Called from AlertingPlugin.onRestore.
+ * Repairs alerting state after a snapshot restore finishes. Called from AlertingPlugin.onRestore.
  *
- * Runs each repair in the background, so the restore is not held up. Each repair checks whether the restore touched its state
+ * The repairs run in a coroutine because they are suspend functions. Each repair checks whether the restore touched its state
  * and changes nothing otherwise, so a second call for the same restore is a no-op.
  *
  * [client] must be the plugin client, so the repairs run as this plugin's identity, which can only change alerting's own system
