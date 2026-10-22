@@ -495,6 +495,15 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         indexTimeout: TimeValue
     ): Pair<AcknowledgedResponse, String> {
         var targetQueryIndex = monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id]
+        if (targetQueryIndex != null && !clusterService.state().metadata.hasIndex(targetQueryIndex)) {
+            // The saved query index may not exist on this cluster, e.g. when the monitor's config was restored from a
+            // snapshot without the query indices. Reset it to null so next step sets it to the existing write index.
+            log.warn(
+                "Monitor ${monitor.id}: saved query index [$targetQueryIndex] for [$sourceIndex] does not exist, " +
+                    "using the write index of [${monitor.dataSources.queryIndex}]"
+            )
+            targetQueryIndex = null
+        }
         if (
             targetQueryIndex == null || (
                 targetQueryIndex != monitor.dataSources.queryIndex &&
