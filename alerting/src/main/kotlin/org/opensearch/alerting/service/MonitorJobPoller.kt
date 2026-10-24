@@ -69,8 +69,21 @@ class MonitorJobPoller(
             logger.info("MonitorJobPoller disabled, not starting poll workers")
             return
         }
-        val provider = requireNotNull(accountIdProvider) { "accountIdProvider must be set before starting" }
-        require(region.isNotBlank()) { "region must be set before starting" }
+        // Throwing here would abort node startup, because this runs in a lifecycle component. A deployment that
+        // turns on multi-tenancy without the account provider or the remote metadata region is not configured for
+        // this poller at all, so log loudly and poll nothing instead of refusing to start the node. Both of those
+        // settings are Final, so they arrive with the flag itself from opensearch.yml and cannot show up later;
+        // queueName is deliberately not checked here because it is Dynamic and may legitimately be set after the
+        // node has started.
+        val provider = accountIdProvider
+        if (provider == null || region.isBlank()) {
+            logger.error(
+                "MonitorJobPoller is enabled but not configured, so no monitor execution messages will be " +
+                    "consumed. accountIdProvider=${if (provider == null) "unset" else "set"}, " +
+                    "region=${if (region.isBlank()) "unset" else region}."
+            )
+            return
+        }
         if (sqsClient == null) {
             sqsClient = SqsClient.builder()
                 .region(Region.of(region))

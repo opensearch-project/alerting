@@ -10,6 +10,7 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import org.opensearch.alerting.util.ArnHelper
+import org.opensearch.common.lifecycle.Lifecycle
 import org.opensearch.common.settings.Settings
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.SearchInput
@@ -140,26 +141,46 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         poller.close()
     }
 
-    fun `test start throws when provider not set`() {
+    fun `test start does not throw when provider not set`() {
+        // doStart runs in a lifecycle component, so throwing here aborts node startup. A deployment that enables
+        // the poller without an account id provider is not configured for it: log and poll nothing instead.
+        val latch = CountDownLatch(1)
+        val sqsClient = FakeSqsClient(
+            onReceive = {
+                latch.countDown()
+                ReceiveMessageResponse.builder().messages(emptyList()).build()
+            }
+        )
         val poller = MonitorJobPoller(
             testXContentRegistry(), mockClient(), true,
             null, "us-west-2", "test-queue", mappingProvider()
-        )
-        expectThrows(Exception::class.java) {
-            poller.start()
-        }
+        ).also { it.sqsClient = sqsClient }
+        poller.start()
+        assertEquals("The node must still start", Lifecycle.State.STARTED, poller.lifecycleState())
+        assertFalse("Should not have polled without an account id provider", latch.await(500, TimeUnit.MILLISECONDS))
+        poller.stop()
         poller.close()
     }
 
-    fun `test start throws when region not set`() {
+    fun `test start does not throw when region not set`() {
+        // plugins.alerting.multi_tenancy_enabled turns the poller on, but the remote metadata region is a separate
+        // Final setting. Missing it must not stop the node from starting.
+        val latch = CountDownLatch(1)
+        val sqsClient = FakeSqsClient(
+            onReceive = {
+                latch.countDown()
+                ReceiveMessageResponse.builder().messages(emptyList()).build()
+            }
+        )
         val poller = MonitorJobPoller(
             testXContentRegistry(), mockClient(), true,
             testAccountIdProvider(), "", "test-queue",
             mappingProvider()
-        )
-        expectThrows(Exception::class.java) {
-            poller.start()
-        }
+        ).also { it.sqsClient = sqsClient }
+        poller.start()
+        assertEquals("The node must still start", Lifecycle.State.STARTED, poller.lifecycleState())
+        assertFalse("Should not have polled without a region", latch.await(500, TimeUnit.MILLISECONDS))
+        poller.stop()
         poller.close()
     }
 

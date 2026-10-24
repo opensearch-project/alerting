@@ -4,6 +4,7 @@
  */
 
 import java.nio.charset.StandardCharsets
+import org.gradle.process.CommandLineArgumentProvider
 import java.nio.file.Files
 import java.security.GeneralSecurityException
 import java.security.cert.X509Certificate
@@ -140,6 +141,8 @@ configurations.testImplementation {
 configurations {
     opensearchPlugin
     zipArchive
+    // Byte Buddy agent for Mockito's inline mock maker, resolved so it can be passed with -javaagent below.
+    mockitoAgent
 }
 
 // This flag indicates the existence of security plugin
@@ -228,6 +231,13 @@ dependencies {
     testImplementation "org.antlr:antlr4-runtime:${versions.antlr4}"
     testImplementation "org.jetbrains.kotlin:kotlin-test:${kotlin_version}"
     testImplementation "org.mockito:mockito-core:${versions.mockito}"
+    // The OpenSearch test framework ships mockito-extensions/org.mockito.plugins.MockMaker in its framework jar,
+    // pinning Mockito to the subclass mock maker, which cannot mock final Kotlin classes or the final classes
+    // this repository does not own in core and commons. src/test/resources/mockito-extensions selects the inline
+    // maker instead -- which relies on our test resources preceding the framework jar on the test runtime
+    // classpath, as Mockito uses the first provider it finds. Mockito 5.18+ no longer self-attaches its Byte
+    // Buddy agent, so it is resolved here and passed with -javaagent below.
+    mockitoAgent("net.bytebuddy:byte-buddy-agent:${versions.bytebuddy}") { transitive = false }
     testImplementation "org.opensearch.plugin:reindex-client:${opensearch_version}"
     testImplementation "org.opensearch.plugin:parent-join-client:${opensearch_version}"
     testImplementation "org.opensearch.plugin:lang-painless:${opensearch_version}"
@@ -248,6 +258,18 @@ opensearch_tmp_dir.mkdirs()
 
 test {
     systemProperty 'tests.security.manager', 'false'
+}
+
+// Every Test task shares sourceSets.test, so they all pick up the inline mock maker selected in
+// src/test/resources/mockito-extensions and all need its agent. Supplied through an argument provider rather
+// than jvmArgs so the configuration is not resolved at configuration time.
+tasks.withType(Test).configureEach {
+    jvmArgumentProviders.add(new CommandLineArgumentProvider() {
+        @Override
+        Iterable<String> asArguments() {
+            return ["-javaagent:${configurations.mockitoAgent.asPath}".toString()]
+        }
+    })
 }
 
 task integTest(type: RestIntegTestTask) {

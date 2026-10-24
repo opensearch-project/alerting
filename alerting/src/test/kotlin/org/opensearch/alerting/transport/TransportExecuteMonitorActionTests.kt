@@ -20,7 +20,7 @@ import org.opensearch.action.support.ActionFilters
 import org.opensearch.alerting.MonitorRunnerService
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
-import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.alertingPluginSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.cluster.ClusterState
 import org.opensearch.cluster.metadata.Metadata
@@ -74,8 +74,7 @@ class TransportExecuteMonitorActionTests : OpenSearchTestCase() {
         // so they must be present in the ClusterSettings used by the mocked ClusterService.
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES_ACCESS_STRATEGY)
+        settingSet.addAll(alertingPluginSettings())
         val clusterSettings = ClusterSettings(Settings.EMPTY, settingSet)
         Mockito.`when`(clusterService.clusterSettings).thenReturn(clusterSettings)
 
