@@ -19,6 +19,7 @@ import org.opensearch.client.Response
 import org.opensearch.client.RestClient
 import org.opensearch.client.WarningsHandler
 import org.opensearch.common.UUIDs
+import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
@@ -953,3 +954,12 @@ fun assertPplTriggersEqual(pplTrigger1: PPLTrigger, pplTrigger2: PPLTrigger) {
         pplTrigger2.customCondition
     )
 }
+
+/**
+ * The plugin's own settings, for tests that build a [org.opensearch.common.settings.ClusterSettings].
+ *
+ * Components under test register update consumers for the settings they read, and `AbstractScopedSettings`
+ * rejects a consumer for an unregistered key, so a hand-maintained allowlist drifts from production every time a
+ * setting is added. This is the same list the plugin gives the node.
+ */
+fun alertingPluginSettings(): Set<Setting<*>> = AlertingPlugin().settings.toSet()

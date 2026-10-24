@@ -16,7 +16,7 @@ import org.mockito.Mockito.verify
 import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.alerting.AlertingPlugin.Companion.TENANT_ID_HEADER
-import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.alertingPluginSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.Setting
@@ -70,8 +70,7 @@ class TransportGetMonitorActionTests : OpenSearchTestCase() {
 
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
-        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
+        settingSet.addAll(alertingPluginSettings())
         val clusterSettings = ClusterSettings(Settings.EMPTY, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
     }
@@ -220,8 +219,7 @@ class TransportGetMonitorActionTests : OpenSearchTestCase() {
     private fun createAction(settings: Settings): TransportGetMonitorAction {
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
-        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
+        settingSet.addAll(alertingPluginSettings())
         val clusterSettings = ClusterSettings(settings, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
 

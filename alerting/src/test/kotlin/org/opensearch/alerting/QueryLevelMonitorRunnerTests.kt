@@ -15,7 +15,6 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.Setting
@@ -55,7 +54,7 @@ class QueryLevelMonitorRunnerTests : OpenSearchTestCase() {
 
         val settings = Settings.builder().build()
         val settingSet = hashSetOf<Setting<*>>()
-        settingSet.add(AlertingSettings.MAX_COMMENTS_PER_NOTIFICATION)
+        settingSet.addAll(alertingPluginSettings())
         val clusterSettings = ClusterSettings(settings, settingSet)
         `when`(clusterService.clusterSettings).thenReturn(clusterSettings)
 
