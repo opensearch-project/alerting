@@ -7,6 +7,8 @@ package org.opensearch.alerting.util
 
 import org.opensearch.alerting.parser
 import org.opensearch.cluster.metadata.IndexMetadata
+import org.opensearch.common.xcontent.XContentHelper
+import org.opensearch.common.xcontent.json.JsonXContent
 import org.opensearch.test.OpenSearchTestCase
 import java.lang.NumberFormatException
 import kotlin.test.assertFailsWith
@@ -87,5 +89,21 @@ class IndexUtilsTests : OpenSearchTestCase() {
 
         val shouldUpdateIndex = IndexUtils.shouldUpdateIndex(index, newMapping)
         assertFalse(shouldUpdateIndex)
+    }
+
+    fun `test resolve field aliases replaces field-alias names with their paths`() {
+        val mapping = "{\"properties\":{" +
+            "\"fw\":{\"properties\":{\"dst\":{\"type\":\"keyword\"},\"src\":{\"type\":\"keyword\"}}}," +
+            "\"dst-ip\":{\"type\":\"alias\",\"path\":\"fw.dst\"}," +
+            "\"source\":{\"properties\":{\"ip\":{\"type\":\"alias\",\"path\":\"fw.src\"}}}," +
+            "\"message\":{\"type\":\"text\"}}}"
+        val mappingSource = XContentHelper.convertToMap(JsonXContent.jsonXContent, mapping, false)
+
+        assertEquals(
+            listOf("fw.dst", "fw.src", "message", "unmapped"),
+            IndexUtils.resolveFieldAliases(listOf("dst-ip", "source.ip", "message", "unmapped"), mappingSource)
+        )
+        assertEquals(listOf("fw.dst"), IndexUtils.resolveFieldAliases(listOf("dst-ip", "fw.dst"), mappingSource))
+        assertEquals(listOf("dst-ip", "message"), IndexUtils.resolveFieldAliases(listOf("dst-ip", "message"), null))
     }
 }
