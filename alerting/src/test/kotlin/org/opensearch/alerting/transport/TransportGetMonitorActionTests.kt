@@ -17,6 +17,7 @@ import org.opensearch.action.search.SearchRequest
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.alerting.AlertingPlugin.Companion.TENANT_ID_HEADER
 import org.opensearch.alerting.alertingPluginSettings
+import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.Setting
@@ -169,6 +170,9 @@ class TransportGetMonitorActionTests : OpenSearchTestCase() {
     fun `test resource sharing client set skips backend role validation`() {
         // Set up resource sharing client
         val mockRsc = Mockito.mock(org.opensearch.security.spi.resources.client.ResourceSharingClient::class.java)
+        // shouldUseResourceAuthz needs both a client and the feature enabled for the type. Without this
+        // the mock returns false, backend role validation runs, and doExecute returns before the SDK call.
+        whenever(mockRsc.isFeatureEnabledForType(any())).thenReturn(true)
         org.opensearch.alerting.ResourceSharingClientAccessor.setResourceSharingClient(mockRsc)
 
         try {
@@ -198,6 +202,9 @@ class TransportGetMonitorActionTests : OpenSearchTestCase() {
             verify(sdkClient).getDataObjectAsync(any(GetDataObjectRequest::class.java))
         } finally {
             org.opensearch.alerting.ResourceSharingClientAccessor.clear()
+            // filter_by_backend_roles is deprecated in favour of the resource sharing this test covers,
+            // and setting it emits a warning that the base class otherwise fails the test on.
+            assertSettingDeprecationsAndWarnings(arrayOf<Setting<*>>(AlertingSettings.FILTER_BY_BACKEND_ROLES))
         }
     }
 

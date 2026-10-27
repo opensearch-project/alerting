@@ -33,6 +33,7 @@ import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
+import java.util.concurrent.CompletableFuture
 import org.mockito.Mockito.`when` as whenever
 
 @ThreadLeakFilters(filters = [TransportDeleteMonitorActionTests.CoroutineThreadFilter::class])
@@ -66,13 +67,14 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
     }
 
-    fun `test SDK getDataObject is called`() {
+    fun `test SDK getDataObjectAsync is called`() {
         val response = GetDataObjectResponse.builder()
             .id("test-monitor-id")
             .index(".opendistro-alerting-config")
             .source(null)
             .build()
-        whenever(sdkClient.getDataObject(any(GetDataObjectRequest::class.java))).thenReturn(response)
+        whenever(sdkClient.getDataObjectAsync(any(GetDataObjectRequest::class.java)))
+            .thenReturn(CompletableFuture.completedFuture(response))
 
         val action = createAction()
         val request = DeleteMonitorRequest("test-monitor-id", org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE)
@@ -81,7 +83,7 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
 
         invokeDoExecute(action, request, listener)
 
-        verify(sdkClient, timeout(1000)).getDataObject(any(GetDataObjectRequest::class.java))
+        verify(sdkClient, timeout(1000)).getDataObjectAsync(any(GetDataObjectRequest::class.java))
     }
 
     fun `test getMonitor not found calls onFailure`() {
@@ -90,7 +92,8 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
             .index(".opendistro-alerting-config")
             .source(null)
             .build()
-        whenever(sdkClient.getDataObject(any(GetDataObjectRequest::class.java))).thenReturn(response)
+        whenever(sdkClient.getDataObjectAsync(any(GetDataObjectRequest::class.java)))
+            .thenReturn(CompletableFuture.completedFuture(response))
 
         val action = createAction()
         val request = DeleteMonitorRequest("test-monitor-id", org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE)
@@ -103,8 +106,8 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
     }
 
     fun `test SDK exception propagated to listener`() {
-        whenever(sdkClient.getDataObject(any(GetDataObjectRequest::class.java)))
-            .thenThrow(RuntimeException("SDK connection failed"))
+        whenever(sdkClient.getDataObjectAsync(any(GetDataObjectRequest::class.java)))
+            .thenReturn(CompletableFuture.failedFuture(RuntimeException("SDK connection failed")))
 
         val action = createAction()
         val request = DeleteMonitorRequest("test-monitor-id", org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE)
@@ -176,7 +179,8 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
             .index(".opendistro-alerting-config")
             .source(null)
             .build()
-        whenever(sdkClient.getDataObject(any(GetDataObjectRequest::class.java))).thenReturn(response)
+        whenever(sdkClient.getDataObjectAsync(any(GetDataObjectRequest::class.java)))
+            .thenReturn(CompletableFuture.completedFuture(response))
 
         val action = createAction()
         val request = DeleteMonitorRequest("test-monitor-id", org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE)
@@ -186,7 +190,7 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         invokeDoExecute(action, request, listener)
 
         val captor = ArgumentCaptor.forClass(GetDataObjectRequest::class.java)
-        verify(sdkClient, timeout(1000)).getDataObject(captor.capture())
+        verify(sdkClient, timeout(1000)).getDataObjectAsync(captor.capture())
         assertEquals(expectedTenantId, captor.value.tenantId())
     }
 
@@ -197,7 +201,8 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
             .index(".opendistro-alerting-config")
             .source(null)
             .build()
-        whenever(sdkClient.getDataObject(any(GetDataObjectRequest::class.java))).thenReturn(response)
+        whenever(sdkClient.getDataObjectAsync(any(GetDataObjectRequest::class.java)))
+            .thenReturn(CompletableFuture.completedFuture(response))
 
         val action = createAction()
         val request = DeleteMonitorRequest("test-monitor-id", org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE)
@@ -207,7 +212,7 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         invokeDoExecute(action, request, listener)
 
         val captor = ArgumentCaptor.forClass(GetDataObjectRequest::class.java)
-        verify(sdkClient, timeout(1000)).getDataObject(captor.capture())
+        verify(sdkClient, timeout(1000)).getDataObjectAsync(captor.capture())
         assertNull(captor.value.tenantId())
     }
 
