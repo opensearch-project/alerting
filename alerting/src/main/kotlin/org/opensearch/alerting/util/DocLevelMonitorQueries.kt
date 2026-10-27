@@ -56,7 +56,7 @@ import kotlin.coroutines.suspendCoroutine
 
 private val log = LogManager.getLogger(DocLevelMonitorQueries::class.java)
 
-class DocLevelMonitorQueries(private val client: Client, private val clusterService: ClusterService) {
+open class DocLevelMonitorQueries(private val client: Client, private val clusterService: ClusterService) {
     companion object {
 
         const val PROPERTIES = "properties"
@@ -486,7 +486,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             }
     }
 
-    private suspend fun updateQueryIndexMappings(
+    internal open suspend fun updateQueryIndexMappings(
         monitor: Monitor,
         monitorMetadata: MonitorMetadata,
         sourceIndex: String,
@@ -689,7 +689,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
      * Adjusts max field limit index setting for query index if source index has higher limit.
      * This will prevent max field limit exception, when source index has more fields then query index limit
      */
-    private suspend fun adjustMaxFieldLimitForQueryIndex(sourceIndexFieldLimit: Long, concreteQueryIndex: String) {
+    internal open suspend fun adjustMaxFieldLimitForQueryIndex(sourceIndexFieldLimit: Long, concreteQueryIndex: String) {
         val getSettingsResponse: GetSettingsResponse = client.suspendUntil {
             admin().indices().getSettings(GetSettingsRequest().indices(concreteQueryIndex), it)
         }
@@ -732,7 +732,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         return response.newIndex
     }
 
-    private fun getWriteIndexNameForAlias(alias: String): String? {
+    internal open fun getWriteIndexNameForAlias(alias: String): String? {
         return this.clusterService.state().metadata().indicesLookup?.get(alias)?.writeIndex?.index?.name
     }
 }
