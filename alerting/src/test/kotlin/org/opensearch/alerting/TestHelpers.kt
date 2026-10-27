@@ -371,8 +371,13 @@ fun randomBucketLevelTrigger(
     )
 }
 
+/**
+ * [min] is the fewest actions to generate, not the start of the range the count is drawn from:
+ * `(min..randomInt(max))` is empty whenever `randomInt` returns a value below [min], so asking for a
+ * minimum of one silently produced no actions about a tenth of the time.
+ */
 fun randomActionsForBucketLevelTrigger(min: Int = 0, max: Int = 10, destinationId: String = ""): List<Action> =
-    (min..randomInt(max)).map { randomActionWithPolicy(destinationId = destinationId) }
+    (1..randomIntBetween(maxOf(min, 1), max)).map { randomActionWithPolicy(destinationId = destinationId) }
 
 fun randomDocumentLevelTrigger(
     id: String = UUIDs.base64UUID(),
