@@ -153,11 +153,15 @@ object QueryLevelMonitorRunner : MonitorRunner() {
                     remoteTriggerResults[trigger.id]
                         ?: QueryLevelTriggerRunResult(trigger.name, false, null)
                 } else {
+                    // This branch is reached only because the search input failed, and that failure is
+                    // recorded on inputResults; monitorResult.error is set only by the early return above,
+                    // so reading it here would always yield null.
+                    val inputError = monitorResult.inputResults.error
                     logger.warn(
                         "Monitor ${monitor.id} trigger ${trigger.id}: search input failed, " +
-                            "skipping trigger evaluation. Error: ${monitorResult.error?.message}"
+                            "skipping trigger evaluation. Error: ${inputError?.message}"
                     )
-                    QueryLevelTriggerRunResult(trigger.name, !dryrun, monitorResult.error)
+                    QueryLevelTriggerRunResult(trigger.name, !dryrun, inputError)
                 }
             } else {
                 when (Monitor.MonitorType.valueOf(monitor.monitorType.uppercase(Locale.ROOT))) {

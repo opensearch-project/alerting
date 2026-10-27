@@ -8,6 +8,7 @@ package org.opensearch.alerting
 import junit.framework.TestCase.assertNull
 import org.apache.hc.core5.http.Header
 import org.apache.hc.core5.http.HttpEntity
+import org.mockito.ArgumentMatchers
 import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.destination.email.EmailAccount
 import org.opensearch.alerting.model.destination.email.EmailEntry
@@ -19,6 +20,7 @@ import org.opensearch.client.Response
 import org.opensearch.client.RestClient
 import org.opensearch.client.WarningsHandler
 import org.opensearch.common.UUIDs
+import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentFactory
@@ -953,3 +955,22 @@ fun assertPplTriggersEqual(pplTrigger1: PPLTrigger, pplTrigger2: PPLTrigger) {
         pplTrigger2.customCondition
     )
 }
+
+/**
+ * The plugin's own settings, for tests that build a [org.opensearch.common.settings.ClusterSettings].
+ *
+ * Components under test register update consumers for the settings they read, and `AbstractScopedSettings`
+ * rejects a consumer for an unregistered key, so a hand-maintained allowlist drifts from production every time a
+ * setting is added. This is the same list the plugin gives the node.
+ */
+fun alertingPluginSettings(): Set<Setting<*>> = AlertingPlugin().settings.toSet()
+
+/**
+ * A Mockito `any()` matcher usable against Kotlin functions that declare non-null parameters.
+ *
+ * `ArgumentMatchers.any()` returns null, and Kotlin rejects that at the call site with
+ * "any(...) must not be null". Declaring a non-null return type here keeps the check off the call site; the null
+ * still reaches Mockito, which only needs the matcher to have been registered.
+ */
+@Suppress("UNCHECKED_CAST")
+fun <T> anyNonNull(): T = ArgumentMatchers.any<T>() as T
