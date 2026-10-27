@@ -62,7 +62,8 @@ class TransportSearchAlertingCommentActionTests : OpenSearchTestCase() {
 
     fun `test search passes tenantId to SDK`() {
         val expectedTenantId = "test-tenant:test-scope"
-        threadContext.putHeader(TENANT_ID_HEADER, expectedTenantId)
+        // search takes the tenant id as a parameter; the header is read by doExecute, which this
+        // test does not go through.
 
         val future: CompletionStage<SearchDataObjectResponse> =
             CompletableFuture.completedFuture(SearchDataObjectResponse(null as SearchResponse?))
@@ -72,7 +73,7 @@ class TransportSearchAlertingCommentActionTests : OpenSearchTestCase() {
 
         @Suppress("UNCHECKED_CAST")
         val listener = Mockito.mock(ActionListener::class.java) as ActionListener<SearchResponse>
-        action.search(SearchRequest(".opensearch-alerting-comments-history-*"), listener)
+        action.search(SearchRequest(".opensearch-alerting-comments-history-*"), listener, expectedTenantId)
 
         val captor = ArgumentCaptor.forClass(SearchDataObjectRequest::class.java)
         verify(sdkClient).searchDataObjectAsync(captor.capture())

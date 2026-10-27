@@ -60,7 +60,8 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
 
     fun `test search passes tenantId to SDK`() {
         val expectedTenantId = "test-tenant:test-scope"
-        threadContext.putHeader(TENANT_ID_HEADER, expectedTenantId)
+        // search takes the tenant id as a parameter; the header is read by doExecute, which this
+        // test does not go through.
 
         val future: CompletionStage<SearchDataObjectResponse> =
             CompletableFuture.completedFuture(SearchDataObjectResponse(null as org.opensearch.action.search.SearchResponse?))
@@ -79,7 +80,7 @@ class TransportGetDestinationsActionTests : OpenSearchTestCase() {
 
         @Suppress("UNCHECKED_CAST")
         val listener = Mockito.mock(ActionListener::class.java) as ActionListener<GetDestinationsResponse>
-        action.search(SearchSourceBuilder(), listener)
+        action.search(SearchSourceBuilder(), listener, expectedTenantId)
 
         val captor = ArgumentCaptor.forClass(SearchDataObjectRequest::class.java)
         verify(sdkClient).searchDataObjectAsync(captor.capture())
