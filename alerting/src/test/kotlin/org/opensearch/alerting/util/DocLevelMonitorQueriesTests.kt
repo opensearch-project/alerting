@@ -87,7 +87,7 @@ class DocLevelMonitorQueriesTests : OpenSearchTestCase() {
         assertNotSame(nested, copy["outer"])
     }
 
-    fun `test deepCopyMap shallow copies list values`() {
+    fun `test deepCopyMap produces a distinct mutable list for list values`() {
         val list = mutableListOf("a", "b", "c")
         val original = mutableMapOf<String, Any>("items" to list)
 
@@ -490,5 +490,74 @@ class DocLevelMonitorQueriesTests : OpenSearchTestCase() {
             innerMap["nested_key"],
         )
         assertNotSame(innerMap, copiedInnerMap)
+    }
+
+    // -------------------------------------------------------------------------
+    // isUnrecoverableMappingError predicate (updateQueryIndexMappings fast-fail)
+    //
+    // The predicate is inlined as a local val inside the private suspend fun
+    // updateQueryIndexMappings and cannot be invoked directly.  We test the
+    // boolean expression directly here to protect against message-format drift
+    // and to document which error strings trigger the fast-fail path.
+    //
+    // Production predicate (DocLevelMonitorQueries.kt lines 589-592):
+    //   it.contains("alias must refer to an existing field") ||
+    //     (it.contains("mapper [") && it.contains("cannot be changed from type"))
+    // -------------------------------------------------------------------------
+
+    private fun isUnrecoverableMappingError(msg: String?): Boolean =
+        msg?.let {
+            it.contains("alias must refer to an existing field") ||
+                (it.contains("mapper [") && it.contains("cannot be changed from type"))
+        } ?: false
+
+    fun `test isUnrecoverableMappingError matches alias-refer-to-existing-field message`() {
+        val msg = "alias must refer to an existing field [real_field]"
+
+        assertTrue(
+            "Expected 'alias must refer to an existing field' to trigger the fast-fail predicate",
+            isUnrecoverableMappingError(msg),
+        )
+    }
+
+    fun `test isUnrecoverableMappingError matches mapper-cannot-be-changed-from-type message`() {
+        val msg = "mapper [timestamp] cannot be changed from type [date] to [keyword]"
+
+        assertTrue(
+            "Expected 'mapper [X] cannot be changed from type' to trigger the fast-fail predicate",
+            isUnrecoverableMappingError(msg),
+        )
+    }
+
+    fun `test isUnrecoverableMappingError does not match unrelated error message`() {
+        val msg = "Limit of total fields [1000] has been exceeded"
+
+        assertFalse(
+            "Expected field-limit error to NOT trigger the fast-fail predicate (it has a separate retry path)",
+            isUnrecoverableMappingError(msg),
+        )
+    }
+
+    fun `test isUnrecoverableMappingError returns false for null message`() {
+        assertFalse(
+            "Expected null message to return false from the fast-fail predicate",
+            isUnrecoverableMappingError(null),
+        )
+    }
+
+    fun `test isUnrecoverableMappingError requires both mapper-tokens for type-change branch`() {
+        // "mapper [" alone without "cannot be changed from type" must NOT match.
+        val msgMapperOnly = "mapper [field] is already defined"
+        // "cannot be changed from type" alone without "mapper [" must NOT match.
+        val msgPhraseOnly = "cannot be changed from type [date] to [keyword]"
+
+        assertFalse(
+            "Only 'mapper [' substring must NOT trigger the predicate",
+            isUnrecoverableMappingError(msgMapperOnly),
+        )
+        assertFalse(
+            "Only 'cannot be changed from type' must NOT trigger the predicate",
+            isUnrecoverableMappingError(msgPhraseOnly),
+        )
     }
 }
