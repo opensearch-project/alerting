@@ -1523,19 +1523,11 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             params.docCount > 0
         """.trimIndent()
 
-        // The assertions below require lastNotificationTime to advance for a completed alert, and
-        // BucketLevelMonitorRunner only advances it for alerts a PER_ALERT action ran for: alertsToUpdate is
-        // populated inside the per-alert action loop. Rewriting the PER_ALERT policies is therefore not enough,
-        // because every generated action may independently be PER_EXECUTION, leaving nothing to advance the
-        // timestamp. Prepend one PER_ALERT action carrying COMPLETED, and keep the generated ones for their
-        // randomness.
-        val actions = listOf(
-            randomActionWithPolicy(
-                actionExecutionPolicy = ActionExecutionPolicy(
-                    PerAlertActionScope(setOf(AlertCategory.NEW, AlertCategory.DEDUPED, AlertCategory.COMPLETED))
-                )
-            )
-        ) + randomActionsForBucketLevelTrigger(min = 1).map {
+        // The rewrite below has to leave a non-empty list. randomBucketLevelTrigger replaces an empty
+        // actions list with freshly generated ones, and those never pass through this rewrite, so a
+        // PER_ALERT policy without COMPLETED can reach the trigger and leave the completed alert's
+        // lastNotificationTime untouched.
+        val actions = randomActionsForBucketLevelTrigger(min = 1).map {
             if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
                 it.copy(
                     actionExecutionPolicy = ActionExecutionPolicy(
