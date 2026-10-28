@@ -240,8 +240,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 newNodes.add(Triple(oldName, newName, props))
             } else if (nodeProps.containsKey(PROPERTIES) && nodeProps[PROPERTIES] != null) {
                 // Internal(non-leaf) node - visit children.
-                // Pass nodeProps[PROPERTIES] as a MutableMap so recursive mutations propagate back
-                // through nodeProps into the parent node (via the newNodes update loop below).
+                // Copy nodeProps[PROPERTIES] into childProps, recurse on childProps, then write
+                // childProps back into nodeProps[PROPERTIES] so the parent node sees updated children.
                 @Suppress("UNCHECKED_CAST")
                 val childProps = (nodeProps[PROPERTIES] as Map<String, Any>).toMutableMap()
                 traverseMappingsAndUpdate(childProps, fullPath, processLeafFn, flattenPaths)

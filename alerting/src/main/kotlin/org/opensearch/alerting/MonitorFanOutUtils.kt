@@ -51,8 +51,8 @@ fun distributeShards(
  * It preserves existing sequence numbers and initializes new shards with UNASSIGNED_SEQ_NO.
  *
  * @param lastRunContext The previous run context from monitor metadata
- * @param monitorCtx The execution context containing cluster service
  * @param index The name of the index for which the context is being initialized
+ * @param shardCount The total shard count for the index
  * @return A map containing the initialized last run context; a new MutableMap owned by the caller — mutations to the returned map do not affect the input [lastRunContext].
  */
 fun initializeNewLastRunContext(
