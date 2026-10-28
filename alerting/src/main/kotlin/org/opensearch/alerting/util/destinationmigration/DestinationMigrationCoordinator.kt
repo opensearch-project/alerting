@@ -57,9 +57,16 @@ class DestinationMigrationCoordinator(
             return
         }
 
-        // Only proceed with migration initiation logic when the scheduled-jobs
-        // index routing table actually changed; skip all other cluster events.
-        if (!event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)) return
+        // Proceed with migration initiation when:
+        //   (a) the scheduled-jobs index routing table changed, OR
+        //   (b) the index does not exist yet (bootstrap / initial creation path), OR
+        //   (c) this node just became cluster manager (promotion on an already-created index).
+        // Skip all other cluster events to avoid unnecessary work.
+        val indexExists = event.state().routingTable().hasIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)
+        val indexChanged = event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)
+        val becameClusterManager = !event.previousState().nodes().isLocalNodeElectedClusterManager &&
+            event.state().nodes().isLocalNodeElectedClusterManager
+        if (indexExists && !indexChanged && !becameClusterManager) return
 
         if (DestinationMigrationUtilService.finishFlag) {
             logger.info("Reset destination migration process.")

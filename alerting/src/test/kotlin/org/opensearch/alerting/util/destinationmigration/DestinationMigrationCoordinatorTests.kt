@@ -16,6 +16,7 @@ import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterState
 import org.opensearch.cluster.node.DiscoveryNodes
+import org.opensearch.cluster.routing.RoutingTable
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.test.OpenSearchTestCase
@@ -111,6 +112,21 @@ class DestinationMigrationCoordinatorTests : OpenSearchTestCase() {
         // Scheduled-jobs index did not change — routing-table guard fires.
         whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(false)
 
+        // Stub for the new guard variables: index exists, was already manager → guard short-circuits.
+        val currentState = Mockito.mock(ClusterState::class.java)
+        val previousState = Mockito.mock(ClusterState::class.java)
+        val currentRoutingTable = Mockito.mock(RoutingTable::class.java)
+        val currentNodes = Mockito.mock(DiscoveryNodes::class.java)
+        val previousNodes = Mockito.mock(DiscoveryNodes::class.java)
+        whenever(event.state()).thenReturn(currentState)
+        whenever(event.previousState()).thenReturn(previousState)
+        whenever(currentState.routingTable()).thenReturn(currentRoutingTable)
+        whenever(currentState.nodes()).thenReturn(currentNodes)
+        whenever(previousState.nodes()).thenReturn(previousNodes)
+        whenever(currentRoutingTable.hasIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(true)
+        whenever(currentNodes.isLocalNodeElectedClusterManager).thenReturn(true)
+        whenever(previousNodes.isLocalNodeElectedClusterManager).thenReturn(true) // not a new promotion
+
         coordinator.clusterChanged(event)
 
         // initMigrateDestinations() must never be entered.
@@ -135,6 +151,21 @@ class DestinationMigrationCoordinatorTests : OpenSearchTestCase() {
         whenever(event.localNodeClusterManager()).thenReturn(true)
         whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(true)
 
+        // Stub for the new guard variables: index exists, indexChanged=true → guard passes.
+        val currentState = Mockito.mock(ClusterState::class.java)
+        val previousState = Mockito.mock(ClusterState::class.java)
+        val currentRoutingTable = Mockito.mock(RoutingTable::class.java)
+        val currentNodes = Mockito.mock(DiscoveryNodes::class.java)
+        val previousNodes = Mockito.mock(DiscoveryNodes::class.java)
+        whenever(event.state()).thenReturn(currentState)
+        whenever(event.previousState()).thenReturn(previousState)
+        whenever(currentState.routingTable()).thenReturn(currentRoutingTable)
+        whenever(currentState.nodes()).thenReturn(currentNodes)
+        whenever(previousState.nodes()).thenReturn(previousNodes)
+        whenever(currentRoutingTable.hasIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(true)
+        whenever(currentNodes.isLocalNodeElectedClusterManager).thenReturn(true)
+        whenever(previousNodes.isLocalNodeElectedClusterManager).thenReturn(true) // already was manager
+
         coordinator.clusterChanged(event)
 
         assertFalse(
@@ -154,6 +185,21 @@ class DestinationMigrationCoordinatorTests : OpenSearchTestCase() {
         // Only some other index changed, not SCHEDULED_JOBS_INDEX.
         whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(false)
         whenever(event.indexRoutingTableChanged("some-other-index")).thenReturn(true)
+
+        // Stub for the new guard variables: index exists, was already manager → guard short-circuits.
+        val currentState = Mockito.mock(ClusterState::class.java)
+        val previousState = Mockito.mock(ClusterState::class.java)
+        val currentRoutingTable = Mockito.mock(RoutingTable::class.java)
+        val currentNodes = Mockito.mock(DiscoveryNodes::class.java)
+        val previousNodes = Mockito.mock(DiscoveryNodes::class.java)
+        whenever(event.state()).thenReturn(currentState)
+        whenever(event.previousState()).thenReturn(previousState)
+        whenever(currentState.routingTable()).thenReturn(currentRoutingTable)
+        whenever(currentState.nodes()).thenReturn(currentNodes)
+        whenever(previousState.nodes()).thenReturn(previousNodes)
+        whenever(currentRoutingTable.hasIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(true)
+        whenever(currentNodes.isLocalNodeElectedClusterManager).thenReturn(true)
+        whenever(previousNodes.isLocalNodeElectedClusterManager).thenReturn(true) // not a new promotion
 
         coordinator.clusterChanged(event)
 
@@ -180,6 +226,21 @@ class DestinationMigrationCoordinatorTests : OpenSearchTestCase() {
         whenever(event.localNodeClusterManager()).thenReturn(true)
         whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(true)
 
+        // Stub for the new guard variables: index exists, indexChanged=true → guard passes.
+        val currentState = Mockito.mock(ClusterState::class.java)
+        val previousState = Mockito.mock(ClusterState::class.java)
+        val currentRoutingTable = Mockito.mock(RoutingTable::class.java)
+        val currentNodes = Mockito.mock(DiscoveryNodes::class.java)
+        val previousNodes = Mockito.mock(DiscoveryNodes::class.java)
+        whenever(event.state()).thenReturn(currentState)
+        whenever(event.previousState()).thenReturn(previousState)
+        whenever(currentState.routingTable()).thenReturn(currentRoutingTable)
+        whenever(currentState.nodes()).thenReturn(currentNodes)
+        whenever(previousState.nodes()).thenReturn(previousNodes)
+        whenever(currentRoutingTable.hasIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(true)
+        whenever(currentNodes.isLocalNodeElectedClusterManager).thenReturn(true)
+        whenever(previousNodes.isLocalNodeElectedClusterManager).thenReturn(true) // already was manager
+
         coordinator.clusterChanged(event)
 
         // initMigrateDestinations() must have been entered — scheduledJobIndexExists()
@@ -201,5 +262,87 @@ class DestinationMigrationCoordinatorTests : OpenSearchTestCase() {
 
         // No cancellable exists, so scheduledJobIndices must never be touched.
         verify(scheduledJobIndices, never()).scheduledJobIndexExists()
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 7: bootstrap path — index absent, node is cluster manager
+    //         indexRoutingTableChanged returns false but index does not exist, so
+    //         the guard must NOT short-circuit and migration initiation must fire.
+    // -------------------------------------------------------------------------
+
+    fun `test clusterChanged triggers migration when index does not exist yet (bootstrap path)`() {
+        val clusterState = Mockito.mock(ClusterState::class.java)
+        val discoveryNodes = Mockito.mock(DiscoveryNodes::class.java)
+        whenever(clusterService.state()).thenReturn(clusterState)
+        whenever(clusterState.nodes()).thenReturn(discoveryNodes)
+        whenever(discoveryNodes.isLocalNodeElectedClusterManager).thenReturn(true)
+
+        // scheduledJobIndexExists() returns false so initMigrateDestinations bails early.
+        whenever(scheduledJobIndices.scheduledJobIndexExists()).thenReturn(false)
+
+        val event = Mockito.mock(ClusterChangedEvent::class.java)
+        whenever(event.localNodeClusterManager()).thenReturn(true)
+        // Routing table did not change (index never existed), but...
+        whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(false)
+
+        // ...the index does not exist in the routing table — bootstrap path.
+        val currentState = Mockito.mock(ClusterState::class.java)
+        val previousState = Mockito.mock(ClusterState::class.java)
+        val currentRoutingTable = Mockito.mock(RoutingTable::class.java)
+        val currentNodes = Mockito.mock(DiscoveryNodes::class.java)
+        val previousNodes = Mockito.mock(DiscoveryNodes::class.java)
+        whenever(event.state()).thenReturn(currentState)
+        whenever(event.previousState()).thenReturn(previousState)
+        whenever(currentState.routingTable()).thenReturn(currentRoutingTable)
+        whenever(currentState.nodes()).thenReturn(currentNodes)
+        whenever(previousState.nodes()).thenReturn(previousNodes)
+        whenever(currentRoutingTable.hasIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(false) // index absent
+        whenever(currentNodes.isLocalNodeElectedClusterManager).thenReturn(true)
+        whenever(previousNodes.isLocalNodeElectedClusterManager).thenReturn(true)
+
+        coordinator.clusterChanged(event)
+
+        // Guard must not short-circuit: initMigrateDestinations() is entered.
+        verify(scheduledJobIndices).scheduledJobIndexExists()
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 8: manager promotion — index exists, routing unchanged, node just
+    //         became cluster manager; migration initiation must still be triggered.
+    // -------------------------------------------------------------------------
+
+    fun `test clusterChanged triggers migration when node just became cluster manager (promotion path)`() {
+        val clusterState = Mockito.mock(ClusterState::class.java)
+        val discoveryNodes = Mockito.mock(DiscoveryNodes::class.java)
+        whenever(clusterService.state()).thenReturn(clusterState)
+        whenever(clusterState.nodes()).thenReturn(discoveryNodes)
+        whenever(discoveryNodes.isLocalNodeElectedClusterManager).thenReturn(true)
+
+        // scheduledJobIndexExists() returns false so initMigrateDestinations bails early.
+        whenever(scheduledJobIndices.scheduledJobIndexExists()).thenReturn(false)
+
+        val event = Mockito.mock(ClusterChangedEvent::class.java)
+        whenever(event.localNodeClusterManager()).thenReturn(true)
+        // Index routing table did not change — but the node was just promoted.
+        whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(false)
+
+        val currentState = Mockito.mock(ClusterState::class.java)
+        val previousState = Mockito.mock(ClusterState::class.java)
+        val currentRoutingTable = Mockito.mock(RoutingTable::class.java)
+        val currentNodes = Mockito.mock(DiscoveryNodes::class.java)
+        val previousNodes = Mockito.mock(DiscoveryNodes::class.java)
+        whenever(event.state()).thenReturn(currentState)
+        whenever(event.previousState()).thenReturn(previousState)
+        whenever(currentState.routingTable()).thenReturn(currentRoutingTable)
+        whenever(currentState.nodes()).thenReturn(currentNodes)
+        whenever(previousState.nodes()).thenReturn(previousNodes)
+        whenever(currentRoutingTable.hasIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(true) // index exists
+        whenever(currentNodes.isLocalNodeElectedClusterManager).thenReturn(true) // now is manager
+        whenever(previousNodes.isLocalNodeElectedClusterManager).thenReturn(false) // was NOT manager before
+
+        coordinator.clusterChanged(event)
+
+        // Guard must not short-circuit: initMigrateDestinations() is entered.
+        verify(scheduledJobIndices).scheduledJobIndexExists()
     }
 }
