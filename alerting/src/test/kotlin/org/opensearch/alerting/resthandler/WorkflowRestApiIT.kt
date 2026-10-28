@@ -1223,4 +1223,33 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
             assertTrue(it.errorMessage == null)
         }
     }
+
+    fun `test create workflow with more than 10 delegates success`() {
+        // Regression test: SearchSourceBuilder in validateMonitorAccess was missing .size(monitorIds.size),
+        // causing OpenSearch to return only the default 10 hits. For workflows with 11+ delegates,
+        // validateDelegateMonitorsExist would fail with 'are not valid monitor ids' for any monitors
+        // beyond the first 10, even though all monitors existed.
+        val testIndex = createTestIndex()
+        val docQuery = DocLevelQuery(query = "test_field:\"us-west-2\"", name = "3", fields = listOf())
+        val docLevelInput = DocLevelMonitorInput("description", listOf(testIndex), listOf(docQuery))
+        val trigger = randomDocumentLevelTrigger(condition = ALWAYS_RUN)
+
+        val monitorIds = (1..11).map {
+            createMonitor(
+                randomDocumentLevelMonitor(
+                    inputs = listOf(docLevelInput),
+                    triggers = listOf(trigger),
+                )
+            ).id
+        }
+
+        val workflow = randomWorkflow(monitorIds = monitorIds)
+        val createdWorkflow = createWorkflow(workflow)
+
+        assertNotEquals(
+            "Create workflow with 11 delegates failed: workflow id is missing",
+            Workflow.NO_ID,
+            createdWorkflow.id,
+        )
+    }
 }
