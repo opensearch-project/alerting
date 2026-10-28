@@ -286,7 +286,7 @@ integTest.getClusters().forEach{c -> c.plugin(project.getObjects().fileProperty(
 def _numNodes = findProperty('numNodes') as Integer ?: 1
 
 testClusters.integTest {
-    testDistribution = "ARCHIVE"
+    testDistribution = "INTEG_TEST"
     // Cluster shrink exception thrown if we try to set numberOfNodes to 1, so only apply if > 1
     if (_numNodes > 1) numberOfNodes = _numNodes
     // When running integration tests it doesn't forward the --debug-jvm to the cluster anymore
@@ -452,7 +452,7 @@ task integTestPluggableDataformat(type: RestIntegTestTask) {
 }
 
 testClusters.integTestPluggableDataformat {
-    testDistribution = "ARCHIVE"
+    testDistribution = "INTEG_TEST"
     systemProperty 'opensearch.experimental.feature.pluggable.dataformat.enabled', 'true'
 
     plugin(provider({ new RegularFile() { @Override File getAsFile() { return configurations.zipArchive.asFileTree.matching { include '**/opensearch-notifications-core*' }.singleFile } } }))
