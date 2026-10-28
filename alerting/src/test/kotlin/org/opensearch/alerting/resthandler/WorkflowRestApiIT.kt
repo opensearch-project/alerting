@@ -1251,5 +1251,9 @@ class WorkflowRestApiIT : AlertingRestTestCase() {
             Workflow.NO_ID,
             createdWorkflow.id,
         )
+        // Verify all 11 delegates were accepted — a search-truncation bug that returned only 10
+        // results but did not throw would still pass the ID check above.
+        val delegates = (createdWorkflow.inputs[0] as CompositeInput).sequence.delegates
+        assertEquals("Expected all 11 delegate monitors to be stored", 11, delegates.size)
     }
 }
