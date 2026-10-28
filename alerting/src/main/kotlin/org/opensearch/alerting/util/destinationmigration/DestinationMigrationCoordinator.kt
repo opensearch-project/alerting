@@ -57,15 +57,19 @@ class DestinationMigrationCoordinator(
             return
         }
 
-        // Proceed with migration initiation when:
+        // Proceed with migration initiation when ANY of:
         //   (a) the scheduled-jobs index routing table changed, OR
-        //   (b) the index does not exist yet (bootstrap / initial creation path), OR
-        //   (c) this node just became cluster manager (promotion on an already-created index).
+        //   (b) the index does not exist yet (bootstrap / initial creation path) — when the index
+        //       is absent this guard passes on every cluster event until the index appears; the
+        //       inner idempotency checks in initMigrateDestinations() prevent double-scheduling, OR
+        //   (c) this node just became cluster manager (promotion on an already-created index;
+        //       promotion fires a nodes-change event, not an index-routing change).
         // Skip all other cluster events to avoid unnecessary work.
+        // Note: event.localNodeClusterManager() == true is already proven by the demotion guard
+        // above, so the second half of becameClusterManager is omitted — it is always true here.
         val indexExists = event.state().routingTable().hasIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)
         val indexChanged = event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)
-        val becameClusterManager = !event.previousState().nodes().isLocalNodeElectedClusterManager &&
-            event.state().nodes().isLocalNodeElectedClusterManager
+        val becameClusterManager = !event.previousState().nodes().isLocalNodeElectedClusterManager
         if (indexExists && !indexChanged && !becameClusterManager) return
 
         if (DestinationMigrationUtilService.finishFlag) {

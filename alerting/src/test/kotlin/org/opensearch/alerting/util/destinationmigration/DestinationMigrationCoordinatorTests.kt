@@ -31,8 +31,8 @@ import org.mockito.Mockito.`when` as whenever
  * Control flow after the fix:
  *   1. Demotion guard (fail-closed): if NOT cluster manager → cancel migration & return.
  *      This runs unconditionally so demotion always stops in-progress work.
- *   2. Index-scope guard: if SCHEDULED_JOBS_INDEX routing did NOT change → return.
- *      Prevents unnecessary migration initiation on unrelated cluster events.
+ *   2. Index-scope guard: if index EXISTS AND routing UNCHANGED AND node was ALREADY manager → return.
+ *      Allows initiation on routing changes, bootstrap (index absent), and manager-promotion events.
  *   3. Migration initiation logic (finishFlag reset, runningLock, initMigrateDestinations).
  *
  * Strategy: construct the coordinator with a mocked [ClusterService] so the
