@@ -19,6 +19,7 @@ import org.opensearch.cluster.node.DiscoveryNodes
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.test.OpenSearchTestCase
+import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
 import org.mockito.Mockito.`when` as whenever
@@ -26,14 +27,17 @@ import org.mockito.Mockito.`when` as whenever
 /**
  * Unit tests for [DestinationMigrationCoordinator.clusterChanged].
  *
- * These tests focus on the index-scope guard added at the top of [clusterChanged]:
- *   if (!event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)) return
+ * Control flow after the fix:
+ *   1. Demotion guard (fail-closed): if NOT cluster manager → cancel migration & return.
+ *      This runs unconditionally so demotion always stops in-progress work.
+ *   2. Index-scope guard: if SCHEDULED_JOBS_INDEX routing did NOT change → return.
+ *      Prevents unnecessary migration initiation on unrelated cluster events.
+ *   3. Migration initiation logic (finishFlag reset, runningLock, initMigrateDestinations).
  *
  * Strategy: construct the coordinator with a mocked [ClusterService] so the
  * `init` block's `addListener` / `addLifecycleListener` calls succeed without
  * a real cluster, then drive [clusterChanged] with a mocked [ClusterChangedEvent]
- * whose [ClusterChangedEvent.indexRoutingTableChanged] return value controls
- * which branch is exercised.
+ * configured to exercise each branch.
  */
 @ThreadLeakFilters(filters = [DestinationMigrationCoordinatorTests.CoroutineThreadFilter::class])
 class DestinationMigrationCoordinatorTests : OpenSearchTestCase() {
@@ -67,100 +71,101 @@ class DestinationMigrationCoordinatorTests : OpenSearchTestCase() {
     }
 
     // -------------------------------------------------------------------------
-    // Test 1: guard short-circuits when the scheduled-jobs index did NOT change
+    // Test 1: demotion cancels active migration regardless of index changes
+    //         (fail-closed: the demotion guard runs before the routing-table guard)
     // -------------------------------------------------------------------------
 
-    fun `test clusterChanged skips all logic when indexRoutingTableChanged returns false`() {
+    fun `test clusterChanged cancels active migration when node is demoted from cluster manager`() {
+        // Simulate an active, non-cancelled scheduled migration.
+        val activeMigration = Mockito.mock(Scheduler.Cancellable::class.java)
+        whenever(activeMigration.isCancelled).thenReturn(false)
+
+        // Seed the coordinator with the active migration via the manager path first.
+        // We do this by using reflection to set scheduledMigration directly.
+        val field = DestinationMigrationCoordinator::class.java.getDeclaredField("scheduledMigration")
+        field.isAccessible = true
+        field.set(coordinator, activeMigration)
+
+        // Demotion event: NOT the cluster manager. Routing table is irrelevant —
+        // the demotion guard runs unconditionally before the routing-table guard.
         val event = Mockito.mock(ClusterChangedEvent::class.java)
+        whenever(event.localNodeClusterManager()).thenReturn(false)
+        // Even if SCHEDULED_JOBS_INDEX did not change, cancellation must still fire.
         whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(false)
 
         coordinator.clusterChanged(event)
 
-        // scheduledJobIndices must never be touched — that method is only called
-        // inside initMigrateDestinations(), which is unreachable when the guard fires.
-        verify(scheduledJobIndices, never()).scheduledJobIndexExists()
-        // localNodeClusterManager() must not be evaluated either.
-        verify(event, never()).localNodeClusterManager()
+        // The active migration must have been cancelled.
+        verify(activeMigration).cancel()
     }
 
     // -------------------------------------------------------------------------
-    // Test 2: guard passes through when the scheduled-jobs index DID change
-    //         and the node is not the cluster manager (non-manager branch)
+    // Test 2: index-scope guard short-circuits when the scheduled-jobs index
+    //         did NOT change and node IS cluster manager
     // -------------------------------------------------------------------------
 
-    fun `test clusterChanged passes guard when indexRoutingTableChanged returns true for SCHEDULED_JOBS_INDEX`() {
+    fun `test clusterChanged skips migration initiation when indexRoutingTableChanged returns false`() {
         val event = Mockito.mock(ClusterChangedEvent::class.java)
-        whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(true)
-        // Not the cluster manager — avoids triggering the scheduling path.
-        whenever(event.localNodeClusterManager()).thenReturn(false)
+        // Node is cluster manager — demotion guard does not fire.
+        whenever(event.localNodeClusterManager()).thenReturn(true)
+        // Scheduled-jobs index did not change — routing-table guard fires.
+        whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(false)
 
         coordinator.clusterChanged(event)
 
-        // The guard was passed, so localNodeClusterManager() must have been evaluated.
-        verify(event).localNodeClusterManager()
+        // initMigrateDestinations() must never be entered.
+        verify(scheduledJobIndices, never()).scheduledJobIndexExists()
     }
 
     // -------------------------------------------------------------------------
-    // Test 3: finishFlag is reset to false when the guard passes and finishFlag
-    //         was true before the call
+    // Test 3: finishFlag is reset when both guards pass (node is manager, index changed)
     // -------------------------------------------------------------------------
 
-    fun `test clusterChanged resets finishFlag when guard passes and finishFlag was true`() {
+    fun `test clusterChanged resets finishFlag when both guards pass and finishFlag was true`() {
         DestinationMigrationUtilService.finishFlag = true
 
+        val clusterState = Mockito.mock(ClusterState::class.java)
+        val discoveryNodes = Mockito.mock(DiscoveryNodes::class.java)
+        whenever(clusterService.state()).thenReturn(clusterState)
+        whenever(clusterState.nodes()).thenReturn(discoveryNodes)
+        // isLocalNodeElectedClusterManager is checked inside initMigrateDestinations.
+        whenever(discoveryNodes.isLocalNodeElectedClusterManager).thenReturn(false)
+
         val event = Mockito.mock(ClusterChangedEvent::class.java)
+        whenever(event.localNodeClusterManager()).thenReturn(true)
         whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(true)
-        whenever(event.localNodeClusterManager()).thenReturn(false)
 
         coordinator.clusterChanged(event)
 
         assertFalse(
-            "finishFlag should be reset to false when clusterChanged processes a relevant index change",
+            "finishFlag should be reset to false after clusterChanged processes a relevant index change",
             DestinationMigrationUtilService.finishFlag,
         )
     }
 
     // -------------------------------------------------------------------------
-    // Test 4: migration does NOT start when the node is not the cluster manager,
-    //         even though the guard passes
-    // -------------------------------------------------------------------------
-
-    fun `test clusterChanged does not start migration when node is not cluster manager`() {
-        val event = Mockito.mock(ClusterChangedEvent::class.java)
-        whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(true)
-        whenever(event.localNodeClusterManager()).thenReturn(false)
-
-        coordinator.clusterChanged(event)
-
-        // initMigrateDestinations() is guarded by localNodeClusterManager() == true.
-        // When that is false the method must never be entered, so scheduledJobIndices
-        // must remain untouched.
-        verify(scheduledJobIndices, never()).scheduledJobIndexExists()
-    }
-
-    // -------------------------------------------------------------------------
-    // Test 5: guard does NOT short-circuit for an unrelated index change
-    //         — verifying the guard checks the exact SCHEDULED_JOBS_INDEX name
+    // Test 4: unrelated index change with node as cluster manager does not
+    //         trigger migration initiation
     // -------------------------------------------------------------------------
 
     fun `test clusterChanged skips logic for unrelated index routing table change`() {
         val event = Mockito.mock(ClusterChangedEvent::class.java)
-        // The event reports that some other index changed, not SCHEDULED_JOBS_INDEX.
+        whenever(event.localNodeClusterManager()).thenReturn(true)
+        // Only some other index changed, not SCHEDULED_JOBS_INDEX.
         whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(false)
         whenever(event.indexRoutingTableChanged("some-other-index")).thenReturn(true)
 
         coordinator.clusterChanged(event)
 
         verify(scheduledJobIndices, never()).scheduledJobIndexExists()
-        verify(event, never()).localNodeClusterManager()
     }
 
     // -------------------------------------------------------------------------
-    // Test 6: cluster manager path calls scheduledJobIndexExists() when guard
-    //         passes and the node IS the cluster manager
+    // Test 5: cluster manager path enters initMigrateDestinations when both
+    //         guards pass
     // -------------------------------------------------------------------------
 
-    fun `test clusterChanged enters migration init path when node is cluster manager and guard passes`() {
+    fun `test clusterChanged enters migration init path when node is cluster manager and index changed`() {
         val clusterState = Mockito.mock(ClusterState::class.java)
         val discoveryNodes = Mockito.mock(DiscoveryNodes::class.java)
         whenever(clusterService.state()).thenReturn(clusterState)
@@ -168,17 +173,33 @@ class DestinationMigrationCoordinatorTests : OpenSearchTestCase() {
         whenever(discoveryNodes.isLocalNodeElectedClusterManager).thenReturn(true)
 
         // scheduledJobIndexExists() returns false so initMigrateDestinations bails
-        // early without attempting to schedule anything via threadPool.
+        // early without scheduling anything via threadPool.
         whenever(scheduledJobIndices.scheduledJobIndexExists()).thenReturn(false)
 
         val event = Mockito.mock(ClusterChangedEvent::class.java)
-        whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(true)
         whenever(event.localNodeClusterManager()).thenReturn(true)
+        whenever(event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)).thenReturn(true)
 
         coordinator.clusterChanged(event)
 
         // initMigrateDestinations() must have been entered — scheduledJobIndexExists()
         // is the first call inside it.
         verify(scheduledJobIndices).scheduledJobIndexExists()
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 6: demotion with no active migration does not throw or call cancel
+    // -------------------------------------------------------------------------
+
+    fun `test clusterChanged handles demotion gracefully when no migration is active`() {
+        // scheduledMigration is null by default after construction.
+        val event = Mockito.mock(ClusterChangedEvent::class.java)
+        whenever(event.localNodeClusterManager()).thenReturn(false)
+
+        // Should not throw.
+        coordinator.clusterChanged(event)
+
+        // No cancellable exists, so scheduledJobIndices must never be touched.
+        verify(scheduledJobIndices, never()).scheduledJobIndexExists()
     }
 }

@@ -46,6 +46,19 @@ class DestinationMigrationCoordinator(
     }
 
     override fun clusterChanged(event: ClusterChangedEvent) {
+        // Cancellation on demotion must always run regardless of index changes —
+        // a node losing cluster-manager status is a metadata event, not a routing
+        // table change, so it must be handled before the routing-table guard.
+        if (!event.localNodeClusterManager()) {
+            if (scheduledMigration != null && !scheduledMigration!!.isCancelled) {
+                logger.info("Cancelling the migration process.")
+                scheduledMigration?.cancel()
+            }
+            return
+        }
+
+        // Only proceed with migration initiation logic when the scheduled-jobs
+        // index routing table actually changed; skip all other cluster events.
         if (!event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)) return
 
         if (DestinationMigrationUtilService.finishFlag) {
@@ -53,21 +66,12 @@ class DestinationMigrationCoordinator(
             scheduledMigration?.cancel()
             DestinationMigrationUtilService.finishFlag = false
         }
-        if (
-            event.localNodeClusterManager() &&
-            !runningLock &&
-            (scheduledMigration == null || scheduledMigration!!.isCancelled)
-        ) {
+        if (!runningLock && (scheduledMigration == null || scheduledMigration!!.isCancelled)) {
             try {
                 runningLock = true
                 initMigrateDestinations()
             } finally {
                 runningLock = false
-            }
-        } else if (!event.localNodeClusterManager()) {
-            if (scheduledMigration != null && !scheduledMigration!!.isCancelled) {
-                logger.info("Cancelling the migration process.")
-                scheduledMigration?.cancel()
             }
         }
     }
