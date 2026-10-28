@@ -211,10 +211,17 @@ object MonitorMetadataService :
                 (monitor.inputs[0] as RemoteDocLevelMonitorInput).docLevelMonitorInput.indices[0]
             else null
             val runContext = if (monitor.monitorType.endsWith(Monitor.MonitorType.DOC_LEVEL_MONITOR.value)) {
+                // Safe reconstruction: filter out any entries whose value is not a Map (e.g. stale scalar entries
+                // from prior migrations or XContent parse paths that produce non-MutableMap values), then copy
+                // each surviving value into a fresh MutableMap. This avoids ClassCastException on non-empty but
+                // wrongly-shaped lastRunContext.
                 @Suppress("UNCHECKED_CAST")
-                val lastRunCtx = if (metadata.lastRunContext.isEmpty()) null
-                else (metadata.lastRunContext as MutableMap<String, MutableMap<String, Any>>)
-                createFullRunContext(monitorIndex, lastRunCtx)
+                val lastRunCtx: MutableMap<String, MutableMap<String, Any>> = metadata.lastRunContext
+                    .entries
+                    .filter { it.value is Map<*, *> }
+                    .associate { it.key to (it.value as Map<String, Any>).toMutableMap() }
+                    .toMutableMap()
+                createFullRunContext(monitorIndex, lastRunCtx.ifEmpty { null })
             } else null
             return if (runContext != null) {
                 metadata.copy(

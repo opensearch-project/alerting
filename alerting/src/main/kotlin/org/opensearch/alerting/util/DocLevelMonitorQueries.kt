@@ -235,11 +235,19 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 flattenPaths.put(fullPath, nodeProps)
                 // Calls processLeafFn and gets old node name, new node name and new properties of node.
                 // This is all information we need to update this node
-                val (oldName, newName, props) = processLeafFn(it.key, fullPath, (it.value as Map<String, Any>).toMutableMap())
+                // Reuse nodeProps rather than creating a second independent copy from it.value.
+                val (oldName, newName, props) = processLeafFn(it.key, fullPath, nodeProps)
                 newNodes.add(Triple(oldName, newName, props))
             } else if (nodeProps.containsKey(PROPERTIES) && nodeProps[PROPERTIES] != null) {
-                // Internal(non-leaf) node - visit children
-                traverseMappingsAndUpdate((nodeProps[PROPERTIES] as Map<String, Any>).toMutableMap(), fullPath, processLeafFn, flattenPaths)
+                // Internal(non-leaf) node - visit children.
+                // Pass nodeProps[PROPERTIES] as a MutableMap so recursive mutations propagate back
+                // through nodeProps into the parent node (via the newNodes update loop below).
+                @Suppress("UNCHECKED_CAST")
+                val childProps = (nodeProps[PROPERTIES] as Map<String, Any>).toMutableMap()
+                traverseMappingsAndUpdate(childProps, fullPath, processLeafFn, flattenPaths)
+                // Write the mutated child properties back so the parent node sees the updates.
+                nodeProps[PROPERTIES] = childProps
+                newNodes.add(Triple(it.key, it.key, nodeProps as Any))
             }
         }
         // Here we can update all processed leaves in tree

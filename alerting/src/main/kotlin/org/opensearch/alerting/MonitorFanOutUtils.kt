@@ -53,7 +53,7 @@ fun distributeShards(
  * @param lastRunContext The previous run context from monitor metadata
  * @param monitorCtx The execution context containing cluster service
  * @param index The name of the index for which the context is being initialized
- * @return A map containing the initialized last run context
+ * @return A map containing the initialized last run context; a new MutableMap owned by the caller — mutations to the returned map do not affect the input [lastRunContext].
  */
 fun initializeNewLastRunContext(
     lastRunContext: Map<String, Any>,
