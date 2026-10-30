@@ -374,7 +374,9 @@ fun randomBucketLevelTrigger(
 /**
  * [min] is the fewest actions to generate, not the start of the range the count is drawn from:
  * `(min..randomInt(max))` is empty whenever `randomInt` returns a value below [min], so asking for a
- * minimum of one silently produced no actions about a tenth of the time.
+ * minimum of one silently produced no actions about a tenth of the time. Callers that post-process the
+ * result cannot treat an empty list as harmless, because [randomBucketLevelTrigger] replaces one with
+ * freshly generated actions that skip whatever the caller applied.
  */
 fun randomActionsForBucketLevelTrigger(min: Int = 0, max: Int = 10, destinationId: String = ""): List<Action> =
     (1..randomIntBetween(maxOf(min, 1), max)).map { randomActionWithPolicy(destinationId = destinationId) }
