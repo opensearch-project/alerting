@@ -65,33 +65,21 @@ suspend fun SdkClient.deleteDataObjectStashed(
 }
 
 /**
- * Runs [block] under [stored], then restores the context the coroutine had, on whichever thread it resumes. This keeps
- * the caller's context from reaching the calls that follow [block].
+ * Executes [Client.index] under [stored], the caller's context, which is set only while the request is dispatched.
+ *
+ * The calling thread gets its own context back before the coroutine suspends, so no thread keeps the caller's
+ * context, whichever thread the coroutine resumes on. The stash before dispatch keeps the caller's persistent
+ * headers, which the security plugin reads to record the resource's creator.
  */
-suspend fun <T> ThreadContext.withStoredContext(stored: ThreadContext.StoredContext, block: suspend () -> T): T {
-    val own = newStoredContext(false)
-    stored.restore()
-    try {
-        return block()
-    } finally {
-        own.restore()
-    }
-}
-
-/**
- * Executes [Client.index] with the caller's [ThreadContext] stashed just before dispatch; the stash
- * is closed via the completion callback so it works across the async / coroutine-resume boundary.
- * Prefer this over `client.suspendUntil { client.index(req, it) }` when the write must run under
- * the plugin (not the caller) but the surrounding coroutine flow must retain the caller's
- * persistent auth for the security plugin's [ResourceIndexListener].
- */
-suspend fun Client.indexStashed(
-    request: IndexRequest,
-): IndexResponse {
-    val stored = this.threadPool().threadContext.stashContext()
-    return try {
-        this.suspendUntil { this.index(request, it) }
-    } finally {
-        stored.close()
+suspend fun Client.indexWithContext(stored: ThreadContext.StoredContext, request: IndexRequest): IndexResponse {
+    val threadContext = threadPool().threadContext
+    return suspendUntil { listener ->
+        val own = threadContext.newStoredContext(false)
+        stored.restore()
+        try {
+            threadContext.stashContext().use { index(request, listener) }
+        } finally {
+            own.restore()
+        }
     }
 }

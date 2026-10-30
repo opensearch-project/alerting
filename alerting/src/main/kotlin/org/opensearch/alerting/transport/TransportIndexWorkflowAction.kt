@@ -45,11 +45,10 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.MAX_TRIGGERS_
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.settings.DestinationSettings.Companion.ALLOW_LIST
 import org.opensearch.alerting.util.IndexUtils
-import org.opensearch.alerting.util.indexStashed
+import org.opensearch.alerting.util.indexWithContext
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isQueryLevelMonitor
 import org.opensearch.alerting.util.use
-import org.opensearch.alerting.util.withStoredContext
 import org.opensearch.alerting.workflow.CompositeWorkflowRunner
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -433,9 +432,7 @@ class TransportIndexWorkflowAction @Inject constructor(
 
             try {
                 // The caller's context reaches only this write, where the security plugin records the creator
-                val indexResponse: IndexResponse = client.threadPool().threadContext.withStoredContext(storedThreadContext) {
-                    client.indexStashed(indexRequest)
-                }
+                val indexResponse: IndexResponse = client.indexWithContext(storedThreadContext, indexRequest)
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
                     log.error("Failed to create workflow: $failureReasons")
@@ -599,9 +596,7 @@ class TransportIndexWorkflowAction @Inject constructor(
                 .timeout(indexTimeout)
 
             try {
-                val indexResponse: IndexResponse = client.threadPool().threadContext.withStoredContext(storedThreadContext) {
-                    client.indexStashed(indexRequest)
-                }
+                val indexResponse: IndexResponse = client.indexWithContext(storedThreadContext, indexRequest)
                 val failureReasons = checkShardsFailure(indexResponse)
                 if (failureReasons != null) {
                     actionListener.onFailure(

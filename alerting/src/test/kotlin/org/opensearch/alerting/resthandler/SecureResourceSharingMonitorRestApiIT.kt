@@ -350,6 +350,21 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         assertPrincipals(workflow.id, setOf("user:$RS_ALICE"), absent = setOf("user:$RS_BOB"))
     }
 
+    fun `test workflow update by a read-write shared user keeps the owner`() {
+        val monitorId = aliceCreatesMonitor().id
+        val workflow = createWorkflowWithClient(aliceClient!!, randomWorkflow(monitorIds = listOf(monitorId)))
+        waitForResourceSharingEntry(workflow.id)
+        // Bob also needs its delegate monitor to update the workflow
+        shareResource(aliceClient!!, monitorId, READ_WRITE, RS_BOB)
+        shareResource(aliceClient!!, workflow.id, READ_WRITE, RS_BOB, WORKFLOW_RESOURCE_TYPE)
+
+        updateWorkflowAs(bobClient!!, workflow.copy(name = "renamed-by-bob"))
+
+        assertEquals("renamed-by-bob", storedSource(workflow.id).stringMap("workflow")?.get("name"))
+        assertEquals(RS_ALICE, sharingRecordOwner(workflow.id))
+        assertPrincipals(workflow.id, setOf("user:$RS_ALICE", "user:$RS_BOB"))
+    }
+
     // ─── Subordinate resource: alerts ────────────────────────────────────────────
 
     fun `test alerts inherit denial when monitor is not shared`() {
@@ -532,6 +547,11 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
     private fun storedSource(docId: String): Map<String, Any> {
         val response = adminClient().makeRequest("GET", "/${ScheduledJob.SCHEDULED_JOBS_INDEX}/_doc/$docId")
         return response.asMap()["_source"] as Map<String, Any>
+    }
+
+    private fun sharingRecordOwner(docId: String): String? {
+        val source = adminClient().makeRequest("GET", "/$configSharingIndex/_doc/$docId").asMap()["_source"] as Map<*, *>
+        return (source["created_by"] as? Map<*, *>)?.get("user") as? String
     }
 
     /** Returns the stored values as a list, so a duplicate value fails the comparison. */
