@@ -320,19 +320,24 @@ class TransportDocLevelMonitorFanOutAction
                  * generates a single alert with multiple findings.
                  */
                 if (monitor.shouldCreateSingleAlertForFindings == null || monitor.shouldCreateSingleAlertForFindings == false) {
+                    val findingToDocPairs = createFindings(
+                        monitor, docsToQueries, idQueryMap,
+                        !dryrun && monitor.id != Monitor.NO_ID,
+                        executionId,
+                        findingsToTriggeredQueries
+                    )
                     monitor.triggers.forEach {
                         triggerResults[it.id] = runForEachDocTrigger(
                             monitorResult,
                             it as DocumentLevelTrigger,
                             monitor,
-                            idQueryMap,
-                            docsToQueries,
                             queryToDocIds,
                             dryrun,
                             executionId = executionId,
                             findingIdToDocSource,
                             findingsToTriggeredQueries = findingsToTriggeredQueries,
-                            workflowRunContext = workflowRunContext
+                            workflowRunContext = workflowRunContext,
+                            findingToDocPairs = findingToDocPairs
                         )
                     }
                 } else if (monitor.shouldCreateSingleAlertForFindings == true) {
@@ -453,29 +458,18 @@ class TransportDocLevelMonitorFanOutAction
         monitorResult: MonitorRunResult<DocumentLevelTriggerRunResult>,
         trigger: DocumentLevelTrigger,
         monitor: Monitor,
-        idQueryMap: Map<String, DocLevelQuery>,
-        docsToQueries: MutableMap<String, MutableList<String>>,
         queryToDocIds: Map<DocLevelQuery, Set<String>>,
         dryrun: Boolean,
         executionId: String,
         findingIdToDocSource: MutableMap<String, MultiGetItemResponse>,
         findingsToTriggeredQueries: MutableMap<String, List<DocLevelQuery>>,
-        workflowRunContext: WorkflowRunContext?
+        workflowRunContext: WorkflowRunContext?,
+        findingToDocPairs: List<Pair<String, String>>
     ): DocumentLevelTriggerRunResult {
         val triggerCtx = DocumentLevelTriggerExecutionContext(monitor, trigger, clusterSettings = clusterService.clusterSettings)
         val triggerResult = triggerService.runDocLevelTrigger(monitor, trigger, queryToDocIds)
 
         val triggerFindingDocPairs = mutableListOf<Pair<String, String>>()
-
-        // TODO: Implement throttling for findings
-        val findingToDocPairs = createFindings(
-            monitor,
-            docsToQueries,
-            idQueryMap,
-            !dryrun && monitor.id != Monitor.NO_ID,
-            executionId,
-            findingsToTriggeredQueries
-        )
 
         findingToDocPairs.forEach {
             // Only pick those entries whose docs have triggers associated with them
