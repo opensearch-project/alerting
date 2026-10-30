@@ -289,7 +289,8 @@ testClusters.integTest {
     testDistribution = "ARCHIVE"
     // Cluster shrink exception thrown if we try to set numberOfNodes to 1, so only apply if > 1
     if (_numNodes > 1) numberOfNodes = _numNodes
-    // Snapshot restore tests register a shared file system repository under this path
+    // Snapshot restore tests register a file system repository, which must be one directory every node shares. Without this
+    // setting each node of a multi-node cluster gets its own repo directory, so registering the repository fails.
     setting 'path.repo', "${buildDir}/cluster/shared/repo/integTest"
     // When running integration tests it doesn't forward the --debug-jvm to the cluster anymore
     // i.e. we have to use a custom property to flag when we want to debug opensearch JVM

@@ -31,6 +31,7 @@ import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.Request
 import org.opensearch.client.Response
+import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.UUIDs
@@ -1212,12 +1213,18 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     /**
      * Snapshots [indices] into a new snapshot in a file system repository under the test cluster's path.repo and returns the
      * snapshot's name. Uses the admin client, because alerting's indices are system indices when the security plugin is installed.
+     * Skips the test when the cluster has no path.repo, as when opensearch-build runs these tests against a distribution.
      */
     protected fun snapshotIndices(vararg indices: String): String {
-        adminClient().makeRequest(
-            "PUT", "_snapshot/$RESTORE_REPO", emptyMap(),
-            StringEntity("""{ "type": "fs", "settings": { "location": "$RESTORE_REPO" } }""", APPLICATION_JSON)
-        )
+        try {
+            adminClient().makeRequest(
+                "PUT", "_snapshot/$RESTORE_REPO", emptyMap(),
+                StringEntity("""{ "type": "fs", "settings": { "location": "$RESTORE_REPO" } }""", APPLICATION_JSON)
+            )
+        } catch (e: ResponseException) {
+            assumeFalse("The test cluster has no path.repo, so it can't hold a snapshot repository", e.message!!.contains(NO_PATH_REPO))
+            throw e
+        }
         val snapshot = "restore-${randomAlphaOfLength(8).lowercase(Locale.ROOT)}"
         val response = adminClient().makeRequest(
             "PUT", "_snapshot/$RESTORE_REPO/$snapshot", mapOf("wait_for_completion" to "true"),
@@ -1952,6 +1959,9 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
 
     companion object {
         private const val RESTORE_REPO = "restore-test-repo"
+
+        /** Part of the error OpenSearch returns when a file system repository is registered on a cluster with no path.repo. */
+        private const val NO_PATH_REPO = "path.repo because this setting is empty"
 
         internal interface IProxy {
             val version: String?

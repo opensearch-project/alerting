@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting
 
+import kotlinx.coroutines.runBlocking
 import org.opensearch.action.ActionRequest
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteWorkflowAction
@@ -52,7 +53,6 @@ import org.opensearch.alerting.resthandler.RestSearchAlertingCommentAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
-import org.opensearch.alerting.restore.AlertingRestoreReconciler
 import org.opensearch.alerting.script.TriggerScript
 import org.opensearch.alerting.service.AssumeRoleCredentialsCache
 import org.opensearch.alerting.service.DeleteMonitorService
@@ -96,6 +96,7 @@ import org.opensearch.alerting.transport.TransportSearchMonitorAction
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.MustacheTemplateService
 import org.opensearch.alerting.util.PluginClient
+import org.opensearch.alerting.util.WriteAliasRepair
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.node.DiscoveryNodes
@@ -175,7 +176,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     SearchPlugin, SystemIndexPlugin, IdentityAwarePlugin, RestoreListenerPlugin, PercolatorPluginExt() {
 
     private var pluginClient: PluginClient? = null
-    private lateinit var restoreReconciler: AlertingRestoreReconciler
+    private lateinit var writeAliasRepair: WriteAliasRepair
 
     override fun getContextAllowlists(): Map<ScriptContext<*>, List<Allowlist>> {
         val whitelist = AllowlistLoader.loadFromResourceFiles(javaClass, "org.opensearch.alerting.txt")
@@ -317,7 +318,11 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
         val settings = environment.settings()
         val lockService = LockService(client, clusterService)
-        alertIndices = AlertIndices(settings, client, threadPool, clusterService)
+        // Built here so AlertIndices and CommentsIndices can repair write aliases as this plugin. assignSubject gives it its identity.
+        val pluginClientInstance = PluginClient(client)
+        this.pluginClient = pluginClientInstance
+        this.writeAliasRepair = WriteAliasRepair(pluginClientInstance, clusterService)
+        alertIndices = AlertIndices(settings, client, threadPool, clusterService, writeAliasRepair = writeAliasRepair)
 
         val sdkClient: SdkClient = SdkClientFactory.createSdkClient(
             client,
@@ -365,7 +370,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerDestinationSettings()
             .registerRemoteMonitors(monitorTypeToMonitorRunners)
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
-        commentsIndices = CommentsIndices(environment.settings(), client, threadPool, clusterService)
+        commentsIndices = CommentsIndices(environment.settings(), client, threadPool, clusterService, writeAliasRepair)
         docLevelMonitorQueries = DocLevelMonitorQueries(client, clusterService)
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
@@ -419,10 +424,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             }
         }
 
-        val pluginClientInstance = PluginClient(client)
-        this.pluginClient = pluginClientInstance
-        this.restoreReconciler = AlertingRestoreReconciler(pluginClientInstance, clusterService)
-
         return listOf(
             sweeper,
             scheduler,
@@ -444,9 +445,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         pluginClient?.setSubject(pluginSubject)
     }
 
-    override fun onRestore(context: RestoreContext) {
-        restoreReconciler.onRestore(context)
-    }
+    // Core calls this on its generic thread pool and logs anything it throws, so the repair can block that thread until it is done
+    override fun onRestore(context: RestoreContext) = runBlocking { writeAliasRepair.repair(context) }
 
     override fun getSettings(): List<Setting<*>> {
         return listOf(

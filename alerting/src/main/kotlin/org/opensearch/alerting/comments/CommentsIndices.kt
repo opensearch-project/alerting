@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.comments
 
+import kotlinx.coroutines.runBlocking
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.ResourceAlreadyExistsException
@@ -25,6 +26,7 @@ import org.opensearch.alerting.alerts.AlertIndices
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.WriteAliasRepair
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.metadata.IndexMetadata
@@ -46,7 +48,8 @@ class CommentsIndices(
     settings: Settings,
     private val client: Client,
     private val threadPool: ThreadPool,
-    private val clusterService: ClusterService
+    private val clusterService: ClusterService,
+    private val writeAliasRepair: WriteAliasRepair? = null
 ) : ClusterStateListener {
 
     init {
@@ -174,7 +177,14 @@ class CommentsIndices(
         commentsHistoryIndexInitialized
     }
 
+    /** Repairs the comments history alias if it names more than one index, so a repair the restore missed happens here. Blocks until done. */
+    private fun repairWriteAlias() {
+        val repair = writeAliasRepair ?: return
+        runBlocking { repair.repair(COMMENTS_HISTORY_WRITE_INDEX) }
+    }
+
     private fun rolloverAndDeleteCommentsHistoryIndices() {
+        repairWriteAlias()
         rolloverCommentsHistoryIndex()
         deleteOldIndices("comments", COMMENTS_HISTORY_ALL)
     }

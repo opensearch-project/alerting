@@ -397,14 +397,50 @@ class AlertIndicesIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test restore leaves the history write alias off an index whose is_write_index is false`() {
+        val alias = AlertIndices.ALERT_HISTORY_WRITE_INDEX
+        val pattern = AlertIndices.ALERT_HISTORY_INDEX_PATTERN
+        val restored = createHistoryIndex(pattern.replace("-1>", "-000002>"), alias, """{ "is_write_index": false }""")
+        val snapshot = snapshotIndices(restored)
+        deleteIndex(restored)
+        val own = createHistoryIndex(pattern, alias)
+        restoreIndices(snapshot, restored)
+
+        // The restored index is marked as not to be written to, so this cluster's own index keeps the alias
+        assertBusy({ assertEquals(listOf(own), aliasIndices(alias)) }, 30, TimeUnit.SECONDS)
+        val response = adminClient().makeRequest("POST", "$alias/_doc", emptyMap(), StringEntity("{}", APPLICATION_JSON))
+        assertEquals(RestStatus.CREATED, response.restStatus())
+    }
+
+    fun `test history rollover repairs a write alias that names two indices without a restore`() {
+        val alias = AlertIndices.ALERT_HISTORY_WRITE_INDEX
+        val pattern = AlertIndices.ALERT_HISTORY_INDEX_PATTERN
+        val own = createHistoryIndex(pattern, alias)
+        createHistoryIndex(pattern.replace("-1>", "-000002>"), alias)
+        assertEquals(2, aliasIndices(alias).size)
+
+        try {
+            // The rollover job runs every period, and repairs the alias before it rolls over. The repair keeps the -000002 index,
+            // and a rollover may then move the alias on to -000003, so check only that the alias left this cluster's -1 index.
+            client().updateSettings(AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD.key, "1s")
+            assertBusy({
+                val names = aliasIndices(alias)
+                assertEquals(names.toString(), 1, names.size)
+                assertNotEquals(own, names.single())
+            }, 30, TimeUnit.SECONDS)
+        } finally {
+            resetHistorySettings()
+        }
+    }
+
     /**
-     * Creates [name], which can use date math, with [alias] and no is_write_index flag, the way alerting creates its history
-     * indices, and returns the created index's name.
+     * Creates [name], which can use date math, with [alias] set to [aliasBody], and returns the created index's name. The default
+     * body sets no is_write_index flag, the way alerting creates its history indices.
      */
-    private fun createHistoryIndex(name: String, alias: String): String {
+    private fun createHistoryIndex(name: String, alias: String, aliasBody: String = "{}"): String {
         val response = adminClient().makeRequest(
             "PUT", "/" + URLEncoder.encode(name, Charsets.UTF_8.toString()), emptyMap(),
-            StringEntity("""{ "aliases": { "$alias": {} } }""", APPLICATION_JSON)
+            StringEntity("""{ "aliases": { "$alias": $aliasBody } }""", APPLICATION_JSON)
         )
         return response.asMap()["index"] as String
     }
