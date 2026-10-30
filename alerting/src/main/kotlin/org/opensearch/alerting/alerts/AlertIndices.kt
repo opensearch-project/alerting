@@ -8,6 +8,7 @@ package org.opensearch.alerting.alerts
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.apache.logging.log4j.LogManager
 import org.opensearch.ExceptionsHelper
 import org.opensearch.ResourceAlreadyExistsException
@@ -43,6 +44,7 @@ import org.opensearch.alerting.settings.AlertingSettings.Companion.FINDING_HISTO
 import org.opensearch.alerting.settings.AlertingSettings.Companion.REQUEST_TIMEOUT
 import org.opensearch.alerting.util.CommentsUtils
 import org.opensearch.alerting.util.IndexUtils
+import org.opensearch.alerting.util.WriteAliasRepair
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.metadata.IndexMetadata
@@ -84,7 +86,8 @@ class AlertIndices(
     private val client: Client,
     private val threadPool: ThreadPool,
     private val clusterService: ClusterService,
-    private val multiTenancyEnabled: Boolean = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
+    private val multiTenancyEnabled: Boolean = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings),
+    private val writeAliasRepair: WriteAliasRepair? = null
 ) : ClusterStateListener {
 
     init {
@@ -436,12 +439,20 @@ class AlertIndices(
         }
     }
 
+    /** Repairs each alias in [aliases] that names more than one index, so a repair the restore missed happens here. Blocks until done. */
+    private fun repairWriteAliases(vararg aliases: String) {
+        val repair = writeAliasRepair ?: return
+        runBlocking { aliases.forEach { repair.repair(it) } }
+    }
+
     private fun rolloverAndDeleteAlertHistoryIndices() {
+        repairWriteAliases(ALERT_HISTORY_WRITE_INDEX)
         if (alertHistoryEnabled) rolloverAlertHistoryIndex()
         deleteOldIndices("History", ALERT_HISTORY_ALL)
     }
 
     private fun rolloverAndDeleteFindingHistoryIndices() {
+        repairWriteAliases(FINDING_HISTORY_WRITE_INDEX)
         if (findingHistoryEnabled) rolloverFindingHistoryIndex()
         deleteOldIndices("Finding", FINDING_HISTORY_ALL)
     }

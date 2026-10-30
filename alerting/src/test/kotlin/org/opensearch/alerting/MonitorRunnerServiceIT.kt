@@ -1523,9 +1523,10 @@ class MonitorRunnerServiceIT : AlertingRestTestCase() {
             params.docCount > 0
         """.trimIndent()
 
-        // For the Actions ensure that there is at least one and any PER_ALERT actions contain ACTIVE, DEDUPED and COMPLETED in its policy
-        // so that the assertions done later in this test don't fail.
-        // The config is being mutated this way to still maintain the randomness in configuration (like including other ActionExecutionScope).
+        // The rewrite below has to leave a non-empty list. randomBucketLevelTrigger replaces an empty
+        // actions list with freshly generated ones, and those never pass through this rewrite, so a
+        // PER_ALERT policy without COMPLETED can reach the trigger and leave the completed alert's
+        // lastNotificationTime untouched.
         val actions = randomActionsForBucketLevelTrigger(min = 1).map {
             if (it.actionExecutionPolicy?.actionExecutionScope is PerAlertActionScope) {
                 it.copy(

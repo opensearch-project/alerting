@@ -12,7 +12,7 @@ import org.mockito.Mockito
 import org.mockito.Mockito.verify
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.alerting.AlertingPlugin.Companion.TENANT_ID_HEADER
-import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.alertingPluginSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.Setting
@@ -51,14 +51,15 @@ class TransportSearchMonitorActionTests : OpenSearchTestCase() {
 
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
+        settingSet.addAll(alertingPluginSettings())
         val clusterSettings = ClusterSettings(Settings.EMPTY, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
     }
 
     fun `test search passes tenantId to SDK`() {
         val expectedTenantId = "test-tenant:test-scope"
-        threadContext.putHeader(TENANT_ID_HEADER, expectedTenantId)
+        // search takes the tenant id as a parameter; the header is read by doExecute, which this
+        // test does not go through.
 
         val future: CompletionStage<SearchDataObjectResponse> =
             CompletableFuture.completedFuture(SearchDataObjectResponse(null as org.opensearch.action.search.SearchResponse?))
@@ -70,7 +71,8 @@ class TransportSearchMonitorActionTests : OpenSearchTestCase() {
         val listener = Mockito.mock(ActionListener::class.java) as ActionListener<org.opensearch.action.search.SearchResponse>
         action.search(
             org.opensearch.action.search.SearchRequest(".opendistro-alerting-config"),
-            listener
+            listener,
+            expectedTenantId
         )
 
         val captor = ArgumentCaptor.forClass(SearchDataObjectRequest::class.java)

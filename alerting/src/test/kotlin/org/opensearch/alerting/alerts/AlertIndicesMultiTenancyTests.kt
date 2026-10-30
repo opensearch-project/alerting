@@ -11,7 +11,7 @@ import org.mockito.Mockito
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.opensearch.Version
-import org.opensearch.alerting.settings.AlertingSettings
+import org.opensearch.alerting.alertingPluginSettings
 import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
@@ -38,18 +38,7 @@ class AlertIndicesMultiTenancyTests : OpenSearchTestCase() {
     private fun buildClusterService(settings: Settings): ClusterService {
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.ALERT_HISTORY_ENABLED)
-        settingSet.add(AlertingSettings.ALERT_HISTORY_MAX_DOCS)
-        settingSet.add(AlertingSettings.ALERT_HISTORY_INDEX_MAX_AGE)
-        settingSet.add(AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD)
-        settingSet.add(AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD)
-        settingSet.add(AlertingSettings.REQUEST_TIMEOUT)
-        settingSet.add(AlertingSettings.FINDING_HISTORY_ENABLED)
-        settingSet.add(AlertingSettings.FINDING_HISTORY_MAX_DOCS)
-        settingSet.add(AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE)
-        settingSet.add(AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD)
-        settingSet.add(AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD)
-        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
+        settingSet.addAll(alertingPluginSettings())
         val discoveryNode = DiscoveryNode("node", buildNewFakeTransportAddress(), Version.CURRENT)
         val clusterSettings = ClusterSettings(settings, settingSet)
         return Mockito.spy(ClusterServiceUtils.createClusterService(threadPool, discoveryNode, clusterSettings))

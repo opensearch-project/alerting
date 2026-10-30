@@ -27,10 +27,9 @@ import org.opensearch.alerting.action.GetEmailGroupRequest
 import org.opensearch.alerting.action.GetEmailGroupResponse
 import org.opensearch.alerting.action.GetRemoteIndexesRequest
 import org.opensearch.alerting.action.GetRemoteIndexesResponse
+import org.opensearch.alerting.alertingPluginSettings
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.lock.LockService
-import org.opensearch.alerting.settings.AlertingSettings
-import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
@@ -112,21 +111,7 @@ class TransportMultiTenancyBlockTests : OpenSearchTestCase() {
 
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
-        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
-        settingSet.add(AlertingSettings.ALERT_HISTORY_ENABLED)
-        settingSet.add(AlertingSettings.ALERTING_MAX_MONITORS)
-        settingSet.add(AlertingSettings.MAX_TRIGGERS_PER_MONITOR)
-        settingSet.add(AlertingSettings.REQUEST_TIMEOUT)
-        settingSet.add(AlertingSettings.INDEX_TIMEOUT)
-        settingSet.add(AlertingSettings.MAX_ACTION_THROTTLE_VALUE)
-        settingSet.add(DestinationSettings.ALLOW_LIST)
-        settingSet.add(AlertingSettings.CROSS_CLUSTER_MONITORING_ENABLED)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
-        settingSet.add(AlertingSettings.JOB_QUEUE_NAME)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_EXECUTION_ROLE_NAME)
+        settingSet.addAll(alertingPluginSettings())
         val clusterSettings = ClusterSettings(multiTenancySettings, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
 

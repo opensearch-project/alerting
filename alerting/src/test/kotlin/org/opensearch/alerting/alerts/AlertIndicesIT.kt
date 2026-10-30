@@ -11,6 +11,7 @@ import org.opensearch.action.search.SearchResponse
 import org.opensearch.alerting.ALWAYS_RUN
 import org.opensearch.alerting.AlertingRestTestCase
 import org.opensearch.alerting.NEVER_RUN
+import org.opensearch.alerting.comments.CommentsIndices
 import org.opensearch.alerting.makeRequest
 import org.opensearch.alerting.randomDocumentLevelMonitor
 import org.opensearch.alerting.randomDocumentLevelTrigger
@@ -24,6 +25,7 @@ import org.opensearch.commons.alerting.model.DocLevelQuery
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.core.rest.RestStatus
 import org.opensearch.test.OpenSearchTestCase
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 class AlertIndicesIT : AlertingRestTestCase() {
@@ -372,4 +374,77 @@ class AlertIndicesIT : AlertingRestTestCase() {
         assertEquals("Request to get alert history failed", RestStatus.OK, response.restStatus())
         return SearchResponse.fromXContent(createParser(jsonXContent, response.entity.content)).hits.totalHits!!.value
     }
+
+    fun `test restore of history indices leaves each history write alias on one index without a monitor run`() {
+        val patterns = mapOf(
+            AlertIndices.ALERT_HISTORY_WRITE_INDEX to AlertIndices.ALERT_HISTORY_INDEX_PATTERN,
+            AlertIndices.FINDING_HISTORY_WRITE_INDEX to AlertIndices.FINDING_HISTORY_INDEX_PATTERN,
+            CommentsIndices.COMMENTS_HISTORY_WRITE_INDEX to CommentsIndices.COMMENTS_HISTORY_INDEX_PATTERN
+        )
+        // The snapshot holds each history's second index (-000002), from a cluster that rolled its history over once today
+        val restored = patterns.mapValues { (alias, pattern) -> createHistoryIndex(pattern.replace("-1>", "-000002>"), alias) }
+        val snapshot = snapshotIndices(*restored.values.toTypedArray())
+        restored.values.forEach { deleteIndex(it) }
+        // Before the restore, this cluster has created its own first history index (-1) for each alias
+        patterns.forEach { (alias, pattern) -> createHistoryIndex(pattern, alias) }
+        restoreIndices(snapshot, *restored.values.toTypedArray())
+
+        assertBusy({ restored.forEach { (alias, index) -> assertEquals(alias, listOf(index), aliasIndices(alias)) } }, 30, TimeUnit.SECONDS)
+        // With the alias on one index again, rollover works and names the next index after the restored one
+        restored.keys.forEach { alias ->
+            val newIndex = adminClient().makeRequest("POST", "$alias/_rollover").asMap()["new_index"] as String
+            assertTrue(newIndex, newIndex.endsWith("-000003"))
+        }
+    }
+
+    fun `test restore leaves the history write alias off an index whose is_write_index is false`() {
+        val alias = AlertIndices.ALERT_HISTORY_WRITE_INDEX
+        val pattern = AlertIndices.ALERT_HISTORY_INDEX_PATTERN
+        val restored = createHistoryIndex(pattern.replace("-1>", "-000002>"), alias, """{ "is_write_index": false }""")
+        val snapshot = snapshotIndices(restored)
+        deleteIndex(restored)
+        val own = createHistoryIndex(pattern, alias)
+        restoreIndices(snapshot, restored)
+
+        // The restored index is marked as not to be written to, so this cluster's own index keeps the alias
+        assertBusy({ assertEquals(listOf(own), aliasIndices(alias)) }, 30, TimeUnit.SECONDS)
+        val response = adminClient().makeRequest("POST", "$alias/_doc", emptyMap(), StringEntity("{}", APPLICATION_JSON))
+        assertEquals(RestStatus.CREATED, response.restStatus())
+    }
+
+    fun `test history rollover repairs a write alias that names two indices without a restore`() {
+        val alias = AlertIndices.ALERT_HISTORY_WRITE_INDEX
+        val pattern = AlertIndices.ALERT_HISTORY_INDEX_PATTERN
+        val own = createHistoryIndex(pattern, alias)
+        createHistoryIndex(pattern.replace("-1>", "-000002>"), alias)
+        assertEquals(2, aliasIndices(alias).size)
+
+        try {
+            // The rollover job runs every period, and repairs the alias before it rolls over. The repair keeps the -000002 index,
+            // and a rollover may then move the alias on to -000003, so check only that the alias left this cluster's -1 index.
+            client().updateSettings(AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD.key, "1s")
+            assertBusy({
+                val names = aliasIndices(alias)
+                assertEquals(names.toString(), 1, names.size)
+                assertNotEquals(own, names.single())
+            }, 30, TimeUnit.SECONDS)
+        } finally {
+            resetHistorySettings()
+        }
+    }
+
+    /**
+     * Creates [name], which can use date math, with [alias] set to [aliasBody], and returns the created index's name. The default
+     * body sets no is_write_index flag, the way alerting creates its history indices.
+     */
+    private fun createHistoryIndex(name: String, alias: String, aliasBody: String = "{}"): String {
+        val response = adminClient().makeRequest(
+            "PUT", "/" + URLEncoder.encode(name, Charsets.UTF_8.toString()), emptyMap(),
+            StringEntity("""{ "aliases": { "$alias": $aliasBody } }""", APPLICATION_JSON)
+        )
+        return response.asMap()["index"] as String
+    }
+
+    /** The indices that [alias] names, sorted. */
+    private fun aliasIndices(alias: String): List<String> = adminClient().makeRequest("GET", "_alias/$alias").asMap().keys.sorted()
 }

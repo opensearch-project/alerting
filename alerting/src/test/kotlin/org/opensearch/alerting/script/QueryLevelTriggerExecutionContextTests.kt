@@ -6,11 +6,11 @@
 package org.opensearch.alerting.script
 
 import org.junit.Assert
+import org.opensearch.alerting.alertingPluginSettings
 import org.opensearch.alerting.randomQueryLevelMonitor
 import org.opensearch.alerting.randomQueryLevelMonitorRunResult
 import org.opensearch.alerting.randomQueryLevelTrigger
 import org.opensearch.alerting.randomUser
-import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
@@ -24,7 +24,7 @@ class QueryLevelTriggerExecutionContextTests : OpenSearchTestCase() {
     fun `test results are included for query-level context when allowed roles are not set`() {
         val settings = Settings.builder().build()
         val settingSet = hashSetOf<Setting<*>>()
-        settingSet.add(AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES)
+        settingSet.addAll(alertingPluginSettings())
         clusterSettings = ClusterSettings(settings, settingSet)
         val monitor = randomQueryLevelMonitor()
         val trigger = randomQueryLevelTrigger()
@@ -47,7 +47,7 @@ class QueryLevelTriggerExecutionContextTests : OpenSearchTestCase() {
             .putList("plugins.alerting.notification_context_results_allowed_roles", listOf("role1"))
             .build()
         val settingSet = hashSetOf<Setting<*>>()
-        settingSet.add(AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES)
+        settingSet.addAll(alertingPluginSettings())
         clusterSettings = ClusterSettings(settings, settingSet)
         val monitor = randomQueryLevelMonitor(user = randomUser(listOf("role2")))
         val trigger = randomQueryLevelTrigger()
@@ -70,7 +70,7 @@ class QueryLevelTriggerExecutionContextTests : OpenSearchTestCase() {
             .putList("plugins.alerting.notification_context_results_allowed_roles", listOf("role1", "role2"))
             .build()
         val settingSet = hashSetOf<Setting<*>>()
-        settingSet.add(AlertingSettings.NOTIFICATION_CONTEXT_RESULTS_ALLOWED_ROLES)
+        settingSet.addAll(alertingPluginSettings())
         clusterSettings = ClusterSettings(settings, settingSet)
         val monitor = randomQueryLevelMonitor(user = randomUser(listOf("role1")))
         val trigger = randomQueryLevelTrigger()

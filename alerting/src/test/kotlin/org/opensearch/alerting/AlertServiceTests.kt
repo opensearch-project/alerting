@@ -10,7 +10,6 @@ import org.junit.Before
 import org.mockito.Mockito
 import org.opensearch.Version
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.getBucketKeysHash
 import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.cluster.service.ClusterService
@@ -51,17 +50,7 @@ class AlertServiceTests : OpenSearchTestCase() {
         settings = Settings.builder().build()
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.ALERT_HISTORY_ENABLED)
-        settingSet.add(AlertingSettings.ALERT_HISTORY_MAX_DOCS)
-        settingSet.add(AlertingSettings.ALERT_HISTORY_INDEX_MAX_AGE)
-        settingSet.add(AlertingSettings.ALERT_HISTORY_ROLLOVER_PERIOD)
-        settingSet.add(AlertingSettings.ALERT_HISTORY_RETENTION_PERIOD)
-        settingSet.add(AlertingSettings.REQUEST_TIMEOUT)
-        settingSet.add(AlertingSettings.FINDING_HISTORY_ENABLED)
-        settingSet.add(AlertingSettings.FINDING_HISTORY_MAX_DOCS)
-        settingSet.add(AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE)
-        settingSet.add(AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD)
-        settingSet.add(AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD)
+        settingSet.addAll(alertingPluginSettings())
         val discoveryNode = DiscoveryNode("node", buildNewFakeTransportAddress(), Version.CURRENT)
         val clusterSettings = ClusterSettings(settings, settingSet)
         val testClusterService = ClusterServiceUtils.createClusterService(threadPool, discoveryNode, clusterSettings)

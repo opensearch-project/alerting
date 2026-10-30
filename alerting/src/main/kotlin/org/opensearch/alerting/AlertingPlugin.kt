@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting
 
+import kotlinx.coroutines.runBlocking
 import org.opensearch.action.ActionRequest
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteWorkflowAction
@@ -95,6 +96,7 @@ import org.opensearch.alerting.transport.TransportSearchMonitorAction
 import org.opensearch.alerting.util.DocLevelMonitorQueries
 import org.opensearch.alerting.util.MustacheTemplateService
 import org.opensearch.alerting.util.PluginClient
+import org.opensearch.alerting.util.WriteAliasRepair
 import org.opensearch.alerting.util.destinationmigration.DestinationMigrationCoordinator
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.node.DiscoveryNodes
@@ -142,6 +144,7 @@ import org.opensearch.plugins.ActionPlugin
 import org.opensearch.plugins.ExtensiblePlugin
 import org.opensearch.plugins.IdentityAwarePlugin
 import org.opensearch.plugins.ReloadablePlugin
+import org.opensearch.plugins.RestoreListenerPlugin
 import org.opensearch.plugins.ScriptPlugin
 import org.opensearch.plugins.SearchPlugin
 import org.opensearch.plugins.SystemIndexPlugin
@@ -157,6 +160,7 @@ import org.opensearch.rest.RestController
 import org.opensearch.rest.RestHandler
 import org.opensearch.script.ScriptContext
 import org.opensearch.script.ScriptService
+import org.opensearch.snapshots.RestoreContext
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
 import org.opensearch.watcher.ResourceWatcherService
@@ -169,9 +173,10 @@ import java.util.function.Supplier
  * [BucketLevelTrigger.XCONTENT_REGISTRY], [ClusterMetricsInput.XCONTENT_REGISTRY] to the [NamedXContentRegistry] so that we are able to deserialize the custom named objects.
  */
 internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, ReloadablePlugin,
-    SearchPlugin, SystemIndexPlugin, IdentityAwarePlugin, PercolatorPluginExt() {
+    SearchPlugin, SystemIndexPlugin, IdentityAwarePlugin, RestoreListenerPlugin, PercolatorPluginExt() {
 
     private var pluginClient: PluginClient? = null
+    private lateinit var writeAliasRepair: WriteAliasRepair
 
     override fun getContextAllowlists(): Map<ScriptContext<*>, List<Allowlist>> {
         val whitelist = AllowlistLoader.loadFromResourceFiles(javaClass, "org.opensearch.alerting.txt")
@@ -313,7 +318,11 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
         // Need to figure out how to use the OpenSearch DI classes rather than handwiring things here.
         val settings = environment.settings()
         val lockService = LockService(client, clusterService)
-        alertIndices = AlertIndices(settings, client, threadPool, clusterService)
+        // Built here so AlertIndices and CommentsIndices can repair write aliases as this plugin. assignSubject gives it its identity.
+        val pluginClientInstance = PluginClient(client)
+        this.pluginClient = pluginClientInstance
+        this.writeAliasRepair = WriteAliasRepair(pluginClientInstance, clusterService)
+        alertIndices = AlertIndices(settings, client, threadPool, clusterService, writeAliasRepair = writeAliasRepair)
 
         val sdkClient: SdkClient = SdkClientFactory.createSdkClient(
             client,
@@ -361,7 +370,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             .registerDestinationSettings()
             .registerRemoteMonitors(monitorTypeToMonitorRunners)
         scheduledJobIndices = ScheduledJobIndices(client.admin(), clusterService)
-        commentsIndices = CommentsIndices(environment.settings(), client, threadPool, clusterService)
+        commentsIndices = CommentsIndices(environment.settings(), client, threadPool, clusterService, writeAliasRepair)
         docLevelMonitorQueries = DocLevelMonitorQueries(client, clusterService)
         scheduler = JobScheduler(threadPool, runner)
         sweeper = JobSweeper(environment.settings(), client, clusterService, threadPool, xContentRegistry, scheduler, ALERTING_JOB_TYPES)
@@ -415,9 +424,6 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             }
         }
 
-        val pluginClientInstance = PluginClient(client)
-        this.pluginClient = pluginClientInstance
-
         return listOf(
             sweeper,
             scheduler,
@@ -438,6 +444,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
     override fun assignSubject(pluginSubject: PluginSubject) {
         pluginClient?.setSubject(pluginSubject)
     }
+
+    // Core calls this on its generic thread pool and logs anything it throws, so the repair can block that thread until it is done
+    override fun onRestore(context: RestoreContext) = runBlocking { writeAliasRepair.repair(context) }
 
     override fun getSettings(): List<Setting<*>> {
         return listOf(

@@ -15,8 +15,8 @@ import org.mockito.Mockito.timeout
 import org.mockito.Mockito.verify
 import org.opensearch.action.support.ActionFilters
 import org.opensearch.alerting.AlertingPlugin.Companion.TENANT_ID_HEADER
+import org.opensearch.alerting.alertingPluginSettings
 import org.opensearch.alerting.service.ExternalSchedulerService
-import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.ClusterSettings
 import org.opensearch.common.settings.Setting
@@ -33,6 +33,7 @@ import org.opensearch.test.OpenSearchTestCase
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
+import java.util.concurrent.CompletableFuture
 import org.mockito.Mockito.`when` as whenever
 
 @ThreadLeakFilters(filters = [TransportDeleteMonitorActionTests.CoroutineThreadFilter::class])
@@ -61,22 +62,19 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
 
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
-        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
+        settingSet.addAll(alertingPluginSettings())
         val clusterSettings = ClusterSettings(Settings.EMPTY, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(clusterSettings)
     }
 
-    fun `test SDK getDataObject is called`() {
+    fun `test SDK getDataObjectAsync is called`() {
         val response = GetDataObjectResponse.builder()
             .id("test-monitor-id")
             .index(".opendistro-alerting-config")
             .source(null)
             .build()
-        whenever(sdkClient.getDataObject(any(GetDataObjectRequest::class.java))).thenReturn(response)
+        whenever(sdkClient.getDataObjectAsync(any(GetDataObjectRequest::class.java)))
+            .thenReturn(CompletableFuture.completedFuture(response))
 
         val action = createAction()
         val request = DeleteMonitorRequest("test-monitor-id", org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE)
@@ -85,7 +83,7 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
 
         invokeDoExecute(action, request, listener)
 
-        verify(sdkClient, timeout(1000)).getDataObject(any(GetDataObjectRequest::class.java))
+        verify(sdkClient, timeout(1000)).getDataObjectAsync(any(GetDataObjectRequest::class.java))
     }
 
     fun `test getMonitor not found calls onFailure`() {
@@ -94,7 +92,8 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
             .index(".opendistro-alerting-config")
             .source(null)
             .build()
-        whenever(sdkClient.getDataObject(any(GetDataObjectRequest::class.java))).thenReturn(response)
+        whenever(sdkClient.getDataObjectAsync(any(GetDataObjectRequest::class.java)))
+            .thenReturn(CompletableFuture.completedFuture(response))
 
         val action = createAction()
         val request = DeleteMonitorRequest("test-monitor-id", org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE)
@@ -107,8 +106,8 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
     }
 
     fun `test SDK exception propagated to listener`() {
-        whenever(sdkClient.getDataObject(any(GetDataObjectRequest::class.java)))
-            .thenThrow(RuntimeException("SDK connection failed"))
+        whenever(sdkClient.getDataObjectAsync(any(GetDataObjectRequest::class.java)))
+            .thenReturn(CompletableFuture.failedFuture(RuntimeException("SDK connection failed")))
 
         val action = createAction()
         val request = DeleteMonitorRequest("test-monitor-id", org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE)
@@ -129,10 +128,7 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
 
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
+        settingSet.addAll(alertingPluginSettings())
         val cs = ClusterSettings(settings, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(cs)
 
@@ -183,7 +179,8 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
             .index(".opendistro-alerting-config")
             .source(null)
             .build()
-        whenever(sdkClient.getDataObject(any(GetDataObjectRequest::class.java))).thenReturn(response)
+        whenever(sdkClient.getDataObjectAsync(any(GetDataObjectRequest::class.java)))
+            .thenReturn(CompletableFuture.completedFuture(response))
 
         val action = createAction()
         val request = DeleteMonitorRequest("test-monitor-id", org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE)
@@ -193,7 +190,7 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         invokeDoExecute(action, request, listener)
 
         val captor = ArgumentCaptor.forClass(GetDataObjectRequest::class.java)
-        verify(sdkClient, timeout(1000)).getDataObject(captor.capture())
+        verify(sdkClient, timeout(1000)).getDataObjectAsync(captor.capture())
         assertEquals(expectedTenantId, captor.value.tenantId())
     }
 
@@ -204,7 +201,8 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
             .index(".opendistro-alerting-config")
             .source(null)
             .build()
-        whenever(sdkClient.getDataObject(any(GetDataObjectRequest::class.java))).thenReturn(response)
+        whenever(sdkClient.getDataObjectAsync(any(GetDataObjectRequest::class.java)))
+            .thenReturn(CompletableFuture.completedFuture(response))
 
         val action = createAction()
         val request = DeleteMonitorRequest("test-monitor-id", org.opensearch.action.support.WriteRequest.RefreshPolicy.IMMEDIATE)
@@ -214,7 +212,7 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
         invokeDoExecute(action, request, listener)
 
         val captor = ArgumentCaptor.forClass(GetDataObjectRequest::class.java)
-        verify(sdkClient, timeout(1000)).getDataObject(captor.capture())
+        verify(sdkClient, timeout(1000)).getDataObjectAsync(captor.capture())
         assertNull(captor.value.tenantId())
     }
 
@@ -225,11 +223,7 @@ class TransportDeleteMonitorActionTests : OpenSearchTestCase() {
 
         val settingSet = hashSetOf<Setting<*>>()
         settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
-        settingSet.add(AlertingSettings.FILTER_BY_BACKEND_ROLES)
-        settingSet.add(AlertingSettings.MULTI_TENANCY_ENABLED)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ENABLED)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ACCOUNT_ID)
-        settingSet.add(AlertingSettings.EXTERNAL_SCHEDULER_ROLE_NAME)
+        settingSet.addAll(alertingPluginSettings())
         val cs = ClusterSettings(settings, settingSet)
         whenever(clusterService.clusterSettings).thenReturn(cs)
 
