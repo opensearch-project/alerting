@@ -2669,7 +2669,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             false
         )
         val docLevelQueryIndex = ".opensearch-alerting-queries-000001"
-        // the query index is a system index, so only the admin certificate can create and close it directly
+        // the query index is a system index, so create and close it with the admin certificate; closing it as a user is refused
         adminClient().makeRequest(
             "PUT", docLevelQueryIndex,
             StringEntity(

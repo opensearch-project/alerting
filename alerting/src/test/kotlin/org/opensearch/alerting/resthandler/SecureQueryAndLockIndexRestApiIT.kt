@@ -115,8 +115,13 @@ class SecureQueryAndLockIndexRestApiIT : AlertingRestTestCase() {
     }
 
     private fun assertWriteForbidden(index: String) {
+        // control: the same user can write the same document to an ordinary index, so the 403 below comes from the system index
+        val doc = """{"monitor_id": "fake"}"""
+        val control = userClient!!.makeRequest("POST", "${createTestIndex()}/_doc", StringEntity(doc, APPLICATION_JSON))
+        assertEquals("Unexpected status", RestStatus.CREATED, control.restStatus())
+
         val e = expectThrows(ResponseException::class.java) {
-            userClient!!.makeRequest("POST", "$index/_doc", StringEntity("""{"monitor_id": "fake"}""", APPLICATION_JSON))
+            userClient!!.makeRequest("POST", "$index/_doc", StringEntity(doc, APPLICATION_JSON))
         }
         assertEquals("Unexpected status", RestStatus.FORBIDDEN, e.response.restStatus())
     }
