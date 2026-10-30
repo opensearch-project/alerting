@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicReference
  * Each call starts on the test thread and is completed from a second thread, as a coroutine on Dispatchers.IO can
  * resume elsewhere. Neither thread may end up with a context other than its own.
  */
-class SdkClientExtensionsTests : OpenSearchTestCase() {
+class DataObjectStashTests : OpenSearchTestCase() {
 
     private val threadContext = ThreadContext(Settings.EMPTY)
     private val sdkClient = mock(SdkClient::class.java)
