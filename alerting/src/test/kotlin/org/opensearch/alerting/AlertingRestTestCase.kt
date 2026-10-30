@@ -31,6 +31,7 @@ import org.opensearch.alerting.settings.DestinationSettings
 import org.opensearch.alerting.util.DestinationType
 import org.opensearch.client.Request
 import org.opensearch.client.Response
+import org.opensearch.client.ResponseException
 import org.opensearch.client.RestClient
 import org.opensearch.client.WarningFailureException
 import org.opensearch.common.UUIDs
@@ -1209,6 +1210,42 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         client().makeRequest("DELETE", "_data_stream/$datastream")
     }
 
+    /**
+     * Snapshots [indices] into a new snapshot in a file system repository under the test cluster's path.repo and returns the
+     * snapshot's name. Uses the admin client, because alerting's indices are system indices when the security plugin is installed.
+     * Skips the test when the cluster has no path.repo, as when opensearch-build runs these tests against a distribution.
+     */
+    protected fun snapshotIndices(vararg indices: String): String {
+        try {
+            adminClient().makeRequest(
+                "PUT", "_snapshot/$RESTORE_REPO", emptyMap(),
+                StringEntity("""{ "type": "fs", "settings": { "location": "$RESTORE_REPO" } }""", APPLICATION_JSON)
+            )
+        } catch (e: ResponseException) {
+            assumeFalse("The test cluster has no path.repo, so it can't hold a snapshot repository", e.message!!.contains(NO_PATH_REPO))
+            throw e
+        }
+        val snapshot = "restore-${randomAlphaOfLength(8).lowercase(Locale.ROOT)}"
+        val response = adminClient().makeRequest(
+            "PUT", "_snapshot/$RESTORE_REPO/$snapshot", mapOf("wait_for_completion" to "true"),
+            StringEntity(snapshotIndicesBody(indices), APPLICATION_JSON)
+        )
+        assertEquals("SUCCESS", (response.asMap()["snapshot"] as Map<*, *>)["state"])
+        return snapshot
+    }
+
+    /** Restores [indices] from [snapshot] with the admin client and waits until the restore finishes. */
+    protected fun restoreIndices(snapshot: String, vararg indices: String) {
+        val response = adminClient().makeRequest(
+            "POST", "_snapshot/$RESTORE_REPO/$snapshot/_restore", mapOf("wait_for_completion" to "true"),
+            StringEntity(snapshotIndicesBody(indices), APPLICATION_JSON)
+        )
+        assertEquals(0, ((response.asMap()["snapshot"] as Map<*, *>)["shards"] as Map<*, *>)["failed"])
+    }
+
+    private fun snapshotIndicesBody(indices: Array<out String>) =
+        """{ "indices": "${indices.joinToString(",")}", "include_global_state": false }"""
+
     protected fun createIndexAlias(alias: String, mappings: String?, setting: String? = "") {
         val indexPattern = "$alias*"
         var componentTemplateMappings = "\"properties\": {" +
@@ -1921,6 +1958,11 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
     }
 
     companion object {
+        private const val RESTORE_REPO = "restore-test-repo"
+
+        /** Part of the error OpenSearch returns when a file system repository is registered on a cluster with no path.repo. */
+        private const val NO_PATH_REPO = "path.repo because this setting is empty"
+
         internal interface IProxy {
             val version: String?
             var sessionId: String?
