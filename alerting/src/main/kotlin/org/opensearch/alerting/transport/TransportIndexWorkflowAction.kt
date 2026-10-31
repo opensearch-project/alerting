@@ -776,7 +776,10 @@ class TransportIndexWorkflowAction @Inject constructor(
         val compositeInput = request.workflow.inputs[0] as CompositeInput
         val monitorIds = compositeInput.sequence.delegates.stream().map { it.monitorId }.collect(Collectors.toList())
         val query = QueryBuilders.boolQuery().filter(QueryBuilders.termsQuery("_id", monitorIds))
-        val searchSource = SearchSourceBuilder().query(query)
+        // Safe: monitorIds.size is always ≤ MAX_DELEGATE_SIZE (25), well below the default
+        // index.max_result_window (10 000). Without an explicit size the default is 10, which
+        // silently truncates workflows with more than 10 delegates.
+        val searchSource = SearchSourceBuilder().query(query).size(monitorIds.size)
         val searchRequest = SearchRequest(SCHEDULED_JOBS_INDEX).source(searchSource)
 
         if (user != null && !isAdmin(user) && filterByEnabled) {
