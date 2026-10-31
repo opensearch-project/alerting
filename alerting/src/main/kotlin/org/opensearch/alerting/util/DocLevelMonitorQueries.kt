@@ -56,7 +56,11 @@ import kotlin.coroutines.suspendCoroutine
 
 private val log = LogManager.getLogger(DocLevelMonitorQueries::class.java)
 
-class DocLevelMonitorQueries(private val client: Client, private val clusterService: ClusterService) {
+/**
+ * Manages doc-level query index lifecycle: creation, mapping updates, rollover, and field-limit adjustment.
+ * `open` for test isolation only — not designed as a production extension point.
+ */
+open class DocLevelMonitorQueries(private val client: Client, private val clusterService: ClusterService) {
     companion object {
 
         const val PROPERTIES = "properties"
@@ -486,7 +490,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             }
     }
 
-    private suspend fun updateQueryIndexMappings(
+    internal open suspend fun updateQueryIndexMappings(
         monitor: Monitor,
         monitorMetadata: MonitorMetadata,
         sourceIndex: String,
@@ -506,13 +510,12 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         }
         if (
             targetQueryIndex == null || (
-                targetQueryIndex != monitor.dataSources.queryIndex &&
+                targetQueryIndex == monitor.dataSources.queryIndex &&
                     monitor.deleteQueryIndexInEveryRun == true
                 )
         ) {
-            // queryIndex is alias which will always have only 1 backing index which is writeIndex
-            // This is due to a fact that that _rollover API would maintain only single index under alias
-            // if you don't add is_write_index setting when creating index initially
+            // Fix: old != caused churn — a concrete index always differs from the alias, so the branch
+            // fired every run. == also catches the rare case where the alias name itself was persisted.
             targetQueryIndex = getWriteIndexNameForAlias(monitor.dataSources.queryIndex)
             if (targetQueryIndex == null) {
                 val message = "Failed to get write index for queryIndex alias:${monitor.dataSources.queryIndex}"
@@ -697,7 +700,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
      * Adjusts max field limit index setting for query index if source index has higher limit.
      * This will prevent max field limit exception, when source index has more fields then query index limit
      */
-    private suspend fun adjustMaxFieldLimitForQueryIndex(sourceIndexFieldLimit: Long, concreteQueryIndex: String) {
+    internal open suspend fun adjustMaxFieldLimitForQueryIndex(sourceIndexFieldLimit: Long, concreteQueryIndex: String) {
         val getSettingsResponse: GetSettingsResponse = client.suspendUntil {
             admin().indices().getSettings(GetSettingsRequest().indices(concreteQueryIndex), it)
         }
@@ -716,10 +719,13 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     it
                 )
             }
+            if (!updateSettingsResponse.isAcknowledged) {
+                log.warn("Failed to update max field limit setting for query index: $concreteQueryIndex")
+            }
         }
     }
 
-    private suspend fun rolloverQueryIndex(monitor: Monitor): String {
+    internal open suspend fun rolloverQueryIndex(monitor: Monitor): String {
         val queryIndex = monitor.dataSources.queryIndex
         val queryIndexPattern = monitor.dataSources.queryIndex + INDEX_PATTERN_SUFFIX
 
@@ -740,7 +746,11 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         return response.newIndex
     }
 
-    private fun getWriteIndexNameForAlias(alias: String): String? {
+    /**
+     * Returns the concrete write-index name for [alias], or `null` if the alias or write index doesn't exist.
+     * Always returns a concrete index name, never an alias name.
+     */
+    internal open fun getWriteIndexNameForAlias(alias: String): String? {
         return this.clusterService.state().metadata().indicesLookup?.get(alias)?.writeIndex?.index?.name
     }
 }
