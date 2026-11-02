@@ -135,7 +135,13 @@ class DataObjectStashTests : OpenSearchTestCase() {
             responder.join()
         }
         assertNotNull("the call must complete", result.get())
-        return Observed(dispatched.caller.get(), dispatched.transient.get(), starterTransient.get(), starterCaller.get(), responderTransient.get())
+        return Observed(
+            dispatchedCaller = dispatched.caller.get(),
+            dispatchedTransient = dispatched.transient.get(),
+            starterTransient = starterTransient.get(),
+            starterCaller = starterCaller.get(),
+            responderTransient = responderTransient.get(),
+        )
     }
 
     private fun assertOwnContextsKept(observed: Observed) {
