@@ -2669,7 +2669,9 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             false
         )
         val docLevelQueryIndex = ".opensearch-alerting-queries-000001"
-        // the query index is a system index, so create and close it with the admin certificate; closing it as a user is refused
+        // The query index is a system index, so only the admin certificate can create and close it.
+        // Create the backing index without the .opensearch-alerting-queries alias: with no write index behind the alias,
+        // indexing the doc level queries fails and monitor creation must clean up the monitor.
         adminClient().makeRequest(
             "PUT", docLevelQueryIndex,
             StringEntity(
@@ -2681,14 +2683,12 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
                       "monitor_id": { "type": "text" },
                       "index": { "type": "text" }
                     }
-                  },
-                  "aliases": { ".opensearch-alerting-queries": {} }
+                  }
                 }
                 """.trimIndent(),
                 ContentType.APPLICATION_JSON
             )
         )
-        // close index to simulate doc level query indexing failure
         adminClient().makeRequest("POST", "$docLevelQueryIndex/_close")
         try {
             val monitor = randomDocumentLevelMonitor(
