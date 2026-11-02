@@ -104,8 +104,14 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
 
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
 
-        val lastRunContext = if (monitorMetadata.lastRunContext.isNullOrEmpty()) mutableMapOf()
-        else monitorMetadata.lastRunContext.toMutableMap() as MutableMap<String, MutableMap<String, Any>>
+        // Safe reconstruction: filter non-Map values to avoid ClassCastException on stale or malformed entries.
+        @Suppress("UNCHECKED_CAST")
+        val lastRunContext: MutableMap<String, MutableMap<String, Any>> = if (monitorMetadata.lastRunContext.isNullOrEmpty()) mutableMapOf()
+        else monitorMetadata.lastRunContext
+            .entries
+            .filter { it.value is Map<*, *> }
+            .associate { it.key to (it.value as Map<String, Any>).toMutableMap() }
+            .toMutableMap()
 
         val updatedLastRunContext = lastRunContext.toMutableMap()
 
@@ -461,7 +467,8 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             for (fanOutResponse in docLevelMonitorFanOutResponses) {
                 if (fanOutResponse.exception == null) {
                     // fanOutResponse.lastRunContexts //updatedContexts for relevant shards
-                    val indexLastRunContext = updatedLastRunContext[indexName] as MutableMap<String, Any>
+                    // indexName is always a key of updatedLastRunContext (we iterate its keys above)
+                    val indexLastRunContext = updatedLastRunContext[indexName]!!
 
                     if (fanOutResponse.lastRunContexts.contains("index") && fanOutResponse.lastRunContexts["index"] == indexName) {
                         fanOutResponse.lastRunContexts.keys.forEach {
