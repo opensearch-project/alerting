@@ -43,6 +43,19 @@ class AlertingResourceSharingExtensionTests : OpenSearchTestCase() {
         assertEquals("/workflow/user/backend_roles", workflowProvider.ownerBackendRolesPath())
     }
 
+    fun `test workflow provider matches documents that hold workflow`() {
+        val workflowProvider = extension.getResourceProviders().first { it.resourceType() == "alerting-workflow" }
+        assertTrue(workflowProvider.matchesResource { field -> if (field == "workflow.type") "workflow" else null })
+        assertFalse(workflowProvider.matchesResource { field -> if (field == "workflow.type") "alerting-workflow" else null })
+        assertFalse(workflowProvider.matchesResource { field -> if (field == "monitor.type") "monitor" else null })
+    }
+
+    fun `test monitor provider matches documents that hold monitor`() {
+        val monitorProvider = extension.getResourceProviders().first { it.resourceType() == "monitor" }
+        assertTrue(monitorProvider.matchesResource { field -> if (field == "monitor.type") "monitor" else null })
+        assertFalse(monitorProvider.matchesResource { field -> if (field == "workflow.type") "workflow" else null })
+    }
+
     fun `test assignResourceSharingClient sets client in accessor`() {
         val mockClient = mock(ResourceSharingClient::class.java)
         extension.assignResourceSharingClient(mockClient)
