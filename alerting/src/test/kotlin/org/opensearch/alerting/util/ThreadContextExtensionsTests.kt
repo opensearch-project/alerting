@@ -86,8 +86,60 @@ class ThreadContextExtensionsTests : OpenSearchTestCase() {
         assertEquals("own", threadContext.getTransient<Any>(TRANSIENT))
     }
 
+    /**
+     * Headers set in prepare reach the dispatch, and neither the starting nor the answering thread keeps them.
+     */
+    fun `test suspendStashed dispatches with the prepared headers and leaves them on no thread`() {
+        val threadContext = ThreadContext(Settings.EMPTY)
+        threadContext.putTransient(TRANSIENT, "own")
+
+        val seenByDispatch = AtomicReference<Any?>()
+        val pending = AtomicReference<ActionListener<String>>()
+        val result = AtomicReference<String>()
+        val seenByStarter = AtomicReference<Any?>("unset")
+        val seenByResponder = AtomicReference<Any?>("unset")
+        runBlocking {
+            launch(Dispatchers.Unconfined) {
+                result.set(
+                    threadContext.suspendStashed({ threadContext.putTransient(PREPARED, "prepared") }) { listener ->
+                        seenByDispatch.set(threadContext.getTransient<Any>(PREPARED))
+                        pending.set(listener)
+                    }
+                )
+            }
+            seenByStarter.set(threadContext.getTransient<Any>(TRANSIENT))
+
+            val responder = Thread {
+                pending.get().onResponse("done")
+                seenByResponder.set(threadContext.getTransient<Any>(PREPARED))
+            }
+            responder.start()
+            responder.join()
+        }
+
+        assertEquals("prepared", seenByDispatch.get())
+        assertEquals("done", result.get())
+        assertEquals("the starting thread must get its own context back", "own", seenByStarter.get())
+        assertNull("the starting thread must not keep the prepared headers", threadContext.getTransient<Any>(PREPARED))
+        assertNull("the answering thread took the prepared headers", seenByResponder.get())
+    }
+
+    fun `test suspendStashed closes the stash when prepare fails`() {
+        val threadContext = ThreadContext(Settings.EMPTY)
+        threadContext.putTransient(TRANSIENT, "own")
+        val failure = IllegalStateException("bad target")
+
+        val thrown = expectThrows(IllegalStateException::class.java) {
+            runBlocking { threadContext.suspendStashed<String>({ throw failure }) { fail("must not dispatch") } }
+        }
+
+        assertSame(failure, thrown)
+        assertEquals("own", threadContext.getTransient<Any>(TRANSIENT))
+    }
+
     companion object {
         private const val CALLER = "caller"
         private const val TRANSIENT = "transient"
+        private const val PREPARED = "prepared"
     }
 }

@@ -16,6 +16,8 @@ import org.opensearch.remote.metadata.client.GetDataObjectResponse
 import org.opensearch.remote.metadata.client.PutDataObjectRequest
 import org.opensearch.remote.metadata.client.PutDataObjectResponse
 import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
+import org.opensearch.remote.metadata.client.SearchDataObjectResponse
 import org.opensearch.transport.client.Client
 
 /**
@@ -26,10 +28,10 @@ import org.opensearch.transport.client.Client
  * reject them, while the persistent `OPENDISTRO_SECURITY_AUTHENTICATED_USER` header stays readable by
  * [org.opensearch.security.resources.ResourceIndexListener] to record `createdBy`.
  *
- * Each helper stashes only while the call is dispatched. The local client sends the request on the calling thread,
- * so the request carries the stashed context, and the calling thread gets its own context back before the coroutine
- * suspends. A stash closed after the suspension would run on whichever thread the coroutine resumes on, and leave a
- * context behind on both threads.
+ * Each helper stashes only while the call is dispatched, and the calling thread gets its own context back before the
+ * coroutine suspends. A stash closed after the suspension would run on whichever thread the coroutine resumes on, and
+ * leave a context behind on both threads. The local cluster client sends the request on the calling thread, so its
+ * requests carry the stashed context; a remote backend dispatches on its own executor, and the stash does not reach it.
  */
 
 suspend fun SdkClient.putDataObjectStashed(
@@ -61,6 +63,11 @@ suspend fun SdkClient.getDataObjectStashed(
     request: GetDataObjectRequest,
     threadContext: ThreadContext,
 ): GetDataObjectResponse = threadContext.stashContext().use { this.getDataObjectAsync(request) }.await()
+
+suspend fun SdkClient.searchDataObjectStashed(
+    request: SearchDataObjectRequest,
+    threadContext: ThreadContext,
+): SearchDataObjectResponse = threadContext.stashContext().use { this.searchDataObjectAsync(request) }.await()
 
 suspend fun SdkClient.deleteDataObjectStashed(
     request: DeleteDataObjectRequest,

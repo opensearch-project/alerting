@@ -20,6 +20,8 @@ import org.opensearch.remote.metadata.client.GetDataObjectResponse
 import org.opensearch.remote.metadata.client.PutDataObjectRequest
 import org.opensearch.remote.metadata.client.PutDataObjectResponse
 import org.opensearch.remote.metadata.client.SdkClient
+import org.opensearch.remote.metadata.client.SearchDataObjectRequest
+import org.opensearch.remote.metadata.client.SearchDataObjectResponse
 import org.opensearch.test.OpenSearchTestCase
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicReference
@@ -62,6 +64,19 @@ class DataObjectStashTests : OpenSearchTestCase() {
 
         val observed = observe(dispatched, { pending.complete(mock(GetDataObjectResponse::class.java)) }) {
             sdkClient.getDataObjectStashed(GetDataObjectRequest.builder().index("index").id("id").build(), threadContext)
+        }
+
+        assertNull("transient headers must be stashed for the dispatch", observed.dispatchedTransient)
+        assertOwnContextsKept(observed)
+    }
+
+    fun `test searchDataObjectStashed dispatches stashed and leaves both threads as they were`() {
+        val pending = CompletableFuture<SearchDataObjectResponse>()
+        val dispatched = recordDispatch()
+        `when`(sdkClient.searchDataObjectAsync(any(SearchDataObjectRequest::class.java))).thenAnswer { dispatched.run(); pending }
+
+        val observed = observe(dispatched, { pending.complete(mock(SearchDataObjectResponse::class.java)) }) {
+            sdkClient.searchDataObjectStashed(SearchDataObjectRequest.builder().indices("index").build(), threadContext)
         }
 
         assertNull("transient headers must be stashed for the dispatch", observed.dispatchedTransient)
