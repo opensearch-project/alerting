@@ -100,6 +100,20 @@ class DataObjectStashTests : OpenSearchTestCase() {
         assertOwnContextsKept(observed)
     }
 
+    fun `test putDataObjectAsCaller without a caller dispatches stashed and leaves both threads as they were`() {
+        val pending = CompletableFuture<PutDataObjectResponse>()
+        val dispatched = recordDispatch()
+        `when`(sdkClient.putDataObjectAsync(any(PutDataObjectRequest::class.java))).thenAnswer { dispatched.run(); pending }
+
+        val observed = observe(dispatched, { pending.complete(mock(PutDataObjectResponse::class.java)) }) {
+            sdkClient.putDataObjectAsCaller(PutDataObjectRequest.builder().index("index").build(), threadContext, null)
+        }
+
+        assertNull(observed.dispatchedCaller)
+        assertNull("transient headers must be stashed for the dispatch", observed.dispatchedTransient)
+        assertOwnContextsKept(observed)
+    }
+
     private class Dispatch(private val threadContext: ThreadContext) : Runnable {
         val caller = AtomicReference<Any?>()
         val transient = AtomicReference<Any?>()

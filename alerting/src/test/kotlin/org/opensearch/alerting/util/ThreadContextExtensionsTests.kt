@@ -58,7 +58,36 @@ class ThreadContextExtensionsTests : OpenSearchTestCase() {
         assertNull("the answering thread took the caller's context", seenByResponder.get())
     }
 
+    fun `test suspendAsCaller passes a failure through`() {
+        val threadContext = ThreadContext(Settings.EMPTY)
+        val failure = IllegalStateException("lookup failed")
+
+        val thrown = expectThrows(IllegalStateException::class.java) {
+            runBlocking { threadContext.suspendAsCaller<String>(null) { listener -> listener.onFailure(failure) } }
+        }
+
+        assertSame(failure, thrown)
+    }
+
+    fun `test suspendAsCaller without a caller dispatches stashed and keeps this thread's context`() {
+        val threadContext = ThreadContext(Settings.EMPTY)
+        threadContext.putTransient(TRANSIENT, "own")
+        val seenByDispatch = AtomicReference<Any?>("unset")
+
+        val result = runBlocking {
+            threadContext.suspendAsCaller<String>(null) { listener ->
+                seenByDispatch.set(threadContext.getTransient<Any>(TRANSIENT))
+                listener.onResponse("done")
+            }
+        }
+
+        assertEquals("done", result)
+        assertNull("transient headers must be stashed for the dispatch", seenByDispatch.get())
+        assertEquals("own", threadContext.getTransient<Any>(TRANSIENT))
+    }
+
     companion object {
         private const val CALLER = "caller"
+        private const val TRANSIENT = "transient"
     }
 }
