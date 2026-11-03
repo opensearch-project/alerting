@@ -494,6 +494,46 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         poller.close()
     }
 
+    fun `test executeMonitor dispatches with the populated headers and leaves the thread as it was`() {
+        val mockClient = mockClient()
+        val mockThreadPool = mock(org.opensearch.threadpool.ThreadPool::class.java)
+        val threadContext = org.opensearch.common.util.concurrent.ThreadContext(Settings.EMPTY)
+        `when`(mockClient.threadPool()).thenReturn(mockThreadPool)
+        `when`(mockThreadPool.threadContext).thenReturn(threadContext)
+        val seenByDispatch = java.util.concurrent.atomic.AtomicReference<Any?>()
+        org.mockito.Mockito.doAnswer {
+            seenByDispatch.set(threadContext.getTransient<String>("x-account-id"))
+            @Suppress("UNCHECKED_CAST")
+            (it.getArgument(2) as org.opensearch.core.action.ActionListener<Any>)
+                .onResponse(mock(org.opensearch.alerting.action.ExecuteMonitorResponse::class.java))
+            null
+        }.`when`(mockClient).execute(
+            org.mockito.ArgumentMatchers.eq(org.opensearch.alerting.action.ExecuteMonitorAction.INSTANCE),
+            org.mockito.ArgumentMatchers.any(org.opensearch.alerting.action.ExecuteMonitorRequest::class.java),
+            org.mockito.ArgumentMatchers.any()
+        )
+
+        val poller = MonitorJobPoller(
+            testXContentRegistry(), mockClient, true,
+            testAccountIdProvider(), "us-east-1", "test-queue",
+            mappingProvider(),
+            tenantAccountIdHeaderName = "x-account-id",
+            tenantResourceIdHeaderNames = mapOf("target_1" to "x-resource-id")
+        )
+        val target = Target(
+            type = "target_1",
+            endpoint = "https://my-domain.us-west-2.es.amazonaws.com",
+            arn = "arn:aws:es:us-west-2:790849549214:domain/test-domain"
+        )
+        val monitor = org.opensearch.alerting.randomQueryLevelMonitor().copy(target = target)
+
+        kotlinx.coroutines.runBlocking { poller.executeMonitor(monitor, java.time.Instant.now()) }
+
+        assertEquals("790849549214", seenByDispatch.get())
+        assertNull("the populated headers must not stay on the calling thread", threadContext.getTransient<String>("x-account-id"))
+        poller.close()
+    }
+
     fun `test populateThreadContext skips transient headers when settings empty`() {
         val mockClient = mockClient()
         val mockThreadPool = mock(org.opensearch.threadpool.ThreadPool::class.java)

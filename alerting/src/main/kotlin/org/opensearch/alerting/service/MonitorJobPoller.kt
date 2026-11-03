@@ -159,7 +159,7 @@ class MonitorJobPoller(
         }
     }
 
-    private suspend fun executeMonitor(monitor: Monitor, jobStartTime: Instant) {
+    internal suspend fun executeMonitor(monitor: Monitor, jobStartTime: Instant) {
 
         val request = ExecuteMonitorRequest(
             dryrun = false,
