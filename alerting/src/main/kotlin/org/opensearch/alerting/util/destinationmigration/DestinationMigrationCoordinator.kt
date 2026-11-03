@@ -16,6 +16,7 @@ import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.lifecycle.LifecycleListener
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.threadpool.Scheduler
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
@@ -45,26 +46,43 @@ class DestinationMigrationCoordinator(
     }
 
     override fun clusterChanged(event: ClusterChangedEvent) {
+        // Cancellation on demotion must always run regardless of index changes —
+        // a node losing cluster-manager status is a metadata event, not a routing
+        // table change, so it must be handled before the routing-table guard.
+        if (!event.localNodeClusterManager()) {
+            if (scheduledMigration != null && !scheduledMigration!!.isCancelled) {
+                logger.info("Cancelling the migration process.")
+                scheduledMigration?.cancel()
+            }
+            return
+        }
+
+        // Proceed with migration initiation when ANY of:
+        //   (a) the scheduled-jobs index routing table changed, OR
+        //   (b) the index does not exist yet (bootstrap / initial creation path) — when the index
+        //       is absent this guard passes on every cluster event until the index appears; the
+        //       inner idempotency checks in initMigrateDestinations() prevent double-scheduling, OR
+        //   (c) this node just became cluster manager (promotion on an already-created index;
+        //       promotion fires a nodes-change event, not an index-routing change).
+        // Skip all other cluster events to avoid unnecessary work.
+        // Note: event.localNodeClusterManager() == true is already proven by the demotion guard
+        // above, so the second half of becameClusterManager is omitted — it is always true here.
+        val indexExists = event.state().routingTable().hasIndex(ScheduledJob.SCHEDULED_JOBS_INDEX)
+        val indexChanged = event.indexRoutingTableChanged(ScheduledJob.SCHEDULED_JOBS_INDEX)
+        val becameClusterManager = !event.previousState().nodes().isLocalNodeElectedClusterManager
+        if (indexExists && !indexChanged && !becameClusterManager) return
+
         if (DestinationMigrationUtilService.finishFlag) {
             logger.info("Reset destination migration process.")
             scheduledMigration?.cancel()
             DestinationMigrationUtilService.finishFlag = false
         }
-        if (
-            event.localNodeClusterManager() &&
-            !runningLock &&
-            (scheduledMigration == null || scheduledMigration!!.isCancelled)
-        ) {
+        if (!runningLock && (scheduledMigration == null || scheduledMigration!!.isCancelled)) {
             try {
                 runningLock = true
                 initMigrateDestinations()
             } finally {
                 runningLock = false
-            }
-        } else if (!event.localNodeClusterManager()) {
-            if (scheduledMigration != null && !scheduledMigration!!.isCancelled) {
-                logger.info("Cancelling the migration process.")
-                scheduledMigration?.cancel()
             }
         }
     }
