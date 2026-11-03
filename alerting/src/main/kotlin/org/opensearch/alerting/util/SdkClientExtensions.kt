@@ -42,7 +42,7 @@ suspend fun SdkClient.putDataObjectStashed(
 /**
  * Same as [putDataObjectStashed], but dispatched under [caller], the context captured on the request thread, so the
  * security plugin records the caller as the creator of a new resource. The calling thread gets its own context back
- * before the coroutine suspends.
+ * before the coroutine suspends. [indexWithContext] does the same for a [Client] write.
  */
 suspend fun SdkClient.putDataObjectAsCaller(
     request: PutDataObjectRequest,
@@ -79,7 +79,8 @@ suspend fun SdkClient.deleteDataObjectStashed(
  *
  * The calling thread gets its own context back before the coroutine suspends, so no thread keeps the caller's
  * context, whichever thread the coroutine resumes on. The stash before dispatch keeps the caller's persistent
- * headers, which the security plugin reads to record the resource's creator.
+ * headers, which the security plugin reads to record the resource's creator. [putDataObjectAsCaller] does the same
+ * for an [SdkClient] write.
  */
 suspend fun Client.indexWithContext(stored: ThreadContext.StoredContext, request: IndexRequest): IndexResponse {
     val threadContext = threadPool().threadContext
