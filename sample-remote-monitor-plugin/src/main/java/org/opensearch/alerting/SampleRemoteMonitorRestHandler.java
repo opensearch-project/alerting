@@ -98,6 +98,7 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                 false,
                 "sample-remote-monitor-plugin",
                 null,
+                null,
                 null
         );
         IndexMonitorRequest indexMonitorRequest1 = new IndexMonitorRequest(
@@ -161,6 +162,7 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                     false,
                     false,
                     "sample-remote-monitor-plugin",
+                    null,
                     null,
                     null
             );
@@ -248,6 +250,7 @@ public class SampleRemoteMonitorRestHandler extends BaseRestHandler {
                     false,
                     false,
                     "sample-remote-monitor-plugin",
+                    null,
                     null,
                     null
             );

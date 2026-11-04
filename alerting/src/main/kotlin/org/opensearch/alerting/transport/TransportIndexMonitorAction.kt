@@ -884,6 +884,8 @@ class TransportIndexMonitorAction @Inject constructor(
                 )
                 log.debug("Created monitor's backend roles: $rbacRoles")
             }
+            // created_by is server-owned: always derive it from the authenticated caller and ignore any client value.
+            request.monitor = request.monitor.copy(createdBy = user?.name)
 
             log.info("Creating new monitor: ${request.monitor.name}, type: ${request.monitor.monitorType}")
 
@@ -1104,7 +1106,11 @@ class TransportIndexMonitorAction @Inject constructor(
                 log.debug("Update monitor backend roles to: ${request.monitor.user?.backendRoles}")
             }
 
-            request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
+            // created_by never changes after creation; ignore any value in the update request.
+            request.monitor = request.monitor.copy(
+                schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion,
+                createdBy = currentMonitor.createdBy
+            )
 
             log.info("Updating monitor, ${currentMonitor.id}")
 

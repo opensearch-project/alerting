@@ -1,6 +1,6 @@
 {
   "_meta" : {
-    "schema_version": 9
+    "schema_version": 10
   },
   "properties": {
     "all_shared_principals": {
@@ -31,6 +31,9 @@
           }
         },
         "monitor_type": {
+          "type": "keyword"
+        },
+        "created_by": {
           "type": "keyword"
         },
         "user": {
