@@ -121,6 +121,18 @@ import java.util.Locale
 private val log = LogManager.getLogger(TransportIndexMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
+/** Key in [Monitor.uiMetadata] holding the user who created the monitor. Only the server sets it. */
+private const val UI_METADATA_CREATED_BY_KEY = "created_by"
+
+/**
+ * Replaces any client-supplied creator in ui_metadata with [createdBy], or removes the key when [createdBy] is null.
+ * Other ui_metadata keys are left untouched.
+ */
+private fun Monitor.withServerOwnedCreatedBy(createdBy: String?): Monitor {
+    val uiMetadata = uiMetadata - UI_METADATA_CREATED_BY_KEY
+    return copy(uiMetadata = if (createdBy == null) uiMetadata else uiMetadata + (UI_METADATA_CREATED_BY_KEY to createdBy))
+}
+
 class TransportIndexMonitorAction @Inject constructor(
     transportService: TransportService,
     val client: Client,
@@ -884,6 +896,8 @@ class TransportIndexMonitorAction @Inject constructor(
                 )
                 log.debug("Created monitor's backend roles: $rbacRoles")
             }
+            // The creator in ui_metadata is server-owned: always derive it from the authenticated caller.
+            request.monitor = request.monitor.withServerOwnedCreatedBy(user?.name)
 
             log.info("Creating new monitor: ${request.monitor.name}, type: ${request.monitor.monitorType}")
 
@@ -1105,6 +1119,8 @@ class TransportIndexMonitorAction @Inject constructor(
             }
 
             request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
+            // The creator never changes after creation: keep the stored value, whatever the request's ui_metadata holds.
+            request.monitor = request.monitor.withServerOwnedCreatedBy(currentMonitor.uiMetadata[UI_METADATA_CREATED_BY_KEY] as? String)
 
             log.info("Updating monitor, ${currentMonitor.id}")
 
