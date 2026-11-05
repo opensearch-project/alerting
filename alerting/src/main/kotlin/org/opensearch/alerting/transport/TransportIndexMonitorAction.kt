@@ -125,13 +125,11 @@ private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 private const val UI_METADATA_CREATED_BY_KEY = "created_by"
 
 /**
- * Replaces any client-supplied creator in ui_metadata with [createdBy], or removes the key when [createdBy] is null.
- * Other ui_metadata keys are left untouched.
+ * Returns this monitor's ui_metadata with the creator set to [createdBy], or with the key removed when
+ * [createdBy] is null. Any client-supplied creator is replaced. Other ui_metadata keys are left untouched.
  */
-private fun Monitor.withServerOwnedCreatedBy(createdBy: String?): Monitor {
-    val uiMetadata = uiMetadata - UI_METADATA_CREATED_BY_KEY
-    return copy(uiMetadata = if (createdBy == null) uiMetadata else uiMetadata + (UI_METADATA_CREATED_BY_KEY to createdBy))
-}
+private fun Monitor.uiMetadataWithCreatedBy(createdBy: String?): Map<String, Any> =
+    (uiMetadata - UI_METADATA_CREATED_BY_KEY) + listOfNotNull(createdBy?.let { UI_METADATA_CREATED_BY_KEY to it })
 
 class TransportIndexMonitorAction @Inject constructor(
     transportService: TransportService,
@@ -897,7 +895,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 log.debug("Created monitor's backend roles: $rbacRoles")
             }
             // The creator in ui_metadata is server-owned: always derive it from the authenticated caller.
-            request.monitor = request.monitor.withServerOwnedCreatedBy(user?.name)
+            request.monitor = request.monitor.copy(uiMetadata = request.monitor.uiMetadataWithCreatedBy(user?.name))
 
             log.info("Creating new monitor: ${request.monitor.name}, type: ${request.monitor.monitorType}")
 
@@ -1118,9 +1116,13 @@ class TransportIndexMonitorAction @Inject constructor(
                 log.debug("Update monitor backend roles to: ${request.monitor.user?.backendRoles}")
             }
 
-            request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
             // The creator never changes after creation: keep the stored value, whatever the request's ui_metadata holds.
-            request.monitor = request.monitor.withServerOwnedCreatedBy(currentMonitor.uiMetadata[UI_METADATA_CREATED_BY_KEY] as? String)
+            request.monitor = request.monitor.copy(
+                schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion,
+                uiMetadata = request.monitor.uiMetadataWithCreatedBy(
+                    currentMonitor.uiMetadata[UI_METADATA_CREATED_BY_KEY] as? String
+                )
+            )
 
             log.info("Updating monitor, ${currentMonitor.id}")
 

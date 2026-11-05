@@ -499,7 +499,9 @@ class MonitorRestApiIT : AlertingRestTestCase() {
         val uiMetadata = getMonitorAsDashboards(monitor.id).uiMetadata
         assertEquals("Other ui_metadata keys must be kept", "bar", uiMetadata["foo"])
         assertNotEquals("Client-supplied created_by must be ignored", "spoofed-user", uiMetadata["created_by"])
-        if (!isHttps()) {
+        if (isHttps()) {
+            assertEquals("created_by must be the authenticated user", authenticatedUser(), uiMetadata["created_by"])
+        } else {
             assertFalse("created_by must be absent when security is disabled", uiMetadata.containsKey("created_by"))
         }
     }
@@ -507,6 +509,9 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     fun `test update monitor does not change created_by in ui_metadata`() {
         val monitor = createMonitor(randomQueryLevelMonitor())
         val createdBy = getMonitorAsDashboards(monitor.id).uiMetadata["created_by"]
+        if (isHttps()) {
+            assertEquals("created_by must be recorded on create", authenticatedUser(), createdBy)
+        }
 
         updateMonitor(monitor.copy(name = "renamed-monitor", uiMetadata = mapOf("created_by" to "spoofed-user")))
 
