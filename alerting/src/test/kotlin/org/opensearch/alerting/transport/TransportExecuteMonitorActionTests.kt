@@ -168,6 +168,30 @@ class TransportExecuteMonitorActionTests : OpenSearchTestCase() {
         verify(client, never()).search(any(SearchRequest::class.java), any())
     }
 
+    fun `test scheduled run does not trigger access check`() {
+        val action = createAction()
+        val monitor = Monitor(
+            id = "scheduled-monitor-id",
+            name = "test", monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR.value,
+            enabled = true, schedule = IntervalSchedule(1, ChronoUnit.MINUTES),
+            lastUpdateTime = Instant.now(), enabledTime = Instant.now(), user = null,
+            inputs = listOf(SearchInput(listOf("sensitive-index"), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))),
+            triggers = emptyList(), uiMetadata = mapOf()
+        )
+        // MonitorRunnerService dispatches a scheduled run with both the id and the stored monitor.
+        val request = ExecuteMonitorRequest(false, TimeValue(Instant.now().toEpochMilli()), monitor.id, monitor)
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<ExecuteMonitorResponse>
+
+        try {
+            invokeDoExecute(action, request, listener)
+        } catch (e: java.lang.reflect.InvocationTargetException) {
+            // MonitorRunnerService is not initialized in unit tests — expected once execution is launched
+        }
+
+        verify(client, never()).search(any(SearchRequest::class.java), any())
+    }
+
     private fun invokeDoExecute(
         action: TransportExecuteMonitorAction,
         request: ExecuteMonitorRequest,
