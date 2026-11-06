@@ -148,8 +148,9 @@ class TransportExecuteMonitorAction @Inject constructor(
                 return
             }
 
-            // No caller user means a scheduled/internal run; the runner enforces monitor.user roles.
-            if (user == null) {
+            // Only the job scheduler sends a stored monitor with its id and no caller; REST inline requests never set monitorId.
+            val isScheduledRun = user == null && execMonitorRequest.monitorId != null && !execMonitorRequest.dryrun
+            if (isScheduledRun) {
                 client.threadPool().threadContext.stashContext().use {
                     executeInlineMonitor(monitor, execMonitorRequest, tenantId, actionListener)
                 }

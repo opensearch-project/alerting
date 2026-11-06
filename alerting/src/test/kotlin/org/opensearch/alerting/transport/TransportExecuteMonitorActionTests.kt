@@ -187,6 +187,26 @@ class TransportExecuteMonitorActionTests : OpenSearchTestCase() {
         verify(client, never()).search(any(SearchRequest::class.java), any())
     }
 
+    fun `test inline monitor on remote index without caller user or monitor id still triggers index access check`() {
+        Mockito.doAnswer { invocation ->
+            @Suppress("UNCHECKED_CAST")
+            val listener = invocation.getArgument<ActionListener<SearchResponse>>(1)
+            listener.onFailure(OpenSearchSecurityException("no permissions for [indices:data/read/search]"))
+            null
+        }.`when`(client).search(any(SearchRequest::class.java), any())
+
+        val action = createAction()
+        val request = ExecuteMonitorRequest(false, TimeValue(Instant.now().toEpochMilli()), null, remoteIndexMonitor())
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<ExecuteMonitorResponse>
+
+        invokeDoExecute(action, request, listener)
+
+        val captor = org.mockito.ArgumentCaptor.forClass(Exception::class.java)
+        verify(listener, timeout(1000)).onFailure(captor.capture())
+        assertEquals(RestStatus.FORBIDDEN, (captor.value as AlertingException).status())
+    }
+
     fun `test inline monitor on remote index with caller user triggers index access check`() {
         putCallerUser()
         Mockito.doAnswer { invocation ->
