@@ -30,6 +30,7 @@ import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.util.concurrent.ThreadContext
+import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.Monitor
@@ -89,6 +90,7 @@ class TransportExecuteMonitorActionTests : OpenSearchTestCase() {
     }
 
     fun `test inline monitor with search input triggers index access check`() {
+        putCallerUser()
         Mockito.doAnswer { invocation ->
             @Suppress("UNCHECKED_CAST")
             val listener = invocation.getArgument<ActionListener<SearchResponse>>(1)
@@ -118,6 +120,7 @@ class TransportExecuteMonitorActionTests : OpenSearchTestCase() {
     }
 
     fun `test inline doc-level monitor with custom indices triggers index access check`() {
+        putCallerUser()
         Mockito.doAnswer { invocation ->
             @Suppress("UNCHECKED_CAST")
             val listener = invocation.getArgument<ActionListener<SearchResponse>>(1)
@@ -167,6 +170,57 @@ class TransportExecuteMonitorActionTests : OpenSearchTestCase() {
 
         verify(client, never()).search(any(SearchRequest::class.java), any())
     }
+
+    fun `test scheduled run on remote index without caller user skips index access check`() {
+        val action = createAction()
+        val monitor = remoteIndexMonitor()
+        val request = ExecuteMonitorRequest(false, TimeValue(Instant.now().toEpochMilli()), "monitor-id", monitor)
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<ExecuteMonitorResponse>
+
+        try {
+            invokeDoExecute(action, request, listener)
+        } catch (e: java.lang.reflect.InvocationTargetException) {
+            // MonitorRunnerService is not initialized in unit tests — expected once execution is launched
+        }
+
+        verify(client, never()).search(any(SearchRequest::class.java), any())
+    }
+
+    fun `test inline monitor on remote index with caller user triggers index access check`() {
+        putCallerUser()
+        Mockito.doAnswer { invocation ->
+            @Suppress("UNCHECKED_CAST")
+            val listener = invocation.getArgument<ActionListener<SearchResponse>>(1)
+            listener.onFailure(OpenSearchSecurityException("no permissions for [indices:data/read/search]"))
+            null
+        }.`when`(client).search(any(SearchRequest::class.java), any())
+
+        val action = createAction()
+        val request = ExecuteMonitorRequest(true, TimeValue(Instant.now().toEpochMilli()), null, remoteIndexMonitor())
+        @Suppress("UNCHECKED_CAST")
+        val listener = Mockito.mock(ActionListener::class.java) as ActionListener<ExecuteMonitorResponse>
+
+        invokeDoExecute(action, request, listener)
+
+        val captor = org.mockito.ArgumentCaptor.forClass(Exception::class.java)
+        verify(listener, timeout(1000)).onFailure(captor.capture())
+        val exception = captor.value
+        assertTrue("Expected AlertingException but got ${exception.javaClass}", exception is AlertingException)
+        assertEquals(RestStatus.FORBIDDEN, (exception as AlertingException).status())
+    }
+
+    private fun putCallerUser() {
+        threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, "alice|backend1|role1")
+    }
+
+    private fun remoteIndexMonitor(): Monitor = Monitor(
+        name = "test", monitorType = Monitor.MonitorType.QUERY_LEVEL_MONITOR.value,
+        enabled = true, schedule = IntervalSchedule(5, ChronoUnit.MINUTES),
+        lastUpdateTime = Instant.now(), enabledTime = Instant.now(), user = null,
+        inputs = listOf(SearchInput(listOf("remote:logs-*"), SearchSourceBuilder().query(QueryBuilders.matchAllQuery()))),
+        triggers = emptyList(), uiMetadata = mapOf()
+    )
 
     private fun invokeDoExecute(
         action: TransportExecuteMonitorAction,

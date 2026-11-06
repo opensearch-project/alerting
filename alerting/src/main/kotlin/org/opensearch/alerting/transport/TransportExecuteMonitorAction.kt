@@ -148,6 +148,14 @@ class TransportExecuteMonitorAction @Inject constructor(
                 return
             }
 
+            // No caller user means a scheduled/internal run; the runner enforces monitor.user roles.
+            if (user == null) {
+                client.threadPool().threadContext.stashContext().use {
+                    executeInlineMonitor(monitor, execMonitorRequest, tenantId, actionListener)
+                }
+                return
+            }
+
             checkIndicesAndExecute(monitor, execMonitorRequest, tenantId, actionListener)
         }
     }
