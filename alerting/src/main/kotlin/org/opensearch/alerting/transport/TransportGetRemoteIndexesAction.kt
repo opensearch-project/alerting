@@ -118,75 +118,77 @@ class TransportGetRemoteIndexesAction @Inject constructor(
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
         client.threadPool().threadContext.stashContext().use {
             scope.launch(TenantContext(tenantId)) {
-                val singleThreadContext = newSingleThreadContext("GetRemoteIndexesActionThread")
-                withContext(singleThreadContext) {
-                    it.restore()
-                    val clusterIndexesList = mutableListOf<ClusterIndexes>()
+                // Closed after use, so the dedicated thread does not outlive the call
+                newSingleThreadContext("GetRemoteIndexesActionThread").use { singleThreadContext ->
+                    withContext(singleThreadContext) {
+                        it.restore()
+                        val clusterIndexesList = mutableListOf<ClusterIndexes>()
 
-                    var resolveIndexResponse: ResolveIndexAction.Response? = null
-                    try {
-                        resolveIndexResponse = getRemoteClusters(request.indexes)
-                    } catch (e: Exception) {
-                        log.error("Failed to retrieve indexes for request $request", e)
-                        actionListener.onFailure(AlertingException.wrap(e))
-                    }
-
-                    val resolvedIndexes: MutableList<String> = mutableListOf()
-                    if (resolveIndexResponse != null) {
-                        resolveIndexResponse.indices.forEach { resolvedIndexes.add(it.name) }
-                        resolveIndexResponse.aliases.forEach { resolvedIndexes.add(it.name) }
-                    }
-
-                    val clusterIndexesMap = CrossClusterMonitorUtils.separateClusterIndexes(resolvedIndexes, clusterService)
-
-                    clusterIndexesMap.forEach { (clusterName, indexes) ->
-                        val targetClient = CrossClusterMonitorUtils.getClientForCluster(clusterName, client, clusterService)
-
-                        val startTime = Instant.now()
-                        var clusterHealthResponse: ClusterHealthResponse? = null
+                        var resolveIndexResponse: ResolveIndexAction.Response? = null
                         try {
-                            clusterHealthResponse = getHealthStatuses(targetClient, indexes)
+                            resolveIndexResponse = getRemoteClusters(request.indexes)
                         } catch (e: Exception) {
-                            log.error("Failed to retrieve health statuses for request $request", e)
+                            log.error("Failed to retrieve indexes for request $request", e)
                             actionListener.onFailure(AlertingException.wrap(e))
                         }
-                        val endTime = Instant.now()
-                        val latency = Duration.between(startTime, endTime).toMillis()
 
-                        var mappingsResponse: GetMappingsResponse? = null
-                        if (request.includeMappings) {
+                        val resolvedIndexes: MutableList<String> = mutableListOf()
+                        if (resolveIndexResponse != null) {
+                            resolveIndexResponse.indices.forEach { resolvedIndexes.add(it.name) }
+                            resolveIndexResponse.aliases.forEach { resolvedIndexes.add(it.name) }
+                        }
+
+                        val clusterIndexesMap = CrossClusterMonitorUtils.separateClusterIndexes(resolvedIndexes, clusterService)
+
+                        clusterIndexesMap.forEach { (clusterName, indexes) ->
+                            val targetClient = CrossClusterMonitorUtils.getClientForCluster(clusterName, client, clusterService)
+
+                            val startTime = Instant.now()
+                            var clusterHealthResponse: ClusterHealthResponse? = null
                             try {
-                                mappingsResponse = getIndexMappings(targetClient, indexes)
+                                clusterHealthResponse = getHealthStatuses(targetClient, indexes)
                             } catch (e: Exception) {
-                                log.error("Failed to retrieve mappings for request $request", e)
+                                log.error("Failed to retrieve health statuses for request $request", e)
                                 actionListener.onFailure(AlertingException.wrap(e))
                             }
-                        }
+                            val endTime = Instant.now()
+                            val latency = Duration.between(startTime, endTime).toMillis()
 
-                        val clusterIndexList = mutableListOf<ClusterIndex>()
-                        if (clusterHealthResponse != null) {
-                            indexes.forEach {
-                                clusterIndexList.add(
-                                    ClusterIndex(
-                                        indexName = it,
-                                        indexHealth = clusterHealthResponse.indices[it]?.status,
-                                        mappings = mappingsResponse?.mappings?.get(it)
-                                    )
-                                )
+                            var mappingsResponse: GetMappingsResponse? = null
+                            if (request.includeMappings) {
+                                try {
+                                    mappingsResponse = getIndexMappings(targetClient, indexes)
+                                } catch (e: Exception) {
+                                    log.error("Failed to retrieve mappings for request $request", e)
+                                    actionListener.onFailure(AlertingException.wrap(e))
+                                }
                             }
-                        }
 
-                        clusterIndexesList.add(
-                            ClusterIndexes(
-                                clusterName = clusterName,
-                                clusterHealth = clusterHealthResponse?.status,
-                                hubCluster = clusterName == clusterService.clusterName.value(),
-                                indexes = clusterIndexList,
-                                latency = latency
+                            val clusterIndexList = mutableListOf<ClusterIndex>()
+                            if (clusterHealthResponse != null) {
+                                indexes.forEach {
+                                    clusterIndexList.add(
+                                        ClusterIndex(
+                                            indexName = it,
+                                            indexHealth = clusterHealthResponse.indices[it]?.status,
+                                            mappings = mappingsResponse?.mappings?.get(it)
+                                        )
+                                    )
+                                }
+                            }
+
+                            clusterIndexesList.add(
+                                ClusterIndexes(
+                                    clusterName = clusterName,
+                                    clusterHealth = clusterHealthResponse?.status,
+                                    hubCluster = clusterName == clusterService.clusterName.value(),
+                                    indexes = clusterIndexList,
+                                    latency = latency
+                                )
                             )
-                        )
+                        }
+                        actionListener.onResponse(GetRemoteIndexesResponse(clusterIndexes = clusterIndexesList))
                     }
-                    actionListener.onResponse(GetRemoteIndexesResponse(clusterIndexes = clusterIndexesList))
                 }
             }
         }
