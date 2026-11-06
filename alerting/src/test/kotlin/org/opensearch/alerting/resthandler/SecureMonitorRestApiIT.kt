@@ -57,6 +57,7 @@ import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.DocLevelMonitorInput
 import org.opensearch.commons.alerting.model.IntervalSchedule
 import org.opensearch.commons.alerting.model.PPLTrigger
+import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.authuser.User
 import org.opensearch.commons.rest.SecureRestClientBuilder
@@ -87,6 +88,9 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
 
     val user = "userD"
     var userClient: RestClient? = null
+
+    /** Role granting `crud` on every index, used to show that system-index protection is what blocks a write. */
+    private val WRITE_ANY_INDEX_ROLE = "alerting_write_any_index_role"
 
     @Before
     fun create() {
@@ -623,6 +627,120 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
         val updatedMonitor = updateMonitor(monitor = monitorV2)
 
         assertFalse("The monitor was not disabled", updatedMonitor.enabled)
+    }
+
+    fun `test ui_metadata created_by is the creator and is kept on update by another user`() {
+        if (!isHttps()) {
+            return
+        }
+        createUserWithRoles(user, listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE), listOf(TEST_HR_BACKEND_ROLE), false)
+        try {
+            val monitor = createMonitorWithClient(
+                userClient!!,
+                randomQueryLevelMonitor().copy(uiMetadata = mapOf("created_by" to "admin")),
+                listOf(TEST_HR_BACKEND_ROLE)
+            )
+            assertEquals("created_by must be the authenticated creator", user, getMonitorAsDashboards(monitor.id).uiMetadata["created_by"])
+
+            // The admin client is a different user. Its update must not change created_by, whether it sends a
+            // spoofed value or, like an API client that never sees ui_metadata, no ui_metadata at all.
+            updateMonitor(monitor.copy(name = "renamed-by-admin", uiMetadata = mapOf("created_by" to "admin")))
+            assertEquals("Spoofed update must not change created_by", user, getMonitorAsDashboards(monitor.id).uiMetadata["created_by"])
+
+            updateMonitor(monitor.copy(name = "renamed-without-ui-metadata", uiMetadata = mapOf()))
+            val updatedMonitor = getMonitorAsDashboards(monitor.id)
+            assertEquals("Monitor was not updated", "renamed-without-ui-metadata", updatedMonitor.name)
+            assertEquals("Update without ui_metadata must not remove created_by", user, updatedMonitor.uiMetadata["created_by"])
+        } finally {
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
+    }
+
+    fun `test creator cannot rewrite ui_metadata created_by on update`() {
+        if (!isHttps()) {
+            return
+        }
+        createUserWithRoles(user, listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE), listOf(TEST_HR_BACKEND_ROLE), false)
+        try {
+            val monitor = createMonitorWithClient(userClient!!, randomQueryLevelMonitor(), listOf(TEST_HR_BACKEND_ROLE))
+
+            updateMonitorWithClient(
+                userClient!!,
+                monitor.copy(name = "renamed-by-owner", uiMetadata = mapOf("created_by" to "admin")),
+                listOf(TEST_HR_BACKEND_ROLE)
+            )
+
+            val updatedMonitor = getMonitorAsDashboards(monitor.id)
+            assertEquals("Monitor was not updated", "renamed-by-owner", updatedMonitor.name)
+            assertEquals("Update must not change created_by", user, updatedMonitor.uiMetadata["created_by"])
+        } finally {
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
+    }
+
+    fun `test user cannot overwrite ui_metadata created_by by writing to the config index directly`() {
+        if (!isHttps()) {
+            return
+        }
+        createUserWithRoles(user, listOf(ALERTING_FULL_ACCESS_ROLE, READALL_AND_MONITOR_ROLE), listOf(TEST_HR_BACKEND_ROLE), false)
+        // `crud` on every index, so the user's index privileges cannot be the reason a write is refused.
+        // System-index protection is then the only thing left that can reject a write to the config index.
+        createIndexRole(WRITE_ANY_INDEX_ROLE, "*")
+        createUserRolesMapping(WRITE_ANY_INDEX_ROLE, arrayOf(user))
+        try {
+            val monitor = createMonitorWithClient(userClient!!, randomQueryLevelMonitor(), listOf(TEST_HR_BACKEND_ROLE))
+
+            // Control: the same user, role and APIs are permitted on an ordinary index, so a 403 below
+            // cannot be about index privileges. _update on a missing document reaches the document lookup
+            // and returns 404, which means the privilege check passed.
+            val controlIndex = createTestIndex()
+            try {
+                userClient!!.makeRequest(
+                    "POST", "/$controlIndex/_update/missing-doc", emptyMap(),
+                    StringEntity("{\"doc\":{\"field\":\"value\"}}", ContentType.APPLICATION_JSON)
+                )
+                fail("_update on a missing document must return 404")
+            } catch (e: ResponseException) {
+                assertEquals(
+                    "The test role must permit _update, otherwise the assertions below prove nothing",
+                    RestStatus.NOT_FOUND,
+                    e.response.restStatus()
+                )
+            }
+            val controlByQuery = userClient!!.makeRequest(
+                "POST", "/$controlIndex/_update_by_query", emptyMap(),
+                StringEntity("{\"query\":{\"match_all\":{}}}", ContentType.APPLICATION_JSON)
+            )
+            assertEquals(
+                "The test role must permit _update_by_query, otherwise the assertions below prove nothing",
+                RestStatus.OK,
+                controlByQuery.restStatus()
+            )
+
+            val configIndex = ScheduledJob.SCHEDULED_JOBS_INDEX
+            val attempts = listOf(
+                "/$configIndex/_update/${monitor.id}" to
+                    "{\"doc\":{\"monitor\":{\"ui_metadata\":{\"created_by\":\"admin\"}}}}",
+                "/$configIndex/_update_by_query" to
+                    "{\"query\":{\"term\":{\"_id\":\"${monitor.id}\"}}," +
+                    "\"script\":{\"source\":\"ctx._source.monitor.ui_metadata.created_by = 'admin'\"}}"
+            )
+            attempts.forEach { (endpoint, body) ->
+                try {
+                    userClient!!.makeRequest("POST", endpoint, emptyMap(), StringEntity(body, ContentType.APPLICATION_JSON))
+                    fail("Direct write to $endpoint must be rejected")
+                } catch (e: ResponseException) {
+                    assertEquals("Direct write to $endpoint must be forbidden", RestStatus.FORBIDDEN, e.response.restStatus())
+                }
+            }
+            assertEquals("created_by must be unchanged", user, getMonitorAsDashboards(monitor.id).uiMetadata["created_by"])
+        } finally {
+            deleteRoleAndRoleMapping(WRITE_ANY_INDEX_ROLE)
+            createUserRolesMapping(ALERTING_FULL_ACCESS_ROLE, arrayOf())
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
+        }
     }
 
     fun `test update monitor with enable filter by`() {

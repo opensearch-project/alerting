@@ -121,6 +121,32 @@ import java.util.Locale
 private val log = LogManager.getLogger(TransportIndexMonitorAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
+/** Key in [Monitor.uiMetadata] holding the user who created the monitor. Only the server sets it. */
+private const val UI_METADATA_CREATED_BY_KEY = "created_by"
+
+/**
+ * Returns this monitor's ui_metadata with the creator set to [createdBy], or with the key removed when
+ * [createdBy] is null. Any client-supplied creator is replaced. Other ui_metadata keys are left untouched.
+ */
+private fun Monitor.uiMetadataWithCreatedBy(createdBy: String?): Map<String, Any> =
+    (uiMetadata - UI_METADATA_CREATED_BY_KEY) + listOfNotNull(createdBy?.let { UI_METADATA_CREATED_BY_KEY to it })
+
+/**
+ * The creator stored on [monitor], or null when the key is absent or holds a non-string. The server only ever
+ * writes a string, so a non-string value cannot have come from the server and is not carried forward.
+ * Only the type is logged, never the value, since it is client-supplied.
+ */
+private fun storedCreatedBy(monitor: Monitor): String? {
+    val stored = monitor.uiMetadata[UI_METADATA_CREATED_BY_KEY]
+    if (stored != null && stored !is String) {
+        log.debug(
+            "Discarding non-string ${Monitor.UI_METADATA_FIELD}.$UI_METADATA_CREATED_BY_KEY " +
+                "of type [${stored::class.simpleName}] on monitor ${monitor.id}"
+        )
+    }
+    return stored as? String
+}
+
 class TransportIndexMonitorAction @Inject constructor(
     transportService: TransportService,
     val client: Client,
@@ -884,6 +910,15 @@ class TransportIndexMonitorAction @Inject constructor(
                 )
                 log.debug("Created monitor's backend roles: $rbacRoles")
             }
+            // The creator in ui_metadata is server-owned: always derive it from the authenticated caller.
+            if (user?.name == null) {
+                log.debug(
+                    "No authenticated user in the thread context, so no " +
+                        "${Monitor.UI_METADATA_FIELD}.$UI_METADATA_CREATED_BY_KEY is recorded " +
+                        "for monitor ${request.monitor.name}"
+                )
+            }
+            request.monitor = request.monitor.copy(uiMetadata = request.monitor.uiMetadataWithCreatedBy(user?.name))
 
             log.info("Creating new monitor: ${request.monitor.name}, type: ${request.monitor.monitorType}")
 
@@ -1104,7 +1139,11 @@ class TransportIndexMonitorAction @Inject constructor(
                 log.debug("Update monitor backend roles to: ${request.monitor.user?.backendRoles}")
             }
 
-            request.monitor = request.monitor.copy(schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion)
+            // The creator never changes after creation: keep the stored value, whatever the request's ui_metadata holds.
+            request.monitor = request.monitor.copy(
+                schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion,
+                uiMetadata = request.monitor.uiMetadataWithCreatedBy(storedCreatedBy(currentMonitor))
+            )
 
             log.info("Updating monitor, ${currentMonitor.id}")
 
