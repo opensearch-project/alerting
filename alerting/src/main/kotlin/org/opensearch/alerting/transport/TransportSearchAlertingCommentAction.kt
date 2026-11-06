@@ -22,6 +22,7 @@ import org.opensearch.alerting.alerts.AlertIndices.Companion.ALL_ALERT_INDEX_PAT
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.MAX_SEARCH_SIZE
+import org.opensearch.alerting.util.suspendAsCaller
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -54,9 +55,6 @@ import org.opensearch.tasks.Task
 import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.Client
 import java.io.IOException
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
 private val log = LogManager.getLogger(TransportSearchAlertingCommentAction::class.java)
 private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
@@ -237,17 +235,11 @@ class TransportSearchAlertingCommentAction @Inject constructor(
         // getAccessibleResourceIds resolves the caller from the authenticated-user header in
         // ThreadContext, so it must run under the caller's context (restored here) rather than the
         // stashed plugin context; otherwise it sees no user and returns no accessible monitors.
-        val accessibleMonitorIds: Set<String> = client.threadPool().threadContext.stashContext().use {
-            storedThreadContext?.restore()
-            suspendCoroutine { cont ->
-                (rsc as org.opensearch.security.spi.resources.client.ResourceSharingClient).getAccessibleResourceIds(
-                    ResourceSharingUtils.MONITOR_RESOURCE_TYPE,
-                    object : ActionListener<Set<String>> {
-                        override fun onResponse(ids: Set<String>) = cont.resume(ids)
-                        override fun onFailure(e: Exception) = cont.resumeWithException(e)
-                    }
-                )
-            }
+        val accessibleMonitorIds: Set<String> = client.threadPool().threadContext.suspendAsCaller(storedThreadContext) { listener ->
+            (rsc as org.opensearch.security.spi.resources.client.ResourceSharingClient).getAccessibleResourceIds(
+                ResourceSharingUtils.MONITOR_RESOURCE_TYPE,
+                listener
+            )
         }
 
         // termsQuery over accessible monitor ids is bounded by index.max_terms_count (default 65536);

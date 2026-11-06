@@ -29,6 +29,7 @@ import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.executeTranspor
 import org.opensearch.alerting.util.clusterMetricsMonitorHelpers.toMap
 import org.opensearch.alerting.util.getCancelAfterTimeInterval
 import org.opensearch.alerting.util.getRoleFilterEnabled
+import org.opensearch.alerting.util.suspendStashed
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver
 import org.opensearch.cluster.routing.Preference
@@ -200,21 +201,20 @@ class InputService(
             }
 
             // Add user role filter for AD result
-            client.threadPool().threadContext.stashContext().use {
-                // Possible long term solution:
-                // 1.Use secure rest client to send request to AD search result API. If no permission exception,
-                // that mean user has read access on AD result. Then don't need to add user role filter when query
-                // AD result if AD backend role filter is disabled.
-                // 2.Security provide some transport action to verify if user has permission to search AD result.
-                // Monitor runner will send transport request to check permission first. If security plugin response
-                // is yes, user has permission to query AD result. If AD role filter enabled, we will add user role
-                // filter to protect data at user role level; otherwise, user can query any AD result.
-                if (getRoleFilterEnabled(clusterService, settings, "plugins.anomaly_detection.filter_by_backend_roles")) {
-                    addUserBackendRolesFilter(monitor.user, searchRequest.source())
-                }
-                val searchResponse: SearchResponse = client.suspendUntil { client.search(searchRequest, it) }
-                results += searchResponse.convertToMap()
+            // Possible long term solution:
+            // 1.Use secure rest client to send request to AD search result API. If no permission exception,
+            // that mean user has read access on AD result. Then don't need to add user role filter when query
+            // AD result if AD backend role filter is disabled.
+            // 2.Security provide some transport action to verify if user has permission to search AD result.
+            // Monitor runner will send transport request to check permission first. If security plugin response
+            // is yes, user has permission to query AD result. If AD role filter enabled, we will add user role
+            // filter to protect data at user role level; otherwise, user can query any AD result.
+            if (getRoleFilterEnabled(clusterService, settings, "plugins.anomaly_detection.filter_by_backend_roles")) {
+                addUserBackendRolesFilter(monitor.user, searchRequest.source())
             }
+            val searchResponse: SearchResponse =
+                client.threadPool().threadContext.suspendStashed { listener -> client.search(searchRequest, listener) }
+            results += searchResponse.convertToMap()
             InputRunResults(results.toList())
         } catch (e: Exception) {
             logger.info("Error collecting anomaly result inputs for monitor: ${monitor.id}", e)
@@ -477,20 +477,20 @@ class InputService(
         if (remoteMonitoringEnabled && input.clusters.isNotEmpty()) {
             // If remote monitoring is enabled, and the monitor is configured to execute against remote clusters,
             // execute the API against each cluster, and compile the results.
-            client.threadPool().threadContext.stashContext().use {
-                val singleThreadContext = newSingleThreadContext("ClusterMetricsMonitorThread")
-                withContext(singleThreadContext) {
-                    it.restore()
-                    input.clusters.forEach { cluster ->
-                        val targetClient = CrossClusterMonitorUtils.getClientForCluster(cluster, client, clusterService)
-                        val response = executeTransportAction(input, targetClient)
-                        // Not all supported API reference the cluster name in their response.
-                        // Mapping each response to the cluster name before adding to results.
-                        // Not adding this same logic for local-only monitors to avoid breaking existing monitors.
-                        responseMap[cluster] = response.toMap()
-                    }
-                    results += responseMap
+            // Captured here and restored on the dedicated thread; no stash is held across the suspension
+            val callerContext = client.threadPool().threadContext.newStoredContext(false)
+            val singleThreadContext = newSingleThreadContext("ClusterMetricsMonitorThread")
+            withContext(singleThreadContext) {
+                callerContext.restore()
+                input.clusters.forEach { cluster ->
+                    val targetClient = CrossClusterMonitorUtils.getClientForCluster(cluster, client, clusterService)
+                    val response = executeTransportAction(input, targetClient)
+                    // Not all supported API reference the cluster name in their response.
+                    // Mapping each response to the cluster name before adding to results.
+                    // Not adding this same logic for local-only monitors to avoid breaking existing monitors.
+                    responseMap[cluster] = response.toMap()
                 }
+                results += responseMap
             }
         } else {
             // Else only execute the API against the local cluster.

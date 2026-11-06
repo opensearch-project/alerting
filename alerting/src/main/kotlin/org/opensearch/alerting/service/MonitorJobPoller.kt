@@ -16,8 +16,8 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.action.ExecuteMonitorAction
 import org.opensearch.alerting.action.ExecuteMonitorRequest
 import org.opensearch.alerting.action.ExecuteMonitorResponse
-import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.ArnHelper
+import org.opensearch.alerting.util.suspendStashed
 import org.opensearch.common.lifecycle.AbstractLifecycleComponent
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
@@ -159,7 +159,7 @@ class MonitorJobPoller(
         }
     }
 
-    private suspend fun executeMonitor(monitor: Monitor, jobStartTime: Instant) {
+    internal suspend fun executeMonitor(monitor: Monitor, jobStartTime: Instant) {
 
         val request = ExecuteMonitorRequest(
             dryrun = false,
@@ -169,11 +169,8 @@ class MonitorJobPoller(
             requestStart = null
         )
         try {
-            client.threadPool().threadContext.stashContext().use {
-                populateThreadContext(monitor)
-                client.suspendUntil<Client, ExecuteMonitorResponse> {
-                    client.execute(ExecuteMonitorAction.INSTANCE, request, it)
-                }
+            client.threadPool().threadContext.suspendStashed<ExecuteMonitorResponse>({ populateThreadContext(monitor) }) { listener ->
+                client.execute(ExecuteMonitorAction.INSTANCE, request, listener)
             }
         } catch (e: Exception) {
             throw AlertingException.wrap(e)
