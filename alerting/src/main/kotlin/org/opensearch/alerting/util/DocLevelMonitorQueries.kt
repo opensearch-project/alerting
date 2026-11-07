@@ -56,6 +56,9 @@ import kotlin.coroutines.suspendCoroutine
 
 private val log = LogManager.getLogger(DocLevelMonitorQueries::class.java)
 
+/** A doc level query that the query index rejected for [sourceIndex]. */
+data class DocLevelQueryIndexingFailure(val sourceIndex: String, val queryId: String, val reason: String)
+
 class DocLevelMonitorQueries(private val client: Client, private val clusterService: ClusterService) {
     companion object {
 
@@ -64,6 +67,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         const val TYPE = "type"
         const val INDEX_PATTERN_SUFFIX = "-000001"
         const val QUERY_INDEX_BASE_FIELDS_COUNT = 8 // 3 fields we defined and 5 builtin additional metadata fields
+        const val MAX_REPORTED_QUERY_INDEXING_FAILURES = 5
         @JvmStatic
         fun docLevelQueriesMappings(): String {
             return DocLevelMonitorQueries::class.java.classLoader.getResource("mappings/doc-level-queries.json").readText()
@@ -73,6 +77,14 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 DocLevelMonitorQueries::class.java.classLoader.getResource("settings/doc-level-queries.json").readText(),
                 XContentType.JSON
             ).build()
+        }
+
+        fun queryIndexingFailuresMessage(monitorId: String, failures: List<DocLevelQueryIndexingFailure>): String {
+            val reported = failures.take(MAX_REPORTED_QUERY_INDEXING_FAILURES)
+                .joinToString(", ") { "[query: ${it.queryId}, index: ${it.sourceIndex}, reason: ${it.reason}]" }
+            val remaining = failures.size - MAX_REPORTED_QUERY_INDEXING_FAILURES
+            return "Monitor [$monitorId] failed to install [${failures.size}] doc level queries, which are not evaluated: $reported" +
+                if (remaining > 0) " and [$remaining] more" else ""
         }
     }
 
@@ -259,9 +271,10 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         monitorMetadata: MonitorMetadata,
         refreshPolicy: RefreshPolicy = RefreshPolicy.IMMEDIATE,
         indexTimeout: TimeValue
-    ) {
+    ): List<DocLevelQueryIndexingFailure> {
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
+        val failures = mutableListOf<DocLevelQueryIndexingFailure>()
 
         val indices = docLevelMonitorInput.indices
         val clusterState = clusterService.state()
@@ -375,11 +388,19 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     conflictingFields,
                     refreshPolicy,
                     indexTimeout
-                )
+                ).forEach { (queryId, reason) -> failures.add(DocLevelQueryIndexingFailure(indexName, queryId, reason)) }
             }
         }
+        if (failures.isNotEmpty()) {
+            log.error(
+                "Monitor [$monitorId] failed to install [${failures.size}] doc level queries: " +
+                    failures.joinToString(", ") { "[query: ${it.queryId}, index: ${it.sourceIndex}, reason: ${it.reason}]" }
+            )
+        }
+        return failures
     }
 
+    /** Returns the monitor query id and failure reason of every query rejected by the query index. */
     private suspend fun doIndexAllQueries(
         concreteQueryIndex: String,
         sourceIndex: String,
@@ -389,7 +410,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         conflictingPaths: Set<String>,
         refreshPolicy: RefreshPolicy,
         indexTimeout: TimeValue
-    ) {
+    ): List<Pair<String, String>> {
         val indexRequests = mutableListOf<IndexRequest>()
         val conflictingPathToConcreteIndices = mutableMapOf<String, MutableSet<String>>()
         flattenPaths.forEach { fieldPath ->
@@ -407,6 +428,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         }
 
         val newQueries = mutableListOf<DocLevelQuery>()
+        // Monitor query id of each entry in newQueries, positionally aligned with newQueries and indexRequests.
+        val originalQueryIds = mutableListOf<String>()
         queries.forEach {
             val filteredConcreteIndices = mutableSetOf<String>()
             var query = it.query
@@ -425,9 +448,11 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         query = query.replace("<index>", filteredConcreteIndex)
                     )
                     newQueries.add(newQuery)
+                    originalQueryIds.add(it.id)
                 }
             } else {
                 newQueries.add(it.copy(id = "${it.id}_$sourceIndex"))
+                originalQueryIds.add(it.id)
             }
         }
 
@@ -452,6 +477,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             log.debug("query $query added for execution of monitor $monitorId on index $sourceIndex")
         }
         log.debug("bulk inserting percolate [${queries.size}] queries")
+        val failures = mutableListOf<Pair<String, String>>()
         if (indexRequests.isNotEmpty()) {
             val bulkResponse: BulkResponse = client.suspendUntil {
                 client.bulk(
@@ -460,10 +486,12 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             }
             bulkResponse.forEach { bulkItemResponse ->
                 if (bulkItemResponse.isFailed) {
-                    log.error(bulkItemResponse.failureMessage)
+                    val rootCause = generateSequence(bulkItemResponse.failure.cause as Throwable?) { it.cause }.lastOrNull()
+                    failures.add(originalQueryIds[bulkItemResponse.itemId] to (rootCause?.message ?: bulkItemResponse.failureMessage))
                 }
             }
         }
+        return failures
     }
 
     /**
