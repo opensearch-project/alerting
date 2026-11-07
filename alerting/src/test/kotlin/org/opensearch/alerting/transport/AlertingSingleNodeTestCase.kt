@@ -25,6 +25,7 @@ import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
 import org.opensearch.alerting.alerts.AlertIndices
+import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.common.xcontent.XContentFactory
@@ -86,6 +87,21 @@ abstract class AlertingSingleNodeTestCase : OpenSearchSingleNodeTestCase() {
     override fun setUp() {
         super.setUp()
         createTestIndex()
+    }
+
+    /**
+     * Deleting a monitor that still has alerts records a cleanup task and takes the cleanup lock, which creates the
+     * lock index. That index is legitimate at runtime, but this framework asserts that a test leaves no index behind,
+     * so it is removed here rather than by the service, which has no business deleting the index it shares with the
+     * job scheduler.
+     */
+    override fun tearDown() {
+        try {
+            client().admin().indices().delete(DeleteIndexRequest(LockService.LOCK_INDEX_NAME)).get()
+        } catch (e: Exception) {
+            // The lock index only exists if something took a lock during the test.
+        }
+        super.tearDown()
     }
 
     protected fun getAllIndicesFromPattern(pattern: String): List<String> {

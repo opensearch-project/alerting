@@ -25,6 +25,7 @@ import org.opensearch.action.support.HandledTransportAction
 import org.opensearch.action.support.WriteRequest.RefreshPolicy
 import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.ResourceSharingUtils
+import org.opensearch.alerting.cleanup.AlertCleanupService
 import org.opensearch.alerting.core.lock.LockModel
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.opensearchapi.addFilter
@@ -186,6 +187,14 @@ class TransportDeleteWorkflowAction @Inject constructor(
                             return
                         }
                     }
+
+                    // Recorded before the workflow document goes: the alert indices for its chained alerts are resolved
+                    // from a delegate monitor, and the delegates may themselves be deleted below.
+                    AlertCleanupService.recordWorkflowCleanupTask(
+                        workflow = workflow,
+                        survivingTriggerIds = emptyList(),
+                        jobDeleted = true
+                    )
 
                     val deleteResponse = deleteWorkflow(deleteRequest)
                     var deleteWorkflowResponse = DeleteWorkflowResponse(deleteResponse.id, deleteResponse.version)

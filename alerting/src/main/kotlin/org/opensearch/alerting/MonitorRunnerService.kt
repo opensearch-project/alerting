@@ -22,13 +22,12 @@ import org.opensearch.alerting.action.ExecuteWorkflowAction
 import org.opensearch.alerting.action.ExecuteWorkflowRequest
 import org.opensearch.alerting.action.ExecuteWorkflowResponse
 import org.opensearch.alerting.alerts.AlertIndices
-import org.opensearch.alerting.alerts.AlertMover.Companion.moveAlerts
+import org.opensearch.alerting.cleanup.AlertCleanupService
 import org.opensearch.alerting.core.JobRunner
 import org.opensearch.alerting.core.ScheduledJobIndices
 import org.opensearch.alerting.core.lock.LockModel
 import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.model.destination.DestinationContextFactory
-import org.opensearch.alerting.opensearchapi.retry
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.remote.monitors.RemoteDocumentLevelMonitorRunner
 import org.opensearch.alerting.remote.monitors.RemoteMonitorRegistry
@@ -196,11 +195,17 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
                 MOVE_ALERTS_BACKOFF_MILLIS.get(monitorCtx.settings),
                 MOVE_ALERTS_BACKOFF_COUNT.get(monitorCtx.settings)
             )
+        AlertCleanupService.retryPolicy = monitorCtx.moveAlertsRetryPolicy!!
         monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(
             MOVE_ALERTS_BACKOFF_MILLIS,
             MOVE_ALERTS_BACKOFF_COUNT
         ) { millis, count ->
             monitorCtx.moveAlertsRetryPolicy = BackoffPolicy.exponentialBackoff(millis, count)
+            AlertCleanupService.retryPolicy = monitorCtx.moveAlertsRetryPolicy!!
+        }
+
+        monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(AlertingSettings.ALERT_CLEANUP_RESUME_INTERVAL) {
+            AlertCleanupService.rescheduleResume(it)
         }
 
         monitorCtx.clusterService!!.clusterSettings.addSettingsUpdateConsumer(SEARCH_CANCEL_AFTER_TIME_INTERVAL_SETTING) {
@@ -271,6 +276,7 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
         }
 
         monitorCtx.multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(monitorCtx.settings)
+        AlertCleanupService.multiTenancyEnabled = monitorCtx.multiTenancyEnabled
 
         return this
     }
@@ -306,53 +312,62 @@ object MonitorRunnerService : JobRunner, CoroutineScope, AbstractLifecycleCompon
 
     override fun doClose() {}
 
+    /**
+     * Records the cleanup owed for triggers that have disappeared from [job], then announces it to the cluster.
+     *
+     * This hook is reached once per indexed job, from the shard copy that acted as primary for the operation, so the
+     * task is recorded exactly once without any node having to agree with any other about who should do it. The job
+     * object is in hand here, which is what lets the task name the monitor's configured alert indices rather than
+     * falling back to the defaults.
+     */
     override fun postIndex(job: ScheduledJob) {
         if (monitorCtx.multiTenancyEnabled) return
-        if (job is Monitor) {
-            launch {
+        when (job) {
+            is Monitor -> launch {
                 try {
-                    monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
-                        if (monitorCtx.alertIndices!!.isAlertInitialized(job.dataSources)) {
-                            moveAlerts(monitorCtx.client!!, job.id, job)
-                        }
-                    }
+                    if (!monitorCtx.alertIndices!!.isAlertInitialized(job.dataSources)) return@launch
+                    val task = AlertCleanupService.recordMonitorCleanupTask(
+                        monitor = job,
+                        survivingTriggerIds = job.triggers.map { it.id },
+                        jobDeleted = false
+                    )
+                    if (task != null) AlertCleanupService.announce(job.id)
                 } catch (e: Exception) {
-                    logger.error("Failed to move active alerts for monitor [${job.id}].", e)
+                    logger.error("Failed to record alert cleanup for monitor [${job.id}].", e)
                 }
             }
-        } else if (job is Workflow) {
-            launch {
+            is Workflow -> launch {
                 try {
-                    monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
-                        moveAlerts(monitorCtx.client!!, job.id, job, monitorCtx)
-                    }
+                    val task = AlertCleanupService.recordWorkflowCleanupTask(
+                        workflow = job,
+                        survivingTriggerIds = job.triggers.map { it.id },
+                        jobDeleted = false
+                    )
+                    if (task != null) AlertCleanupService.announce(job.id)
                 } catch (e: Exception) {
-                    logger.error("Failed to move active alerts for monitor [${job.id}].", e)
+                    logger.error("Failed to record alert cleanup for workflow [${job.id}].", e)
                 }
             }
-        } else {
-            throw IllegalArgumentException("Invalid job type")
+            else -> throw IllegalArgumentException("Invalid job type")
         }
     }
 
+    /**
+     * Announces the cleanup owed for a deleted job.
+     *
+     * The delete API records the task before removing the job document, because that is the last moment at which the
+     * monitor's alert indices are readable. This hook therefore normally has a task waiting for it and only has to tell
+     * the cluster about it. A job document removed straight from the config index leaves no task, so one is recorded
+     * here as a fallback -- with default alert indices, which is all an id can yield.
+     */
     override fun postDelete(jobId: String) {
         if (monitorCtx.multiTenancyEnabled) return
         launch {
             try {
-                monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
-                    moveAlerts(monitorCtx.client!!, jobId, null, monitorCtx)
-                }
+                AlertCleanupService.recordFallbackCleanupTasks(jobId)
+                AlertCleanupService.announce(jobId)
             } catch (e: Exception) {
-                logger.error("Failed to move active alerts for workflow [$jobId]. Could be a monitor", e)
-            }
-            try {
-                monitorCtx.moveAlertsRetryPolicy!!.retry(logger) {
-                    if (monitorCtx.alertIndices!!.isAlertInitialized()) {
-                        moveAlerts(monitorCtx.client!!, jobId, null)
-                    }
-                }
-            } catch (e: Exception) {
-                logger.error("Failed to move active alerts for monitor [$jobId].", e)
+                logger.error("Failed to announce alert cleanup for deleted job [$jobId].", e)
             }
         }
     }
