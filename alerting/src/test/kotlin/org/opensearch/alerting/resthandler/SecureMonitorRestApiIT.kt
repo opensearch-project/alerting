@@ -2829,6 +2829,7 @@ class SecureMonitorRestApiIT : AlertingRestTestCase() {
             assertEquals("Monitors found. Clean up unsuccessful", 0, numberDocsFound)
         } finally {
             deleteRoleAndRoleMapping(ALERTING_INDEX_MONITOR_ACCESS)
+            createUserRolesMapping(READALL_AND_MONITOR_ROLE, arrayOf())
         }
     }
 
