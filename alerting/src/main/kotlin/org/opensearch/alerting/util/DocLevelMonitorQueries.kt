@@ -74,6 +74,36 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 XContentType.JSON
             ).build()
         }
+
+        /**
+         * Returns a deep copy of [source] such that every nested [Map] is a distinct [MutableMap] and
+         * every [List] is a distinct [MutableList] whose [Map] elements are themselves deep-copied.
+         *
+         * This prevents aliasing bugs where mutations to the copy (e.g. leaf-name renaming during
+         * [traverseMappingsAndUpdate]) would otherwise silently corrupt the original mapping tree
+         * read from cluster-state metadata.
+         */
+        @Suppress("UNCHECKED_CAST")
+        fun deepCopyMap(source: Map<String, Any>): MutableMap<String, Any> {
+            val copy = mutableMapOf<String, Any>()
+            for ((key, value) in source) {
+                copy[key] = deepCopyValue(value)
+            }
+            return copy
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        private fun deepCopyValue(value: Any): Any {
+            return when (value) {
+                is Map<*, *> -> deepCopyMap(value as Map<String, Any>)
+                is List<*> -> {
+                    // Mapping trees do not contain null elements, but guard defensively rather than crashing.
+                    value.mapNotNull { element -> deepCopyValue(element ?: return@mapNotNull null) }
+                        .toMutableList()
+                }
+                else -> value // scalars (String, Int, Long, Boolean, …) are immutable — no copy needed
+            }
+        }
     }
 
     suspend fun initDocLevelQueryIndex(): Boolean {
@@ -157,7 +187,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         client.admin().indices().exists(IndicesExistsRequest(queryIndex), it)
                     }
                 if (indicesExistsResponse.isExists == false) {
-                    return
+                    return@forEach
                 }
 
                 val queryBuilder = QueryBuilders.boolQuery()
@@ -223,7 +253,7 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         // If node contains "properties" property then it is internal(non-leaf) node
         log.debug("Node in traverse: $node")
         // newNodes will hold list of updated leaf properties
-        var newNodes = ArrayList<Triple<String, String, Any>>(node.size)
+        val newNodes = ArrayList<Triple<String, String, Any>>(node.size)
         node.entries.forEach {
             // Compute full path relative to root
             val fullPath = if (currentPath.isEmpty()) it.key
@@ -268,25 +298,17 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
 
         // Run through each backing index and apply appropriate mappings to query index
         indices.forEach { indexName ->
-            var concreteIndices = IndexUtils.resolveAllIndices(
+            val concreteIndices = IndexUtils.resolveAllIndices(
                 listOf(indexName),
                 monitorCtx.clusterService!!,
                 monitorCtx.indexNameExpressionResolver!!
             )
-            if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
-                IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
-            ) {
-                val lastWriteIndex = concreteIndices.find { monitorMetadata.lastRunContext.containsKey(it) }
-                if (lastWriteIndex != null) {
-                    val lastWriteIndexCreationDate =
-                        IndexUtils.getCreationDateForIndex(lastWriteIndex, monitorCtx.clusterService!!.state())
-                    concreteIndices = IndexUtils.getNewestIndicesByCreationDate(
-                        concreteIndices,
-                        monitorCtx.clusterService!!.state(),
-                        lastWriteIndexCreationDate
-                    )
-                }
-            }
+            // Note: no creation-date truncation here. We must inspect ALL backing indices so that
+            // getAllConflictingFields can detect fields whose type changed across rollover boundaries
+            // (e.g. resource.host.name: text → keyword). Filtering out old indices hides the conflict,
+            // causing a merged putMapping with a type change that OpenSearch core rejects. Seq_no
+            // watermarks in the runner guarantee that sealed indices produce empty document fan-outs
+            // at negligible cost.
             val updatedIndexName = indexName.replace("*", "_")
             val updatedProperties = mutableMapOf<String, Any>()
             val allFlattenPaths = mutableSetOf<Pair<String, String>>()
@@ -297,10 +319,13 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 if (clusterState.routingTable.hasIndex(concreteIndexName)) {
                     val indexMetadata = clusterState.metadata.index(concreteIndexName)
                     if (indexMetadata.mapping()?.sourceAsMap?.get("properties") != null) {
-                        val properties = (
+                        // Deep-copy the properties map before passing it to traverseMappingsAndUpdate,
+                        // which mutates entries in-place (leaf renaming). Without the copy, the mutations
+                        // would corrupt the immutable cluster-state metadata view.
+                        val properties = deepCopyMap(
                             (indexMetadata.mapping()?.sourceAsMap?.get("properties"))
-                                as MutableMap<String, Any>
-                            )
+                                as Map<String, Any>
+                        )
                         // Node processor function is used to process leaves of index mappings tree
                         //
                         val leafNodeProcessor =
@@ -657,10 +682,12 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
             if (clusterState.routingTable.hasIndex(concreteIndexName)) {
                 val indexMetadata = clusterState.metadata.index(concreteIndexName)
                 if (indexMetadata.mapping()?.sourceAsMap?.get("properties") != null) {
-                    val properties = (
+                    // Deep-copy before traversal: traverseMappingsAndUpdate mutates the tree in-place
+                    // (leaf renaming). Without the copy, mutations corrupt cluster-state metadata.
+                    val properties = deepCopyMap(
                         (indexMetadata.mapping()?.sourceAsMap?.get("properties"))
-                            as MutableMap<String, Any>
-                        )
+                            as Map<String, Any>
+                    )
                     // Node processor function is used to process leaves of index mappings tree
                     //
                     val leafNodeProcessor =
@@ -672,10 +699,29 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     traverseMappingsAndUpdate(properties, "", leafNodeProcessor, flattenPaths)
 
                     flattenPaths.forEach {
-                        if (allFlattenPaths.containsKey(it.key) && allFlattenPaths[it.key]!! != it.value) {
-                            conflictingFields.add(it.key)
+                        // skip alias-type fields — they differ by design across indices and must not be flagged
+                        if (it.value["type"] == "alias") return@forEach
+                        if (allFlattenPaths.containsKey(it.key)) {
+                            val existing = allFlattenPaths[it.key]!!
+                            // Always treat a field-type change (e.g. text → keyword) as conflicting,
+                            // even if it is the only difference between the two property maps.
+                            // This ensures per-index suffixing kicks in before the merged putMapping
+                            // reaches OpenSearch core and is rejected with "cannot be changed from type".
+                            val existingType = existing["type"]
+                            val newType = it.value["type"]
+                            // Use null-safe inequality: a field that had no "type" in one index but
+                            // gained one in another is a structural change and should be flagged.
+                            if (existingType != newType) {
+                                conflictingFields.add(it.key)
+                            } else if (existing != it.value) {
+                                conflictingFields.add(it.key)
+                            }
                         }
                         allFlattenPaths.putIfAbsent(it.key, it.value)
+                        // Note: allFlattenPaths retains the first-seen field definition intentionally.
+                        // It serves only as a comparator for divergence detection — not as the final
+                        // merged mapping. All three conflicting-type cases (A vs B, A vs C, B vs C) are
+                        // caught because each new index is compared against the earliest-seen definition.
                     }
                 }
             }
@@ -714,6 +760,12 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         )
                     ),
                     it
+                )
+            }
+            if (!updateSettingsResponse.isAcknowledged) {
+                log.warn(
+                    "Field mapping limit settings update was not acknowledged for query index [$concreteQueryIndex]. " +
+                        "The index may still have the old limit of $queryIndexLimit."
                 )
             }
         }
