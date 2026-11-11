@@ -134,6 +134,6 @@ class SecureExcludedBackendRolesRestApiIT : AlertingRestTestCase() {
     private fun assertAllRolesRejected(write: () -> Unit) {
         val exception = expectThrows(ResponseException::class.java) { write() }
         assertEquals(400, exception.response.statusLine.statusCode)
-        assertTrue(exception.message!!.contains("would remove all backend roles"))
+        assertTrue(exception.message!!.contains("No backend roles remain after applying the configured exclusions. Contact your administrator."))
     }
 }

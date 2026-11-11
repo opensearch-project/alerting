@@ -54,7 +54,7 @@ class SecureTransportActionTests : OpenSearchTestCase() {
         val exception = expectThrows(IllegalArgumentException::class.java) {
             action.excludeBackendRoles(user, listOf("everyone"))
         }
-        assertTrue(exception.message!!.contains("would remove all backend roles"))
+        assertEquals("No backend roles remain after applying the configured exclusions. Contact your administrator.", exception.message)
         assertEquals(listOf("everyone"), user.backendRoles)
     }
 

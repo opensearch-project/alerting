@@ -69,7 +69,7 @@ interface SecureTransportAction {
         val retainedRoles = user.backendRoles.filterNot { it in excludedRoles }
         // ALL matching accepts an empty list, so removing the last role could broaden access.
         require(retainedRoles.isNotEmpty()) {
-            "plugins.alerting.excluded_backend_roles would remove all backend roles from the stored user"
+            "No backend roles remain after applying the configured exclusions. Contact your administrator."
         }
         return User(user.name, retainedRoles, user.roles, user.customAttributes)
     }
