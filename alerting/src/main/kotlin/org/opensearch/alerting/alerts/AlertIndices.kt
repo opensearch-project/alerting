@@ -48,6 +48,7 @@ import org.opensearch.alerting.util.WriteAliasRepair
 import org.opensearch.cluster.ClusterChangedEvent
 import org.opensearch.cluster.ClusterStateListener
 import org.opensearch.cluster.metadata.IndexMetadata
+import org.opensearch.cluster.service.ClusterManagerThrottlingException
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
@@ -63,6 +64,7 @@ import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
+import org.opensearch.snapshots.SnapshotInProgressException
 import org.opensearch.threadpool.Scheduler.Cancellable
 import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.client.Client
@@ -117,6 +119,39 @@ class AlertIndices(
     }
 
     companion object {
+
+        // Deleting an index fails while it is part of an in-progress snapshot. Snapshots of large clusters routinely run
+        // for several minutes, so blocked deletes are retried with exponential backoff (5, 10 and 20 minutes).
+        const val MAX_HISTORY_DELETE_RETRIES = 3
+        val HISTORY_DELETE_RETRY_BASE_DELAY: TimeValue = TimeValue.timeValueMinutes(5)
+
+        /** Exponential backoff for retrying a blocked history index delete: base delay * 2^attempt. */
+        fun historyDeleteRetryDelay(attempt: Int): TimeValue =
+            TimeValue.timeValueMillis(HISTORY_DELETE_RETRY_BASE_DELAY.millis shl attempt)
+
+        /**
+         * Returns the indices older than [retentionPeriodMillis], except the index that still holds [writeIndex]
+         * while history is enabled.
+         */
+        fun getIndicesToDelete(
+            indicesMetadata: Collection<IndexMetadata>,
+            nowMillis: Long,
+            retentionPeriodMillis: Long,
+            writeIndex: String,
+            historyEnabled: Boolean
+        ): List<String> = indicesMetadata
+            .filter { nowMillis - it.creationDate > retentionPeriodMillis }
+            .filterNot { historyEnabled && it.aliases.containsKey(writeIndex) }
+            .map { it.index.name }
+
+        /**
+         * A delete blocked by an in-progress snapshot or by cluster-manager throttling is transient and is retried
+         * later, instead of waiting a full rollover period for the next scheduled run.
+         */
+        fun isRetryableHistoryDeleteFailure(e: Exception): Boolean {
+            val cause = ExceptionsHelper.unwrapCause(e)
+            return cause is SnapshotInProgressException || cause is ClusterManagerThrottlingException
+        }
 
         /** The in progress alert history index. */
         const val ALERT_INDEX = ".opendistro-alerting-alerts"
@@ -448,13 +483,13 @@ class AlertIndices(
     private fun rolloverAndDeleteAlertHistoryIndices() {
         repairWriteAliases(ALERT_HISTORY_WRITE_INDEX)
         if (alertHistoryEnabled) rolloverAlertHistoryIndex()
-        deleteOldIndices("History", ALERT_HISTORY_ALL)
+        deleteOldIndices("History", ALERT_HISTORY_ALL, alertHistoryRetentionPeriod, ALERT_HISTORY_WRITE_INDEX, alertHistoryEnabled)
     }
 
     private fun rolloverAndDeleteFindingHistoryIndices() {
         repairWriteAliases(FINDING_HISTORY_WRITE_INDEX)
         if (findingHistoryEnabled) rolloverFindingHistoryIndex()
-        deleteOldIndices("Finding", FINDING_HISTORY_ALL)
+        deleteOldIndices("Finding", FINDING_HISTORY_ALL, findingHistoryRetentionPeriod, FINDING_HISTORY_WRITE_INDEX, findingHistoryEnabled)
     }
 
     private fun rolloverIndex(
@@ -524,7 +559,18 @@ class AlertIndices(
         )
     }
 
-    private fun deleteOldIndices(tag: String, indices: String) {
+    /**
+     * Deletes the history indices of a single history type (alerts or findings) that are older than that type's
+     * retention period. Each type is evaluated only against its own retention period and its own write alias, so an
+     * index of one type is never selected by the other type's retention.
+     */
+    private fun deleteOldIndices(
+        tag: String,
+        indices: String,
+        retentionPeriod: TimeValue,
+        writeIndex: String,
+        historyEnabled: Boolean
+    ) {
         logger.info("info deleteOldIndices")
         val clusterStateRequest = ClusterStateRequest()
             .clear()
@@ -538,7 +584,19 @@ class AlertIndices(
                 override fun onResponse(clusterStateResponse: ClusterStateResponse) {
                     if (clusterStateResponse.state.metadata.indices.isNotEmpty()) {
                         scope.launch {
-                            val indicesToDelete = getIndicesToDelete(clusterStateResponse)
+                            val indicesMetadata = clusterStateResponse.state.metadata.indices.values
+                            val indicesToDelete = getIndicesToDelete(
+                                indicesMetadata,
+                                Instant.now().toEpochMilli(),
+                                retentionPeriod.millis,
+                                writeIndex,
+                                historyEnabled
+                            )
+                            if (indicesMetadata.any { it.index.name in indicesToDelete && it.aliases.containsKey(writeIndex) }) {
+                                // The write index is being deleted because history is disabled; it is recreated on next use
+                                if (writeIndex == ALERT_HISTORY_WRITE_INDEX) alertHistoryIndexInitialized = false
+                                if (writeIndex == FINDING_HISTORY_WRITE_INDEX) findingHistoryIndexInitialized = false
+                            }
                             logger.info("Deleting old $tag indices viz $indicesToDelete")
                             if (indices == ALERT_HISTORY_ALL) {
                                 deleteAlertComments(indicesToDelete)
@@ -554,45 +612,6 @@ class AlertIndices(
                 }
             }
         )
-    }
-
-    private fun getIndicesToDelete(clusterStateResponse: ClusterStateResponse): List<String> {
-        val indicesToDelete = mutableListOf<String>()
-        for (entry in clusterStateResponse.state.metadata.indices) {
-            val indexMetaData = entry.value
-            getHistoryIndexToDelete(indexMetaData, alertHistoryRetentionPeriod.millis, ALERT_HISTORY_WRITE_INDEX, alertHistoryEnabled)
-                ?.let { indicesToDelete.add(it) }
-            getHistoryIndexToDelete(indexMetaData, findingHistoryRetentionPeriod.millis, FINDING_HISTORY_WRITE_INDEX, findingHistoryEnabled)
-                ?.let { indicesToDelete.add(it) }
-        }
-        return indicesToDelete
-    }
-
-    private fun getHistoryIndexToDelete(
-        indexMetadata: IndexMetadata,
-        retentionPeriodMillis: Long,
-        writeIndex: String,
-        historyEnabled: Boolean
-    ): String? {
-        val creationTime = indexMetadata.creationDate
-        if ((Instant.now().toEpochMilli() - creationTime) > retentionPeriodMillis) {
-            val alias = indexMetadata.aliases.entries.firstOrNull { writeIndex == it.value.alias }
-            if (alias != null) {
-                if (historyEnabled) {
-                    // If the index has the write alias and history is enabled, don't delete the index
-                    return null
-                } else if (writeIndex == ALERT_HISTORY_WRITE_INDEX) {
-                    // Otherwise reset alertHistoryIndexInitialized since index will be deleted
-                    alertHistoryIndexInitialized = false
-                } else if (writeIndex == FINDING_HISTORY_WRITE_INDEX) {
-                    // Otherwise reset findingHistoryIndexInitialized since index will be deleted
-                    findingHistoryIndexInitialized = false
-                }
-            }
-
-            return indexMetadata.index.name
-        }
-        return null
     }
 
     private fun deleteAllOldHistoryIndices(indicesToDelete: List<String>) {
@@ -620,23 +639,34 @@ class AlertIndices(
 
     private fun deleteOldHistoryIndex(indicesToDelete: List<String>) {
         for (index in indicesToDelete) {
-            val singleDeleteRequest = DeleteIndexRequest(*indicesToDelete.toTypedArray())
-            client.admin().indices().delete(
-                singleDeleteRequest,
-                object : ActionListener<AcknowledgedResponse> {
-                    override fun onResponse(acknowledgedResponse: AcknowledgedResponse?) {
-                        if (acknowledgedResponse != null) {
-                            if (!acknowledgedResponse.isAcknowledged) {
-                                logger.error("Could not delete one or more Alerting/Finding history indices: $index")
-                            }
-                        }
-                    }
-                    override fun onFailure(e: Exception) {
-                        logger.debug("Exception ${e.message} while deleting the index $index")
+            deleteSingleHistoryIndex(index, 0)
+        }
+    }
+
+    private fun deleteSingleHistoryIndex(index: String, attempt: Int) {
+        // One index per request, so that a single index that cannot be deleted does not fail the others.
+        client.admin().indices().delete(
+            DeleteIndexRequest(index),
+            object : ActionListener<AcknowledgedResponse> {
+                override fun onResponse(acknowledgedResponse: AcknowledgedResponse?) {
+                    if (acknowledgedResponse != null && !acknowledgedResponse.isAcknowledged) {
+                        logger.error("Could not delete Alerting/Finding history index: $index")
                     }
                 }
-            )
-        }
+                override fun onFailure(e: Exception) {
+                    if (isRetryableHistoryDeleteFailure(e) && attempt < MAX_HISTORY_DELETE_RETRIES) {
+                        val delay = historyDeleteRetryDelay(attempt)
+                        logger.warn(
+                            "Deleting history index [$index] was blocked by [${ExceptionsHelper.unwrapCause(e).javaClass.simpleName}], " +
+                                "retry ${attempt + 1}/$MAX_HISTORY_DELETE_RETRIES in $delay"
+                        )
+                        threadPool.schedule({ deleteSingleHistoryIndex(index, attempt + 1) }, delay, ThreadPool.Names.MANAGEMENT)
+                    } else {
+                        logger.warn("Failed to delete history index [$index] after ${attempt + 1} attempt(s)", e)
+                    }
+                }
+            }
+        )
     }
 
     private suspend fun deleteAlertComments(alertHistoryIndicesToDelete: List<String>) {
