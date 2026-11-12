@@ -232,6 +232,14 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
         )
 
+        // Transitional control for legacy stored user copies; resource sharing replaces this model.
+        val EXCLUDED_BACKEND_ROLES: Setting<List<String>> = Setting.listSetting(
+            "plugins.alerting.excluded_backend_roles",
+            emptyList(),
+            Function.identity(),
+            Setting.Property.NodeScope, Setting.Property.Dynamic, Setting.Property.Deprecated
+        )
+
         val MAX_ACTIONABLE_ALERT_COUNT = Setting.longSetting(
             "plugins.alerting.max_actionable_alert_count",
             DEFAULT_MAX_ACTIONABLE_ALERT_COUNT,

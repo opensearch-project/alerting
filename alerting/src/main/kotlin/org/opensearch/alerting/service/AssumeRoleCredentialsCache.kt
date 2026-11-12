@@ -10,6 +10,7 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.sts.StsClient
 import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider
 import software.amazon.awssdk.services.sts.model.AssumeRoleRequest
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -35,7 +36,7 @@ class AssumeRoleCredentialsCache(
                 .stsClient(stsClient)
                 .refreshRequest(
                     AssumeRoleRequest.builder()
-                        .roleArn(String.format(roleArnFormat, accountId))
+                        .roleArn(String.format(Locale.ROOT, roleArnFormat, accountId))
                         .roleSessionName("$sessionPrefix-$accountId")
                         .build()
                 )
