@@ -641,18 +641,18 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
         indexDoc(testIndex, "1", testDoc)
         indexDoc(testIndex, "5", testDoc)
         OpenSearchTestCase.waitUntil({
-            val response = client().makeRequest("HEAD", LockService.LOCK_INDEX_NAME)
+            val response = adminClient().makeRequest("HEAD", LockService.LOCK_INDEX_NAME)
             return@waitUntil (response.restStatus().status == 200)
         }, 240, TimeUnit.SECONDS)
 
-        var response = client().makeRequest("GET", LockService.LOCK_INDEX_NAME + "/_search")
+        var response = adminClient().makeRequest("GET", LockService.LOCK_INDEX_NAME + "/_search")
         var responseMap = entityAsMap(response)
         var noOfLocks = ((responseMap["hits"] as Map<String, Any>)["hits"] as List<Any>).size
         assertEquals(1, noOfLocks)
 
         deleteMonitor(monitor)
         refreshIndex(LockService.LOCK_INDEX_NAME)
-        response = client().makeRequest("GET", LockService.LOCK_INDEX_NAME + "/_search")
+        response = adminClient().makeRequest("GET", LockService.LOCK_INDEX_NAME + "/_search")
         responseMap = entityAsMap(response)
         noOfLocks = ((responseMap["hits"] as Map<String, Any>)["hits"] as List<Any>).size
         assertEquals(0, noOfLocks)
@@ -3070,7 +3070,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val currTimeStampMinusTenMinutes = System.currentTimeMillis() - 600000L
         val lock = "{\"scheduled_job_id\":\"${monitor.id}\",\"lock_time\":${currTimeStampMinusTenMinutes / 1000},\"released\":false}"
-        updateDoc(client(), LockService.LOCK_INDEX_NAME, "${monitor.id}-lock", lock)
+        updateDoc(adminClient(), LockService.LOCK_INDEX_NAME, "${monitor.id}-lock", lock)
 
         updateMonitor(monitor.copy(enabled = true), true)
 
@@ -3129,7 +3129,7 @@ class DocumentMonitorRunnerIT : AlertingRestTestCase() {
 
         val currTimeStamp = System.currentTimeMillis()
         val lock = "{\"scheduled_job_id\":\"${monitor.id}\",\"lock_time\":$currTimeStamp,\"released\":false}"
-        updateDoc(client(), LockService.LOCK_INDEX_NAME, "${monitor.id}-lock", lock)
+        updateDoc(adminClient(), LockService.LOCK_INDEX_NAME, "${monitor.id}-lock", lock)
 
         indexDoc(testIndex, "4", testDoc)
         indexDoc(testIndex, "5", testDoc)
