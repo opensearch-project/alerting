@@ -110,7 +110,7 @@ class SecureQueryAndLockIndexRestApiIT : AlertingRestTestCase() {
         val response = client.makeRequest("GET", "$index/_search", StringEntity(query, APPLICATION_JSON))
         assertEquals("Unexpected status", RestStatus.OK, response.restStatus())
         val hits = createParser(XContentType.JSON.xContent(), response.entity.content).map()["hits"] as Map<*, *>
-        val numberDocsFound = (hits["total"] as Map<*, *>)["value"] as Int
+        val numberDocsFound = ((hits["total"] as Map<*, *>)["value"] as Number).toInt()
         assertEquals("Docs found in [$index]: $numberDocsFound", expectAny, numberDocsFound > 0)
     }
 
