@@ -26,13 +26,16 @@ class AlertingPluginSystemIndicesTests : OpenSearchTestCase() {
     fun `test job lock index is a system index`() {
         assertEquals(".opensearch-alerting-config-lock", LockService.LOCK_INDEX_NAME)
         assertSingleDescriptorFor(LockService.LOCK_INDEX_NAME)
+        // the lock descriptor is an exact name, so it must not pull in names that only start with it
+        assertTrue(descriptors.none { it.matchesIndexPattern("${LockService.LOCK_INDEX_NAME}-000001") })
     }
 
     fun `test query indices that a caller names in data sources are not covered`() {
         assertTrue(descriptors.none { it.matchesIndexPattern(".opensearch-sap-windows-detectors-queries-000001") })
     }
 
-    // Core refuses to start a node whose system index patterns overlap, so this mirrors its check.
+    // Core refuses to start a node whose system index patterns overlap, so this mirrors its check. Core runs it over every
+    // plugin's patterns, so this test covers alerting's own set only; a clash with another plugin shows up at node start.
     fun `test descriptors do not overlap`() {
         descriptors.forEach { a ->
             descriptors.filter { it !== a }.forEach { b ->

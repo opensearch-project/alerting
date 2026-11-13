@@ -42,6 +42,13 @@ class SecureQueryAndLockIndexRestApiIT : AlertingRestTestCase() {
     private val role = "query_lock_all_index_role"
     private var userClient: RestClient? = null
 
+    /**
+     * A dot prefixed index that is not registered as a system index. Every assertion below compares against it, so a refusal
+     * on the two indices under test is attributable to the registration and not to the leading dot or to the user's own
+     * permissions.
+     */
+    private var controlIndex: String = ""
+
     @Before
     fun create() {
         createUser(user, arrayOf())
@@ -49,6 +56,8 @@ class SecureQueryAndLockIndexRestApiIT : AlertingRestTestCase() {
         // user out of these indices
         createCustomIndexRole(role, "*", "indices:data/write/bulk")
         createUserRolesMapping(role, arrayOf(user))
+        controlIndex = createTestConfigIndex()
+        indexDocWithAdminClient(controlIndex, "control", """{"monitor_id": "fake"}""")
         userClient = SecureRestClientBuilder(clusterHosts.toTypedArray(), isHttps(), user, password)
             .setSocketTimeout(60000)
             .build()
@@ -64,20 +73,25 @@ class SecureQueryAndLockIndexRestApiIT : AlertingRestTestCase() {
     fun `test user cannot directly search doc-level query system index`() {
         createDocLevelMonitorWithQuery()
         assertSearchHits(adminClient(), "$DOC_LEVEL_QUERIES_INDEX*", expectAny = true)
+        assertSearchHits(userClient!!, controlIndex, expectAny = true)
 
         // The security plugin leaves the system index out of the user's search, so it succeeds with no hits rather than failing
         assertSearchHits(userClient!!, "$DOC_LEVEL_QUERIES_INDEX*", expectAny = false)
+        // and the same for the index behind the alias, named outright, which is what the `*` in the registered pattern covers
+        concreteQueryIndices().forEach { assertSearchHits(userClient!!, it, expectAny = false) }
     }
 
     fun `test user cannot directly write to doc-level query system index`() {
         createDocLevelMonitorWithQuery()
 
         assertWriteForbidden(DOC_LEVEL_QUERIES_INDEX)
+        concreteQueryIndices().forEach { assertWriteForbidden(it) }
     }
 
     fun `test user cannot directly search job lock system index`() {
         createLock()
         assertSearchHits(adminClient(), LOCK_INDEX_NAME, expectAny = true)
+        assertSearchHits(userClient!!, controlIndex, expectAny = true)
 
         assertSearchHits(userClient!!, LOCK_INDEX_NAME, expectAny = false)
     }
@@ -115,10 +129,20 @@ class SecureQueryAndLockIndexRestApiIT : AlertingRestTestCase() {
         assertEquals("Docs found in [$index]: $numberDocsFound", expectAny, numberDocsFound > 0)
     }
 
+    /** The indices behind the query index alias, so a test can name the index the pattern's `*` covers. */
+    private fun concreteQueryIndices(): Set<String> {
+        val response = adminClient().makeRequest("GET", "/$DOC_LEVEL_QUERIES_INDEX*?expand_wildcards=all")
+        assertEquals("Unexpected status", RestStatus.OK, response.restStatus())
+        val indices = createParser(XContentType.JSON.xContent(), response.entity.content).use { it.map() }.keys
+        assertFalse("No index behind [$DOC_LEVEL_QUERIES_INDEX]", indices.isEmpty())
+        return indices
+    }
+
     private fun assertWriteForbidden(index: String) {
-        // control: the same user can write the same document to an ordinary index, so the 403 below comes from the system index
+        // control: the same user can write the same document to a dot prefixed index that is not registered, so the 403 below
+        // comes from the registration and not from the leading dot
         val doc = """{"monitor_id": "fake"}"""
-        val control = userClient!!.makeRequest("POST", "${createTestIndex()}/_doc", StringEntity(doc, APPLICATION_JSON))
+        val control = userClient!!.makeRequest("POST", "$controlIndex/_doc", StringEntity(doc, APPLICATION_JSON))
         assertEquals("Unexpected status", RestStatus.CREATED, control.restStatus())
 
         val e = expectThrows(ResponseException::class.java) {
