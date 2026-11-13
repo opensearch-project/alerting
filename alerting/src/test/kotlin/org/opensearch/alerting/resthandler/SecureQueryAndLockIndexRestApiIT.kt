@@ -43,8 +43,8 @@ class SecureQueryAndLockIndexRestApiIT : AlertingRestTestCase() {
     private var userClient: RestClient? = null
 
     /**
-     * A dot prefixed index that is not registered as a system index. Every assertion below compares against it, so a refusal
-     * on the two indices under test is attributable to the registration and not to the leading dot or to the user's own
+     * A dot prefixed index that is not registered as a system index. Each test reads it and writes it as the same user, so a
+     * refusal on the two indices under test comes from the registration and not from the leading dot or from the user's own
      * permissions.
      */
     private var controlIndex: String = ""
