@@ -6,6 +6,7 @@
 package org.opensearch.alerting.core.settings
 
 import org.opensearch.common.settings.Setting
+import org.opensearch.node.remotestore.RemoteStoreNodeAttribute
 
 /**
  * settings used for [ScheduledJob]'s. These include back off settings, retry counts, timeouts etc...
@@ -16,6 +17,26 @@ class ScheduledJobSettings {
         val SWEEPER_ENABLED = Setting.boolSetting(
             "plugins.scheduled_jobs.enabled",
             LegacyOpenDistroScheduledJobSettings.SWEEPER_ENABLED,
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
+        /**
+         * When enabled, the full sweep deschedules in-memory jobs whose backing document no longer exists in the
+         * scheduled jobs index, confirmed with a realtime GET against the primary shard.
+         *
+         * This repairs jobs orphaned because the delete of their document was never observed on this node. On a
+         * remote-store enabled scheduled jobs index the replica copy does not execute delete operations, so
+         * [JobSweeper.postDelete] never fires on a node that owns a job but holds the replica copy, and the job keeps
+         * running from memory with no document behind it. The sweep only ever visited documents that still exist, so
+         * it could not repair this.
+         *
+         * Unless set explicitly, the default follows the node's remote store configuration: enabled on nodes carrying
+         * a remote segment or translog repository attribute, where the listener gap exists, and disabled elsewhere.
+         * An explicit value, including a dynamic cluster settings update, always takes precedence.
+         */
+        val SWEEP_ORPHAN_RECONCILIATION_ENABLED = Setting.boolSetting(
+            "plugins.scheduled_jobs.sweeper.orphan_reconciliation.enabled",
+            { settings -> RemoteStoreNodeAttribute.isRemoteDataAttributePresent(settings).toString() },
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
         val REQUEST_TIMEOUT = Setting.positiveTimeSetting(
