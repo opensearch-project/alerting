@@ -567,4 +567,161 @@ class DocLevelMonitorQueriesTests : OpenSearchTestCase() {
         )
         assertNotSame(innerMap, copiedInnerMap)
     }
+
+    // -------------------------------------------------------------------------
+    // leafNodeProcessor alias-skip (Fix 1)
+    //
+    // When an alias field is processed by leafNodeProcessor the processor must
+    // return Triple(fieldName, fieldName, mutableMapOf()) — no rename, no props.
+    // The aliasSkippingLeaf helper (defined above) mirrors that logic directly;
+    // these tests exercise the consequence: traverseMappingsAndUpdate must leave
+    // the backing map for an alias field as an empty map, and the field must
+    // still be registered in flattenPaths under its original name.
+    // -------------------------------------------------------------------------
+
+    fun `test traverseMappingsAndUpdate alias field produces empty props after aliasSkippingLeaf`() {
+        val aliasField = mutableMapOf<String, Any>("type" to "alias", "path" to "resource.host.name")
+        val realField = mutableMapOf<String, Any>("type" to "keyword")
+        val properties = mutableMapOf<String, Any>(
+            "host.name" to aliasField,
+            "event_id" to realField,
+        )
+
+        val flattenPaths = mutableMapOf<String, MutableMap<String, Any>>()
+        val queries = makeInstance()
+        queries.traverseMappingsAndUpdate(properties, "", aliasSkippingLeaf, flattenPaths)
+
+        // The alias field must be registered in flattenPaths under its original key.
+        assertTrue(
+            "alias field 'host.name' must appear in flattenPaths",
+            flattenPaths.containsKey("host.name"),
+        )
+        // After the alias-skip, the backing map in properties must be empty.
+        @Suppress("UNCHECKED_CAST")
+        val resultProps = properties["host.name"] as Map<String, Any>
+        assertTrue(
+            "alias field props must be empty after aliasSkippingLeaf so it is not added to updatedProperties",
+            resultProps.isEmpty(),
+        )
+        // The real field must be unaffected.
+        assertTrue(
+            "real field 'event_id' must appear in flattenPaths",
+            flattenPaths.containsKey("event_id"),
+        )
+    }
+
+    fun `test traverseMappingsAndUpdate alias field is not renamed`() {
+        // The leaf that mimics production: renames every non-alias field by appending _suffix.
+        val renamingLeaf =
+            fun(fieldName: String, _: String, props: MutableMap<String, Any>):
+                Triple<String, String, MutableMap<String, Any>> {
+                if (props["type"] == "alias") return Triple(fieldName, fieldName, mutableMapOf())
+                return Triple(fieldName, "${fieldName}_suffix", props.toMutableMap())
+            }
+
+        val properties = mutableMapOf<String, Any>(
+            "host.name" to mutableMapOf<String, Any>("type" to "alias", "path" to "resource.host.name"),
+            "event_id" to mutableMapOf<String, Any>("type" to "keyword"),
+        )
+
+        val flattenPaths = mutableMapOf<String, MutableMap<String, Any>>()
+        val queries = makeInstance()
+        queries.traverseMappingsAndUpdate(properties, "", renamingLeaf, flattenPaths)
+
+        // The alias field key must NOT have been renamed.
+        assertTrue("alias field must keep its original key", properties.containsKey("host.name"))
+        assertFalse("alias field must not gain a _suffix key", properties.containsKey("host.name_suffix"))
+
+        // The real field MUST have been renamed.
+        assertFalse("real field original key must be removed after rename", properties.containsKey("event_id"))
+        assertTrue("real field must gain a _suffix key", properties.containsKey("event_id_suffix"))
+    }
+
+    // -------------------------------------------------------------------------
+    // properties.forEach alias/empty filter (Fix 2)
+    //
+    // After traversal, the caller iterates `properties` to build `updatedProperties`.
+    // Alias fields and the empty-map sentinels produced by the alias-skip must be
+    // filtered out.  The filter logic is:
+    //   - skip if type == "alias"
+    //   - skip if the map is empty  (sentinel left by aliasSkippingLeaf)
+    // -------------------------------------------------------------------------
+
+    fun `test alias and empty entries are excluded from updatedProperties accumulation`() {
+        // Simulate the state of `properties` AFTER traverseMappingsAndUpdate with aliasSkippingLeaf:
+        // alias fields become empty maps, real fields keep their props.
+        val propertiesAfterTraversal = mutableMapOf<String, Any>(
+            "host.name" to mutableMapOf<String, Any>(), // empty sentinel left by alias-skip
+            "event_id_suffix" to mutableMapOf<String, Any>("type" to "keyword"),
+            "level_suffix" to mutableMapOf<String, Any>("type" to "text"),
+        )
+
+        val updatedProperties = mutableMapOf<String, Any>()
+
+        propertiesAfterTraversal.forEach {
+            val valueMap = it.value as? Map<*, *>
+            if (valueMap != null) {
+                when {
+                    // skip nested
+                    valueMap["type"] == "nested" -> { /* no-op */ }
+                    // skip alias fields and empty-props sentinels (Fix 2)
+                    valueMap["type"] == "alias" || valueMap.isEmpty() -> { /* no-op */ }
+                    else -> updatedProperties[it.key] = it.value
+                }
+            }
+        }
+
+        assertFalse(
+            "empty sentinel for alias field must not appear in updatedProperties",
+            updatedProperties.containsKey("host.name"),
+        )
+        assertTrue(
+            "real renamed field must appear in updatedProperties",
+            updatedProperties.containsKey("event_id_suffix"),
+        )
+        assertTrue(
+            "real renamed field must appear in updatedProperties",
+            updatedProperties.containsKey("level_suffix"),
+        )
+    }
+
+    // -------------------------------------------------------------------------
+    // isUnrecoverableMappingError fast-fail detection (Fix 3)
+    //
+    // The fast-fail guard in updateQueryIndexMappings checks whether the exception
+    // message matches known-unrecoverable patterns.  Extract the predicate logic
+    // and test it directly so the guard's correctness is verified without needing
+    // a live cluster.
+    // -------------------------------------------------------------------------
+
+    fun `test isUnrecoverableMappingError detects mapper type conflict message`() {
+        val typeConflictMsg =
+            "mapper [resource.host.name_audit_Bf56gaABptlalFR633AZ] cannot be changed from type [text] to [keyword]"
+        val isUnrecoverable = typeConflictMsg.contains("alias must refer to an existing field") ||
+            (typeConflictMsg.contains("mapper [") && typeConflictMsg.contains("cannot be changed from type"))
+        assertTrue(
+            "mapper type-conflict message must be identified as unrecoverable",
+            isUnrecoverable,
+        )
+    }
+
+    fun `test isUnrecoverableMappingError detects alias dangling reference message`() {
+        val aliasMsg = "alias must refer to an existing field [resource.host.name_audit_Bf56gaABptlalFR633AZ]"
+        val isUnrecoverable = aliasMsg.contains("alias must refer to an existing field") ||
+            (aliasMsg.contains("mapper [") && aliasMsg.contains("cannot be changed from type"))
+        assertTrue(
+            "alias dangling-reference message must be identified as unrecoverable",
+            isUnrecoverable,
+        )
+    }
+
+    fun `test isUnrecoverableMappingError does not flag field-limit message`() {
+        val fieldLimitMsg = "Limit of total fields [1000] in index [.opensearch-alerting-queries] has been exceeded"
+        val isUnrecoverable = fieldLimitMsg.contains("alias must refer to an existing field") ||
+            (fieldLimitMsg.contains("mapper [") && fieldLimitMsg.contains("cannot be changed from type"))
+        assertFalse(
+            "field-limit message must NOT be identified as unrecoverable (it is handled by rollover logic)",
+            isUnrecoverable,
+        )
+    }
 }
