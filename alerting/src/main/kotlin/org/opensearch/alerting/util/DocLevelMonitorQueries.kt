@@ -288,7 +288,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         monitorId: String,
         monitorMetadata: MonitorMetadata,
         refreshPolicy: RefreshPolicy = RefreshPolicy.IMMEDIATE,
-        indexTimeout: TimeValue
+        indexTimeout: TimeValue,
+        isRetry: Boolean = false
     ) {
         val docLevelMonitorInput = monitor.inputs[0] as DocLevelMonitorInput
         val queries: List<DocLevelQuery> = docLevelMonitorInput.queries
@@ -326,40 +327,13 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                             (indexMetadata.mapping()?.sourceAsMap?.get("properties"))
                                 as Map<String, Any>
                         )
-                        // Node processor function is used to process leaves of index mappings tree
-                        //
-                        val leafNodeProcessor =
-                            fun(fieldName: String, fullPath: String, props: MutableMap<String, Any>):
-                                Triple<String, String, MutableMap<String, Any>> {
-                                // Alias fields (type: alias) must not be renamed: the path they point to
-                                // will be renamed separately by the leaf processor for the target field.
-                                // Renaming an alias field itself (or its path) produces a dangling reference
-                                // that causes "alias must refer to an existing field" on putMapping.
-                                if (props["type"] == "alias") {
-                                    return Triple(fieldName, fieldName, mutableMapOf())
-                                }
-                                val newProps = props.toMutableMap()
-                                if (monitor.dataSources.queryIndexMappingsByType.isNotEmpty()) {
-                                    val mappingsByType = monitor.dataSources.queryIndexMappingsByType
-                                    if (props.containsKey("type") && mappingsByType.containsKey(props["type"]!!)) {
-                                        mappingsByType[props["type"]]?.entries?.forEach { iter: Map.Entry<String, String> ->
-                                            newProps[iter.key] = iter.value
-                                        }
-                                    }
-                                }
-
-                                return if (conflictingFields.contains(fullPath)) {
-                                    if (props.containsKey("path")) {
-                                        newProps["path"] = "${props["path"]}_${concreteIndexName}_$monitorId"
-                                    }
-                                    Triple(fieldName, "${fieldName}_${concreteIndexName}_$monitorId", newProps)
-                                } else {
-                                    if (props.containsKey("path")) {
-                                        newProps["path"] = "${props["path"]}_${updatedIndexName}_$monitorId"
-                                    }
-                                    Triple(fieldName, "${fieldName}_${updatedIndexName}_$monitorId", newProps)
-                                }
-                            }
+                        val leafNodeProcessor = buildLeafNodeProcessor(
+                            monitorId = monitorId,
+                            concreteIndexName = concreteIndexName,
+                            updatedIndexName = updatedIndexName,
+                            conflictingFields = conflictingFields,
+                            queryIndexMappingsByType = monitor.dataSources.queryIndexMappingsByType
+                        )
                         // Traverse and update index mappings here while extracting flatten field paths
                         val flattenPaths = mutableMapOf<String, MutableMap<String, Any>>()
                         traverseMappingsAndUpdate(properties, "", leafNodeProcessor, flattenPaths)
@@ -372,17 +346,6 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                                 (it.value as Map<String, Any>)["type"] == NESTED
                             ) {
                                 // skip nested — handled by traverseMappingsAndUpdate
-                            } else if (
-                                it.value is Map<*, *> &&
-                                (
-                                    (it.value as Map<String, Any>)["type"] == "alias" ||
-                                        (it.value as Map<String, Any>).isEmpty()
-                                    )
-                            ) {
-                                // skip alias fields and empty-props entries produced by the alias-skip
-                                // in leafNodeProcessor — they must not be added to updatedProperties
-                                // because putMapping would try to create an alias pointing at a
-                                // non-existent field and reject with "alias must refer to an existing field"
                             } else {
                                 if (updatedProperties.containsKey(it.key) && updatedProperties[it.key] != it.value) {
                                     val mergedField = mergeConflictingFields(
@@ -406,7 +369,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                 updatedIndexName,
                 sourceIndexFieldLimit,
                 updatedProperties,
-                indexTimeout
+                indexTimeout,
+                refreshPolicy,
+                isRetry
             )
 
             if (updateMappingResponse.isAcknowledged) {
@@ -421,6 +386,42 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     indexTimeout
                 )
             }
+        }
+    }
+
+    /**
+     * Builds the leaf-node renaming processor for [traverseMappingsAndUpdate], suffixing conflicting
+     * field names and alias target paths with [concreteIndexName] and non-conflicting ones with
+     * [updatedIndexName].
+     */
+    fun buildLeafNodeProcessor(
+        monitorId: String,
+        concreteIndexName: String,
+        updatedIndexName: String,
+        conflictingFields: Set<String>,
+        queryIndexMappingsByType: Map<String, Map<String, String>> = emptyMap()
+    ): (String, String, MutableMap<String, Any>) -> Triple<String, String, MutableMap<String, Any>> {
+        return fun(
+            fieldName: String,
+            fullPath: String,
+            props: MutableMap<String, Any>
+        ): Triple<String, String, MutableMap<String, Any>> {
+            val newProps = props.toMutableMap()
+            val fieldType = props["type"] as? String
+            if (queryIndexMappingsByType.isNotEmpty() && fieldType != null && queryIndexMappingsByType.containsKey(fieldType)) {
+                queryIndexMappingsByType[fieldType]?.entries?.forEach { iter: Map.Entry<String, String> ->
+                    newProps[iter.key] = iter.value
+                }
+            }
+            val fieldSuffix = if (conflictingFields.contains(fullPath)) concreteIndexName else updatedIndexName
+            if (props.containsKey("path")) {
+                val targetPath = props["path"] as? String
+                if (targetPath != null) {
+                    val targetSuffix = if (conflictingFields.contains(targetPath)) concreteIndexName else updatedIndexName
+                    newProps["path"] = "${targetPath}_${targetSuffix}_$monitorId"
+                }
+            }
+            return Triple(fieldName, "${fieldName}_${fieldSuffix}_$monitorId", newProps)
         }
     }
 
@@ -536,7 +537,9 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
         sourceIndex: String,
         sourceIndexFieldLimit: Long,
         updatedProperties: MutableMap<String, Any>,
-        indexTimeout: TimeValue
+        indexTimeout: TimeValue,
+        refreshPolicy: RefreshPolicy = RefreshPolicy.IMMEDIATE,
+        isRetry: Boolean = false
     ): Pair<AcknowledgedResponse, String> {
         var targetQueryIndex = monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id]
         if (targetQueryIndex != null && !clusterService.state().metadata.hasIndex(targetQueryIndex)) {
@@ -612,25 +615,8 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                     }
                 }
             } else {
-                // Some mapping errors are unrecoverable and retrying (or deleting and recreating
-                // the query index) will not help.  Fast-fail so the caller gets a clear error
-                // rather than a misleading 500 after a silent retry.
-                //   • "alias must refer to an existing field"  — alias path dangling reference
-                //   • "mapper [X] cannot be changed from type [A] to [B]" — type conflict that
-                //     escaped conflict-detection (e.g. alias-field residue in updatedProperties)
-                val isUnrecoverableMappingError = unwrappedException.message?.let {
-                    it.contains("alias must refer to an existing field") ||
-                        (it.contains("mapper [") && it.contains("cannot be changed from type"))
-                } ?: false
-                if (isUnrecoverableMappingError) {
-                    log.error(
-                        "Unrecoverable mapping error on queryIndex $targetQueryIndex — " +
-                            "retry will not help: ${unwrappedException.message}"
-                    )
-                    throw AlertingException.wrap(unwrappedException)
-                }
-                // retry with deleting query index
-                if (monitor.deleteQueryIndexInEveryRun == true) {
+                // retry with deleting query index (bounded to a single retry)
+                if (monitor.deleteQueryIndexInEveryRun == true && !isRetry) {
                     try {
                         log.error(
                             "unknown exception during PUT mapping on queryIndex: $targetQueryIndex, " +
@@ -650,9 +636,14 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                         indexDocLevelQueries(
                             monitor = monitor,
                             monitorId = monitor.id,
-                            monitorMetadata,
-                            indexTimeout = indexTimeout
+                            monitorMetadata = monitorMetadata,
+                            refreshPolicy = refreshPolicy,
+                            indexTimeout = indexTimeout,
+                            isRetry = true
                         )
+                        val retriedQueryIndex =
+                            monitorMetadata.sourceToQueryIndexMapping[sourceIndex + monitor.id] ?: targetQueryIndex
+                        return Pair(AcknowledgedResponse(false), retriedQueryIndex)
                     } catch (e: Exception) {
                         log.error(
                             "Doc level monitor ${monitor.id}: unknown exception during " +
@@ -668,7 +659,6 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
                             "PUT mapping on queryIndex: $targetQueryIndex",
                         e
                     )
-                    val unwrappedException = ExceptionsHelper.unwrapCause(e) as Exception
                     throw AlertingException.wrap(unwrappedException)
                 }
             }
@@ -714,55 +704,59 @@ class DocLevelMonitorQueries(private val client: Client, private val clusterServ
     /**
      * get all fields which have same name but different mappings belonging to an index pattern
      */
+    @Suppress("UNCHECKED_CAST")
     fun getAllConflictingFields(clusterState: ClusterState, concreteIndices: List<String>): Set<String> {
-        val conflictingFields = mutableSetOf<String>()
-        val allFlattenPaths = mutableMapOf<String, MutableMap<String, Any>>()
+        val indexPropertiesList = mutableListOf<Map<String, Any>>()
         concreteIndices.forEach { concreteIndexName ->
             if (clusterState.routingTable.hasIndex(concreteIndexName)) {
                 val indexMetadata = clusterState.metadata.index(concreteIndexName)
-                if (indexMetadata.mapping()?.sourceAsMap?.get("properties") != null) {
-                    // Deep-copy before traversal: traverseMappingsAndUpdate mutates the tree in-place
-                    // (leaf renaming). Without the copy, mutations corrupt cluster-state metadata.
-                    val properties = deepCopyMap(
-                        (indexMetadata.mapping()?.sourceAsMap?.get("properties"))
-                            as Map<String, Any>
-                    )
-                    // Node processor function is used to process leaves of index mappings tree
-                    //
-                    val leafNodeProcessor =
-                        fun(fieldName: String, _: String, props: MutableMap<String, Any>): Triple<String, String, MutableMap<String, Any>> {
-                            return Triple(fieldName, fieldName, props)
-                        }
-                    // Traverse and update index mappings here while extracting flatten field paths
-                    val flattenPaths = mutableMapOf<String, MutableMap<String, Any>>()
-                    traverseMappingsAndUpdate(properties, "", leafNodeProcessor, flattenPaths)
+                val properties = indexMetadata.mapping()?.sourceAsMap?.get("properties")
+                if (properties is Map<*, *>) {
+                    indexPropertiesList.add(properties as Map<String, Any>)
+                }
+            }
+        }
+        return findConflictingFields(indexPropertiesList)
+    }
 
-                    flattenPaths.forEach {
-                        // skip alias-type fields — they differ by design across indices and must not be flagged
-                        if (it.value["type"] == "alias") return@forEach
-                        if (allFlattenPaths.containsKey(it.key)) {
-                            val existing = allFlattenPaths[it.key]!!
-                            // Always treat a field-type change (e.g. text → keyword) as conflicting,
-                            // even if it is the only difference between the two property maps.
-                            // This ensures per-index suffixing kicks in before the merged putMapping
-                            // reaches OpenSearch core and is rejected with "cannot be changed from type".
-                            val existingType = existing["type"]
-                            val newType = it.value["type"]
-                            // Use null-safe inequality: a field that had no "type" in one index but
-                            // gained one in another is a structural change and should be flagged.
-                            if (existingType != newType) {
-                                conflictingFields.add(it.key)
-                            } else if (existing != it.value) {
-                                conflictingFields.add(it.key)
-                            }
-                        }
-                        allFlattenPaths.putIfAbsent(it.key, it.value)
-                        // Note: allFlattenPaths retains the first-seen field definition intentionally.
-                        // It serves only as a comparator for divergence detection — not as the final
-                        // merged mapping. All three conflicting-type cases (A vs B, A vs C, B vs C) are
-                        // caught because each new index is compared against the earliest-seen definition.
+    /**
+     * Finds all field paths whose mappings differ across [indexPropertiesList], including alias
+     * definitions whose target path changed and aliases whose target field is itself conflicting.
+     */
+    fun findConflictingFields(indexPropertiesList: List<Map<String, Any>>): Set<String> {
+        val conflictingFields = mutableSetOf<String>()
+        val allFlattenPaths = mutableMapOf<String, MutableMap<String, Any>>()
+        val aliasToTargetPaths = mutableMapOf<String, MutableSet<String>>()
+        val leafNodeProcessor =
+            fun(fieldName: String, _: String, props: MutableMap<String, Any>): Triple<String, String, MutableMap<String, Any>> {
+                return Triple(fieldName, fieldName, props)
+            }
+
+        indexPropertiesList.forEach { rawProperties ->
+            // Deep-copy before traversal: traverseMappingsAndUpdate mutates the tree in-place
+            // (leaf renaming). Without the copy, mutations corrupt cluster-state metadata.
+            val properties = deepCopyMap(rawProperties)
+            val flattenPaths = mutableMapOf<String, MutableMap<String, Any>>()
+            traverseMappingsAndUpdate(properties, "", leafNodeProcessor, flattenPaths)
+
+            flattenPaths.forEach {
+                if (it.value["type"] == "alias") {
+                    val targetPath = it.value["path"] as? String
+                    if (targetPath != null) {
+                        aliasToTargetPaths.getOrPut(it.key) { mutableSetOf() }.add(targetPath)
                     }
                 }
+                val existing = allFlattenPaths[it.key]
+                if (existing != null && existing != it.value) {
+                    conflictingFields.add(it.key)
+                }
+                allFlattenPaths.putIfAbsent(it.key, it.value)
+            }
+        }
+
+        aliasToTargetPaths.forEach { (aliasField, targetPaths) ->
+            if (targetPaths.any { conflictingFields.contains(it) }) {
+                conflictingFields.add(aliasField)
             }
         }
         return conflictingFields
