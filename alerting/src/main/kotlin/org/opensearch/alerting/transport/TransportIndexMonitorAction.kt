@@ -910,15 +910,17 @@ class TransportIndexMonitorAction @Inject constructor(
                 )
                 log.debug("Created monitor's backend roles: $rbacRoles")
             }
-            // The creator in ui_metadata is server-owned: always derive it from the authenticated caller.
+            // The creator is server-owned: always derive it from the authenticated caller and ignore any client value.
             if (user?.name == null) {
                 log.debug(
-                    "No authenticated user in the thread context, so no " +
-                        "${Monitor.UI_METADATA_FIELD}.$UI_METADATA_CREATED_BY_KEY is recorded " +
+                    "No authenticated user in the thread context, so no creator is recorded " +
                         "for monitor ${request.monitor.name}"
                 )
             }
-            request.monitor = request.monitor.copy(uiMetadata = request.monitor.uiMetadataWithCreatedBy(user?.name))
+            request.monitor = request.monitor.copy(
+                createdBy = user?.name,
+                uiMetadata = request.monitor.uiMetadataWithCreatedBy(user?.name)
+            )
 
             log.info("Creating new monitor: ${request.monitor.name}, type: ${request.monitor.monitorType}")
 
@@ -1139,9 +1141,10 @@ class TransportIndexMonitorAction @Inject constructor(
                 log.debug("Update monitor backend roles to: ${request.monitor.user?.backendRoles}")
             }
 
-            // The creator never changes after creation: keep the stored value, whatever the request's ui_metadata holds.
+            // The creator never changes after creation: keep the stored values, whatever the update request holds.
             request.monitor = request.monitor.copy(
                 schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion,
+                createdBy = currentMonitor.createdBy,
                 uiMetadata = request.monitor.uiMetadataWithCreatedBy(storedCreatedBy(currentMonitor))
             )
 
