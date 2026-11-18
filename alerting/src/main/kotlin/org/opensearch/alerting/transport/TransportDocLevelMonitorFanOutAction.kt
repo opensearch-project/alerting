@@ -266,6 +266,17 @@ class TransportDocLevelMonitorFanOutAction
                     )
                 }
             }
+            // Native queries may target multifields, which have no independent _source value.
+            // Fetching their values as dotted keys changes the percolator document's shape.
+            val sourceMapping = clusterService.state().metadata.index(indexExecutionContext!!.concreteIndexName)
+                ?.mapping()?.sourceAsMap
+            val sourceParents = sourceMapping?.let { org.opensearch.alerting.util.DocLevelMonitorQueries.sourceFieldParents(it) }
+                ?: emptyMap()
+            if (queries.any { it.query.trimStart().startsWith("{") } ||
+                fieldsToBeQueried.any { sourceParents[it] != null && sourceParents[it] != it }
+            ) {
+                fieldsToBeQueried.clear()
+            }
 
             fetchShardDataAndMaybeExecutePercolateQueries(
                 monitor,
@@ -962,11 +973,15 @@ class TransportDocLevelMonitorFanOutAction
             )
 
             percolateQueryResponseHits.forEach { hit ->
+                val nativeConcreteIndex = org.opensearch.alerting.util.DocLevelMonitorQueries.nativeQueryConcreteIndex(
+                    hit.id, monitor.id, (monitor.inputs[0] as DocLevelMonitorInput).queries, concreteIndices
+                )
                 var id = hit.id
                 concreteIndices.forEach { id = id.replace("_${it}_${monitor.id}", "") }
                 monitorInputIndices.forEach { id = id.replace("_${it}_${monitor.id}", "") }
                 val docIndices = hit.field("_percolator_document_slot").values.map { it.toString().toInt() }
                 docIndices.forEach { idx ->
+                    if (nativeConcreteIndex != null && transformedDocs[idx].second.concreteIndexName != nativeConcreteIndex) return@forEach
                     val docIndex = "${transformedDocs[idx].first}|${transformedDocs[idx].second.concreteIndexName}"
                     inputRunResults.getOrPut(id) { mutableSetOf() }.add(docIndex)
                     docsToQueries.getOrPut(docIndex) { mutableListOf() }.add(id)
