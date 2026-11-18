@@ -62,6 +62,7 @@ import org.opensearch.core.action.ActionListener
 import org.opensearch.core.xcontent.NamedXContentRegistry
 import org.opensearch.core.xcontent.XContentParser
 import org.opensearch.core.xcontent.XContentParserUtils
+import org.opensearch.index.IndexNotFoundException
 import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.snapshots.SnapshotInProgressException
@@ -629,7 +630,10 @@ class AlertIndices(
                         }
                     }
                     override fun onFailure(e: Exception) {
-                        logger.error("Delete for Alerting/Finding History Indices $indicesToDelete Failed. Retrying one By one.")
+                        logger.warn(
+                            "Deleting history indices $indicesToDelete failed with " +
+                                "[${ExceptionsHelper.unwrapCause(e).javaClass.simpleName}], retrying one by one"
+                        )
                         deleteOldHistoryIndex(indicesToDelete)
                     }
                 }
@@ -637,7 +641,7 @@ class AlertIndices(
         }
     }
 
-    private fun deleteOldHistoryIndex(indicesToDelete: List<String>) {
+    internal fun deleteOldHistoryIndex(indicesToDelete: List<String>) {
         for (index in indicesToDelete) {
             deleteSingleHistoryIndex(index, 0)
         }
@@ -654,7 +658,10 @@ class AlertIndices(
                     }
                 }
                 override fun onFailure(e: Exception) {
-                    if (isRetryableHistoryDeleteFailure(e) && attempt < MAX_HISTORY_DELETE_RETRIES) {
+                    if (ExceptionsHelper.unwrapCause(e) is IndexNotFoundException) {
+                        // Already deleted, e.g. by the run of a newly elected cluster manager while this retry was pending
+                        logger.debug("History index [$index] was already deleted")
+                    } else if (isRetryableHistoryDeleteFailure(e) && attempt < MAX_HISTORY_DELETE_RETRIES) {
                         val delay = historyDeleteRetryDelay(attempt)
                         logger.warn(
                             "Deleting history index [$index] was blocked by [${ExceptionsHelper.unwrapCause(e).javaClass.simpleName}], " +

@@ -5,17 +5,34 @@
 
 package org.opensearch.alerting.alerts
 
+import org.mockito.Mockito
+import org.mockito.Mockito.any
+import org.mockito.Mockito.anyString
+import org.mockito.Mockito.doAnswer
 import org.opensearch.Version
+import org.opensearch.action.admin.indices.delete.DeleteIndexRequest
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse
+import org.opensearch.alerting.alertingPluginSettings
 import org.opensearch.alerting.alerts.AlertIndices.Companion.ALERT_HISTORY_WRITE_INDEX
 import org.opensearch.alerting.alerts.AlertIndices.Companion.FINDING_HISTORY_WRITE_INDEX
 import org.opensearch.cluster.metadata.AliasMetadata
 import org.opensearch.cluster.metadata.IndexMetadata
+import org.opensearch.cluster.node.DiscoveryNode
 import org.opensearch.cluster.service.ClusterManagerThrottlingException
+import org.opensearch.common.settings.ClusterSettings
+import org.opensearch.common.settings.Setting
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.unit.TimeValue
+import org.opensearch.core.action.ActionListener
+import org.opensearch.index.IndexNotFoundException
 import org.opensearch.snapshots.SnapshotInProgressException
+import org.opensearch.test.ClusterServiceUtils
 import org.opensearch.test.OpenSearchTestCase
+import org.opensearch.threadpool.ThreadPool
 import org.opensearch.transport.RemoteTransportException
+import org.opensearch.transport.client.AdminClient
+import org.opensearch.transport.client.Client
+import org.opensearch.transport.client.IndicesAdminClient
 import java.util.concurrent.TimeUnit
 
 class AlertIndicesHistoryRetentionTests : OpenSearchTestCase() {
@@ -78,7 +95,7 @@ class AlertIndicesHistoryRetentionTests : OpenSearchTestCase() {
     }
 
     fun `test snapshot and throttling failures are retryable`() {
-        assertTrue(AlertIndices.isRetryableHistoryDeleteFailure(SnapshotInProgressException("Cannot delete indices that are being snapshotted")))
+        assertTrue(AlertIndices.isRetryableHistoryDeleteFailure(SnapshotInProgressException("being snapshotted")))
         assertTrue(
             AlertIndices.isRetryableHistoryDeleteFailure(
                 RemoteTransportException("wrapped", SnapshotInProgressException("being snapshotted"))
@@ -96,6 +113,93 @@ class AlertIndicesHistoryRetentionTests : OpenSearchTestCase() {
         assertEquals(TimeValue.timeValueMinutes(5), AlertIndices.historyDeleteRetryDelay(0))
         assertEquals(TimeValue.timeValueMinutes(10), AlertIndices.historyDeleteRetryDelay(1))
         assertEquals(TimeValue.timeValueMinutes(20), AlertIndices.historyDeleteRetryDelay(2))
+    }
+
+    fun `test retry path sends one index per delete request`() {
+        val harness = DeleteHarness()
+
+        harness.alertIndices.deleteOldHistoryIndex(listOf("history-1", "history-2"))
+
+        assertEquals(listOf(listOf("history-1"), listOf("history-2")), harness.requests.map { it.indices().toList() })
+    }
+
+    fun `test snapshot failure is retried with exponential backoff until retries are exhausted`() {
+        val harness = DeleteHarness()
+        harness.alertIndices.deleteOldHistoryIndex(listOf("history-1"))
+
+        // The initial attempt and every retry are blocked by a snapshot; each scheduled retry is run immediately
+        repeat(AlertIndices.MAX_HISTORY_DELETE_RETRIES + 1) { attempt ->
+            harness.listeners[attempt].onFailure(SnapshotInProgressException("Cannot delete indices that are being snapshotted"))
+            harness.retries.getOrNull(attempt)?.run()
+        }
+
+        assertEquals(
+            List(AlertIndices.MAX_HISTORY_DELETE_RETRIES + 1) { listOf("history-1") },
+            harness.requests.map { it.indices().toList() }
+        )
+        // The failure after the last retry is not rescheduled
+        assertEquals(
+            listOf(TimeValue.timeValueMinutes(5), TimeValue.timeValueMinutes(10), TimeValue.timeValueMinutes(20)),
+            harness.retryDelays
+        )
+    }
+
+    fun `test non retryable failure is not retried`() {
+        val harness = DeleteHarness()
+        harness.alertIndices.deleteOldHistoryIndex(listOf("history-1"))
+
+        harness.listeners.single().onFailure(IllegalArgumentException("bad request"))
+
+        assertTrue(harness.retries.isEmpty())
+    }
+
+    fun `test index already deleted is not retried`() {
+        val harness = DeleteHarness()
+        harness.alertIndices.deleteOldHistoryIndex(listOf("history-1"))
+
+        harness.listeners.single().onFailure(IndexNotFoundException("history-1"))
+
+        assertTrue(harness.retries.isEmpty())
+    }
+
+    /** An [AlertIndices] whose delete requests and scheduled retries are recorded instead of executed. */
+    private inner class DeleteHarness {
+        val requests = mutableListOf<DeleteIndexRequest>()
+        val listeners = mutableListOf<ActionListener<AcknowledgedResponse>>()
+        val retries = mutableListOf<Runnable>()
+        val retryDelays = mutableListOf<TimeValue>()
+        val alertIndices: AlertIndices
+
+        init {
+            val indicesClient = Mockito.mock(IndicesAdminClient::class.java)
+            val adminClient = Mockito.mock(AdminClient::class.java)
+            val client = Mockito.mock(Client::class.java)
+            Mockito.`when`(client.admin()).thenReturn(adminClient)
+            Mockito.`when`(adminClient.indices()).thenReturn(indicesClient)
+            doAnswer {
+                requests.add(it.getArgument(0))
+                listeners.add(it.getArgument(1))
+                null
+            }.`when`(indicesClient).delete(any(DeleteIndexRequest::class.java), any())
+
+            val threadPool = Mockito.mock(ThreadPool::class.java)
+            doAnswer {
+                assertEquals(ThreadPool.Names.MANAGEMENT, it.getArgument<String>(2))
+                retries.add(it.getArgument(0))
+                retryDelays.add(it.getArgument(1))
+                null
+            }.`when`(threadPool).schedule(any(Runnable::class.java), any(TimeValue::class.java), anyString())
+
+            val settingSet = hashSetOf<Setting<*>>()
+            settingSet.addAll(ClusterSettings.BUILT_IN_CLUSTER_SETTINGS)
+            settingSet.addAll(alertingPluginSettings())
+            val clusterService = ClusterServiceUtils.createClusterService(
+                threadPool,
+                DiscoveryNode("node", buildNewFakeTransportAddress(), Version.CURRENT),
+                ClusterSettings(Settings.EMPTY, settingSet)
+            )
+            alertIndices = AlertIndices(Settings.EMPTY, client, threadPool, clusterService)
+        }
     }
 
     private fun index(name: String, ageDays: Int, alias: String?): IndexMetadata {
