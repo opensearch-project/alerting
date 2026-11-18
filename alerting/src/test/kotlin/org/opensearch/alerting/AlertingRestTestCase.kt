@@ -717,6 +717,16 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
         return getWorkflow(workflowId = workflow.id)
     }
 
+    /**
+     * The user [client] authenticates as on a secured cluster. `adminClient()` uses the super-admin
+     * certificate instead, which leaves no user in the thread context.
+     */
+    protected fun authenticatedUser(): String = System.getProperty("user", "admin")
+
+    /** Gets a monitor the way OpenSearch Dashboards does, so that the response includes ui_metadata. */
+    protected fun getMonitorAsDashboards(monitorId: String): Monitor =
+        getMonitor(monitorId, BasicHeader(HttpHeaders.USER_AGENT, AlertingPlugin.OPEN_SEARCH_DASHBOARDS_USER_AGENT))
+
     protected fun getMonitor(monitorId: String, header: BasicHeader = BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")): Monitor {
         val response = client().makeRequest("GET", "$ALERTING_BASE_URI/$monitorId", null, header)
         assertEquals("Unable to get monitor $monitorId", RestStatus.OK, response.restStatus())
