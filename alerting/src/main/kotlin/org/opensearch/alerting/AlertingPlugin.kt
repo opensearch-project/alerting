@@ -570,7 +570,9 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             SystemIndexDescriptor(ALL_ALERT_INDEX_PATTERN, "Alerting Plugin system index pattern"),
             SystemIndexDescriptor(ALL_FINDING_INDEX_PATTERN, "Alerting Findings system index pattern"),
             SystemIndexDescriptor(SCHEDULED_JOBS_INDEX, "Alerting Plugin Configuration index"),
-            SystemIndexDescriptor(ALL_COMMENTS_INDEX_PATTERN, "Alerting Comments system index pattern")
+            SystemIndexDescriptor(ALL_COMMENTS_INDEX_PATTERN, "Alerting Comments system index pattern"),
+            SystemIndexDescriptor("${ScheduledJob.DOC_LEVEL_QUERIES_INDEX}*", "Alerting doc-level query index pattern"),
+            SystemIndexDescriptor(LockService.LOCK_INDEX_NAME, "Alerting job lock index")
         )
     }
 
