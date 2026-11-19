@@ -37,10 +37,8 @@ import org.opensearch.alerting.action.GetDestinationsResponse
 import org.opensearch.alerting.model.AlertContext
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.model.destination.DestinationContextFactory
-import org.opensearch.alerting.opensearchapi.InjectorContextElement
 import org.opensearch.alerting.opensearchapi.convertToMap
 import org.opensearch.alerting.opensearchapi.suspendUntil
-import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.DocumentLevelTriggerExecutionContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
@@ -65,11 +63,12 @@ import org.opensearch.alerting.util.destinationmigration.publishLegacyNotificati
 import org.opensearch.alerting.util.destinationmigration.sendNotification
 import org.opensearch.alerting.util.getActionExecutionPolicy
 import org.opensearch.alerting.util.getCancelAfterTimeInterval
+import org.opensearch.alerting.util.injectRolesAndUserInfo
 import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
 import org.opensearch.alerting.util.parseSampleDocTags
 import org.opensearch.alerting.util.printsSampleDocData
-import org.opensearch.alerting.util.use
+import org.opensearch.alerting.util.withStashedContext
 import org.opensearch.cluster.routing.Preference
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -700,22 +699,15 @@ class TransportDocLevelMonitorFanOutAction
                 throw IllegalStateException("Message content missing in the Destination with id: ${action.destinationId}")
             }
             if (!dryrun) {
-                client.threadPool().threadContext.stashContext().use {
-                    withClosableContext(
-                        InjectorContextElement(
-                            monitor.id,
-                            settings,
-                            client.threadPool().threadContext,
-                            monitor.user?.roles,
-                            monitor.user
-                        )
-                    ) {
-                        actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                            action,
-                            actionOutput[Action.SUBJECT],
-                            actionOutput[Action.MESSAGE]!!
-                        )
-                    }
+                val threadContext = client.threadPool().threadContext
+                threadContext.withStashedContext({
+                    threadContext.injectRolesAndUserInfo(monitor.id, settings, monitor.user?.roles, monitor.user)
+                }) {
+                    actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
+                        action,
+                        actionOutput[Action.SUBJECT],
+                        actionOutput[Action.MESSAGE]!!
+                    )
                 }
             }
             ActionRunResult(

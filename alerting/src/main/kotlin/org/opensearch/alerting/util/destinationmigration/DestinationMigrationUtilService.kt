@@ -20,7 +20,7 @@ import org.opensearch.alerting.util.destinationmigration.DestinationConversionUt
 import org.opensearch.alerting.util.destinationmigration.DestinationConversionUtils.Companion.convertEmailAccountToNotificationConfig
 import org.opensearch.alerting.util.destinationmigration.DestinationConversionUtils.Companion.convertEmailGroupToNotificationConfig
 import org.opensearch.alerting.util.destinationmigration.NotificationApiUtils.Companion.createNotificationConfig
-import org.opensearch.alerting.util.use
+import org.opensearch.alerting.util.withStashedContext
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.ConfigConstants
@@ -120,11 +120,12 @@ class DestinationMigrationUtilService {
                 )
                 try {
                     // TODO: recreate user object to pass along the same permissions. Make sure this works when user based security is removed
-                    client.threadPool().threadContext.stashContext().use {
+                    val threadContext = client.threadPool().threadContext
+                    threadContext.withStashedContext({
                         if (userStr.isNotBlank()) {
-                            client.threadPool().threadContext
-                                .putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
+                            threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
                         }
+                    }) {
                         val createResponse = createNotificationConfig(client, createNotificationConfigRequest)
                         migratedNotificationConfigs.add(createResponse.configId)
                         logger.debug(("Migrated destination: ${createResponse.configId}"))

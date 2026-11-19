@@ -137,6 +137,75 @@ class ThreadContextExtensionsTests : OpenSearchTestCase() {
         assertEquals("own", threadContext.getTransient<Any>(TRANSIENT))
     }
 
+    /**
+     * A block that suspends more than once runs every step with the prepared headers, on whichever thread resumes it,
+     * and neither the starting thread nor the answering thread keeps them.
+     */
+    fun `test withStashedContext keeps the prepared headers across suspensions and leaves them on no thread`() {
+        val threadContext = ThreadContext(Settings.EMPTY)
+        threadContext.putTransient(TRANSIENT, "own")
+
+        val seen = java.util.Collections.synchronizedList(mutableListOf<Any?>())
+        val first = AtomicReference<ActionListener<String>>()
+        val second = AtomicReference<ActionListener<String>>()
+        val seenByStarter = AtomicReference<Any?>("unset")
+        val seenByResponder = AtomicReference<Any?>("unset")
+        val ownOnResponder = AtomicReference<Any?>("unset")
+        runBlocking {
+            launch(Dispatchers.Unconfined) {
+                threadContext.withStashedContext({ threadContext.putTransient(PREPARED, "prepared") }) {
+                    seen.add(threadContext.getTransient<Any>(TRANSIENT))
+                    awaitAnswer<String>(first)
+                    seen.add(threadContext.getTransient<Any>(PREPARED))
+                    awaitAnswer<String>(second)
+                    seen.add(threadContext.getTransient<Any>(PREPARED))
+                }
+            }
+            seenByStarter.set(threadContext.getTransient<Any>(PREPARED))
+
+            val responder = Thread {
+                first.get().onResponse("one")
+                second.get().onResponse("two")
+                seenByResponder.set(threadContext.getTransient<Any>(PREPARED))
+                ownOnResponder.set(threadContext.getTransient<Any>(TRANSIENT))
+            }
+            responder.start()
+            responder.join()
+        }
+
+        assertEquals("the block must not see the caller's transients, then the prepared headers each time", listOf(null, "prepared", "prepared"), seen)
+        assertNull("the starting thread kept the prepared headers", seenByStarter.get())
+        assertEquals("the starting thread must get its own context back", "own", threadContext.getTransient<Any>(TRANSIENT))
+        assertNull("the answering thread took the prepared headers", seenByResponder.get())
+        assertNull("the answering thread took the starting thread's context", ownOnResponder.get())
+    }
+
+    fun `test withStashedContext passes a failure through and keeps this thread's context`() {
+        val threadContext = ThreadContext(Settings.EMPTY)
+        threadContext.putTransient(TRANSIENT, "own")
+        val failure = IllegalStateException("send failed")
+
+        val thrown = expectThrows(IllegalStateException::class.java) {
+            runBlocking { threadContext.withStashedContext({ threadContext.putTransient(PREPARED, "prepared") }) { throw failure } }
+        }
+
+        // withContext may rethrow a copy that carries the coroutine's stack, so compare the message
+        assertEquals(failure.message, thrown.message)
+        assertEquals("own", threadContext.getTransient<Any>(TRANSIENT))
+        assertNull(threadContext.getTransient<Any>(PREPARED))
+    }
+
+    /** Suspends until the listener left in [slot] is answered, as a transport call does. */
+    private suspend fun <T> awaitAnswer(slot: AtomicReference<ActionListener<T>>): T =
+        kotlin.coroutines.suspendCoroutine { cont ->
+            slot.set(
+                object : ActionListener<T> {
+                    override fun onResponse(response: T) = cont.resumeWith(Result.success(response))
+                    override fun onFailure(e: Exception) = cont.resumeWith(Result.failure(e))
+                }
+            )
+        }
+
     companion object {
         private const val CALLER = "caller"
         private const val TRANSIENT = "transient"

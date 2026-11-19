@@ -5,15 +5,14 @@
 
 package org.opensearch.alerting
 
-import org.opensearch.alerting.opensearchapi.InjectorContextElement
-import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.script.TriggerExecutionContext
 import org.opensearch.alerting.service.MonitorJobPoller
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.ArnHelper
 import org.opensearch.alerting.util.getConfigAndSendNotification
-import org.opensearch.alerting.util.use
+import org.opensearch.alerting.util.injectRolesAndUserInfo
+import org.opensearch.alerting.util.withStashedContext
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.alerting.model.ActionRunResult
 import org.opensearch.commons.alerting.model.Monitor
@@ -62,25 +61,18 @@ abstract class MonitorRunner {
                 val userStr = client!!.threadPool().threadContext
                     .getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
                 val tenantId = currentTenantId()
-                client.threadPool().threadContext.stashContext().use {
-                    client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
-                    tenantId?.let { client.threadPool().threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, it) }
-                    withClosableContext(
-                        InjectorContextElement(
-                            monitor.id,
-                            monitorCtx.settings!!,
-                            monitorCtx.threadPool!!.threadContext,
-                            monitor.user?.roles,
-                            monitor.user
-                        )
-                    ) {
-                        actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                            action,
-                            monitorCtx,
-                            actionOutput[Action.SUBJECT],
-                            actionOutput[Action.MESSAGE]!!
-                        )
-                    }
+                val threadContext = client.threadPool().threadContext
+                threadContext.withStashedContext({
+                    threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
+                    tenantId?.let { threadContext.putHeader(AlertingPlugin.TENANT_ID_HEADER, it) }
+                    threadContext.injectRolesAndUserInfo(monitor.id, monitorCtx.settings!!, monitor.user?.roles, monitor.user)
+                }) {
+                    actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
+                        action,
+                        monitorCtx,
+                        actionOutput[Action.SUBJECT],
+                        actionOutput[Action.MESSAGE]!!
+                    )
                 }
             }
             ActionRunResult(action.id, action.name, actionOutput, false, MonitorRunnerService.currentTime(), null)
