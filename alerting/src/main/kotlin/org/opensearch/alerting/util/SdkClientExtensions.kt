@@ -47,10 +47,10 @@ suspend fun SdkClient.putDataObjectStashed(
 suspend fun SdkClient.putDataObjectAsCaller(
     request: PutDataObjectRequest,
     threadContext: ThreadContext,
-    caller: ThreadContext.StoredContext?,
+    caller: ThreadContext.StoredContext,
 ): PutDataObjectResponse {
     val own = threadContext.newStoredContext(false)
-    caller?.restore()
+    caller.restore()
     val response = try {
         threadContext.stashContext().use { this.putDataObjectAsync(request) }
     } finally {
