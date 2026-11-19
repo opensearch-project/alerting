@@ -649,7 +649,7 @@ class TransportIndexMonitorAction @Inject constructor(
          * The security plugin's [ResourceIndexListener] requires the auth user to record a share
          * entry for the created resource.
          */
-        private val storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
+        private val storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext,
     ) {
 
         fun resolveUserAndStart() {
