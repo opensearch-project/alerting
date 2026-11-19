@@ -6,6 +6,7 @@ package org.opensearch.alerting
 
 import org.opensearch.core.index.Index
 import org.opensearch.core.index.shard.ShardId
+import org.opensearch.index.seqno.SequenceNumbers
 import org.opensearch.test.OpenSearchTestCase
 
 class MonitorFanOutUtilsTests : OpenSearchTestCase() {
@@ -130,5 +131,46 @@ class MonitorFanOutUtilsTests : OpenSearchTestCase() {
             shardCount += shards.size
         }
         assertEquals(expectedTotalShardCount, shardCount)
+    }
+
+    fun `test initializeNewLastRunContext returns mutable map`() {
+        val result = initializeNewLastRunContext(emptyMap(), "test-index", 3)
+
+        assertTrue("result must be a MutableMap", result is MutableMap)
+        assertTrue("result must contain shard key '0'", result.containsKey("0"))
+        assertTrue("result must contain shard key '1'", result.containsKey("1"))
+        assertTrue("result must contain shard key '2'", result.containsKey("2"))
+        assertEquals("shards_count must equal 3", 3, result["shards_count"])
+        assertEquals("index must equal 'test-index'", "test-index", result["index"])
+
+        // Verify it is truly mutable — must not throw UnsupportedOperationException
+        result["extra_key"] = "extra_value"
+        assertEquals("extra_value", result["extra_key"])
+    }
+
+    fun `test initializeNewLastRunContext preserves existing seq numbers`() {
+        val existingContext = mapOf<String, Any>("0" to 42L)
+
+        val result = initializeNewLastRunContext(existingContext, "preserve-index", 2)
+
+        assertEquals("Existing sequence number for shard 0 must be preserved", 42L, result["0"])
+        assertEquals(
+            "New shard 1 must be initialized to UNASSIGNED_SEQ_NO",
+            SequenceNumbers.UNASSIGNED_SEQ_NO,
+            result["1"]
+        )
+        assertEquals(2, result["shards_count"])
+    }
+
+    fun `test initializeNewLastRunContext with Collections emptyMap does not throw`() {
+        val emptyJavaMap = java.util.Collections.emptyMap<String, Any>()
+
+        val result = initializeNewLastRunContext(emptyJavaMap, "empty-map-index", 2)
+
+        assertNotNull("result must not be null", result)
+        assertTrue("result must be mutable", result is MutableMap)
+        // Verify mutability by inserting a new entry
+        result["probe"] = "ok"
+        assertEquals("ok", result["probe"])
     }
 }
