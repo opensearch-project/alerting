@@ -7,11 +7,10 @@ package org.opensearch.alerting.workflow
 
 import org.opensearch.alerting.MonitorRunnerExecutionContext
 import org.opensearch.alerting.MonitorRunnerService
-import org.opensearch.alerting.opensearchapi.InjectorContextElement
-import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.ChainedAlertTriggerExecutionContext
 import org.opensearch.alerting.util.getConfigAndSendNotification
-import org.opensearch.alerting.util.use
+import org.opensearch.alerting.util.injectRolesAndUserInfo
+import org.opensearch.alerting.util.withStashedContext
 import org.opensearch.commons.alerting.model.ActionRunResult
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.WorkflowRunResult
@@ -52,23 +51,16 @@ abstract class WorkflowRunner {
             }
             if (!dryrun) {
                 val client = monitorCtx.client
-                client!!.threadPool().threadContext.stashContext().use {
-                    withClosableContext(
-                        InjectorContextElement(
-                            workflow.id,
-                            monitorCtx.settings!!,
-                            monitorCtx.threadPool!!.threadContext,
-                            workflow.user?.roles,
-                            workflow.user
-                        )
-                    ) {
-                        actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
-                            action,
-                            monitorCtx,
-                            actionOutput[Action.SUBJECT],
-                            actionOutput[Action.MESSAGE]!!
-                        )
-                    }
+                val threadContext = client!!.threadPool().threadContext
+                threadContext.withStashedContext({
+                    threadContext.injectRolesAndUserInfo(workflow.id, monitorCtx.settings!!, workflow.user?.roles, workflow.user)
+                }) {
+                    actionOutput[Action.MESSAGE_ID] = getConfigAndSendNotification(
+                        action,
+                        monitorCtx,
+                        actionOutput[Action.SUBJECT],
+                        actionOutput[Action.MESSAGE]!!
+                    )
                 }
             }
             ActionRunResult(action.id, action.name, actionOutput, false, MonitorRunnerService.currentTime(), null)

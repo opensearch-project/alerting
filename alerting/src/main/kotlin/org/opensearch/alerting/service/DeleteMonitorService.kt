@@ -25,9 +25,8 @@ import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_MONITOR_PATH
-import org.opensearch.alerting.util.await
 import org.opensearch.alerting.util.deleteDataObjectStashed
-import org.opensearch.alerting.util.use
+import org.opensearch.alerting.util.searchDataObjectStashed
 import org.opensearch.commons.alerting.action.DeleteMonitorResponse
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -212,19 +211,17 @@ object DeleteMonitorService :
                 .searchSourceBuilder(SearchSourceBuilder().query(queryBuilder))
                 .build()
 
-            client.threadPool().threadContext.stashContext().use {
-                val sdkResponse = sdkClient.searchDataObjectAsync(searchRequest).await()
-                val searchResponse = sdkResponse.searchResponse()
-                    ?: throw RuntimeException("Unknown error searching for workflow delegates")
+            val sdkResponse = sdkClient.searchDataObjectStashed(searchRequest, client.threadPool().threadContext)
+            val searchResponse = sdkResponse.searchResponse()
+                ?: throw RuntimeException("Unknown error searching for workflow delegates")
 
-                if (searchResponse.hits.totalHits?.value == 0L) {
-                    return false
-                }
-
-                val workflowIds = searchResponse.hits.hits.map { it.id }.joinToString()
-                log.info("Monitor $monitorId can't be deleted since it belongs to $workflowIds")
-                return true
+            if (searchResponse.hits.totalHits?.value == 0L) {
+                return false
             }
+
+            val workflowIds = searchResponse.hits.hits.map { it.id }.joinToString()
+            log.info("Monitor $monitorId can't be deleted since it belongs to $workflowIds")
+            return true
         } catch (ex: Exception) {
             log.error("Error getting the monitor workflows", ex)
             throw AlertingException.wrap(ex)

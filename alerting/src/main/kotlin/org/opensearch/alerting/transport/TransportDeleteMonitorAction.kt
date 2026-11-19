@@ -92,12 +92,8 @@ class TransportDeleteMonitorAction @Inject constructor(
             return
         }
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
-        // Coroutine dispatch drops the ThreadContext ThreadLocal. Restore the caller's persistent auth
-        // header for the shard-level ResourceIndexListener; DeleteMonitorService's sdkClient calls each
-        // stash per-call via [deleteDataObjectStashed] to keep internal-index writes off the caller.
-        val storedContext = client.threadPool().threadContext.newStoredContext(false)
+        // Deleting a resource needs no caller identity: the security plugin removes its sharing record on delete
         scope.launch(TenantContext(tenantId)) {
-            storedContext.restore()
             DeleteMonitorHandler(
                 client,
                 actionListener,
@@ -118,7 +114,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                 val monitor = getMonitor()
 
                 val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
-                // when resource sharing is enabled, security plugin gates access at the index layer
+                // when resource sharing is enabled, the security plugin checks access at the transport layer, since the request is a DocRequest
                 val canDelete = useRsc ||
                     user == null ||
                     !doFilterForUser(user) ||

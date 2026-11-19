@@ -227,6 +227,27 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
         }
     }
 
+    fun `test deleting a monitor removes its sharing record`() {
+        val monitor = aliceCreatesMonitor()
+        val before = adminClient().performRequest(Request("GET", "/$configSharingIndex/_doc/${monitor.id}"))
+        assertEquals("the sharing record must exist before the delete", RestStatus.OK.status, before.statusLine.statusCode)
+        assertOk { deleteMonitorAs(aliceClient!!, monitor) }
+
+        // The security plugin deletes the record from its shard-level postDelete hook, after the delete has answered
+        val deadline = System.nanoTime() + 10_000L * 1_000_000
+        var status = 0
+        while (System.nanoTime() < deadline) {
+            status = try {
+                adminClient().performRequest(Request("GET", "/$configSharingIndex/_doc/${monitor.id}")).statusLine.statusCode
+            } catch (e: ResponseException) {
+                e.response.statusLine.statusCode
+            }
+            if (status == RestStatus.NOT_FOUND.status) return
+            Thread.sleep(100)
+        }
+        fail("The sharing record of deleted monitor ${monitor.id} is still there, last status $status")
+    }
+
     // ─── full-access share ───────────────────────────────────────────────────────
 
     fun `test full-access share grants re-share`() {
