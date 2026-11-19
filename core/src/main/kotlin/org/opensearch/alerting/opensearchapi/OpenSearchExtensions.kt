@@ -192,33 +192,46 @@ suspend fun <T> PPLPluginInterface.suspendUntil(block: PPLPluginInterface.(Actio
  *
  * With kotlinx-coroutines 1.1.1, a [withContext] call on the same dispatcher can resume its caller inside the frame that
  * ran the block, so the element is not restored until the caller next suspends. [withOwnContextElement] therefore also
- * restores the thread's own context when the block returns. Changes the block makes to the thread context are lost at
- * each suspension. Do not nest elements of different subclasses: 1.1.1 restores them in the order it applied them.
+ * restores the thread's own context when the block returns, and gives an outer block of the same kind its context back.
+ * Changes the block makes to the thread context are lost at each suspension. Do not nest elements of different
+ * subclasses: 1.1.1 restores them in the order it applied them.
  */
 abstract class OwnContextElement(
     private val threadContext: ThreadContext,
     private val preserveResponseHeaders: Boolean = false
 ) : ThreadContextElement<ThreadContext.StoredContext> {
 
-    // The context this element replaced on each thread it is applied to; empty once that context is back
-    private val own = ThreadLocal<ThreadContext.StoredContext?>()
+    /** The context this element replaced on a thread, and how many more times it is applied there, for a child coroutine. */
+    private class Applied(var own: ThreadContext.StoredContext, var depth: Int = 0)
+
+    // Empty once the thread has its own context back
+    private val applied = ThreadLocal<Applied?>()
 
     /** Changes the context of the current thread for the coroutine. */
     protected abstract fun applyToThread()
 
     override fun updateThreadContext(context: CoroutineContext): ThreadContext.StoredContext {
+        val current = applied.get()
+        if (current != null) {
+            // A child coroutine on the same thread inherits this element; the thread already holds its context
+            current.depth++
+            return current.own
+        }
         val saved = threadContext.newStoredContext(preserveResponseHeaders)
-        own.set(saved)
+        applied.set(Applied(saved))
         applyToThread()
         return saved
     }
 
     override fun restoreThreadContext(context: CoroutineContext, oldState: ThreadContext.StoredContext) {
-        // Skipped when the block already returned on this thread and put the context back itself
-        if (own.get() != null) {
-            own.remove()
-            oldState.restore()
+        // Empty when the block already returned on this thread and put the context back itself
+        val current = applied.get() ?: return
+        if (current.depth > 0) {
+            current.depth--
+            return
         }
+        applied.remove()
+        current.own.restore()
     }
 
     /**
@@ -227,16 +240,20 @@ abstract class OwnContextElement(
      * @param outer the element of the same kind that the caller runs under, if any
      */
     internal fun exitOnCurrentThread(outer: OwnContextElement?) {
-        val saved = own.get() ?: return
+        val current = applied.get() ?: return
+        applied.remove()
         if (outer == null) {
-            own.remove()
-            saved.restore()
+            current.own.restore()
         } else {
-            // The caller runs under the outer element; this element's saved context stays here, and its pending restore
-            // puts it back when the caller next leaves the thread
-            saved.restore()
-            outer.applyToThread()
+            // The caller runs under the outer element, which now owns this thread's own context and puts it back
+            outer.takeOver(current.own)
         }
+    }
+
+    private fun takeOver(own: ThreadContext.StoredContext) {
+        val current = applied.get()
+        if (current == null) applied.set(Applied(own)) else current.own = own
+        applyToThread()
     }
 }
 

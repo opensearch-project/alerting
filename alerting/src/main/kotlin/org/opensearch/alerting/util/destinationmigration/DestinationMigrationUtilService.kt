@@ -132,7 +132,7 @@ class DestinationMigrationUtilService {
                         logger.debug(("Migrated destination: ${createResponse.configId}"))
                     }
                 } catch (e: CancellationException) {
-                    // The migration job was cancelled, for example on shutdown; stop rather than log each remaining config
+                    // A cancellation must stop the migration, not be logged and skipped as a failure of this config
                     throw e
                 } catch (e: Exception) {
                     if (e.message?.contains("version conflict, document already exists") == true) {

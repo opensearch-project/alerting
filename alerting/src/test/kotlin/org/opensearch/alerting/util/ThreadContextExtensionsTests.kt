@@ -285,6 +285,81 @@ class ThreadContextExtensionsTests : OpenSearchTestCase() {
         assertEquals("own", threadContext.getTransient<Any>(TRANSIENT))
     }
 
+    /**
+     * The outer block returns right after the inner one, on the answering thread. The code after the outer block runs
+     * without either stash, and the answering thread keeps neither.
+     */
+    fun `test nested withStashedContext that return together leave no stash`() {
+        val threadContext = ThreadContext(Settings.EMPTY)
+        threadContext.putTransient(TRANSIENT, "own")
+
+        val first = AtomicReference<ActionListener<String>>()
+        val afterInner = AtomicReference<List<Any?>>()
+        val afterOuter = AtomicReference<List<Any?>>()
+        val seenByResponder = AtomicReference<List<Any?>>()
+        fun headers(): List<Any?> = listOf(threadContext.getTransient<Any>(OUTER), threadContext.getTransient<Any>(PREPARED))
+        runBlocking {
+            launch(Dispatchers.Unconfined) {
+                threadContext.withStashedContext({ threadContext.putTransient(OUTER, "outer") }) {
+                    threadContext.withStashedContext({ threadContext.putTransient(PREPARED, "inner") }) {
+                        awaitAnswer<String>(first)
+                    }
+                    afterInner.set(headers())
+                }
+                afterOuter.set(headers())
+            }
+
+            val responder = Thread {
+                first.get().onResponse("one")
+                seenByResponder.set(headers())
+            }
+            responder.start()
+            responder.join()
+        }
+
+        assertEquals("the outer block must get its stash back after the inner call", listOf("outer", null), afterInner.get())
+        assertEquals("the code after the outer block ran with a stash", listOf(null, null), afterOuter.get())
+        assertEquals("the answering thread kept a stash", listOf(null, null), seenByResponder.get())
+        assertEquals("own", threadContext.getTransient<Any>(TRANSIENT))
+    }
+
+    /**
+     * A child coroutine that starts on the same thread inherits the stash. When both suspend, the starting thread gets its
+     * own context back.
+     */
+    fun `test withStashedContext gives the thread its context back when a child shares it`() {
+        val threadContext = ThreadContext(Settings.EMPTY)
+        threadContext.putTransient(TRANSIENT, "own")
+
+        val child = AtomicReference<ActionListener<String>>()
+        val parent = AtomicReference<ActionListener<String>>()
+        val seenByChild = AtomicReference<Any?>("unset")
+        val seenByStarter = AtomicReference<List<Any?>>()
+        runBlocking {
+            launch(Dispatchers.Unconfined) {
+                threadContext.withStashedContext({ threadContext.putTransient(PREPARED, "prepared") }) {
+                    // Undispatched, the child starts here at once and applies the inherited stash a second time on this thread
+                    launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                        seenByChild.set(threadContext.getTransient<Any>(PREPARED))
+                        awaitAnswer<String>(child)
+                    }
+                    awaitAnswer<String>(parent)
+                }
+            }
+            seenByStarter.set(listOf(threadContext.getTransient<Any>(PREPARED), threadContext.getTransient<Any>(TRANSIENT)))
+
+            val responder = Thread {
+                child.get().onResponse("child")
+                parent.get().onResponse("parent")
+            }
+            responder.start()
+            responder.join()
+        }
+
+        assertEquals("the child must run with the stash", "prepared", seenByChild.get())
+        assertEquals("the starting thread must get its own context back", listOf(null, "own"), seenByStarter.get())
+    }
+
     /** Suspends until the listener left in [slot] is answered, as a transport call does. */
     private suspend fun <T> awaitAnswer(slot: AtomicReference<ActionListener<T>>): T =
         kotlin.coroutines.suspendCoroutine { cont ->
