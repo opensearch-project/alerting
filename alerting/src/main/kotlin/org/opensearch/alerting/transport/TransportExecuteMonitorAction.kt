@@ -148,6 +148,16 @@ class TransportExecuteMonitorAction @Inject constructor(
                 return
             }
 
+            // A scheduled run arrives from MonitorRunnerService carrying both the id and the stored monitor,
+            // and runs under the identities stored on that monitor rather than a caller's. There is no caller
+            // to authorize, so it skips the index access check; the REST API supplies one of the two, never both.
+            if (execMonitorRequest.monitorId != null) {
+                client.threadPool().threadContext.stashContext().use {
+                    executeInlineMonitor(monitor, execMonitorRequest, tenantId, actionListener)
+                }
+                return
+            }
+
             checkIndicesAndExecute(monitor, execMonitorRequest, tenantId, actionListener)
         }
     }
