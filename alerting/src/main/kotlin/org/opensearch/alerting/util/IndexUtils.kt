@@ -205,5 +205,28 @@ class IndexUtils {
         fun getCreationDateForIndex(index: String, clusterState: ClusterState): Long {
             return clusterState.metadata.index(index).creationDate
         }
+
+        /**
+         * Replaces every field name in [fieldNames] that is a field-alias in [mappingSource] with the alias path.
+         * Returns the distinct resulting field names in input order.
+         */
+        @JvmStatic
+        fun resolveFieldAliases(fieldNames: Collection<String>, mappingSource: Map<String, Any>?): List<String> {
+            val aliasPaths = mutableMapOf<String, String>()
+            collectFieldAliasPaths(mappingSource?.get("properties") as? Map<*, *>, "", aliasPaths)
+            return fieldNames.map { aliasPaths[it] ?: it }.distinct()
+        }
+
+        private fun collectFieldAliasPaths(properties: Map<*, *>?, prefix: String, aliasPaths: MutableMap<String, String>) {
+            properties?.forEach { (name, value) ->
+                val field = value as? Map<*, *> ?: return@forEach
+                val fullName = if (prefix.isEmpty()) "$name" else "$prefix.$name"
+                if (field["type"] == "alias") {
+                    (field["path"] as? String)?.let { aliasPaths[fullName] = it }
+                } else {
+                    collectFieldAliasPaths(field["properties"] as? Map<*, *>, fullName, aliasPaths)
+                }
+            }
+        }
     }
 }
