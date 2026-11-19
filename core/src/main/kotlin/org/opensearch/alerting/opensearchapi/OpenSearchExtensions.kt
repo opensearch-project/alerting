@@ -189,13 +189,13 @@ suspend fun <T> PPLPluginInterface.suspendUntil(block: PPLPluginInterface.(Actio
  * Runs a coroutine with the given roles and user info injected into the thread context.
  *
  * Each time the coroutine is dispatched onto a thread, the element saves that thread's own context, injects the roles
- * and user info, and puts the saved context back when the coroutine suspends or completes. A worker thread therefore
- * never keeps the injected values, or the context of the thread that created the element.
+ * and user info, and puts the saved context back when the coroutine suspends or completes. Use it through
+ * [withClosableContext], which also restores the caller's context once the block returns.
  */
 class InjectorContextElement(
     id: String,
     settings: Settings,
-    private val threadContext: ThreadContext,
+    internal val threadContext: ThreadContext,
     private val roles: List<String>?,
     private val user: User? = null
 ) : ThreadContextElement<ThreadContext.StoredContext> {
@@ -204,7 +204,8 @@ class InjectorContextElement(
     override val key: CoroutineContext.Key<*>
         get() = Key
 
-    var rolesInjectorHelper = InjectSecurity(id, settings, threadContext)
+    // Used only to inject; the context InjectSecurity captures when it is created is never restored.
+    private val rolesInjectorHelper = InjectSecurity(id, settings, threadContext)
 
     override fun updateThreadContext(context: CoroutineContext): ThreadContext.StoredContext {
         val threadOwnContext = threadContext.newStoredContext(true)
@@ -219,10 +220,21 @@ class InjectorContextElement(
     }
 }
 
-/** Runs [block] with [context]; the element itself puts each thread's own context back when the block leaves it. */
+/**
+ * Runs [block] with [context] and then restores the caller's context.
+ *
+ * The restore is needed because `withContext` without a dispatcher change starts the block undispatched: when the
+ * block resumes on another thread and finishes there, the caller's code continues on that thread while the element's
+ * injected values are still in place.
+ */
 suspend fun <T> withClosableContext(
     context: InjectorContextElement,
     block: suspend CoroutineScope.() -> T
 ): T {
-    return withContext(context) { block() }
+    val callerContext = context.threadContext.newStoredContext(true)
+    try {
+        return withContext(context) { block() }
+    } finally {
+        callerContext.restore()
+    }
 }
