@@ -138,8 +138,8 @@ class ThreadContextExtensionsTests : OpenSearchTestCase() {
     }
 
     /**
-     * A block that suspends more than once runs every step with the prepared headers, on whichever thread resumes it,
-     * and neither the starting thread nor the answering thread keeps them.
+     * A block that suspends more than once runs every step with the prepared headers, on whichever thread resumes it.
+     * The code after the block, which runs on the answering thread, and both threads afterwards hold no prepared headers.
      */
     fun `test withStashedContext keeps the prepared headers across suspensions and leaves them on no thread`() {
         val threadContext = ThreadContext(Settings.EMPTY)
@@ -148,6 +148,7 @@ class ThreadContextExtensionsTests : OpenSearchTestCase() {
         val seen = java.util.Collections.synchronizedList(mutableListOf<Any?>())
         val first = AtomicReference<ActionListener<String>>()
         val second = AtomicReference<ActionListener<String>>()
+        val afterBlock = AtomicReference<Any?>("unset")
         val seenByStarter = AtomicReference<Any?>("unset")
         val seenByResponder = AtomicReference<Any?>("unset")
         val ownOnResponder = AtomicReference<Any?>("unset")
@@ -160,6 +161,7 @@ class ThreadContextExtensionsTests : OpenSearchTestCase() {
                     awaitAnswer<String>(second)
                     seen.add(threadContext.getTransient<Any>(PREPARED))
                 }
+                afterBlock.set(threadContext.getTransient<Any>(PREPARED))
             }
             seenByStarter.set(threadContext.getTransient<Any>(PREPARED))
 
@@ -174,6 +176,7 @@ class ThreadContextExtensionsTests : OpenSearchTestCase() {
         }
 
         assertEquals("the block must not see the caller's transients, then the prepared headers each time", listOf(null, "prepared", "prepared"), seen)
+        assertNull("the code after the block ran with the prepared headers", afterBlock.get())
         assertNull("the starting thread kept the prepared headers", seenByStarter.get())
         assertEquals("the starting thread must get its own context back", "own", threadContext.getTransient<Any>(TRANSIENT))
         assertNull("the answering thread took the prepared headers", seenByResponder.get())
@@ -195,6 +198,93 @@ class ThreadContextExtensionsTests : OpenSearchTestCase() {
         assertNull(threadContext.getTransient<Any>(PREPARED))
     }
 
+    /**
+     * The block fails after it resumed on the answering thread. The failure reaches the caller, which runs on that
+     * thread without the prepared headers.
+     */
+    fun `test withStashedContext passes a failure after a resume and leaves the headers on no thread`() {
+        val threadContext = ThreadContext(Settings.EMPTY)
+        threadContext.putTransient(TRANSIENT, "own")
+
+        val first = AtomicReference<ActionListener<String>>()
+        val caught = AtomicReference<Throwable?>()
+        val afterFailure = AtomicReference<Any?>("unset")
+        val seenByResponder = AtomicReference<Any?>("unset")
+        runBlocking {
+            launch(Dispatchers.Unconfined) {
+                try {
+                    threadContext.withStashedContext({ threadContext.putTransient(PREPARED, "prepared") }) {
+                        awaitAnswer<String>(first)
+                        throw IllegalStateException("send failed")
+                    }
+                } catch (e: IllegalStateException) {
+                    caught.set(e)
+                }
+                afterFailure.set(threadContext.getTransient<Any>(PREPARED))
+            }
+
+            val responder = Thread {
+                first.get().onResponse("one")
+                seenByResponder.set(threadContext.getTransient<Any>(PREPARED))
+            }
+            responder.start()
+            responder.join()
+        }
+
+        assertEquals("send failed", caught.get()?.message)
+        assertNull("the caller handled the failure with the prepared headers", afterFailure.get())
+        assertNull("the answering thread took the prepared headers", seenByResponder.get())
+        assertEquals("own", threadContext.getTransient<Any>(TRANSIENT))
+    }
+
+    /**
+     * An inner call runs under its own stash, and the outer block gets its stash back when the inner call returns on
+     * the answering thread.
+     */
+    fun `test nested withStashedContext gives the outer block its stash back`() {
+        val threadContext = ThreadContext(Settings.EMPTY)
+        threadContext.putTransient(TRANSIENT, "own")
+
+        val first = AtomicReference<ActionListener<String>>()
+        val second = AtomicReference<ActionListener<String>>()
+        val inInner = AtomicReference<List<Any?>>()
+        val afterInner = AtomicReference<List<Any?>>()
+        val afterSecond = AtomicReference<List<Any?>>()
+        val afterOuter = AtomicReference<List<Any?>>()
+        val seenByResponder = AtomicReference<List<Any?>>()
+        fun headers(): List<Any?> = listOf(threadContext.getTransient<Any>(OUTER), threadContext.getTransient<Any>(PREPARED))
+        runBlocking {
+            launch(Dispatchers.Unconfined) {
+                threadContext.withStashedContext({ threadContext.putTransient(OUTER, "outer") }) {
+                    threadContext.withStashedContext({ threadContext.putTransient(PREPARED, "inner") }) {
+                        awaitAnswer<String>(first)
+                        inInner.set(headers())
+                    }
+                    afterInner.set(headers())
+                    awaitAnswer<String>(second)
+                    afterSecond.set(headers())
+                }
+                afterOuter.set(headers())
+            }
+
+            val responder = Thread {
+                first.get().onResponse("one")
+                second.get().onResponse("two")
+                seenByResponder.set(headers())
+            }
+            responder.start()
+            responder.join()
+        }
+
+        assertEquals("the inner block runs under the inner stash only", listOf(null, "inner"), inInner.get())
+        assertEquals("the outer block must get its stash back after the inner call", listOf("outer", null), afterInner.get())
+        assertEquals(listOf("outer", null), afterSecond.get())
+        assertEquals("the code after the outer block ran with a stash", listOf(null, null), afterOuter.get())
+        assertEquals("the answering thread kept a stash", listOf(null, null), seenByResponder.get())
+        assertEquals(listOf(null, null), headers())
+        assertEquals("own", threadContext.getTransient<Any>(TRANSIENT))
+    }
+
     /** Suspends until the listener left in [slot] is answered, as a transport call does. */
     private suspend fun <T> awaitAnswer(slot: AtomicReference<ActionListener<T>>): T =
         kotlin.coroutines.suspendCoroutine { cont ->
@@ -210,5 +300,6 @@ class ThreadContextExtensionsTests : OpenSearchTestCase() {
         private const val CALLER = "caller"
         private const val TRANSIENT = "transient"
         private const val PREPARED = "prepared"
+        private const val OUTER = "outer"
     }
 }

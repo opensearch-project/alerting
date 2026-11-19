@@ -33,6 +33,7 @@ import org.opensearch.index.query.QueryBuilders
 import org.opensearch.search.builder.SearchSourceBuilder
 import org.opensearch.transport.client.OpenSearchClient
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -185,38 +186,98 @@ suspend fun <T> PPLPluginInterface.suspendUntil(block: PPLPluginInterface.(Actio
         })
     }
 
+/**
+ * A [ThreadContextElement] that changes the OpenSearch thread context while a coroutine runs on a thread, and puts the
+ * thread's own context back when the coroutine leaves it.
+ *
+ * With kotlinx-coroutines 1.1.1, a [withContext] call on the same dispatcher can resume its caller inside the frame that
+ * ran the block, so the element is not restored until the caller next suspends. [withOwnContextElement] therefore also
+ * restores the thread's own context when the block returns. Changes the block makes to the thread context are lost at
+ * each suspension. Do not nest elements of different subclasses: 1.1.1 restores them in the order it applied them.
+ */
+abstract class OwnContextElement(
+    private val threadContext: ThreadContext,
+    private val preserveResponseHeaders: Boolean = false
+) : ThreadContextElement<ThreadContext.StoredContext> {
+
+    // The context this element replaced on each thread it is applied to; empty once that context is back
+    private val own = ThreadLocal<ThreadContext.StoredContext?>()
+
+    /** Changes the context of the current thread for the coroutine. */
+    protected abstract fun applyToThread()
+
+    override fun updateThreadContext(context: CoroutineContext): ThreadContext.StoredContext {
+        val saved = threadContext.newStoredContext(preserveResponseHeaders)
+        own.set(saved)
+        applyToThread()
+        return saved
+    }
+
+    override fun restoreThreadContext(context: CoroutineContext, oldState: ThreadContext.StoredContext) {
+        // Skipped when the block already returned on this thread and put the context back itself
+        if (own.get() != null) {
+            own.remove()
+            oldState.restore()
+        }
+    }
+
+    /**
+     * Puts the current thread back to what the caller of the block expects, if this element is still applied here.
+     *
+     * @param outer the element of the same kind that the caller runs under, if any
+     */
+    internal fun exitOnCurrentThread(outer: OwnContextElement?) {
+        val saved = own.get() ?: return
+        if (outer == null) {
+            own.remove()
+            saved.restore()
+        } else {
+            // The caller runs under the outer element; this element's saved context stays here, and its pending restore
+            // puts it back when the caller next leaves the thread
+            saved.restore()
+            outer.applyToThread()
+        }
+    }
+}
+
+/**
+ * Runs [block] under [element], and puts the current thread back to the caller's context when the block returns.
+ */
+suspend fun <T> withOwnContextElement(element: OwnContextElement, block: suspend CoroutineScope.() -> T): T {
+    val outer = coroutineContext.fold<OwnContextElement?>(null) { found, e -> if (e.key == element.key && e is OwnContextElement) e else found }
+    try {
+        return withContext(element) { block() }
+    } finally {
+        element.exitOnCurrentThread(outer)
+    }
+}
+
+/**
+ * Runs a coroutine with the roles and the user info of a monitor, workflow or user injected into the thread context.
+ */
 class InjectorContextElement(
     id: String,
     settings: Settings,
     threadContext: ThreadContext,
     private val roles: List<String>?,
     private val user: User? = null
-) : ThreadContextElement<Unit> {
+) : OwnContextElement(threadContext, preserveResponseHeaders = true) {
 
     companion object Key : CoroutineContext.Key<InjectorContextElement>
     override val key: CoroutineContext.Key<*>
         get() = Key
 
-    var rolesInjectorHelper = InjectSecurity(id, settings, threadContext)
+    private val rolesInjectorHelper = InjectSecurity(id, settings, threadContext)
 
-    override fun updateThreadContext(context: CoroutineContext) {
+    override fun applyToThread() {
         rolesInjectorHelper.injectRoles(roles)
         // This is from where plugins extract backend roles. It should be passed when calling APIs of other plugins
         rolesInjectorHelper.injectUserInfo(user)
     }
-
-    override fun restoreThreadContext(context: CoroutineContext, oldState: Unit) {
-        rolesInjectorHelper.close()
-    }
 }
 
+/** Runs [block] under [context], as [withOwnContextElement] does. */
 suspend fun <T> withClosableContext(
     context: InjectorContextElement,
     block: suspend CoroutineScope.() -> T
-): T {
-    try {
-        return withContext(context) { block() }
-    } finally {
-        context.rolesInjectorHelper.close()
-    }
-}
+): T = withOwnContextElement(context, block)

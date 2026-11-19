@@ -6,8 +6,8 @@
 package org.opensearch.alerting.util
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ThreadContextElement
-import kotlinx.coroutines.withContext
+import org.opensearch.alerting.opensearchapi.OwnContextElement
+import org.opensearch.alerting.opensearchapi.withOwnContextElement
 import org.opensearch.common.settings.Settings
 import org.opensearch.common.util.concurrent.ThreadContext
 import org.opensearch.commons.InjectSecurity
@@ -49,15 +49,17 @@ suspend fun <T> ThreadContext.suspendAsCaller(caller: ThreadContext.StoredContex
 /**
  * Runs a suspending [block] under a stashed context set up by [prepare].
  *
- * The context is applied to each thread while it runs the block, and each thread gets its own context back when the
- * block suspends or ends, so the stashed headers stay with the block whichever threads it runs on.
+ * The stashed context is applied to each thread while it runs the block. A thread gets its own context back when the
+ * block suspends there, and the calling thread gets the caller's context back when the block returns. Changes the block
+ * makes to the thread context are lost at each suspension. A nested call runs its block under its own stash and gives
+ * the outer block its stash back when it returns.
  */
 suspend fun <T> ThreadContext.withStashedContext(prepare: () -> Unit = {}, block: suspend CoroutineScope.() -> T): T {
     val stashed = stashContext().use {
         prepare()
         newStoredContext(false)
     }
-    return withContext(StoredContextElement(this, stashed)) { block() }
+    return withOwnContextElement(StoredContextElement(this, stashed), block)
 }
 
 /**
@@ -75,22 +77,16 @@ fun ThreadContext.injectRolesAndUserInfo(id: String, settings: Settings, roles: 
     injector.injectUserInfo(user)
 }
 
-/** Applies [stored] to the thread that runs the coroutine, and puts that thread's own context back when it stops. */
+/** Applies [stored] to each thread that runs the coroutine. */
 private class StoredContextElement(
-    private val threadContext: ThreadContext,
+    threadContext: ThreadContext,
     private val stored: ThreadContext.StoredContext
-) : ThreadContextElement<ThreadContext.StoredContext> {
+) : OwnContextElement(threadContext) {
 
     companion object Key : CoroutineContext.Key<StoredContextElement>
 
     override val key: CoroutineContext.Key<*>
         get() = Key
 
-    override fun updateThreadContext(context: CoroutineContext): ThreadContext.StoredContext {
-        val own = threadContext.newStoredContext(false)
-        stored.restore()
-        return own
-    }
-
-    override fun restoreThreadContext(context: CoroutineContext, oldState: ThreadContext.StoredContext) = oldState.restore()
+    override fun applyToThread() = stored.restore()
 }
