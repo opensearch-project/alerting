@@ -185,13 +185,20 @@ suspend fun <T> PPLPluginInterface.suspendUntil(block: PPLPluginInterface.(Actio
         })
     }
 
+/**
+ * Runs a coroutine with the given roles and user info injected into the thread context.
+ *
+ * Each time the coroutine is dispatched onto a thread, the element saves that thread's own context, injects the roles
+ * and user info, and puts the saved context back when the coroutine suspends or completes. A worker thread therefore
+ * never keeps the injected values, or the context of the thread that created the element.
+ */
 class InjectorContextElement(
     id: String,
     settings: Settings,
-    threadContext: ThreadContext,
+    private val threadContext: ThreadContext,
     private val roles: List<String>?,
     private val user: User? = null
-) : ThreadContextElement<Unit> {
+) : ThreadContextElement<ThreadContext.StoredContext> {
 
     companion object Key : CoroutineContext.Key<InjectorContextElement>
     override val key: CoroutineContext.Key<*>
@@ -199,24 +206,23 @@ class InjectorContextElement(
 
     var rolesInjectorHelper = InjectSecurity(id, settings, threadContext)
 
-    override fun updateThreadContext(context: CoroutineContext) {
+    override fun updateThreadContext(context: CoroutineContext): ThreadContext.StoredContext {
+        val threadOwnContext = threadContext.newStoredContext(true)
         rolesInjectorHelper.injectRoles(roles)
         // This is from where plugins extract backend roles. It should be passed when calling APIs of other plugins
         rolesInjectorHelper.injectUserInfo(user)
+        return threadOwnContext
     }
 
-    override fun restoreThreadContext(context: CoroutineContext, oldState: Unit) {
-        rolesInjectorHelper.close()
+    override fun restoreThreadContext(context: CoroutineContext, oldState: ThreadContext.StoredContext) {
+        oldState.restore()
     }
 }
 
+/** Runs [block] with [context]; the element itself puts each thread's own context back when the block leaves it. */
 suspend fun <T> withClosableContext(
     context: InjectorContextElement,
     block: suspend CoroutineScope.() -> T
 ): T {
-    try {
-        return withContext(context) { block() }
-    } finally {
-        context.rolesInjectorHelper.close()
-    }
+    return withContext(context) { block() }
 }
