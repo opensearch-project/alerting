@@ -147,6 +147,19 @@ class AlertingSettings {
             Setting.Property.NodeScope, Setting.Property.Dynamic
         )
 
+        /**
+         * How often a data node re-offers outstanding alert cleanup tasks to the cluster.
+         *
+         * This is the interval within which the cleanup of a job's alerts recovers from the loss of the node that was
+         * draining it, or from an announcement that was never delivered. Lowering it shortens that window at the cost of
+         * one search of the cleanup task index per node per interval.
+         */
+        val ALERT_CLEANUP_RESUME_INTERVAL = Setting.positiveTimeSetting(
+            "plugins.alerting.alert_cleanup_resume_interval",
+            TimeValue.timeValueMinutes(10),
+            Setting.Property.NodeScope, Setting.Property.Dynamic
+        )
+
         val ALERT_HISTORY_ENABLED = Setting.boolSetting(
             "plugins.alerting.alert_history_enabled",
             LegacyOpenDistroAlertingSettings.ALERT_HISTORY_ENABLED,
