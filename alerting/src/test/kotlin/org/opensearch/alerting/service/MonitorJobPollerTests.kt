@@ -503,6 +503,7 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         val mockClient = mockClient()
         val mockThreadPool = mock(org.opensearch.threadpool.ThreadPool::class.java)
         val threadContext = org.opensearch.common.util.concurrent.ThreadContext(Settings.EMPTY)
+        threadContext.putTransient("own", "own")
         `when`(mockClient.threadPool()).thenReturn(mockThreadPool)
         `when`(mockThreadPool.threadContext).thenReturn(threadContext)
         val seenByDispatch = java.util.concurrent.atomic.AtomicReference<Any?>()
@@ -534,6 +535,7 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
 
         val seenByStarter = java.util.concurrent.atomic.AtomicReference<Any?>("unset")
         val seenByResponder = java.util.concurrent.atomic.AtomicReference<Any?>("unset")
+        val ownOnResponder = java.util.concurrent.atomic.AtomicReference<Any?>("unset")
         kotlinx.coroutines.runBlocking {
             // Unconfined runs the coroutine here until it suspends, and resumes it on the thread that answers
             launch(kotlinx.coroutines.Dispatchers.Unconfined) { poller.executeMonitor(monitor, java.time.Instant.now()) }
@@ -542,6 +544,7 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
             val responder = Thread {
                 pending.get().onResponse(mock(org.opensearch.alerting.action.ExecuteMonitorResponse::class.java))
                 seenByResponder.set(threadContext.getTransient<String>("x-account-id"))
+                ownOnResponder.set(threadContext.getTransient<String>("own"))
             }
             responder.start()
             responder.join()
@@ -550,6 +553,8 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         assertEquals("790849549214", seenByDispatch.get())
         assertNull("the starting thread kept the populated headers", seenByStarter.get())
         assertNull("the answering thread took the populated headers", seenByResponder.get())
+        assertEquals("the starting thread must get its own context back", "own", threadContext.getTransient<String>("own"))
+        assertNull("the answering thread took the starting thread's context", ownOnResponder.get())
         poller.close()
     }
 

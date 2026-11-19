@@ -229,6 +229,8 @@ class SecureResourceSharingMonitorRestApiIT : AlertingRestTestCase() {
 
     fun `test deleting a monitor removes its sharing record`() {
         val monitor = aliceCreatesMonitor()
+        val before = adminClient().performRequest(Request("GET", "/$configSharingIndex/_doc/${monitor.id}"))
+        assertEquals("the sharing record must exist before the delete", RestStatus.OK.status, before.statusLine.statusCode)
         assertOk { deleteMonitorAs(aliceClient!!, monitor) }
 
         // The security plugin deletes the record from its shard-level postDelete hook, after the delete has answered
