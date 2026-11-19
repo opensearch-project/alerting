@@ -7,6 +7,7 @@ package org.opensearch.alerting.service
 
 import com.carrotsearch.randomizedtesting.ThreadFilter
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters
+import kotlinx.coroutines.launch
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import org.opensearch.alerting.util.ArnHelper
@@ -494,18 +495,22 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         poller.close()
     }
 
-    fun `test executeMonitor dispatches with the populated headers and leaves the thread as it was`() {
+    /**
+     * The execute call is answered from a second thread, as it is when the coroutine resumes elsewhere. The populated
+     * headers reach the dispatch, and neither the starting thread nor the answering thread keeps them.
+     */
+    fun `test executeMonitor dispatches with the populated headers and leaves them on no thread`() {
         val mockClient = mockClient()
         val mockThreadPool = mock(org.opensearch.threadpool.ThreadPool::class.java)
         val threadContext = org.opensearch.common.util.concurrent.ThreadContext(Settings.EMPTY)
         `when`(mockClient.threadPool()).thenReturn(mockThreadPool)
         `when`(mockThreadPool.threadContext).thenReturn(threadContext)
         val seenByDispatch = java.util.concurrent.atomic.AtomicReference<Any?>()
+        val pending = java.util.concurrent.atomic.AtomicReference<org.opensearch.core.action.ActionListener<Any>>()
         org.mockito.Mockito.doAnswer {
             seenByDispatch.set(threadContext.getTransient<String>("x-account-id"))
             @Suppress("UNCHECKED_CAST")
-            (it.getArgument(2) as org.opensearch.core.action.ActionListener<Any>)
-                .onResponse(mock(org.opensearch.alerting.action.ExecuteMonitorResponse::class.java))
+            pending.set(it.getArgument(2) as org.opensearch.core.action.ActionListener<Any>)
             null
         }.`when`(mockClient).execute(
             org.mockito.ArgumentMatchers.eq(org.opensearch.alerting.action.ExecuteMonitorAction.INSTANCE),
@@ -527,10 +532,24 @@ class MonitorJobPollerTests : OpenSearchTestCase() {
         )
         val monitor = org.opensearch.alerting.randomQueryLevelMonitor().copy(target = target)
 
-        kotlinx.coroutines.runBlocking { poller.executeMonitor(monitor, java.time.Instant.now()) }
+        val seenByStarter = java.util.concurrent.atomic.AtomicReference<Any?>("unset")
+        val seenByResponder = java.util.concurrent.atomic.AtomicReference<Any?>("unset")
+        kotlinx.coroutines.runBlocking {
+            // Unconfined runs the coroutine here until it suspends, and resumes it on the thread that answers
+            launch(kotlinx.coroutines.Dispatchers.Unconfined) { poller.executeMonitor(monitor, java.time.Instant.now()) }
+            seenByStarter.set(threadContext.getTransient<String>("x-account-id"))
+
+            val responder = Thread {
+                pending.get().onResponse(mock(org.opensearch.alerting.action.ExecuteMonitorResponse::class.java))
+                seenByResponder.set(threadContext.getTransient<String>("x-account-id"))
+            }
+            responder.start()
+            responder.join()
+        }
 
         assertEquals("790849549214", seenByDispatch.get())
-        assertNull("the populated headers must not stay on the calling thread", threadContext.getTransient<String>("x-account-id"))
+        assertNull("the starting thread kept the populated headers", seenByStarter.get())
+        assertNull("the answering thread took the populated headers", seenByResponder.get())
         poller.close()
     }
 
