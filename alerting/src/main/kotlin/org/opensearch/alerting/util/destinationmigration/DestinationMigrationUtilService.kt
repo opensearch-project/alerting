@@ -5,6 +5,7 @@
 
 package org.opensearch.alerting.util.destinationmigration
 
+import kotlinx.coroutines.CancellationException
 import org.apache.logging.log4j.LogManager
 import org.opensearch.action.bulk.BulkRequest
 import org.opensearch.action.bulk.BulkResponse
@@ -130,6 +131,9 @@ class DestinationMigrationUtilService {
                         migratedNotificationConfigs.add(createResponse.configId)
                         logger.debug(("Migrated destination: ${createResponse.configId}"))
                     }
+                } catch (e: CancellationException) {
+                    // The migration job was cancelled, for example on shutdown; stop rather than log each remaining config
+                    throw e
                 } catch (e: Exception) {
                     if (e.message?.contains("version conflict, document already exists") == true) {
                         migratedNotificationConfigs.add(notificationConfigInfo.configId)
