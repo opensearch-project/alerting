@@ -5,9 +5,13 @@
 
 package org.opensearch.alerting.opensearchapi
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.After
@@ -23,25 +27,30 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
+/** Tests that [InjectorContextElement] and [withClosableContext] leave each thread with its own context. */
 class InjectorContextElementTests {
 
     private val marker = "test-marker"
     private lateinit var threadContext: ThreadContext
     private lateinit var worker: ExecutorService
+    private lateinit var other: ExecutorService
 
     @Before
     fun setUp() {
         threadContext = ThreadContext(Settings.EMPTY)
         worker = Executors.newSingleThreadExecutor()
+        other = Executors.newSingleThreadExecutor()
     }
 
     @After
     fun tearDown() {
         worker.shutdownNow()
+        other.shutdownNow()
         worker.awaitTermination(10, TimeUnit.SECONDS)
+        other.awaitTermination(10, TimeUnit.SECONDS)
     }
 
-    /** A guard on the injection itself; it passes with the previous element too. */
+    /** Checks that the roles stay injected across a resume. */
     @Test
     fun `test the roles stay injected after the coroutine resumes on a worker`() {
         val element = InjectorContextElement("monitor", Settings.EMPTY, threadContext, listOf("role_a"))
@@ -78,27 +87,20 @@ class InjectorContextElementTests {
 
     @Test
     fun `test the caller's context is back after the block resumes on another thread`() {
-        val other = Executors.newSingleThreadExecutor()
-        try {
-            val user = User("owner", listOf("backend_a"), listOf("role_a"), listOf())
-            val element = InjectorContextElement("monitor", Settings.EMPTY, threadContext, listOf("role_a"), user)
+        val element = InjectorContextElement("monitor", Settings.EMPTY, threadContext, listOf("role_a"), owner())
 
-            val seen = runBlocking(worker.asCoroutineDispatcher()) {
-                val entryThread = Thread.currentThread()
-                val inBlock = withClosableContext(element) {
-                    withContext(other.asCoroutineDispatcher()) { delay(10) }
-                    delay(10)
-                    listOf(injectedRoles(), Thread.currentThread() !== entryThread)
-                }
-                inBlock + listOf(injectedRoles(), injectedUserInfo())
+        val seen = runBlocking(worker.asCoroutineDispatcher()) {
+            val entryThread = Thread.currentThread()
+            val inBlock = withClosableContext(element) {
+                withContext(other.asCoroutineDispatcher()) { delay(10) }
+                delay(10)
+                listOf(injectedRoles(), Thread.currentThread() !== entryThread)
             }
-
-            // The block ends on the worker it entered on, after a hop to the other dispatcher.
-            assertEquals(listOf("plugin|role_a", false, null, null), seen)
-        } finally {
-            other.shutdownNow()
-            other.awaitTermination(10, TimeUnit.SECONDS)
+            inBlock + listOf(injectedRoles(), injectedUserInfo())
         }
+
+        // The block ends on the worker it entered on, after a hop to the other dispatcher.
+        assertEquals(listOf("plugin|role_a", false, null, null), seen)
     }
 
     @Test
@@ -118,6 +120,78 @@ class InjectorContextElementTests {
         assertEquals("the caller continues on another thread, without the injected roles", listOf(true, null), seen)
         assertNull("the entry thread has no injected roles", injectedRoles())
     }
+
+    @Test
+    fun `test the caller's context is back when the block throws after a hop`() {
+        val element = InjectorContextElement("monitor", Settings.EMPTY, threadContext, listOf("role_a"), owner())
+
+        val seen = runBlocking(worker.asCoroutineDispatcher()) {
+            try {
+                withClosableContext(element) {
+                    withContext(other.asCoroutineDispatcher()) { delay(10) }
+                    throw IllegalStateException("monitor failed")
+                }
+            } catch (e: IllegalStateException) {
+                listOf(e.message, injectedRoles(), injectedUserInfo())
+            }
+        }
+
+        assertEquals(listOf("monitor failed", null, null), seen)
+    }
+
+    @Test
+    fun `test the caller's context is back when the block is cancelled after a hop`() {
+        val element = InjectorContextElement("monitor", Settings.EMPTY, threadContext, listOf("role_a"), owner())
+
+        val seen = runBlocking(worker.asCoroutineDispatcher()) {
+            val afterCancel = mutableListOf<String?>()
+            val inBlock = CompletableDeferred<Unit>()
+            val job = launch {
+                try {
+                    withClosableContext(element) {
+                        withContext(other.asCoroutineDispatcher()) { delay(10) }
+                        inBlock.complete(Unit)
+                        delay(10_000)
+                    }
+                } catch (e: CancellationException) {
+                    afterCancel.add(injectedRoles())
+                    afterCancel.add(injectedUserInfo())
+                }
+            }
+            inBlock.await()
+            job.cancelAndJoin()
+            afterCancel + listOf(injectedRoles())
+        }
+
+        assertEquals(listOf(null, null, null), seen)
+    }
+
+    @Test
+    fun `test a nested block gives the outer block its own roles back`() {
+        val outer = InjectorContextElement("outer", Settings.EMPTY, threadContext, listOf("role_outer"), owner())
+
+        val seen = runBlocking(worker.asCoroutineDispatcher()) {
+            val inOuter = withClosableContext(outer) {
+                val roles = mutableListOf(injectedRoles())
+                val inner = InjectorContextElement("inner", Settings.EMPTY, threadContext, listOf("role_inner"))
+                withClosableContext(inner) {
+                    withContext(other.asCoroutineDispatcher()) { delay(10) }
+                }
+                roles.add(injectedRoles())
+                withContext(other.asCoroutineDispatcher()) { delay(10) }
+                roles.add(injectedRoles())
+                roles
+            }
+            inOuter + listOf(injectedRoles(), injectedUserInfo())
+        }
+
+        assertEquals(
+            listOf("plugin|role_outer", "plugin|role_outer", "plugin|role_outer", null, null),
+            seen
+        )
+    }
+
+    private fun owner() = User("owner", listOf("backend_a"), listOf("role_a"), listOf())
 
     private fun injectedUserInfo(): String? =
         threadContext.getTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
