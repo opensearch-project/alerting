@@ -185,38 +185,56 @@ suspend fun <T> PPLPluginInterface.suspendUntil(block: PPLPluginInterface.(Actio
         })
     }
 
+/**
+ * Runs a coroutine with the given roles and user info injected into the thread context.
+ *
+ * Each time the coroutine is dispatched onto a thread, the element saves that thread's own context, injects the roles
+ * and user info, and puts the saved context back when the coroutine suspends or completes. Use it through
+ * [withClosableContext], which also restores the caller's context once the block returns.
+ */
 class InjectorContextElement(
     id: String,
     settings: Settings,
-    threadContext: ThreadContext,
+    internal val threadContext: ThreadContext,
     private val roles: List<String>?,
     private val user: User? = null
-) : ThreadContextElement<Unit> {
+) : ThreadContextElement<ThreadContext.StoredContext> {
 
     companion object Key : CoroutineContext.Key<InjectorContextElement>
     override val key: CoroutineContext.Key<*>
         get() = Key
 
-    var rolesInjectorHelper = InjectSecurity(id, settings, threadContext)
+    // Used only to inject; the context InjectSecurity captures when it is created is never restored.
+    private val rolesInjectorHelper = InjectSecurity(id, settings, threadContext)
 
-    override fun updateThreadContext(context: CoroutineContext) {
+    override fun updateThreadContext(context: CoroutineContext): ThreadContext.StoredContext {
+        val threadOwnContext = threadContext.newStoredContext(true)
         rolesInjectorHelper.injectRoles(roles)
         // This is from where plugins extract backend roles. It should be passed when calling APIs of other plugins
         rolesInjectorHelper.injectUserInfo(user)
+        return threadOwnContext
     }
 
-    override fun restoreThreadContext(context: CoroutineContext, oldState: Unit) {
-        rolesInjectorHelper.close()
+    override fun restoreThreadContext(context: CoroutineContext, oldState: ThreadContext.StoredContext) {
+        oldState.restore()
     }
 }
 
+/**
+ * Runs [block] with [context] and then restores the caller's context.
+ *
+ * The restore is needed because `withContext` without a dispatcher change starts the block undispatched: when the
+ * block resumes on another thread and finishes there, the caller's code continues on that thread while the element's
+ * injected values are still in place.
+ */
 suspend fun <T> withClosableContext(
     context: InjectorContextElement,
     block: suspend CoroutineScope.() -> T
 ): T {
+    val callerContext = context.threadContext.newStoredContext(true)
     try {
         return withContext(context) { block() }
     } finally {
-        context.rolesInjectorHelper.close()
+        callerContext.restore()
     }
 }
