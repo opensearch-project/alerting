@@ -5,7 +5,6 @@
 
 package org.opensearch.alerting.util
 
-import com.github.mustachejava.DefaultMustacheFactory
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.common.settings.Settings
 import org.opensearch.script.Script
@@ -13,13 +12,14 @@ import org.opensearch.script.ScriptService
 import org.opensearch.script.ScriptType
 import org.opensearch.script.TemplateScript
 import java.io.StringReader
-import java.io.StringWriter
 
 /**
  * Handles mustache template compilation and rendering.
  *
  * When multi-tenancy is enabled, inline scripting is disabled to prevent painless execution.
- * This class uses the mustache-java library directly in that case, bypassing ScriptService.
+ * This class uses a restricted mustache-java factory in that case, bypassing ScriptService.
+ * Direct rendering rejects external template resources, escapes values as JSON string content,
+ * and limits the rendered output size.
  * When multi-tenancy is disabled, it delegates to ScriptService as before.
  */
 class MustacheTemplateService(
@@ -27,12 +27,16 @@ class MustacheTemplateService(
     settings: Settings
 ) {
     private val multiTenancyEnabled = AlertingSettings.MULTI_TENANCY_ENABLED.get(settings)
-    private val mustacheFactory = DefaultMustacheFactory()
+    private val mustacheFactory = RestrictedMustacheFactory()
+
+    companion object {
+        // Per rendered template, measured in UTF-16 code units rather than encoded bytes.
+        internal const val MAX_TEMPLATE_OUTPUT_CHARS = 1_048_576
+    }
 
     /**
      * Compiles and renders an inline mustache template with the given parameters.
-     * Equivalent to: scriptService.compile(Script(INLINE, DEFAULT_TEMPLATE_LANG, template, params), TemplateScript.CONTEXT)
-     *     .newInstance(params).execute()
+     * Uses restricted direct rendering in multi-tenant mode and ScriptService otherwise.
      */
     fun renderTemplate(template: String, params: Map<String, Any>): String {
         return if (multiTenancyEnabled) {
@@ -64,8 +68,8 @@ class MustacheTemplateService(
 
     private fun renderDirectly(template: String, params: Map<String, Any>): String {
         val mustache = mustacheFactory.compile(StringReader(template), "template")
-        val writer = StringWriter()
-        mustache.execute(writer, params)
+        val writer = BoundedTemplateWriter(MAX_TEMPLATE_OUTPUT_CHARS)
+        mustache.execute(writer, params).flush()
         return writer.toString()
     }
 }
