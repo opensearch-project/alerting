@@ -149,11 +149,12 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
             val updatedIndexNames = mutableListOf<String>()
             val docLevelMonitorFanOutResponses: MutableList<DocLevelMonitorFanOutResponse> = mutableListOf()
             docLevelMonitorInput.indices.forEach { indexName ->
-                var concreteIndices = IndexUtils.resolveAllIndices(
+                val allPatternConcreteIndices = IndexUtils.resolveAllIndices(
                     listOf(indexName),
                     monitorCtx.clusterService!!,
                     monitorCtx.indexNameExpressionResolver!!
                 )
+                var concreteIndices = allPatternConcreteIndices
                 var lastWriteIndex: String? = null
                 if (IndexUtils.isAlias(indexName, monitorCtx.clusterService!!.state()) ||
                     IndexUtils.isDataStream(indexName, monitorCtx.clusterService!!.state())
@@ -174,7 +175,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                 updatedIndexNames.add(updatedIndexName)
                 val conflictingFields = monitorCtx.docLevelMonitorQueries!!.getAllConflictingFields(
                     monitorCtx.clusterService!!.state(),
-                    concreteIndices
+                    allPatternConcreteIndices
                 )
 
                 concreteIndices.forEach { concreteIndexName ->
@@ -237,7 +238,7 @@ class DocumentLevelMonitorRunner : MonitorRunner() {
                         updatedIndexName,
                         concreteIndexName,
                         updatedIndexNames,
-                        concreteIndices,
+                        allPatternConcreteIndices,
                         conflictingFields.toList(),
                         matchingDocIdsPerIndex?.get(concreteIndexName),
                         findingIdsForMatchingDocIds
