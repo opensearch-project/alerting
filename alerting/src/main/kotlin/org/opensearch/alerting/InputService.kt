@@ -478,18 +478,20 @@ class InputService(
             // If remote monitoring is enabled, and the monitor is configured to execute against remote clusters,
             // execute the API against each cluster, and compile the results.
             client.threadPool().threadContext.stashContext().use {
-                val singleThreadContext = newSingleThreadContext("ClusterMetricsMonitorThread")
-                withContext(singleThreadContext) {
-                    it.restore()
-                    input.clusters.forEach { cluster ->
-                        val targetClient = CrossClusterMonitorUtils.getClientForCluster(cluster, client, clusterService)
-                        val response = executeTransportAction(input, targetClient)
-                        // Not all supported API reference the cluster name in their response.
-                        // Mapping each response to the cluster name before adding to results.
-                        // Not adding this same logic for local-only monitors to avoid breaking existing monitors.
-                        responseMap[cluster] = response.toMap()
+                // Closed after use, so the dedicated thread does not outlive the call
+                newSingleThreadContext("ClusterMetricsMonitorThread").use { singleThreadContext ->
+                    withContext(singleThreadContext) {
+                        it.restore()
+                        input.clusters.forEach { cluster ->
+                            val targetClient = CrossClusterMonitorUtils.getClientForCluster(cluster, client, clusterService)
+                            val response = executeTransportAction(input, targetClient)
+                            // Not all supported API reference the cluster name in their response.
+                            // Mapping each response to the cluster name before adding to results.
+                            // Not adding this same logic for local-only monitors to avoid breaking existing monitors.
+                            responseMap[cluster] = response.toMap()
+                        }
+                        results += responseMap
                     }
-                    results += responseMap
                 }
             }
         } else {
