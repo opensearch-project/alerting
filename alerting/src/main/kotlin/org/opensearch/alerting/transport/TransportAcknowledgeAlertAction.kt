@@ -18,6 +18,7 @@ import org.opensearch.alerting.AlertingPlugin
 import org.opensearch.alerting.ResourceSharingUtils
 import org.opensearch.alerting.settings.AlertingSettings
 import org.opensearch.alerting.util.await
+import org.opensearch.alerting.util.getDataObjectStashed
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.inject.Inject
@@ -152,7 +153,7 @@ class TransportAcknowledgeAlertAction @Inject constructor(
             .id(monitorId)
             .tenantId(tenantId)
             .build()
-        val response = sdkClient.getDataObject(getRequest)
+        val response = sdkClient.getDataObjectStashed(getRequest, client.threadPool().threadContext)
         val getResponse = response.getResponse()
         if (getResponse == null || !getResponse.isExists) {
             return null
@@ -188,7 +189,9 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                 .searchSourceBuilder(searchSourceBuilder)
                 .build()
             try {
-                val searchResponse = sdkClient.searchDataObjectAsync(sdkSearchRequest).await()
+                val searchResponse = client.threadPool().threadContext.stashContext().use {
+                    sdkClient.searchDataObjectAsync(sdkSearchRequest)
+                }.await()
                     .searchResponse() ?: throw RuntimeException("Unknown error loading alerts")
                 onSearchResponse(searchResponse, monitor)
             } catch (t: Exception) {
@@ -250,12 +253,16 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                 val updateResponse = if (updateRequests.isNotEmpty()) {
                     val bulkRequest = BulkDataObjectRequest(null)
                     updateRequests.forEach { bulkRequest.add(it) }
-                    sdkClient.bulkDataObjectAsync(bulkRequest).await()
+                    client.threadPool().threadContext.stashContext().use {
+                        sdkClient.bulkDataObjectAsync(bulkRequest)
+                    }.await()
                 } else null
                 val copyResponse = if (copyRequests.isNotEmpty()) {
                     val bulkRequest = BulkDataObjectRequest(null)
                     copyRequests.forEach { bulkRequest.add(it) }
-                    sdkClient.bulkDataObjectAsync(bulkRequest).await()
+                    client.threadPool().threadContext.stashContext().use {
+                        sdkClient.bulkDataObjectAsync(bulkRequest)
+                    }.await()
                 } else null
                 onBulkResponse(updateResponse, copyResponse, monitor)
             } catch (t: Exception) {
@@ -311,7 +318,9 @@ class TransportAcknowledgeAlertAction @Inject constructor(
                 try {
                     val bulkRequest = BulkDataObjectRequest(null)
                     deleteRequests.forEach { bulkRequest.add(it) }
-                    val deleteResponse = sdkClient.bulkDataObjectAsync(bulkRequest).await()
+                    val deleteResponse = client.threadPool().threadContext.stashContext().use {
+                        sdkClient.bulkDataObjectAsync(bulkRequest)
+                    }.await()
                     deleteResponse.responses.forEach { item ->
                         missing.remove(item.id())
                         if (item.isFailed) {

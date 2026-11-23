@@ -29,39 +29,36 @@ import org.opensearch.transport.client.Client
  * `OPENDISTRO_SECURITY_AUTHENTICATED_USER` header must still be readable by
  * [org.opensearch.security.resources.ResourceIndexListener] to record `createdBy`.
  *
- * Each helper here stashes right before the sdk call and restores on the completion callback via
- * `whenComplete`, mirroring flow-framework / ml-commons. Callers should invoke these instead of
- * `sdkClient.xxxAsync(...).await()` directly.
+ * Stash only while dispatching the async call, then restore on that same thread before awaiting.
+ * Restoring on a completion or coroutine-resume thread would leak context between requests.
  */
 
 suspend fun SdkClient.putDataObjectStashed(
     request: PutDataObjectRequest,
     threadContext: ThreadContext,
+    callerContext: ThreadContext.StoredContext? = null,
 ): PutDataObjectResponse {
-    val stored = threadContext.stashContext()
-    return this.putDataObjectAsync(request)
-        .whenComplete { _, _ -> stored.close() }
-        .await()
+    val future = threadContext.newStoredContext(false).use {
+        callerContext?.restore()
+        threadContext.stashContext().use { this.putDataObjectAsync(request) }
+    }
+    return future.await()
 }
 
 suspend fun SdkClient.getDataObjectStashed(
     request: GetDataObjectRequest,
     threadContext: ThreadContext,
 ): GetDataObjectResponse {
-    val stored = threadContext.stashContext()
-    return this.getDataObjectAsync(request)
-        .whenComplete { _, _ -> stored.close() }
-        .await()
+    val future = threadContext.stashContext().use { this.getDataObjectAsync(request) }
+    return future.await()
 }
 
 suspend fun SdkClient.deleteDataObjectStashed(
     request: DeleteDataObjectRequest,
     threadContext: ThreadContext,
 ): DeleteDataObjectResponse {
-    val stored = threadContext.stashContext()
-    return this.deleteDataObjectAsync(request)
-        .whenComplete { _, _ -> stored.close() }
-        .await()
+    val future = threadContext.stashContext().use { this.deleteDataObjectAsync(request) }
+    return future.await()
 }
 
 /**
