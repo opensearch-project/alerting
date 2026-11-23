@@ -145,7 +145,7 @@ class TransportGetMonitorAction @Inject constructor(
                         actionListener.onResponse(
                             GetMonitorResponse(
                                 getResponse.id, getResponse.version, getResponse.seqNo, getResponse.primaryTerm,
-                                monitor, associatedCompositeMonitors
+                                monitor, associatedCompositeMonitors, getVisibleBackendRoles(user, monitor?.user)
                             )
                         )
                     }

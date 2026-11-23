@@ -758,7 +758,7 @@ abstract class AlertingRestTestCase : ODFERestTestCase() {
             }
         }
 
-        assertUserNull(monitor)
+        assertOnlyBackendRolesExposed(monitor)
         return monitor.copy(id = id, version = version)
     }
 

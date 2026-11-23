@@ -248,7 +248,7 @@ class TransportGetAlertsAction @Inject constructor(
         if (user == null) {
             // user is null when: 1/ security is disabled. 2/ when the caller is super-admin.
             // Both see everything, so no filtering is applied even under resource sharing.
-            search(alertIndex, searchSourceBuilder, actionListener, tenantId)
+            search(alertIndex, searchSourceBuilder, actionListener, tenantId, user)
         } else if (ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)) {
             // resource sharing is enabled - filter alerts by accessible monitor IDs
             val rsc = ResourceSharingClientAccessor.getResourceSharingClient()
@@ -272,7 +272,7 @@ class TransportGetAlertsAction @Inject constructor(
                             // on the system alerts index. The monitor_id filter, bounded to the caller's
                             // accessible monitors, is what enforces the resource-sharing boundary here.
                             client.threadPool().threadContext.stashContext().use {
-                                search(alertIndex, searchSourceBuilder, actionListener, tenantId)
+                                search(alertIndex, searchSourceBuilder, actionListener, tenantId, user)
                             }
                         }
 
@@ -283,13 +283,13 @@ class TransportGetAlertsAction @Inject constructor(
                 )
             }
         } else if (!doFilterForUser(user)) {
-            search(alertIndex, searchSourceBuilder, actionListener, tenantId)
+            search(alertIndex, searchSourceBuilder, actionListener, tenantId, user)
         } else {
             // security is enabled and filterby is enabled.
             try {
                 log.info("Filtering result by: ${user.backendRoles}")
                 addFilter(user, searchSourceBuilder, "monitor_user.backend_roles.keyword")
-                search(alertIndex, searchSourceBuilder, actionListener, tenantId)
+                search(alertIndex, searchSourceBuilder, actionListener, tenantId, user)
             } catch (ex: IOException) {
                 actionListener.onFailure(AlertingException.wrap(ex))
             }
@@ -301,6 +301,7 @@ class TransportGetAlertsAction @Inject constructor(
         searchSourceBuilder: SearchSourceBuilder,
         actionListener: ActionListener<GetAlertsResponse>,
         tenantId: String? = null,
+        user: User? = null,
     ) {
         val sdkSearchRequest = SearchDataObjectRequest.builder()
             .indices(alertIndex)
@@ -330,11 +331,21 @@ class TransportGetAlertsAction @Inject constructor(
                     XContentParserUtils.ensureExpectedToken(XContentParser.Token.START_OBJECT, xcp.nextToken(), xcp)
                     Alert.parse(xcp, hit.id, hit.version)
                 }
-                actionListener.onResponse(GetAlertsResponse(alerts, totalAlertCount))
+                actionListener.onResponse(GetAlertsResponse(alerts, totalAlertCount, visibleBackendRoles(alerts, user)))
             } catch (e: Exception) {
                 log.error("Failed to search alerts", e)
                 actionListener.onFailure(AlertingException.wrap(e))
             }
         }
+    }
+
+    /**
+     * Maps each alert to the backend roles of its monitor that the requester is entitled to see, so that callers
+     * can audit an alert's access scope without being shown roles they don't belong to.
+     */
+    private fun visibleBackendRoles(alerts: List<Alert>, user: User?): Map<String, List<String>> {
+        return alerts.mapNotNull { alert ->
+            getVisibleBackendRoles(user, alert.monitorUser)?.let { alert.id to it }
+        }.toMap()
     }
 }

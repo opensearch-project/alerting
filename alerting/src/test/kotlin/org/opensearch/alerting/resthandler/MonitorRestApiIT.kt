@@ -406,6 +406,55 @@ class MonitorRestApiIT : AlertingRestTestCase() {
     }
 
     @Throws(Exception::class)
+    fun `test get monitor exposes no user when the monitor carries no backend roles`() {
+        val monitor = createRandomMonitor()
+
+        val response = client().makeRequest(
+            "GET",
+            "$ALERTING_BASE_URI/${monitor.id}",
+            null,
+            BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+        )
+
+        assertEquals("Get monitor failed", RestStatus.OK, response.restStatus())
+        val monitorMap = response.asMap()["monitor"] as Map<String, Any>
+        // Security is disabled here, so the monitor carries no backend roles and no user block is written.
+        assertNull("Monitor user was exposed", monitorMap["user"])
+    }
+
+    @Throws(Exception::class)
+    fun `test search monitor exposes no user when the monitor carries no backend roles`() {
+        createRandomMonitor(refresh = true)
+
+        val search = SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).toString()
+        val response = client().makeRequest(
+            "GET",
+            "$ALERTING_BASE_URI/_search",
+            emptyMap(),
+            StringEntity(search, ContentType.APPLICATION_JSON)
+        )
+
+        assertEquals("Search monitor failed", RestStatus.OK, response.restStatus())
+        val hits = (response.asMap()["hits"] as Map<String, Any>)["hits"] as List<Map<String, Any>>
+        val source = hits.first()["_source"] as Map<String, Any>
+        assertNull("Monitor user was exposed", source["user"])
+    }
+
+    @Throws(Exception::class)
+    fun `test get alerts exposes no monitor user when the monitor carries no backend roles`() {
+        putAlertMappings()
+        val monitor = createRandomMonitor(refresh = true)
+        createAlert(randomAlert(monitor).copy(state = Alert.State.ACTIVE))
+
+        val response = getAlerts(client(), emptyMap())
+
+        val alerts = response.asMap()["alerts"] as List<Map<String, Any>>
+        assertEquals("Expected one alert", 1, alerts.size)
+        // Security is disabled here, so the alert carries no backend roles and no monitor user is written.
+        assertNull("Monitor user was exposed", alerts[0]["monitor_user"])
+    }
+
+    @Throws(Exception::class)
     fun `test getting a monitor that doesn't exist`() {
         try {
             getMonitor(randomAlphaOfLength(20))
