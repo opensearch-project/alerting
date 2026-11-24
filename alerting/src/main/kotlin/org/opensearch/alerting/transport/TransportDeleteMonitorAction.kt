@@ -113,7 +113,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                 val monitor = getMonitor()
 
                 val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
-                // when resource sharing is enabled, security plugin gates access at the index layer
+                // when resource sharing is enabled, the security plugin checks access at the transport layer, since the request is a DocRequest
                 val canDelete = useRsc ||
                     user == null ||
                     !doFilterForUser(user) ||

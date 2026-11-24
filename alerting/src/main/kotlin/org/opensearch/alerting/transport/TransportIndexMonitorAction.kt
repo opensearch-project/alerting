@@ -648,7 +648,7 @@ class TransportIndexMonitorAction @Inject constructor(
          * The security plugin's [ResourceIndexListener] requires the auth user to record a share
          * entry for the created resource.
          */
-        private val storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
+        private val storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext,
     ) {
 
         fun resolveUserAndStart() {
@@ -954,6 +954,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .build()
 
             try {
+                // The caller's context reaches only this write, where the security plugin records the creator
                 val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext, storedThreadContext)
                 if (putResponse.isFailed) {
                     actionListener.onFailure(
@@ -1181,6 +1182,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .build()
 
             try {
+                // The caller's context reaches only this write, where the security plugin records the creator
                 val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext, storedThreadContext)
                 if (putResponse.isFailed) {
                     actionListener.onFailure(
