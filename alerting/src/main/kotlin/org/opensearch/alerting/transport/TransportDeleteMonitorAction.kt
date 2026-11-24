@@ -92,7 +92,6 @@ class TransportDeleteMonitorAction @Inject constructor(
             return
         }
         val tenantId = client.threadPool().threadContext.getHeader(AlertingPlugin.TENANT_ID_HEADER)
-        // Deleting a resource needs no caller identity: the security plugin removes its sharing record on delete
         scope.launch(TenantContext(tenantId)) {
             DeleteMonitorHandler(
                 client,
@@ -114,7 +113,7 @@ class TransportDeleteMonitorAction @Inject constructor(
                 val monitor = getMonitor()
 
                 val useRsc = ResourceSharingUtils.shouldUseResourceAuthz(ResourceSharingUtils.MONITOR_RESOURCE_TYPE)
-                // when resource sharing is enabled, the security plugin checks access at the transport layer, since the request is a DocRequest
+                // when resource sharing is enabled, security plugin gates access at the index layer
                 val canDelete = useRsc ||
                     user == null ||
                     !doFilterForUser(user) ||

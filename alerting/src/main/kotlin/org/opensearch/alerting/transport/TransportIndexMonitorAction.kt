@@ -60,7 +60,6 @@ import org.opensearch.alerting.util.getRoleFilterEnabled
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.util.isClusterMetricsMonitor
 import org.opensearch.alerting.util.isUnsupportedMultiTenantMonitorType
-import org.opensearch.alerting.util.putDataObjectAsCaller
 import org.opensearch.alerting.util.putDataObjectStashed
 import org.opensearch.alerting.util.use
 import org.opensearch.cluster.service.ClusterService
@@ -649,7 +648,7 @@ class TransportIndexMonitorAction @Inject constructor(
          * The security plugin's [ResourceIndexListener] requires the auth user to record a share
          * entry for the created resource.
          */
-        private val storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext,
+        private val storedThreadContext: org.opensearch.common.util.concurrent.ThreadContext.StoredContext? = null,
     ) {
 
         fun resolveUserAndStart() {
@@ -921,6 +920,18 @@ class TransportIndexMonitorAction @Inject constructor(
             }
             request.monitor = request.monitor.copy(uiMetadata = request.monitor.uiMetadataWithCreatedBy(user?.name))
 
+            try {
+                request.monitor = request.monitor.copy(
+                    user = excludeBackendRoles(
+                        request.monitor.user,
+                        clusterService.clusterSettings.get(AlertingSettings.EXCLUDED_BACKEND_ROLES)
+                    )
+                )
+            } catch (e: IllegalArgumentException) {
+                actionListener.onFailure(AlertingException.wrap(e))
+                return
+            }
+
             log.info("Creating new monitor: ${request.monitor.name}, type: ${request.monitor.monitorType}")
 
             if (!tenantId.isNullOrEmpty()) {
@@ -943,8 +954,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .build()
 
             try {
-                // The caller's context reaches only this write, where the security plugin records the creator
-                val putResponse = sdkClient.putDataObjectAsCaller(putRequest, client.threadPool().threadContext, storedThreadContext)
+                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext, storedThreadContext)
                 if (putResponse.isFailed) {
                     actionListener.onFailure(
                         AlertingException.wrap(
@@ -1133,6 +1143,18 @@ class TransportIndexMonitorAction @Inject constructor(
                 log.debug("Update monitor backend roles to: ${request.monitor.user?.backendRoles}")
             }
 
+            try {
+                request.monitor = request.monitor.copy(
+                    user = excludeBackendRoles(
+                        request.monitor.user,
+                        clusterService.clusterSettings.get(AlertingSettings.EXCLUDED_BACKEND_ROLES)
+                    )
+                )
+            } catch (e: IllegalArgumentException) {
+                actionListener.onFailure(AlertingException.wrap(e))
+                return
+            }
+
             // The creator never changes after creation: keep the stored value, whatever the request's ui_metadata holds.
             request.monitor = request.monitor.copy(
                 schemaVersion = IndexUtils.scheduledJobIndexSchemaVersion,
@@ -1159,8 +1181,7 @@ class TransportIndexMonitorAction @Inject constructor(
                 .build()
 
             try {
-                // The caller's context reaches only this write, where the security plugin records the creator
-                val putResponse = sdkClient.putDataObjectAsCaller(putRequest, client.threadPool().threadContext, storedThreadContext)
+                val putResponse = sdkClient.putDataObjectStashed(putRequest, client.threadPool().threadContext, storedThreadContext)
                 if (putResponse.isFailed) {
                     actionListener.onFailure(
                         AlertingException.wrap(

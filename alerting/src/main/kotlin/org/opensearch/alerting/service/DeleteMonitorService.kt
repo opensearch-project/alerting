@@ -25,8 +25,9 @@ import org.opensearch.alerting.core.lock.LockService
 import org.opensearch.alerting.opensearchapi.suspendUntil
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_DELEGATE_PATH
 import org.opensearch.alerting.util.ScheduledJobUtils.Companion.WORKFLOW_MONITOR_PATH
+import org.opensearch.alerting.util.await
 import org.opensearch.alerting.util.deleteDataObjectStashed
-import org.opensearch.alerting.util.searchDataObjectStashed
+import org.opensearch.alerting.util.use
 import org.opensearch.commons.alerting.action.DeleteMonitorResponse
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.ScheduledJob
@@ -184,7 +185,11 @@ object DeleteMonitorService :
     }
 
     private suspend fun deleteLock(monitor: Monitor) {
-        client.suspendUntil<Client, Boolean> { lockService.deleteLock(LockModel.generateLockId(monitor.id), it) }
+        client.suspendUntil<Client, Boolean> { listener ->
+            client.threadPool().threadContext.stashContext().use {
+                lockService.deleteLock(LockModel.generateLockId(monitor.id), listener)
+            }
+        }
     }
 
     /**
@@ -211,8 +216,10 @@ object DeleteMonitorService :
                 .searchSourceBuilder(SearchSourceBuilder().query(queryBuilder))
                 .build()
 
-            val sdkResponse = sdkClient.searchDataObjectStashed(searchRequest, client.threadPool().threadContext)
-            val searchResponse = sdkResponse.searchResponse()
+            val future = client.threadPool().threadContext.stashContext().use {
+                sdkClient.searchDataObjectAsync(searchRequest)
+            }
+            val searchResponse = future.await().searchResponse()
                 ?: throw RuntimeException("Unknown error searching for workflow delegates")
 
             if (searchResponse.hits.totalHits?.value == 0L) {

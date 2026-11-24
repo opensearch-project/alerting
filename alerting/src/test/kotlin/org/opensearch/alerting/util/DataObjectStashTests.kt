@@ -20,8 +20,6 @@ import org.opensearch.remote.metadata.client.GetDataObjectResponse
 import org.opensearch.remote.metadata.client.PutDataObjectRequest
 import org.opensearch.remote.metadata.client.PutDataObjectResponse
 import org.opensearch.remote.metadata.client.SdkClient
-import org.opensearch.remote.metadata.client.SearchDataObjectRequest
-import org.opensearch.remote.metadata.client.SearchDataObjectResponse
 import org.opensearch.test.OpenSearchTestCase
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicReference
@@ -70,19 +68,6 @@ class DataObjectStashTests : OpenSearchTestCase() {
         assertOwnContextsKept(observed)
     }
 
-    fun `test searchDataObjectStashed dispatches stashed and leaves both threads as they were`() {
-        val pending = CompletableFuture<SearchDataObjectResponse>()
-        val dispatched = recordDispatch()
-        `when`(sdkClient.searchDataObjectAsync(any(SearchDataObjectRequest::class.java))).thenAnswer { dispatched.run(); pending }
-
-        val observed = observe(dispatched, { pending.complete(mock(SearchDataObjectResponse::class.java)) }) {
-            sdkClient.searchDataObjectStashed(SearchDataObjectRequest.builder().indices("index").build(), threadContext)
-        }
-
-        assertNull("transient headers must be stashed for the dispatch", observed.dispatchedTransient)
-        assertOwnContextsKept(observed)
-    }
-
     fun `test deleteDataObjectStashed dispatches stashed and leaves both threads as they were`() {
         val pending = CompletableFuture<DeleteDataObjectResponse>()
         val dispatched = recordDispatch()
@@ -96,7 +81,7 @@ class DataObjectStashTests : OpenSearchTestCase() {
         assertOwnContextsKept(observed)
     }
 
-    fun `test putDataObjectAsCaller dispatches with the caller's persistent headers and leaves both threads as they were`() {
+    fun `test putDataObjectStashed with a caller context dispatches with the caller's persistent headers and leaves both threads as they were`() {
         val caller = threadContext.stashContext().use {
             threadContext.putPersistent(CALLER, "alice")
             threadContext.putTransient(TRANSIENT, "caller transient")
@@ -107,7 +92,7 @@ class DataObjectStashTests : OpenSearchTestCase() {
         `when`(sdkClient.putDataObjectAsync(any(PutDataObjectRequest::class.java))).thenAnswer { dispatched.run(); pending }
 
         val observed = observe(dispatched, { pending.complete(mock(PutDataObjectResponse::class.java)) }) {
-            sdkClient.putDataObjectAsCaller(PutDataObjectRequest.builder().index("index").build(), threadContext, caller)
+            sdkClient.putDataObjectStashed(PutDataObjectRequest.builder().index("index").build(), threadContext, caller)
         }
 
         assertEquals("alice", observed.dispatchedCaller)

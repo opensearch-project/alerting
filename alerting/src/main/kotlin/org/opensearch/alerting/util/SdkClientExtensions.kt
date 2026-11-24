@@ -16,8 +16,6 @@ import org.opensearch.remote.metadata.client.GetDataObjectResponse
 import org.opensearch.remote.metadata.client.PutDataObjectRequest
 import org.opensearch.remote.metadata.client.PutDataObjectResponse
 import org.opensearch.remote.metadata.client.SdkClient
-import org.opensearch.remote.metadata.client.SearchDataObjectRequest
-import org.opensearch.remote.metadata.client.SearchDataObjectResponse
 import org.opensearch.transport.client.Client
 
 /**
@@ -28,59 +26,45 @@ import org.opensearch.transport.client.Client
  * reject them, while the persistent `OPENDISTRO_SECURITY_AUTHENTICATED_USER` header stays readable by
  * [org.opensearch.security.resources.ResourceIndexListener] to record `createdBy`.
  *
- * Each helper stashes only while the call is dispatched, and the calling thread gets its own context back before the
- * coroutine suspends. A stash closed after the suspension would run on whichever thread the coroutine resumes on, and
- * leave a context behind on both threads. The local cluster client sends the request on the calling thread, so its
- * requests carry the stashed context; a remote backend dispatches on its own executor, and the stash does not reach it.
+ * Stash only while dispatching the async call, then restore on that same thread before awaiting.
+ * Restoring on a completion or coroutine-resume thread would leak context between requests.
  */
 
 suspend fun SdkClient.putDataObjectStashed(
     request: PutDataObjectRequest,
     threadContext: ThreadContext,
-): PutDataObjectResponse = threadContext.stashContext().use { this.putDataObjectAsync(request) }.await()
-
-/**
- * Same as [putDataObjectStashed], but dispatched under [caller], the context captured on the request thread, so the
- * security plugin records the caller as the creator of a new resource. The calling thread gets its own context back
- * before the coroutine suspends. [indexWithContext] does the same for a [Client] write.
- */
-suspend fun SdkClient.putDataObjectAsCaller(
-    request: PutDataObjectRequest,
-    threadContext: ThreadContext,
-    caller: ThreadContext.StoredContext,
+    callerContext: ThreadContext.StoredContext? = null,
 ): PutDataObjectResponse {
-    val own = threadContext.newStoredContext(false)
-    caller.restore()
-    val response = try {
+    val future = threadContext.newStoredContext(false).use {
+        callerContext?.restore()
         threadContext.stashContext().use { this.putDataObjectAsync(request) }
-    } finally {
-        own.restore()
     }
-    return response.await()
+    return future.await()
 }
 
 suspend fun SdkClient.getDataObjectStashed(
     request: GetDataObjectRequest,
     threadContext: ThreadContext,
-): GetDataObjectResponse = threadContext.stashContext().use { this.getDataObjectAsync(request) }.await()
-
-suspend fun SdkClient.searchDataObjectStashed(
-    request: SearchDataObjectRequest,
-    threadContext: ThreadContext,
-): SearchDataObjectResponse = threadContext.stashContext().use { this.searchDataObjectAsync(request) }.await()
+): GetDataObjectResponse {
+    val future = threadContext.stashContext().use { this.getDataObjectAsync(request) }
+    return future.await()
+}
 
 suspend fun SdkClient.deleteDataObjectStashed(
     request: DeleteDataObjectRequest,
     threadContext: ThreadContext,
-): DeleteDataObjectResponse = threadContext.stashContext().use { this.deleteDataObjectAsync(request) }.await()
+): DeleteDataObjectResponse {
+    val future = threadContext.stashContext().use { this.deleteDataObjectAsync(request) }
+    return future.await()
+}
 
 /**
  * Executes [Client.index] under [stored], the caller's context, which is set only while the request is dispatched.
  *
  * The calling thread gets its own context back before the coroutine suspends, so no thread keeps the caller's
  * context, whichever thread the coroutine resumes on. The stash before dispatch keeps the caller's persistent
- * headers, which the security plugin reads to record the resource's creator. [putDataObjectAsCaller] does the same
- * for an [SdkClient] write.
+ * headers, which the security plugin reads to record the resource's creator. [putDataObjectStashed] with a caller context does
+ * the same for an [SdkClient] write.
  */
 suspend fun Client.indexWithContext(stored: ThreadContext.StoredContext, request: IndexRequest): IndexResponse {
     val threadContext = threadPool().threadContext
