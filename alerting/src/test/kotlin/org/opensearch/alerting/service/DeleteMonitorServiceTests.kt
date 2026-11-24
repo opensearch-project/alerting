@@ -173,6 +173,34 @@ class DeleteMonitorServiceTests : OpenSearchTestCase() {
         assertTrue(captor.value.indices().contains(".opendistro-alerting-config"))
     }
 
+    fun `test monitorIsWorkflowDelegate fails when the SDK returns no search response`() {
+        val sdkResponse = Mockito.mock(SearchDataObjectResponse::class.java)
+        whenever(sdkResponse.searchResponse()).thenReturn(null)
+        whenever(sdkClient.searchDataObjectAsync(any(SearchDataObjectRequest::class.java)))
+            .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(sdkResponse))
+
+        val exception = expectThrows(org.opensearch.commons.alerting.util.AlertingException::class.java) {
+            kotlinx.coroutines.runBlocking { DeleteMonitorService.monitorIsWorkflowDelegate("test-monitor-id") }
+        }
+        assertTrue(exception.message!!.contains("Unknown error searching for workflow delegates"))
+    }
+
+    fun `test monitorIsWorkflowDelegate is true when the total hit count is not reported`() {
+        val searchResponse = Mockito.mock(SearchResponse::class.java)
+        val hits = Mockito.mock(org.opensearch.search.SearchHits::class.java)
+        whenever(hits.totalHits).thenReturn(null)
+        val hit = Mockito.mock(org.opensearch.search.SearchHit::class.java)
+        whenever(hit.id).thenReturn("workflow-1")
+        whenever(hits.hits).thenReturn(arrayOf(hit))
+        whenever(searchResponse.hits).thenReturn(hits)
+        val sdkResponse = Mockito.mock(SearchDataObjectResponse::class.java)
+        whenever(sdkResponse.searchResponse()).thenReturn(searchResponse)
+        whenever(sdkClient.searchDataObjectAsync(any(SearchDataObjectRequest::class.java)))
+            .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(sdkResponse))
+
+        assertTrue(kotlinx.coroutines.runBlocking { DeleteMonitorService.monitorIsWorkflowDelegate("test-monitor-id") })
+    }
+
     fun `test monitorIsWorkflowDelegate wraps exception in AlertingException`() {
         whenever(sdkClient.searchDataObjectAsync(any(SearchDataObjectRequest::class.java)))
             .thenReturn(java.util.concurrent.CompletableFuture.failedFuture(RuntimeException("connection failed")))

@@ -12,7 +12,7 @@ import org.opensearch.action.bulk.BackoffPolicy
 import org.opensearch.alerting.model.destination.Destination
 import org.opensearch.alerting.opensearchapi.retryForNotification
 import org.opensearch.alerting.opensearchapi.suspendUntil
-import org.opensearch.alerting.util.use
+import org.opensearch.alerting.util.suspendStashed
 import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.ConfigConstants
 import org.opensearch.commons.destination.message.LegacyBaseMessage
@@ -80,17 +80,11 @@ class NotificationApiUtils {
             lateinit var createNotificationConfigResponse: CreateNotificationConfigResponse
             val userStr = client.threadPool().threadContext
                 .getTransient<String>(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT)
-            client.threadPool().threadContext.stashContext().use {
-                client.threadPool().threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr)
-                retryPolicy.retryForNotification(logger) {
-                    createNotificationConfigResponse = NotificationsPluginInterface.suspendUntil {
-                        this.createNotificationConfig(
-                            client,
-                            createNotificationConfigRequest,
-                            it
-                        )
-                    }
-                }
+            val threadContext = client.threadPool().threadContext
+            retryPolicy.retryForNotification(logger) {
+                createNotificationConfigResponse = threadContext.suspendStashed(
+                    { threadContext.putTransient(ConfigConstants.OPENSEARCH_SECURITY_USER_INFO_THREAD_CONTEXT, userStr) }
+                ) { listener -> NotificationsPluginInterface.createNotificationConfig(client, createNotificationConfigRequest, listener) }
             }
             return createNotificationConfigResponse
         }

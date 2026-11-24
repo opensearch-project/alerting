@@ -19,14 +19,11 @@ import org.opensearch.remote.metadata.client.SdkClient
 import org.opensearch.transport.client.Client
 
 /**
- * Wrappers around [SdkClient] async methods that preserve the security plugin's ThreadContext
- * invariants across the async boundary.
+ * Wrappers around [SdkClient] async methods that run the call under a stashed [ThreadContext].
  *
- * `sdkClient.xxxAsync(...)` completes on a pool thread whose [ThreadContext] does NOT inherit the
- * caller's stash. Under the resource-sharing framework, alerting writes to internal indices (e.g.
- * `.opendistro-alerting-config`) must run without the caller's transient auth so that
- * [org.opensearch.security.filter.SecurityFilter] doesn't reject them — while the persistent
- * `OPENDISTRO_SECURITY_AUTHENTICATED_USER` header must still be readable by
+ * Under the resource-sharing framework, alerting writes to internal indices (e.g. `.opendistro-alerting-config`)
+ * must run without the caller's transient auth so that [org.opensearch.security.filter.SecurityFilter] doesn't
+ * reject them, while the persistent `OPENDISTRO_SECURITY_AUTHENTICATED_USER` header stays readable by
  * [org.opensearch.security.resources.ResourceIndexListener] to record `createdBy`.
  *
  * Stash only while dispatching the async call, then restore on that same thread before awaiting.
@@ -66,7 +63,8 @@ suspend fun SdkClient.deleteDataObjectStashed(
  *
  * The calling thread gets its own context back before the coroutine suspends, so no thread keeps the caller's
  * context, whichever thread the coroutine resumes on. The stash before dispatch keeps the caller's persistent
- * headers, which the security plugin reads to record the resource's creator.
+ * headers, which the security plugin reads to record the resource's creator. [putDataObjectStashed] with a caller context does
+ * the same for an [SdkClient] write.
  */
 suspend fun Client.indexWithContext(stored: ThreadContext.StoredContext, request: IndexRequest): IndexResponse {
     val threadContext = threadPool().threadContext
