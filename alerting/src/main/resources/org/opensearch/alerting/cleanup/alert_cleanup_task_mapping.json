@@ -1,0 +1,36 @@
+{
+  "dynamic": "strict",
+  "_meta": {
+    "schema_version": 1
+  },
+  "properties": {
+    "job_id": {
+      "type": "keyword"
+    },
+    "scope": {
+      "type": "keyword"
+    },
+    "alert_index": {
+      "type": "keyword"
+    },
+    "alert_history_index": {
+      "type": "keyword"
+    },
+    "surviving_trigger_ids": {
+      "type": "keyword"
+    },
+    "job_deleted": {
+      "type": "boolean"
+    },
+    "cursor": {
+      "type": "long"
+    },
+    "moved_count": {
+      "type": "long"
+    },
+    "created_at": {
+      "type": "date",
+      "format": "epoch_millis"
+    }
+  }
+}
