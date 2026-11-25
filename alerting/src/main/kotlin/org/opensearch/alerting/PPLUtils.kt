@@ -9,14 +9,20 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
 import org.json.JSONObject
+import org.opensearch.action.ActionListenerResponseHandler
 import org.opensearch.alerting.core.ppl.PPLPluginInterface
 import org.opensearch.alerting.opensearchapi.suspendUntil
+import org.opensearch.cluster.node.DiscoveryNode
+import org.opensearch.common.unit.TimeValue
 import org.opensearch.commons.utils.recreateObject
 import org.opensearch.core.action.ActionListener
 import org.opensearch.core.action.ActionResponse
+import org.opensearch.core.common.io.stream.Writeable
 import org.opensearch.sql.plugin.transport.PPLQueryAction
 import org.opensearch.sql.plugin.transport.TransportPPLQueryRequest
 import org.opensearch.sql.plugin.transport.TransportPPLQueryResponse
+import org.opensearch.transport.TransportRequestOptions
+import org.opensearch.transport.TransportService
 import org.opensearch.transport.client.node.NodeClient
 
 object PPLUtils {
@@ -124,6 +130,27 @@ object PPLUtils {
         return mapper.readTree(transportPplQueryResponse.result)
     }
 
+    suspend fun executePplQuery(
+        query: String,
+        explain: Boolean,
+        transportService: TransportService,
+        localNode: DiscoveryNode,
+        requestTimeout: TimeValue
+    ): JsonNode {
+        val transportPplQueryResponse = PPLPluginInterface.suspendUntil {
+            executePplQuery(
+                query,
+                explain,
+                transportService,
+                localNode,
+                requestTimeout,
+                it
+            )
+        }
+
+        return mapper.readTree(transportPplQueryResponse.result)
+    }
+
     /**
      * Executes a PPL query, for callback style flows with an action listener
      *
@@ -170,6 +197,39 @@ object PPLUtils {
         } as ActionListener<TransportPPLQueryResponse>
 
         client.execute(PPLQueryAction.INSTANCE, request, wrappedListener)
+    }
+
+    fun executePplQuery(
+        query: String,
+        explain: Boolean,
+        transportService: TransportService,
+        localNode: DiscoveryNode,
+        requestTimeout: TimeValue,
+        listener: ActionListener<TransportPPLQueryResponse>
+    ) {
+        val path = if (explain) {
+            "/_plugins/_ppl/_explain"
+        } else {
+            "/_plugins/_ppl"
+        }
+
+        val request = TransportPPLQueryRequest(
+            query,
+            JSONObject(mapOf("query" to query)),
+            path
+        )
+
+        val responseReader = Writeable.Reader { TransportPPLQueryResponse(it) }
+        transportService.sendRequest(
+            localNode,
+            PPLQueryAction.NAME,
+            request,
+            TransportRequestOptions
+                .builder()
+                .withTimeout(requestTimeout)
+                .build(),
+            object : ActionListenerResponseHandler<TransportPPLQueryResponse>(listener, responseReader) {}
+        )
     }
 
     fun capAndReformatPPLQueryResults(rawQueryResults: JsonNode, maxSize: Long): List<Map<String, Any?>> {
